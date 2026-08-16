@@ -928,5 +928,11 @@
   "mdm.state.gate_device_not_with_customer": "เครื่องนี้ไม่ได้อยู่กับลูกค้า (อยู่สาขา ศูนย์ซ่อม หรือสต๊อก)",
   "mdm.state.gate_already_open": "เครื่องนี้กำลังอนุญาตให้ลูกค้าลบแอปเองอยู่แล้ว",
   "mdm.validation.gate_minutes_range": "เลือกได้ระหว่าง 5 ถึง 120 นาที",
-  "mdm.not_found.gate_open": "เครื่องนี้ไม่ได้กำลังอนุญาตให้ลูกค้าลบแอปเอง"
+  "mdm.not_found.gate_open": "เครื่องนี้ไม่ได้กำลังอนุญาตให้ลูกค้าลบแอปเอง",
+  "MDM.AUTH.ENROLL_LINK_INVALID": "ลิงก์นำเครื่องเข้าระบบนี้ใช้ไม่ได้แล้ว กรุณาขอลิงก์ใหม่จากสาขาที่ส่งมาให้",
+  "mdm.auth.enroll_link_invalid": "ลิงก์นำเครื่องเข้าระบบนี้ใช้ไม่ได้แล้ว กรุณาขอลิงก์ใหม่จากสาขาที่ส่งมาให้",
+  "MDM.NOT_FOUND.ENROLL_LINK": "เครื่องนี้ไม่มีลิงก์ที่ใช้งานอยู่",
+  "mdm.not_found.enroll_link": "เครื่องนี้ไม่มีลิงก์ที่ใช้งานอยู่",
+  "MDM.VALIDATION.ISSUED_TO_REQUIRED": "กรุณากรอกว่าออกลิงก์ให้ใคร",
+  "mdm.validation.issued_to_required": "กรุณากรอกว่าออกลิงก์ให้ใคร"
 }

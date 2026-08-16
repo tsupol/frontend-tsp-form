@@ -28,22 +28,25 @@
 // Readiness summary = steps 1–5 done + a real baseline lock present (badge).
 // ============================================================================
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Modal, Badge } from 'tsp-form';
 import {
-  ShieldCheck, RefreshCw, Send, CheckCircle, AlertTriangle, Loader2,
-  Fingerprint, ScanLine, RotateCcw, Smartphone, XCircle, Lock, Cloud, CircleDashed,
+  ShieldCheck, RefreshCw, CheckCircle, AlertTriangle, Loader2,
+  XCircle, Lock, Cloud, CircleDashed,
   PackageCheck, PackageOpen, KeyRound, HelpCircle, LockOpen, PauseCircle, Search,
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { apiClient, ApiError } from '../../../lib/api';
 import { DateTime } from '../../../components/DateTime';
 import { RelativeDateTime } from './RelativeDateTime';
-import { applyLightLock, type AssetMdmStatus, type MdmStatusCode, type ApplyTemplateResult, type MdmEnforcementBadge } from './mdmApi';
+import { applyLightLock, type AssetMdmStatus, type ApplyTemplateResult, type MdmEnforcementBadge } from './mdmApi';
 import { parseMdmError } from './mdmApi';
 import { translateApiError } from '../../../lib/apiErrors';
+import { EnrollChecklist } from './shared/EnrollChecklist';
+import { fromAssetStatus, enrollDoneCount } from './shared/enrollView';
+import { EnrollDelegationPanel } from './EnrollDelegationPanel';
 
 interface PrepareResponse {
   request_id: number;
@@ -55,94 +58,20 @@ interface PrepareResponse {
   deduped?: boolean;
 }
 
-type BadgeTone = 'neutral' | 'info' | 'warning' | 'danger' | 'successSoft' | 'success';
-
-// tsp-form .alert only has info/success/warning/danger — map our badge tones onto it.
-const ALERT_TONE: Record<BadgeTone, string> = {
-  neutral: 'alert alert-info',
-  info: 'alert alert-info',
-  warning: 'alert alert-warning',
-  danger: 'alert alert-danger',
-  successSoft: 'alert alert-success',
-  success: 'alert alert-success',
-};
-
-const TONE_ICON: Record<BadgeTone, typeof CheckCircle> = {
-  neutral: Fingerprint,
-  info: Loader2,
-  warning: AlertTriangle,
-  danger: XCircle,
-  successSoft: Loader2,
-  success: CheckCircle,
-};
-
+// The device_info_at column isn't on the shared view type but the row carries it.
 type EnrollExtras = {
   device_info_at?: string | null;
 };
 type EnrollStatus = AssetMdmStatus & EnrollExtras;
 
-// ── The waiting-for-a-wipe hint, escalating with age (134 §3) ────────────────
-// Polling can only reflect things that CHANGE. Some waits never change on their
-// own — the commonest being that the serial recorded on this asset isn't the
-// serial of the device in the staffer's hand, so the profile is bound elsewhere
-// and this asset will never report in, no matter how long anyone watches. The
-// only cure is a message that gets smarter as the wait lengthens.
-//
-// Advice, never an error: the 108-minute case (pressed at closing, wiped later)
-// completed perfectly normally, so nothing here may look like a failure.
-type WaitStage = 'FRESH' | 'PROBABLY_NOT_WIPED' | 'CHECK_SERIAL';
-
-function waitStage(requestedAt: string | null | undefined): WaitStage {
-  if (!requestedAt) return 'FRESH';
-  const ms = Date.now() - new Date(requestedAt).getTime();
-  if (!Number.isFinite(ms)) return 'FRESH';
-  if (ms > 60 * 60_000) return 'CHECK_SERIAL';        // > 1 hour
-  if (ms > 10 * 60_000) return 'PROBABLY_NOT_WIPED';  // 10 min – 1 hour
-  return 'FRESH';                                     // 11 of 12 land inside 10 min
-}
-
-function statusPresentation(s: AssetMdmStatus): { key: string; tone: BadgeTone; spin?: boolean } {
-  switch (s.mdm_status) {
-    case 'NO_SERIAL': return { key: 'NO_SERIAL', tone: 'neutral' };
-    case 'NOT_STARTED': return { key: 'NOT_STARTED', tone: 'neutral' };
-    case 'PREPARING': return { key: 'PREPARING', tone: 'info', spin: true };
-    case 'PROFILE_READY': return { key: 'PROFILE_READY', tone: 'warning' };
-    case 'PREPARE_FAILED': return { key: 'PREPARE_FAILED', tone: 'danger' };
-    case 'IN_MDM':
-      return s.has_basic_info
-        ? { key: 'IN_MDM_INFO', tone: 'success' }
-        : { key: 'IN_MDM_WAITING', tone: 'successSoft', spin: true };
-    default: return { key: 'NOT_STARTED', tone: 'neutral' };
-  }
-}
-
-// ── Step model ───────────────────────────────────────────────────────────────
-// Steps 1–5 are the original enroll strip. 6 and 7 are the new handover steps.
-
-const STEPS_1_5 = [
-  { key: 'serial', icon: Fingerprint, where: 'system' },
-  { key: 'scan', icon: ScanLine, where: 'device' },
-  { key: 'send', icon: Send, where: 'system' },
-  { key: 'wipe', icon: RotateCcw, where: 'device' },
-  { key: 'enrolled', icon: Smartphone, where: 'auto' },
-] as const;
+// The step model, the status band, and the escalating wait hint all moved to
+// shared/EnrollChecklist — the public token page renders the identical strip, so
+// a copy here would let the two screens drift apart while branch A reads this
+// one down the phone to branch B.
 
 // enforcement_badge values that mean a real restriction profile is on the device.
 // NONE / WALLPAPER_ONLY / APPLYING / PAUSED / NOT_IN_MDM are NOT "locked".
 const LOCKED_BADGES = new Set<MdmEnforcementBadge>(['LIGHT', 'MEDIUM', 'HARD']);
-
-/** How many of steps 1–5 are done, from mdm_status. */
-function enrollDoneCount(s: { mdm_status: MdmStatusCode }): number {
-  switch (s.mdm_status) {
-    case 'NO_SERIAL': return 0;
-    case 'NOT_STARTED': return 1;
-    case 'PREPARING': return 2;
-    case 'PROFILE_READY': return 3;
-    case 'PREPARE_FAILED': return 1;
-    case 'IN_MDM': return 5;
-    default: return 0;
-  }
-}
 
 type StepStatus = 'done' | 'current' | 'todo';
 
@@ -198,25 +127,14 @@ export function SubTabEnroll({
   const actorId = user?.user_id ?? null;
   const queryClient = useQueryClient();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [justPrepared, setJustPrepared] = useState(false);
   // Step-3 serial zoom — staff eyeball the serial against the physical device
   // before sending the enrollment, so it renders BIG and letter-spaced.
   const [serialZoomOpen, setSerialZoomOpen] = useState(false);
-
-  // A re-enroll leaves mdm_status at IN_MDM (the view checks the binding first),
-  // so the READY signal lives in prepare_status/detail, not mdm_status.
-  const reenrollReady = status.prepare_is_reenroll && status.prepare_status === 'READY';
-
-  useEffect(() => {
-    const inFlight = status.mdm_status === 'PREPARING' || status.mdm_status === 'PROFILE_READY';
-    if (!inFlight && !reenrollReady) setJustPrepared(false);
-  }, [status.mdm_status, reenrollReady]);
 
   const prepare = useMutation({
     mutationFn: () => apiClient.rpc<PrepareResponse>('fn_mdm_prepare_asset', { p_asset_id: status.asset_id }),
     onSuccess: () => {
       setErrorMsg(null);
-      setJustPrepared(true);
       queryClient.invalidateQueries({ queryKey: ['asset-mdm-status', status.asset_id] });
       onRefresh();
     },
@@ -230,19 +148,6 @@ export function SubTabEnroll({
       onRefetch();
     },
   });
-
-  // Waiting for a human to wipe the device: the profile is pushed and the device
-  // hasn't reported in. Deliberately NOT tied to justPrepared — the staffer who
-  // needs the "check the serial" hint is usually the one coming back an hour
-  // later, whose local "I just pressed it" state is long gone.
-  const awaitingErase = status.prepare_status === 'READY' && !status.in_mdm;
-  // Recompute on every poll tick, so the hint escalates while the tab sits open.
-  const stage = awaitingErase ? waitStage(status.prepare_requested_at) : 'FRESH';
-
-  const presentation = useMemo(() => statusPresentation(status), [status]);
-  const showPrepareButton = status.can_prepare && status.may_prepare;
-  const isRetry = status.mdm_status === 'PREPARE_FAILED';
-  const ToneIcon = TONE_ICON[presentation.tone];
 
   // Step readiness.
   const doneEnroll = enrollDoneCount(status);
@@ -337,143 +242,33 @@ export function SubTabEnroll({
         </div>
       </div>
 
-      {/* Prepare status badge (steps 1–5 detail). The sub line is dropped when it
-          would just repeat the title (e.g. IN_MDM_INFO). */}
-      <div className={ALERT_TONE[presentation.tone]}>
-        <ToneIcon size={20} className={`shrink-0 ${presentation.spin ? 'animate-spin' : ''}`} />
-        <div className="min-w-0 flex-1">
-          <div className="alert-title">{t(`asset.mdm.badge.${presentation.key}.label`)}</div>
-          {(() => {
-            const label = t(`asset.mdm.badge.${presentation.key}.label`);
-            const sub = t(`asset.mdm.badge.${presentation.key}.sub`);
-            // Drop a sub that only restates the label (ignoring trailing period).
-            const same = sub.replace(/[.。]\s*$/, '') === label.replace(/[.。]\s*$/, '');
-            return same ? null : <div className="alert-description">{sub}</div>;
-          })()}
-          {status.mdm_status === 'PREPARE_FAILED' && status.prepare_blocked_reason && (
-            <div className="alert-description font-mono break-words mt-1">{status.prepare_blocked_reason}</div>
-          )}
-        </div>
-      </div>
-
-      {justPrepared && (status.mdm_status === 'PREPARING' || status.mdm_status === 'PROFILE_READY') && (
-        <div className="alert alert-info">
-          <Loader2 size={20} className="shrink-0 animate-spin" />
-          <div className="min-w-0">
-            <div className="alert-title">{t('asset.mdm.afterPress.title')}</div>
-            <div className="alert-description">{t('asset.mdm.afterPress.next')}</div>
-            <div className="alert-description">{t('asset.mdm.afterPress.note')}</div>
+      {/* Steps 1–5 + the status band + the wait hints now come from the SHARED
+          checklist, which the public token page renders too. That is the point:
+          branch A reads this screen down the phone to whoever is holding the
+          device at branch B, so the two must word everything identically. Steps
+          6–7 are staff-only and passed as children. */}
+      <EnrollChecklist
+        view={fromAssetStatus(status)}
+        audience="staff"
+        onPrepare={() => prepare.mutate()}
+        preparing={prepare.isPending}
+        errorMessage={errorMsg}
+        hideKeyBanner
+        serialSlot={status.serial_number ? (
+          <div className="flex items-center gap-2 flex-wrap mb-2">
+            <span className="text-xs text-subtle">{t('asset.mdm.serialCheck.label')}</span>
+            <span className="font-mono text-sm tracking-widest break-all">{status.serial_number}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="btn-icon-sm"
+              startIcon={<Search size={14} />}
+              onClick={() => setSerialZoomOpen(true)}
+              aria-label={t('asset.mdm.serialCheck.zoom')}
+            />
           </div>
-        </div>
-      )}
-
-      {/* Re-enroll READY — the profile is pushed but mdm_status stays IN_MDM, so
-          this box (not the PROFILE_READY one above) tells staff to wipe. The
-          wording names WHOSE device gets erased: pressing this on a customer's
-          device by mistake and then wiping it loses their data (§งานจอ #3). */}
-      {reenrollReady && (
-        <div className="alert alert-warning">
-          <RotateCcw size={20} className="shrink-0" />
-          <div className="min-w-0">
-            <div className="alert-title">{t('asset.mdm.reenrollReady.title')}</div>
-            <div className="alert-description">{t('asset.mdm.reenrollReady.warn')}</div>
-            <div className="alert-description">{t('asset.mdm.reenrollReady.next')}</div>
-          </div>
-        </div>
-      )}
-
-      {/* Escalating wait hint (§3). Only once the wait is long enough to be worth
-          questioning — under 10 minutes it's just the normal wipe, and the boxes
-          above already say what to do. Info tone, not warning: a long wait is
-          still a valid wait, and the device may yet arrive on its own. */}
-      {stage !== 'FRESH' && (
-        <div className="alert alert-info">
-          <HelpCircle size={20} className="shrink-0" />
-          <div className="min-w-0">
-            <div className="alert-title">{t(`asset.mdm.waitHint.${stage}.title`)}</div>
-            <div className="alert-description">{t(`asset.mdm.waitHint.${stage}.body`)}</div>
-            {status.prepare_requested_at && (
-              <div className="alert-description">
-                {t('asset.mdm.waitHint.since')}{' '}
-                <RelativeDateTime value={status.prepare_requested_at} relClassName="" />
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {errorMsg && (
-        <div className="alert alert-danger">
-          <XCircle size={16} />
-          <span>{errorMsg}</span>
-        </div>
-      )}
-
-      {/* 7-step checklist. */}
-      <div className="border border-line rounded-md p-4">
-        <div className="flex flex-col">
-          {STEPS_1_5.map((step, i) => {
-            const state: StepStatus = i < doneEnroll ? 'done' : (i === doneEnroll ? 'current' : 'todo');
-            const isSendStep = step.key === 'send';
-            return (
-              <StepRow
-                key={step.key}
-                n={i + 1}
-                icon={step.icon}
-                title={t(`asset.mdm.step.${step.key}`)}
-                where={t(`asset.mdm.stepWhere.${step.where}`)}
-                state={state}
-              >
-                {/* Step 3 shows the serial being enrolled + a magnifier that
-                    blows it up full-screen, so staff can check it against the
-                    physical device before sending. */}
-                {isSendStep && status.serial_number && (
-                  <div className="flex items-center gap-2 flex-wrap mb-2">
-                    <span className="text-xs text-subtle">{t('asset.mdm.serialCheck.label')}</span>
-                    <span className="font-mono text-sm tracking-widest break-all">{status.serial_number}</span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="btn-icon-sm"
-                      startIcon={<Search size={14} />}
-                      onClick={() => setSerialZoomOpen(true)}
-                      aria-label={t('asset.mdm.serialCheck.zoom')}
-                    />
-                  </div>
-                )}
-
-                {/* Step 3 owns the send-enrollment button. Re-enroll (device
-                    already IN_MDM, branch wiped it) reuses the same RPC — only
-                    the wording changes (mig 968). */}
-                {isSendStep && showPrepareButton && (
-                  <div className="flex flex-col gap-1.5">
-                    <div>
-                      <Button
-                        color="primary"
-                        size="sm"
-                        startIcon={isRetry ? <RotateCcw size={15} /> : status.prepare_is_reenroll ? <RotateCcw size={15} /> : <Send size={15} />}
-                        onClick={() => prepare.mutate()}
-                        disabled={prepare.isPending}
-                      >
-                        {isRetry
-                          ? t('asset.mdm.button.retry')
-                          : status.prepare_is_reenroll
-                            ? t('asset.mdm.button.reenroll')
-                            : t('asset.mdm.button.prepare')}
-                      </Button>
-                    </div>
-                    {status.prepare_is_reenroll && !isRetry && (
-                      <p className="text-xs text-subtle">{t('asset.mdm.button.reenrollHint')}</p>
-                    )}
-                  </div>
-                )}
-                {isSendStep && status.can_prepare && !status.may_prepare && (
-                  <div className="text-xs text-subtler">{t('asset.mdm.noPermission')}</div>
-                )}
-              </StepRow>
-            );
-          })}
-
+        ) : undefined}
+      >
           {/* Step 6 — AUTO-DETECTED status badges. Not checkboxes: the system
               computes these, staff never sets them. The two keys are separate
               lines on purpose — they protect against different things and one
@@ -571,8 +366,13 @@ export function SubTabEnroll({
               )}
             </div>
           </StepRow>
-        </div>
-      </div>
+      </EnrollChecklist>
+
+      {/* Hand the enrollment to someone outside this branch (migs 248-250).
+          Hides itself when may_enroll_delegate is false. Placed after the
+          checklist because it is an alternative to doing steps 3–5 here, not a
+          step of its own. */}
+      <EnrollDelegationPanel status={status} onRefresh={onRefresh} />
 
       {/* Device info — when reported. */}
       {status.in_mdm && status.has_basic_info && (

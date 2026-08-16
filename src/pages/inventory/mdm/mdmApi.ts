@@ -13,6 +13,10 @@
 
 import { apiClient, ApiError } from '../../../lib/api';
 import type { TFunction } from 'i18next';
+// Type-only, so this erases at compile time and the cycle with enrollView (which
+// imports this file's types) never exists at runtime. RemoteEnrollStatus is
+// declared there on purpose: that file owns what may cross into the public page.
+import type { RemoteEnrollStatus } from './shared/enrollView';
 
 // ── v_asset_mdm_status: the shared row every sub-tab reads ──────────────────
 // Base columns live in AssetMdmTab (130 §4). This file owns the additions from
@@ -195,6 +199,26 @@ export interface AssetMdmStatus {
   enforcement_badge: MdmEnforcementBadge;
   may_apply_light: boolean;
   apply_light_blocked_reason: MdmApplyLightBlockedReason | null; // null = pressable
+
+  // ── Remote enroll delegation (migs 248-250) ───────────────────────────────
+  // may_enroll_delegate is permission AND territory, like the other may_* flags:
+  // false hides the whole strip rather than letting a press 403. It is NOT tied
+  // to can_prepare — a link can be issued ahead of time for B to press later.
+  // ⛔ Never hide/show this on role_code: the eligible set is DB config that
+  //    changes without an FE release, and the flag follows on the next poll.
+  may_enroll_delegate: boolean;
+  // The live link, straight off the same row — so the status block renders from
+  // page load with no extra call. There is deliberately NO token column here:
+  // seeing a token must be logged as REVEALED, so it only comes from the reveal
+  // RPC on an explicit press.
+  enroll_link_active: boolean;
+  enroll_link_issued_to: string | null;
+  enroll_link_issued_by: number | null;
+  enroll_link_issued_at: string | null;
+  enroll_link_expires_at: string | null;
+  enroll_link_first_used_at: string | null;
+  enroll_link_last_seen_at: string | null;
+  enroll_link_delegation_id: number | null;
 
   // Device info (§3.1) — battery is 0–1, multiply by 100.
   battery_level: number | null;
@@ -1178,4 +1202,171 @@ export function parseMdmError(err: unknown, t: TFunction): ParsedMdmError {
   const message = translated || hint || fallbackMsg || code || t('common.error');
 
   return { code, detail, hint, message, isNotEnrolled, isPermissionDenied };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Remote enroll delegation — "นำเครื่องเข้าระบบจากนอกสาขา"
+// IMPLEMENT 2026-08-15_mdm_remote_enroll_delegation.md · migs nnf-mdm 248-250
+//
+// Branch A issues a 3-hour, single-device link so branch B (who may have no NNF
+// login at all) can walk the device through the enroll ritual themselves.
+//
+// Five RPCs, split by who may call them:
+//   · create / reveal / revoke  — nnf_user only, PUBLIC revoked. Branch A.
+//   · status / retry            — PUBLIC on purpose: the token IS the auth.
+// The anonymous pair MUST pass includeAuth=false; sending a stale Bearer from a
+// half-expired session would fail the request for a link that is perfectly fine.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Why a token stopped working. Drives the dead-link copy on the public page. */
+export type EnrollLinkInvalidReason = 'NOT_FOUND' | 'EXPIRED' | 'REVOKED' | 'COMPLETED';
+
+/**
+ * Pull the reason out of an ENROLL_LINK_INVALID rejection.
+ * Returns null when this isn't that error, so callers can tell "the link died"
+ * apart from "the network hiccupped" — the first is final, the second retries.
+ */
+export function enrollLinkInvalidReason(err: unknown): EnrollLinkInvalidReason | null {
+  if (!(err instanceof ApiError)) return null;
+  const code = (err.messageKey || err.code || '').toUpperCase();
+  if (!code.includes('ENROLL_LINK_INVALID')) return null;
+  const p = err.messageParams as Record<string, unknown> | undefined;
+  const reason = typeof p?.reason === 'string' ? p.reason.toUpperCase() : '';
+  return (['NOT_FOUND', 'EXPIRED', 'REVOKED', 'COMPLETED'] as const)
+    .find((r) => r === reason) ?? 'NOT_FOUND';
+}
+
+// ── Branch A: issue / reveal / revoke ───────────────────────────────────────
+
+/** Preview when a link is already live. Not an error — a race-guard (§1.1a). */
+export interface EnrollLinkAlreadyActive {
+  already_active: true;
+  delegation_id: number;
+  issued_to_note: string;
+  issued_by: number;
+  issued_at: string;
+  expires_at: string;
+  first_used_at: string | null;
+  last_seen_at: string | null;
+  hit_count: number;
+}
+
+/** Preview when there is no live link: the challenge to confirm through. */
+export interface EnrollLinkPreview {
+  preview: true;
+  serial: string;
+  /** false → the link will dead-end at B; they cannot scan into ABM. Warn LOUD. */
+  in_abm_now: boolean;
+  replace: boolean;
+  challenge: MdmChallenge;
+}
+
+export type EnrollLinkCreatePreview = EnrollLinkPreview | EnrollLinkAlreadyActive;
+
+export function isAlreadyActive(r: EnrollLinkCreatePreview | EnrollLinkCreateResult):
+  r is EnrollLinkAlreadyActive {
+  return (r as EnrollLinkAlreadyActive).already_active === true;
+}
+
+export interface EnrollLinkCreated {
+  preview: false;
+  delegation_id: number;
+  asset_id: number;
+  serial: string;
+  /** 64 chars. The ONLY place it ever appears — the view has no token column. */
+  token: string;
+  expires_at: string;
+}
+
+/** Commit can still answer `already_active` when p_replace was dropped (§1.2b). */
+export type EnrollLinkCreateResult = EnrollLinkCreated | EnrollLinkAlreadyActive;
+
+export function enrollLinkPreview(
+  assetId: number, actorId: number, replace = false,
+): Promise<EnrollLinkCreatePreview> {
+  return apiClient.rpc<EnrollLinkCreatePreview>('fn_mdm_enroll_link_create', {
+    p_asset_id: assetId,
+    p_actor_id: actorId,
+    p_preview: true,
+    p_replace: replace,
+  });
+}
+
+/**
+ * Commit. ⚠️ `p_replace` must be sent on BOTH preview and commit when replacing:
+ * a commit that drops it does NOT error — it falls through to the already-active
+ * branch and hands back the OLD link instead of a new token (by design: BE will
+ * not silently kill a QR that branch B is holding). Seeing `already_active` here
+ * means the flag went missing, not that anything is wrong with the request.
+ */
+export function enrollLinkCreate(p: {
+  assetId: number; actorId: number; challengeId: number;
+  confirmCode: string; issuedTo: string; replace?: boolean;
+}): Promise<EnrollLinkCreateResult> {
+  return apiClient.rpc<EnrollLinkCreateResult>('fn_mdm_enroll_link_create', {
+    p_asset_id: p.assetId,
+    p_actor_id: p.actorId,
+    p_preview: false,
+    p_challenge_id: p.challengeId,
+    p_confirm_code: p.confirmCode,
+    p_issued_to: p.issuedTo,
+    p_replace: p.replace ?? false,
+  });
+}
+
+export interface EnrollLinkRevealed {
+  delegation_id: number;
+  asset_id: number;
+  serial: string;
+  token: string;
+  issued_to_note: string;
+  issued_at: string;
+  expires_at: string;
+  first_used_at: string | null;
+  last_seen_at: string | null;
+  hit_count: number;
+}
+
+/**
+ * Show the token again (staff lost it / need to resend).
+ * ⛔ NEVER call this on page load or from an effect — every call is logged as a
+ *    REVEALED event. The live-link status block renders from the view's
+ *    enroll_link_* columns instead; this fires only on an explicit press.
+ */
+export function enrollLinkReveal(assetId: number, actorId: number): Promise<EnrollLinkRevealed> {
+  return apiClient.rpc<EnrollLinkRevealed>('fn_mdm_enroll_link_reveal', {
+    p_asset_id: assetId,
+    p_actor_id: actorId,
+  });
+}
+
+export interface EnrollLinkRevoked {
+  delegation_id: number;
+  revoked_at: string;
+  revoke_reason: string;
+}
+
+export function enrollLinkRevoke(
+  assetId: number, actorId: number, reason?: string,
+): Promise<EnrollLinkRevoked> {
+  return apiClient.rpc<EnrollLinkRevoked>('fn_mdm_enroll_link_revoke', {
+    p_asset_id: assetId,
+    p_actor_id: actorId,
+    ...(reason ? { p_reason: reason } : {}),
+  });
+}
+
+// ── Branch B: the public token pair (anonymous) ─────────────────────────────
+
+/**
+ * Poll the device state behind a token. Anonymous by design — BE granted this
+ * to PUBLIC and self-gates on the token, so includeAuth is false.
+ */
+export function remoteEnrollStatus(token: string): Promise<RemoteEnrollStatus> {
+  return apiClient.rpc<RemoteEnrollStatus>('fn_mdm_remote_enroll_status', { p_token: token }, false);
+}
+
+/** "เตรียมเครื่อง / ลองอีกครั้ง" from the link holder. Same shape as tab-1's. */
+export function remoteEnrollRetry(token: string): Promise<PrepareAssetResult> {
+  return apiClient.rpc<PrepareAssetResult>('fn_mdm_remote_enroll_retry', { p_token: token }, false);
 }

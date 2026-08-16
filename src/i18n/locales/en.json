@@ -238,7 +238,8 @@
     "doesNotHave": "Does not have",
     "notSet": "Not set",
     "days": "days",
-    "download": "Download"
+    "download": "Download",
+    "refresh": "Refresh"
   },
   "dashboard": {
     "pushBannerTitle": "Push notifications are off",
@@ -2605,8 +2606,10 @@
         },
         "CHECK_SERIAL": {
           "title": "Wiped it already but it still hasn't enrolled?",
-          "body": "Check that the serial printed on the device or its box matches the serial on this asset. If they differ, the enrollment profile went to a different device and this one will never report in."
-        }
+          "body": "Check that the serial printed on the device or its box matches the serial on this asset. If they differ, the enrollment profile went to a different device and this one will never report in.",
+          "bodyRemote": "Check that the serial printed on the device or its box matches the one shown above. If they differ, contact the branch that sent you this link."
+        },
+        "waiting": "Waiting {{time}}"
       },
       "reenrollReady": {
         "title": "Enrollment profile is ready — now wipe this device",
@@ -2959,6 +2962,51 @@
         "lastTime": "Last time:",
         "lastRemoved": "the customer removed {{count}} app(s)",
         "lastRemovedNone": "the customer removed nothing"
+      },
+      "band": {
+        "NO_SERIAL": {
+          "title": "No Serial/IMEI yet",
+          "body": "Record the Serial/IMEI first before you can enroll."
+        },
+        "NOT_STARTED": {
+          "title": "Scan the device into ABM, then press this",
+          "body": "If you haven't scanned it yet, wipe the device and scan it with Configurator first."
+        },
+        "PREPARING": {
+          "title": "Sending to Apple…",
+          "body": "Usually under a minute."
+        },
+        "PROFILE_READY": {
+          "title": "Ready — now wipe the device",
+          "body": "The system has done its part. Nothing else happens until someone wipes this device."
+        },
+        "PREPARE_FAILED": {
+          "title": "Couldn't send — the device may not be scanned into ABM yet",
+          "body": "Check in ABM that this device is there. The system will retry on its own within 1 hour."
+        },
+        "PREPARE_FAILED_REMOTE": {
+          "title": "Can't continue — please contact the branch",
+          "body": "This device needs to be set up by the branch that sent you this link. Call them and read them the serial number above."
+        },
+        "IN_MDM": {
+          "title": "Device is in the system",
+          "body": "Keep the device on and connected to the internet."
+        },
+        "REENROLL_READY": {
+          "title": "Enrollment profile is ready — now wipe this device",
+          "body": "This erases everything on the device you're holding. Make sure it's the company device you meant to re-enroll, not a customer's."
+        }
+      },
+      "wipeSteps": {
+        "s1": "On the device, open Settings → General",
+        "s2": "Tap Transfer or Reset → Erase All Content and Settings",
+        "s3": "Wait for the Remote Management screen — it enrolls by itself"
+      },
+      "keys": {
+        "readyTitle": "Protected — safe to hand over",
+        "notReadyTitle": "Not safe to hand over yet",
+        "appleShort": "Apple key",
+        "orgShort": "Company key"
       }
     },
     "icloud_appleOnly": "iCloud applies to Apple devices only.",
@@ -7276,5 +7324,81 @@
     "checkedMinutesAgo": "Checked {{n}} min ago",
     "noActionNeeded": "You don't need to do anything or report this — the system team is alerted automatically through a separate channel.",
     "unavailable": "Could not read the system status right now."
+  },
+  "enrollLink": {
+    "title": "Enroll from another branch",
+    "desc": "Send a link so someone outside this branch can put this device into the system. The link works for 3 hours and only for this device.",
+    "issueButton": "Create link / QR",
+    "activeBadge": "Link active",
+    "issuedTo": "Issued to",
+    "lastSeen": "Last opened",
+    "neverOpened": "Not opened yet",
+    "expiresInHm": "expires in {{h}}h {{m}}m",
+    "expiresInM": "expires in {{m}} min",
+    "showLink": "Show link",
+    "reissue": "Replace",
+    "revoke": "Revoke",
+    "error": {
+      "replaceFlagLost": "The old link is still active, so no new link was created. Press Replace and try again."
+    },
+    "dialog": {
+      "title": "Create an enrollment link",
+      "body": "Anyone holding this link can put this device into the system for the next 3 hours.",
+      "replaceTitle": "Replace the enrollment link",
+      "replaceBody": "A new link is created and the current one stops working immediately.",
+      "replaceNote": "Whoever is holding the old QR will no longer be able to use it — send them the new one.",
+      "confirm": "Create link",
+      "issuedToLabel": "Who is this for?",
+      "issuedToPlaceholder": "e.g. Bang Yai branch — Khun Golf",
+      "issuedToHint": "Recorded for your own audit trail. It never appears in the link or on the page they see.",
+      "notInAbmTitle": "This device isn't in ABM yet",
+      "notInAbmBody": "The link will dead-end at the other branch — they can't scan a device into ABM. Scan it in first, then send the link."
+    },
+    "reveal": {
+      "title": "Enrollment link",
+      "scanHint": "Have them scan this, or send them the link below.",
+      "copy": "Copy link",
+      "copied": "Copied",
+      "privacyNote": "Send this only to the person you named. Anyone with the link can enroll this device."
+    },
+    "revokeDialog": {
+      "title": "Revoke this link?",
+      "body": "The link stops working straight away. You can create a new one at any time.",
+      "reasonLabel": "Reason (optional)",
+      "reasonPlaceholder": "e.g. customer is no longer collecting",
+      "confirm": "Revoke link"
+    }
+  },
+  "remoteEnroll": {
+    "serialLabel": "Device serial number",
+    "serialHint": "Check this matches the serial on the device or its box before wiping.",
+    "watching": "Watching for updates",
+    "updatedJustNow": "Updated just now",
+    "updatedAgo": "Updated {{seconds}}s ago",
+    "expiresInHm": "This link works for another {{h}}h {{m}}m",
+    "expiresInM": "This link works for another {{m}} min",
+    "done": {
+      "title": "All done",
+      "body": "The device is in the system and ready to hand over.",
+      "tellBranch": "You can tell the branch it's finished."
+    },
+    "offline": {
+      "title": "Can't reach the system",
+      "body": "Check your internet connection and try again."
+    },
+    "dead": {
+      "NOT_FOUND": {
+        "title": "This link doesn't work",
+        "body": "Ask the branch that sent it to you for a new link."
+      },
+      "EXPIRED": {
+        "title": "This link has expired",
+        "body": "Links last 3 hours. Ask the branch that sent it to you for a new one."
+      },
+      "REVOKED": {
+        "title": "This link has been cancelled",
+        "body": "The branch that sent it cancelled this link. Contact them if you still need to set up the device."
+      }
+    }
   }
 }

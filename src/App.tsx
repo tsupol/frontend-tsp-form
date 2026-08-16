@@ -12,6 +12,7 @@ import { HomePage } from './pages/HomePage';
 import { DashboardPage } from './pages/DashboardPage';
 import { UserPage } from './pages/UserPage';
 import { EnrollRedirectPage } from './pages/EnrollRedirectPage';
+import { RemoteEnrollPage } from './pages/mdm-enroll/RemoteEnrollPage';
 import { HoldingSelectModal } from './components/HoldingSelectModal';
 import { ChatDockProvider } from './contexts/ChatDockContext';
 import { ChatDock } from './components/ChatDock';
@@ -210,6 +211,11 @@ function App() {
       {/* One-URL login for automation — localhost only, unauthenticated by design */}
       {isLocalDev() && <Route path="/dev-login" element={<DevLoginPage />} />}
       <Route path="/enroll" element={<EnrollRedirectPage />} />
+      {/* Delegated MDM enrollment — branch A issues a 3h token so branch B (who
+          may have no NNF login at all) can walk the device through the enroll
+          ritual. Public by design: the token IS the authorisation, and the BE
+          granted its two RPCs to PUBLIC accordingly. */}
+      <Route path="/mdm-enroll" element={<RemoteEnrollPage />} />
 
       {/* Dashboard */}
       <Route

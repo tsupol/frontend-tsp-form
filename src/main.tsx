@@ -38,3 +38,20 @@ createRoot(document.getElementById('root')!).render(
     </QueryClientProvider>
   </StrictMode>,
 );
+
+// Retire the boot splash from index.html once React has actually painted.
+// Two frames, not one: the first only guarantees the commit is scheduled, so
+// hiding on it can reveal an empty root for a frame — the flash we are here to
+// remove. Fading (rather than removing) hands over as a cross-fade, since the
+// real page is already drawn underneath by then.
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    const boot = document.getElementById('app-boot');
+    if (!boot) return;
+    boot.classList.add('is-done');
+    boot.addEventListener('transitionend', () => boot.remove(), { once: true });
+    // Belt and braces: if the transition never fires (reduced motion, tab in the
+    // background), drop it anyway so it can never trap clicks.
+    setTimeout(() => boot.remove(), 600);
+  });
+});

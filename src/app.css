@@ -913,3 +913,34 @@ input[type="number"
 .branch-scope-select-all .selected-chip-close {
     display: none;
 }
+
+/* ── Remote enroll (public token page) ──────────────────────────────────────
+   The page polls every 5–30s and otherwise sits still. Two small motions carry
+   the "we are watching this device for you" message that the static layout
+   cannot; both are motion-safe at the call site, so a reduced-motion viewer
+   simply gets the static version. */
+
+/* One pulse per arriving poll response — keyed on the response, NOT looping, so
+   a stalled fetch leaves the dot still and the signal stays truthful. */
+@keyframes ping-once {
+    0%   { transform: scale(1);   opacity: 1; }
+    70%  { transform: scale(2.4); opacity: 0; }
+    100% { transform: scale(1);   opacity: 1; }
+}
+
+.animate-ping-once {
+    animation: ping-once 900ms ease-out;
+}
+
+/* The success checkmark draws itself. This is the moment the link holder turns
+   the phone around to show the branch staffer on the other end of the call, so
+   it earns one deliberate flourish. */
+@keyframes draw-check {
+    from { stroke-dashoffset: 32; }
+    to   { stroke-dashoffset: 0; }
+}
+
+.remote-enroll-check {
+    stroke-dasharray: 32;
+    animation: draw-check 420ms ease-out 80ms backwards;
+}

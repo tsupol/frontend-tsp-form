@@ -12,9 +12,100 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet" />
     <title>NNF System</title>
     <style>@layer theme, base, components, utilities;</style>
+
+    <!-- Boot splash. The app bundle is large, so without this the browser shows
+         a bare white/black page plus its own progress bar until React's first
+         paint — which reads as "nothing is happening", especially on a phone
+         over the LAN. Everything here is INLINE on purpose: an external file
+         would be one more round trip before the user sees anything.
+
+         The theme is resolved before paint (same rule as ThemeContext: stored
+         choice, else system), so the splash never flashes the wrong colour and
+         then swap. -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('theme');
+          var resolved = (!stored || stored === 'system')
+            ? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
+            : stored;
+          document.documentElement.setAttribute('data-theme', resolved);
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      })();
+    </script>
+    <style>
+      /* Standalone values, not theme tokens: the token stylesheet is part of the
+         bundle we are waiting for. These match the two theme backgrounds. */
+      #app-boot {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1.25rem;
+        background: #0f1115;
+        color: #8b93a7;
+        font-family: 'Noto Sans Thai', system-ui, sans-serif;
+        z-index: 9999;
+        /* Fades out once React mounts; the page underneath is already painted,
+           so the hand-off is a cross-fade rather than a flash. */
+        transition: opacity 260ms ease-out;
+      }
+      :root[data-theme='light'] #app-boot {
+        background: #f7f8fa;
+        color: #6b7280;
+      }
+      #app-boot.is-done { opacity: 0; pointer-events: none; }
+
+      /* A determinate-looking sweep rather than a spinner: a spinner says
+         "waiting", a moving bar says "loading, and it is progressing". */
+      #app-boot .boot-track {
+        width: 168px;
+        height: 3px;
+        border-radius: 999px;
+        background: rgba(139, 147, 167, 0.18);
+        overflow: hidden;
+      }
+      #app-boot .boot-fill {
+        display: block;
+        width: 40%;
+        height: 100%;
+        border-radius: inherit;
+        background: currentColor;
+        opacity: 0.65;
+        animation: boot-sweep 1.15s ease-in-out infinite;
+      }
+      @keyframes boot-sweep {
+        0%   { transform: translateX(-110%); }
+        100% { transform: translateX(360%); }
+      }
+      #app-boot .boot-mark {
+        width: 40px; height: 40px;
+        opacity: 0.9;
+        animation: boot-pulse 1.8s ease-in-out infinite;
+      }
+      @keyframes boot-pulse {
+        0%, 100% { opacity: 0.45; }
+        50%      { opacity: 0.95; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #app-boot .boot-fill { animation: none; width: 100%; }
+        #app-boot .boot-mark { animation: none; }
+        #app-boot { transition: none; }
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+
+    <div id="app-boot" role="status" aria-live="polite">
+      <img src="/nnf-favicon.svg" alt="" class="boot-mark" />
+      <div class="boot-track"><span class="boot-fill"></span></div>
+    </div>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -928,5 +928,11 @@
   "mdm.state.gate_device_not_with_customer": "This device is not with the customer — it is at a branch, a repair centre, or in stock.",
   "mdm.state.gate_already_open": "The customer is already allowed to remove apps on this device.",
   "mdm.validation.gate_minutes_range": "Choose between 5 and 120 minutes.",
-  "mdm.not_found.gate_open": "The customer is not currently allowed to remove apps on this device."
+  "mdm.not_found.gate_open": "The customer is not currently allowed to remove apps on this device.",
+  "MDM.AUTH.ENROLL_LINK_INVALID": "This enrollment link no longer works. Ask the branch that sent it for a new one.",
+  "mdm.auth.enroll_link_invalid": "This enrollment link no longer works. Ask the branch that sent it for a new one.",
+  "MDM.NOT_FOUND.ENROLL_LINK": "There is no active enrollment link for this device.",
+  "mdm.not_found.enroll_link": "There is no active enrollment link for this device.",
+  "MDM.VALIDATION.ISSUED_TO_REQUIRED": "Enter who the link is being issued to.",
+  "mdm.validation.issued_to_required": "Enter who the link is being issued to."
 }

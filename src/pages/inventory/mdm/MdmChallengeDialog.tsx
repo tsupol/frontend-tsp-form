@@ -45,6 +45,18 @@ interface Props {
   note?: string | null;
   /** Label for the confirm button, already translated. */
   confirmLabel: string;
+  /**
+   * Extra fields rendered inside the dialog, ABOVE the countdown — so the 5
+   * seconds are spent filling them in rather than staring at a number. The
+   * enroll-link dialog uses this for its mandatory "issued to whom" note.
+   */
+  extraFields?: React.ReactNode;
+  /**
+   * Blocks confirm even when the code matches — for a required `extraFields`
+   * value. The server validates independently (ISSUED_TO_REQUIRED) and does NOT
+   * burn the challenge on that rejection, so this is convenience, not the check.
+   */
+  extraInvalid?: boolean;
   busy?: boolean;
   /** Submit error from the commit call, already translated. */
   error?: string | null;
@@ -62,7 +74,8 @@ function secondsUntil(iso: string | undefined): number {
 
 export function MdmChallengeDialog({
   challenge, serial, title, body, tone = 'warning', note,
-  confirmLabel, busy = false, error, onDismissError, onConfirm, onClose,
+  confirmLabel, extraFields, extraInvalid = false,
+  busy = false, error, onDismissError, onConfirm, onClose,
 }: Props) {
   const { t } = useTranslation();
   const [typed, setTyped] = useState('');
@@ -103,7 +116,7 @@ export function MdmChallengeDialog({
 
   const code = challenge?.confirm_code ?? '';
   const matches = typed === code && code.length > 0;
-  const canConfirm = !busy && !expired && remaining === 0 && matches;
+  const canConfirm = !busy && !expired && remaining === 0 && matches && !extraInvalid;
 
   return (
     <Modal open={!!challenge} onClose={() => !busy && onClose()} maxWidth="26rem" width="100%">
@@ -126,6 +139,10 @@ export function MdmChallengeDialog({
         </div>
 
         {note && <p className="text-xs text-subtle mt-2">{note}</p>}
+
+        {/* Above the countdown on purpose: the enforced 5-second wait becomes
+            the time the operator fills this in, instead of dead air. */}
+        {extraFields && <div className="mt-3">{extraFields}</div>}
 
         {expired ? (
           <div className="alert alert-warning mt-3">
