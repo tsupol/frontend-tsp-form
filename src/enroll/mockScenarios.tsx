@@ -20,6 +20,7 @@
 
 import { useState } from 'react';
 import { isLocalDev } from '../lib/devEnv';
+import type { ApplyTemplateResult } from '../pages/inventory/mdm/mdmApi';
 import type { RemoteEnrollStatus } from '../pages/inventory/mdm/shared/enrollView';
 import type { DeadReason } from './api';
 
@@ -67,6 +68,42 @@ export interface Scenario {
   status?: RemoteEnrollStatus;
   dead?: DeadReason;
   offline?: boolean;
+}
+
+/**
+ * A stand-in for fn_mdm_remote_enroll_apply_light, so the step-7 button and its
+ * preview→confirm dialog can actually be REVIEWED in the picker.
+ *
+ * Without this the mock page passed no onApplyLight and the button hid itself —
+ * which silently made the one control this whole screen exists for the only
+ * thing you could not preview. The restriction keys are the real ones from
+ * ENFORCEMENT_LIGHT, so the dialog shows the same list a device would.
+ *
+ * Commit (preview:false) resolves but changes nothing: the mock status lives in
+ * the URL, so the badge only moves if you pick another scenario. That is honest
+ * — this driver mocks the SERVER, and the server's reply to a commit is "queued",
+ * not "locked".
+ */
+const MOCK_LIGHT_RESTRICTIONS = [
+  'allowAccountModification',
+  'allowModifyFindMy',
+  'allowEraseContentAndSettings',
+  'allowHostPairing',
+  'allowProfileInstallation',
+].map((key) => ({ key, allowed: false }));
+
+export async function mockApplyLight(preview: boolean): Promise<ApplyTemplateResult> {
+  await new Promise((r) => setTimeout(r, 400)); // the loading state is worth seeing
+  return {
+    count: MOCK_LIGHT_RESTRICTIONS.length,
+    serial: SERIAL,
+    preview,
+    display_name: 'Enforcement Light',
+    template_key: 'ENFORCEMENT_LIGHT',
+    removal_disallowed: true,
+    restrictions: MOCK_LIGHT_RESTRICTIONS,
+    ...(preview ? {} : { intent_id: 90001 }),
+  };
 }
 
 export const MOCK_SCENARIOS: Scenario[] = [

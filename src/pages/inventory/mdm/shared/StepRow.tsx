@@ -9,7 +9,9 @@
 // for.
 
 import type { ReactNode } from 'react';
-import { CheckCircle } from 'lucide-react';
+// Check, not CheckCircle: the dot the icon sits inside is already a filled
+// circle, so a circled glyph draws a ring inside a ring.
+import { Check, type LucideIcon } from 'lucide-react';
 
 export type StepStatus = 'done' | 'current' | 'todo';
 
@@ -17,7 +19,7 @@ export function StepRow({
   n, icon: Icon, title, where, state, last, children,
 }: {
   n: number;
-  icon: typeof CheckCircle;
+  icon: LucideIcon;
   title: string;
   where?: string;
   state: StepStatus;
@@ -35,7 +37,7 @@ export function StepRow({
             : state === 'done' ? 'bg-success border-success text-success-contrast'
               : 'bg-surface border-line text-subtle'
         }`}>
-          {state === 'done' ? <CheckCircle size={13} /> : <Icon size={12} />}
+          {state === 'done' ? <Check size={14} strokeWidth={3} /> : <Icon size={12} />}
         </div>
         {!last && <div className={`w-0.5 flex-1 min-h-[0.75rem] my-0.5 motion-safe:transition-colors motion-safe:duration-200 ${state === 'done' ? 'bg-success' : 'bg-line'}`} />}
       </div>

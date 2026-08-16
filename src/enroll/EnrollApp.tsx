@@ -33,7 +33,7 @@ import { CheckCircle } from 'lucide-react';
 import { usePoll } from './usePoll';
 import { useLang, useTheme, ViewerControls } from './Controls';
 import { requestPrepare, remoteEnrollApplyLight, EnrollLinkDead, type DeadReason } from './api';
-import { MOCK_SCENARIOS, ScenarioPicker, useMockScenario } from './mockScenarios';
+import { MOCK_SCENARIOS, ScenarioPicker, useMockScenario, mockApplyLight } from './mockScenarios';
 import { EnrollChecklist } from '../pages/inventory/mdm/shared/EnrollChecklist';
 import { EnrollReadinessSteps } from '../pages/inventory/mdm/shared/EnrollReadinessSteps';
 import { SerialHero } from '../pages/inventory/mdm/shared/SerialDisplay';
@@ -223,9 +223,14 @@ export function EnrollApp() {
     ? Math.max(0, Math.floor((new Date(status.link_expires_at).getTime() - Date.now()) / 1000))
     : null;
 
-  const applyLight = (mock.active || !token)
-    ? undefined
-    : (preview: boolean) => remoteEnrollApplyLight(token, preview);
+  // In mock mode the button must still render and open its dialog — it is the
+  // one control this screen exists for, and hiding it there made it the only
+  // thing the picker could not preview.
+  const applyLight = mock.active
+    ? mockApplyLight
+    : token
+      ? (preview: boolean) => remoteEnrollApplyLight(token, preview)
+      : undefined;
 
   return (
     <Shell controls={controls}>
@@ -274,7 +279,7 @@ export function EnrollApp() {
           <EnrollReadinessSteps
             view={view}
             onApplyLight={applyLight}
-            onApplied={live.refetch}
+            onApplied={mock.active ? () => {} : live.refetch}
             // No apiErrors namespace on this page and no MDM error catalogue —
             // a dead link is the one failure the holder can act on, and it is
             // already terminal via polling. Everything else is "try again".
