@@ -121,7 +121,7 @@ export function useChatRealtimeSnackbars() {
 
         // Refresh inbox so badge counts + preview update
         queryClient.invalidateQueries({ queryKey: ['chat-inbox'] });
-        queryClient.invalidateQueries({ queryKey: ['nav', 'chat-unread'] });
+        queryClient.invalidateQueries({ queryKey: ['nav', 'counters'] });
 
         addSnackbar({
           duration: 6000,

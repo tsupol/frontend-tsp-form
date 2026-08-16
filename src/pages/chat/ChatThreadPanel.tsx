@@ -225,18 +225,43 @@ export function ChatThreadPanel({
     lastAnnounced.current = null;
   }, [contractId]);
 
+  // Marks the WHOLE room read (chat_mark_read is idempotent). Fired on open and
+  // again whenever a customer message lands while the room is on screen — an
+  // open-only mark leaves mid-conversation arrivals unread in the DB, so the
+  // inbox and nav badge count messages the user is literally looking at.
+  //
+  // A hidden tab defers the mark until the tab is visible again: the customer's
+  // app renders is_read as a read receipt, and auto-marking a room nobody is
+  // looking at would fake it.
+  const pendingMarkRead = useRef(false);
+  const markRead = useCallback(() => {
+    if (contractId === null) return;
+    if (document.visibilityState !== 'visible') { pendingMarkRead.current = true; return; }
+    pendingMarkRead.current = false;
+    apiClient.rpc('chat_mark_read', { p_contract_id: contractId })
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ['chat-inbox'] });
+        queryClient.invalidateQueries({ queryKey: ['nav', 'counters'] });
+      })
+      .catch(err => console.warn('[chat] mark_read failed', err));
+  }, [contractId, queryClient]);
+
   const markedRef = useRef<number | null>(null);
   useEffect(() => {
     if (!enabled || contractId === null) return;
     if (markedRef.current === contractId) return;
     markedRef.current = contractId;
-    apiClient.rpc('chat_mark_read', { p_contract_id: contractId })
-      .then(() => {
-        queryClient.invalidateQueries({ queryKey: ['chat-inbox'] });
-        queryClient.invalidateQueries({ queryKey: ['nav', 'chat-unread'] });
-      })
-      .catch(err => console.warn('[chat] mark_read failed', err));
-  }, [contractId, enabled, queryClient]);
+    markRead();
+  }, [contractId, enabled, markRead]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const onVis = () => {
+      if (document.visibilityState === 'visible' && pendingMarkRead.current) markRead();
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, [enabled, markRead]);
 
   // Realtime: subscribe to chat:contract:<id> + slip:contract:<id> while the
   // thread is open. Either event reloads both queries — the timeline merge
@@ -259,15 +284,19 @@ export function ChatThreadPanel({
     };
 
     // Messages refresh page 0 rather than invalidate — see refreshNewestMessages.
-    const onChatEvent = () => {
+    const onChatEvent = (raw: unknown) => {
       refreshNewestMessages().catch(err => console.warn('[chat] refresh failed', err));
       reloadSidecars();
+      // A customer message landing in the open room is being read right now —
+      // mark it before the user has to leave and re-enter the thread.
+      const p = raw as { type?: string; sender_type?: string };
+      if (p?.type === 'chat_message' && p.sender_type === 'CUSTOMER') markRead();
     };
 
     const unsubChat = wsClient.subscribe(`chat:contract:${contractId}`, onChatEvent);
     const unsubSlip = wsClient.subscribe(`slip:contract:${contractId}`, reloadSidecars);
     return () => { unsubChat(); unsubSlip(); };
-  }, [contractId, enabled, queryClient, refreshNewestMessages]);
+  }, [contractId, enabled, queryClient, refreshNewestMessages, markRead]);
 
   // Snapshot the first unread CUSTOMER message ID on initial load — this
   // pins the "unread below" divider so it stays put as the user reads, just

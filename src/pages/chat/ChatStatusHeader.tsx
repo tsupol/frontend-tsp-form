@@ -102,7 +102,7 @@ export function ChatThreadActionsMenu({ contractId, inboxRow }: ActionsMenuProps
     ),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['chat-inbox'] });
-      queryClient.invalidateQueries({ queryKey: ['nav', 'chat-unread'] });
+      queryClient.invalidateQueries({ queryKey: ['nav', 'counters'] });
       const msgKey = !data.had_messages
         ? 'chat.markUnread.noMessages'
         : data.marked_unread === 0

@@ -96,7 +96,7 @@ export function ChatPage() {
     if (!branchId) return;
     const refresh = () => {
       queryClient.invalidateQueries({ queryKey: ['chat-inbox'] });
-      queryClient.invalidateQueries({ queryKey: ['nav', 'chat-unread'] });
+      queryClient.invalidateQueries({ queryKey: ['nav', 'counters'] });
     };
     const unsubBranch = wsClient.subscribe(`branch:${branchId}`, refresh);
     const unsubChat = wsClient.subscribe(`chat:branch:${branchId}`, refresh);
@@ -110,7 +110,7 @@ export function ChatPage() {
   useEffect(() => {
     const refresh = () => {
       queryClient.invalidateQueries({ queryKey: ['chat-inbox'] });
-      queryClient.invalidateQueries({ queryKey: ['nav', 'chat-unread'] });
+      queryClient.invalidateQueries({ queryKey: ['nav', 'counters'] });
     };
     const onVisibility = () => { if (document.visibilityState === 'visible') refresh(); };
     window.addEventListener('focus', refresh);
@@ -262,7 +262,7 @@ export function ChatPage() {
     const ids = visibleContractIdsKey.split(',').map(Number);
     const refresh = () => {
       queryClient.invalidateQueries({ queryKey: ['chat-inbox'] });
-      queryClient.invalidateQueries({ queryKey: ['nav', 'chat-unread'] });
+      queryClient.invalidateQueries({ queryKey: ['nav', 'counters'] });
     };
     const unsubs = ids.map(id => wsClient.subscribe(`chat:contract:${id}`, refresh));
     return () => { unsubs.forEach(u => u()); };
