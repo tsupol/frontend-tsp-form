@@ -6,6 +6,14 @@
     <link rel="shortcut icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="robots" content="noindex, nofollow" />
+    <!-- Tells the browser this page supplies BOTH schemes itself.
+         Without it, browsers with their own dark mode — Samsung Internet is the
+         common one on the phones that scan these QR codes — apply a force-dark
+         filter that rewrites our colours. The symptom is that switching to the
+         light theme produces a dark-but-slightly-lighter page: the browser is
+         darkening a palette that was already correct. Chrome, which has no such
+         filter on by default, looked fine throughout. -->
+    <meta name="color-scheme" content="light dark" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -34,6 +42,14 @@
       })();
     </script>
     <style>
+      /* The CSS half of the force-dark opt-out. The meta tag above declares
+         support; this pins the ACTUAL scheme to whichever theme is active, so a
+         browser in dark mode does not "help" by inverting our light palette.
+         Both are needed — Samsung Internet honours the computed property, and
+         it has to follow the toggle, not stay fixed. */
+      :root { color-scheme: dark; }
+      :root[data-theme='light'] { color-scheme: light; }
+
       /* Standalone values — the token stylesheet is in the bundle we are waiting
          for. These match the two theme backgrounds. */
       #enroll-boot {

@@ -262,6 +262,15 @@
     --color-badge-outline-info-border: var(--color-info);
 }
 
+/* Declare which scheme is actually in force, so browsers with their own dark
+   mode stop "helping". Samsung Internet (common on the phones that scan our QR
+   codes) applies a force-dark filter to any page it believes is light, which
+   rewrites an already-correct light palette into dark-but-lighter. Chrome has
+   no such filter on by default, which is why this only showed up on a handset.
+   The value must FOLLOW the toggle — a fixed one is as wrong as none. */
+:root { color-scheme: dark; }
+[data-theme="light"] { color-scheme: light; }
+
 /* ── Light theme ──────────────────────────────────────────────────── */
 
 [data-theme="light"] {
