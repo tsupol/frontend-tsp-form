@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { FlaskConical, PenLine, Image, Bell, AlertTriangle, KeyRound, Scissors, Stamp, Receipt, Trash2, QrCode } from 'lucide-react';
+import { isLocalDev } from '../../lib/devEnv';
 
 const navItems = [
   { path: '/dev/signature', label: 'Signature Pad', icon: PenLine },
@@ -14,10 +15,13 @@ const navItems = [
   { path: '/dev/enroll-preview', label: 'Enroll Page States', icon: QrCode },
 ];
 
+// The "you are exposing this" banner. Uses the same allowlist as the routes
+// themselves (isLocalDev), so reaching the dev server from a phone on the same
+// wifi — the normal way to test the QR page — doesn't nag on every screen.
+// A host outside that set still warns, which is the case the banner is for.
 function isLocalhost(): boolean {
   if (typeof window === 'undefined') return true;
-  const h = window.location.hostname;
-  return h === 'localhost' || h === '127.0.0.1' || h === '::1';
+  return isLocalDev();
 }
 
 export function DevLayout({ children }: { children: ReactNode }) {
