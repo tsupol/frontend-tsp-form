@@ -33,11 +33,115 @@ import { SerialHero } from '../inventory/mdm/shared/SerialDisplay';
 import { useEnrollPoll } from '../inventory/mdm/shared/useEnrollPoll';
 import { useTicker, secondsUntil, splitDuration } from '../inventory/mdm/shared/useTicker';
 
-/** Page shell — one column, centred, comfortable on a phone held one-handed. */
+// ── Language ────────────────────────────────────────────────────────────────
+// The app-wide i18n config falls back to English and caches the admin user's
+// choice in localStorage. Neither is right here: this page is read by someone
+// standing in a Thai shop, usually not our staff, and the admin app's language
+// says nothing about what THEY read. So Thai is the default, chosen once on
+// mount unless the URL asks otherwise (?lang=en).
+//
+// The switch is deliberately NOT written to localStorage — flipping this page
+// to English must not silently change the language of the admin app for a
+// staffer who opened the link on their own phone to check it.
+const PAGE_LANGS = ['th', 'en'] as const;
+type PageLang = (typeof PAGE_LANGS)[number];
+
+// Module-level, NOT component state. The shell is rendered by five different
+// branches (loading / dead / offline / finished / main), so a useState inside it
+// resets to Thai every time the page changes state — silently throwing away the
+// choice of someone who had just switched to English. Keeping it here means the
+// selection survives those swaps for the life of the page.
+let currentLang: PageLang = 'th';
+
+function useRemoteEnrollLanguage(): [PageLang, (l: PageLang) => void] {
+  const { i18n } = useTranslation();
+  const [searchParams] = useSearchParams();
+  const requested = searchParams.get('lang');
+
+  const [lang, setLangState] = useState<PageLang>(() => {
+    currentLang = PAGE_LANGS.includes(requested as PageLang)
+      ? (requested as PageLang)
+      : currentLang;
+    return currentLang;
+  });
+
+  const setLang = (l: PageLang) => {
+    currentLang = l;
+    setLangState(l);
+  };
+
+  // ⛔ i18n.changeLanguage would PERSIST this. The app's detector is configured
+  // with caches:['localStorage'], so forcing Thai here — or a visitor tapping
+  // EN — would rewrite the stored preference and silently flip the whole admin
+  // app for a staffer who merely opened the QR link in their own browser to
+  // check it. Restore whatever was cached immediately afterwards so this page's
+  // language stays local to this page.
+  useEffect(() => {
+    if (i18n.language === lang) return;
+    let cached: string | null = null;
+    try {
+      cached = localStorage.getItem('i18nextLng');
+    } catch {
+      cached = null;
+    }
+    i18n.changeLanguage(lang).finally(() => {
+      try {
+        if (cached === null) localStorage.removeItem('i18nextLng');
+        else localStorage.setItem('i18nextLng', cached);
+      } catch {
+        /* private mode — nothing to restore into */
+      }
+    });
+  }, [i18n, lang]);
+
+  return [lang, setLang];
+}
+
+/** Two-up toggle. Small and quiet — it must not compete with the serial. */
+function LanguageSwitch({
+  lang, onChange,
+}: {
+  lang: PageLang;
+  onChange: (l: PageLang) => void;
+}) {
+  return (
+    <div className="flex justify-end">
+      <div className="inline-flex rounded-md border border-line overflow-hidden">
+        {PAGE_LANGS.map((l) => (
+          <button
+            key={l}
+            type="button"
+            onClick={() => onChange(l)}
+            aria-pressed={lang === l}
+            className={`px-2.5 py-1 text-xs font-medium cursor-pointer border-none transition-colors ${
+              lang === l
+                ? 'bg-primary text-primary-contrast'
+                : 'bg-surface text-subtle hover:bg-surface-hover'
+            }`}
+          >
+            {l === 'th' ? 'ไทย' : 'EN'}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Page shell — one column, centred, comfortable on a phone held one-handed.
+ *
+ * The language switch lives HERE rather than in the main view, so it is present
+ * on every state including the dead-link and success screens. Someone who lands
+ * on "ลิงก์หมดอายุ" and cannot read it needs the toggle most of all.
+ */
 function Shell({ children }: { children: React.ReactNode }) {
+  const [lang, setLang] = useRemoteEnrollLanguage();
   return (
     <div className="min-h-dvh bg-bg flex justify-center px-4 py-6">
-      <div className="w-full max-w-md flex flex-col gap-4">{children}</div>
+      <div className="w-full max-w-md flex flex-col gap-4">
+        <LanguageSwitch lang={lang} onChange={setLang} />
+        {children}
+      </div>
     </div>
   );
 }
