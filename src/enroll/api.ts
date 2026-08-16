@@ -49,17 +49,29 @@ async function rpc<T>(fn: string, params: Record<string, unknown>): Promise<T> {
     // fall through to the status check below
   }
 
-  const env = body as { ok?: boolean; data?: T; code?: string; message_key?: string; params?: { reason?: string } } | null;
+  // The v2 error envelope nests the detail under `error`, NOT at the top level:
+  //   { ok:false, error:{ code, message_key, params:{ reason } } }
+  // Reading code/params off the root silently never matches, and a dead link
+  // then falls through to the transient branch and renders "check your
+  // internet" — sending the person at branch B hunting for a wifi problem
+  // instead of phoning branch A for a new link. Verified against the live
+  // response, not assumed.
+  const env = body as {
+    ok?: boolean;
+    data?: T;
+    error?: { code?: string; message_key?: string; params?: { reason?: string } };
+  } | null;
 
   if (env && env.ok === false) {
-    const code = (env.message_key || env.code || '').toUpperCase();
+    const err = env.error ?? {};
+    const code = (err.message_key || err.code || '').toUpperCase();
     if (code.includes('ENROLL_LINK_INVALID')) {
-      const raw = (env.params?.reason ?? '').toUpperCase();
+      const raw = (err.params?.reason ?? '').toUpperCase();
       const reason = (['NOT_FOUND', 'EXPIRED', 'REVOKED', 'COMPLETED'] as const)
         .find((r) => r === raw) ?? 'NOT_FOUND';
       throw new EnrollLinkDead(reason);
     }
-    throw new Error(env.code || 'request failed');
+    throw new Error(err.code || 'request failed');
   }
 
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
