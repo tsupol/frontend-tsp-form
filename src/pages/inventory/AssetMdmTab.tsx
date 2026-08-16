@@ -111,7 +111,11 @@ export function AssetMdmTab({ assetId, onRefresh }: { assetId: number; onRefresh
   const goToEnroll = () => setActive('enroll');
 
   return (
-    <div className="flex-1 min-h-0 min-w-0 flex flex-col">
+    // The reveal runs ONCE, on the first render that has data — keyed off the
+    // same flag the skeleton used. Binding it to isFetching instead would replay
+    // the animation on every 5s poll, which is exactly the twitchiness the
+    // skeleton was added to avoid.
+    <div className="flex-1 min-h-0 min-w-0 flex flex-col animate-reveal">
       {tabs.length > 1 && (
         <OverflowTabs
           tabs={tabs}

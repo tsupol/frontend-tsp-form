@@ -33,6 +33,13 @@
         } catch (e) {
           document.documentElement.setAttribute('data-theme', 'dark');
         }
+        // When the splash first became visible. main.tsx holds it for a minimum
+        // dwell measured from HERE, not from when the bundle finished parsing —
+        // otherwise a warm cache shows a splash that appears and vanishes in the
+        // same breath, which reads as a glitch rather than a load.
+        window.__bootAt = Date.now();
+        // Holds #root down + transparent until main.tsx lifts the curtain.
+        document.documentElement.classList.add('app-booting');
       })();
     </script>
     <style>
@@ -59,6 +66,33 @@
         color: #6b7280;
       }
       #app-boot.is-done { opacity: 0; pointer-events: none; }
+
+      /* The reveal. #root starts nudged down and transparent, then rises into
+         place as the splash lifts — the two motions overlap, so it reads as one
+         curtain going up rather than "fade out, then slide in".
+         (.app-booting is set below and removed by main.tsx.)
+
+         ⛔ The transform and the transition are BOTH scoped to the booting/
+         revealing classes, and the revealing class is removed once the animation
+         ends. A `transform` left on #root permanently would make it a containing
+         block for position:fixed descendants — every tsp-form modal, drawer,
+         popover and the modal backdrop would then position against #root instead
+         of the viewport. A transitionable property must not outlive its
+         transition here. */
+      :root.app-booting #root {
+        opacity: 0;
+        transform: translateY(14px);
+      }
+      :root.app-revealing #root {
+        opacity: 1;
+        transform: none;
+        transition: opacity 420ms ease-out,
+                    transform 460ms cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        :root.app-booting #root { opacity: 1; transform: none; }
+        :root.app-revealing #root { transition: none; }
+      }
 
       /* A determinate-looking sweep rather than a spinner: a spinner says
          "waiting", a moving bar says "loading, and it is progressing". */
