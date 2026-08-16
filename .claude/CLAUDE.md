@@ -63,10 +63,10 @@
 When using tsp-form components, follow this lookup order:
 
 1. **This project first:** Check existing usage in `src/` — reuse the same patterns for consistency
-2. **Examples:** `C:\Users\tonsu\PhpstormProjects\tsp-form\src\example\` — check here for usage patterns if no existing usage in this project
-3. **Component source:** `C:\Users\tonsu\PhpstormProjects\tsp-form\src\components\` — only if examples don't clarify enough
-4. **Context/hooks:** `C:\Users\tonsu\PhpstormProjects\tsp-form\src\context\`
-5. **CLAUDE.md:** `C:\Users\tonsu\PhpstormProjects\tsp-form\.claude\CLAUDE.md` — for conventions
+2. **Examples:** `D:\dev\tsp-form\src\example\` — check here for usage patterns if no existing usage in this project
+3. **Component source:** `D:\dev\tsp-form\src\components\` — only if examples don't clarify enough
+4. **Context/hooks:** `D:\dev\tsp-form\src\context\`
+5. **CLAUDE.md:** `D:\dev\tsp-form\.claude\CLAUDE.md` — for conventions
 
 Form patterns, PopOver, Alert/Snackbar, icon buttons, etc. — all in the global `tsp-form-guide.md`. Project-specific component rules (BranchPinInput, alert-danger error display, masked/date inputs, color tokens, inline links) — `.claude/tsp-form-guide-here.md`. Don't restate either here.
 

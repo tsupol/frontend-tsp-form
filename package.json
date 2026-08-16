@@ -37,7 +37,7 @@
     "signature_pad": "^5.1.3",
     "tailwindcss": "^4.1.14",
     "tesseract.js": "^7.0.0",
-    "tsp-form": "^0.8.7",
+    "tsp-form": "^0.9.3",
     "write-excel-file": "^4.1.1"
   },
   "devDependencies": {
