@@ -135,6 +135,7 @@ import { DevBillPrintPage } from './pages/dev/DevBillPrintPage';
 import { DevNotificationsPage } from './pages/dev/DevNotificationsPage';
 import { DevTokensPage } from './pages/dev/DevTokensPage';
 import { DevRemoveButtonsPage } from './pages/dev/DevRemoveButtonsPage';
+import { DevEnrollPreviewPage } from './pages/dev/DevEnrollPreviewPage';
 import { DevLoginPage } from './pages/dev/DevLoginPage';
 import { isLocalDev } from './lib/devEnv';
 
@@ -775,6 +776,16 @@ function App() {
               <ProtectedRoute>
                 <AdminLayout>
                   <DevLayout><DevTokensPage /></DevLayout>
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dev/enroll-preview"
+            element={
+              <ProtectedRoute>
+                <AdminLayout>
+                  <DevLayout><DevEnrollPreviewPage /></DevLayout>
                 </AdminLayout>
               </ProtectedRoute>
             }

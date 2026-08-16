@@ -229,6 +229,36 @@ function ExpiryLine({ expiresAt }: { expiresAt: string | null }) {
 }
 
 /**
+ * Retire the boot splash from index.html, which is scoped to this path only.
+ *
+ * Lives here rather than in main.tsx so the admin app's startup is untouched —
+ * it has no splash by design. Held for a minimum dwell measured from first paint
+ * (window.__enrollBootAt): on a warm cache React paints in ~200ms, and a splash
+ * that appears and vanishes in the same breath reads as a glitch, not a load.
+ */
+const BOOT_MIN_DWELL = 900;
+
+function useDismissBootSplash() {
+  useEffect(() => {
+    const boot = document.getElementById('enroll-boot');
+    if (!boot) return;
+    const started = (window as unknown as { __enrollBootAt?: number }).__enrollBootAt ?? Date.now();
+    const wait = Math.max(0, BOOT_MIN_DWELL - (Date.now() - started));
+    const id = setTimeout(() => {
+      boot.classList.add('is-done');
+      boot.addEventListener('transitionend', () => boot.remove(), { once: true });
+      // If the transition never fires (reduced motion, background tab) the
+      // splash must still go, or it sits over the page eating every tap.
+      setTimeout(() => {
+        boot.remove();
+        document.documentElement.classList.remove('enroll-booting');
+      }, 500);
+    }, wait);
+    return () => clearTimeout(id);
+  }, []);
+}
+
+/**
  * The "we are watching" pulse. Fires when DATA ARRIVES, not on a loop — so a
  * stalled fetch leaves the dot still, and the signal stays honest. Without it a
  * page that polls every 5s looks frozen, which is precisely how staff concluded
@@ -266,6 +296,10 @@ export function RemoteEnrollPage() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
+
+  // Hand off from the inline splash. Unconditional and first: every branch below
+  // returns early, and the splash must lift no matter which one wins.
+  useDismissBootSplash();
 
   // A dead link is FINAL — stop polling and stop retrying. Anything else (a
   // flaky phone signal at branch B) must keep trying, so the two are split.

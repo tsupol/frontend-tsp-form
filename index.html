@@ -12,9 +12,102 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet" />
     <title>NNF System</title>
     <style>@layer theme, base, components, utilities;</style>
+
+    <!-- Boot splash — /mdm-enroll ONLY.
+         The admin app deliberately has none: staff open it once and keep the tab
+         all day, so a splash is in the way far more often than it helps.
+         The QR page is the opposite — a stranger opens it cold, once, on a phone,
+         and the bundle takes seconds to arrive. Without this they stare at a
+         blank screen and assume the link is broken.
+         Everything is inline: an external file would be one more round trip
+         before anything appears. -->
+    <script>
+      (function () {
+        if (location.pathname !== '/mdm-enroll') return;
+        try {
+          var stored = localStorage.getItem('theme');
+          var resolved = (!stored || stored === 'system')
+            ? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
+            : stored;
+          document.documentElement.setAttribute('data-theme', resolved);
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+        document.documentElement.classList.add('enroll-booting');
+        // First paint. The page holds the splash for a minimum dwell measured
+        // from here, not from when the bundle finished parsing.
+        window.__enrollBootAt = Date.now();
+      })();
+    </script>
+    <style>
+      /* Standalone values, not theme tokens — the token stylesheet is inside the
+         bundle we are waiting for. These match the two theme backgrounds. */
+      :root.enroll-booting #enroll-boot {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1.25rem;
+        background: #0f1115;
+        color: #8b93a7;
+        font-family: 'Noto Sans Thai', system-ui, sans-serif;
+        z-index: 9999;
+        transition: opacity 300ms ease-out;
+      }
+      /* Hidden unless the boot script opted this path in, so the admin app never
+         renders it even for a frame. */
+      #enroll-boot { display: none; }
+      :root[data-theme='light'].enroll-booting #enroll-boot {
+        background: #f7f8fa;
+        color: #6b7280;
+      }
+      #enroll-boot.is-done { opacity: 0; pointer-events: none; }
+
+      /* A sweeping bar, not a spinner: a spinner says "waiting", a moving bar
+         says "loading, and it is getting somewhere". */
+      #enroll-boot .boot-track {
+        width: 168px; height: 3px;
+        border-radius: 999px;
+        background: rgba(139, 147, 167, 0.18);
+        overflow: hidden;
+      }
+      #enroll-boot .boot-fill {
+        display: block; width: 40%; height: 100%;
+        border-radius: inherit;
+        background: currentColor;
+        opacity: 0.65;
+        animation: enroll-boot-sweep 1.15s ease-in-out infinite;
+      }
+      @keyframes enroll-boot-sweep {
+        0%   { transform: translateX(-110%); }
+        100% { transform: translateX(360%); }
+      }
+      #enroll-boot .boot-mark {
+        width: 44px; height: 44px;
+        opacity: 0.9;
+        animation: enroll-boot-pulse 1.8s ease-in-out infinite;
+      }
+      @keyframes enroll-boot-pulse {
+        0%, 100% { opacity: 0.45; }
+        50%      { opacity: 0.95; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #enroll-boot .boot-fill { animation: none; width: 100%; }
+        #enroll-boot .boot-mark { animation: none; }
+        :root.enroll-booting #enroll-boot { transition: none; }
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+
+    <div id="enroll-boot" role="status" aria-live="polite">
+      <img src="/nnf-favicon.svg" alt="" class="boot-mark" />
+      <div class="boot-track"><span class="boot-fill"></span></div>
+    </div>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
