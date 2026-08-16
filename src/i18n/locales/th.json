@@ -7044,6 +7044,8 @@
     "attachFile": "ไฟล์",
     "attachFileComingSoon": "การแนบไฟล์จะเปิดให้ใช้เร็วๆ นี้",
     "uploading": "กำลังอัปโหลด…",
+    "removeImage": "ลบรูปภาพ",
+    "captionPlaceholder": "เพิ่มคำบรรยายภาพ",
     "imageInvalid": "กรุณาเลือกไฟล์รูปภาพ",
     "imageTooLarge": "ไฟล์รูปภาพใหญ่เกินไป",
     "selectToView": "เลือกการสนทนา",

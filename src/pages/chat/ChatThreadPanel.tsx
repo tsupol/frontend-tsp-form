@@ -9,7 +9,7 @@ import {
 } from 'tsp-form';
 import {
   ChevronRight, ChevronDown, CheckCircle, ExternalLink, FileText, Image as ImageIcon, Send, Smile,
-  XCircle, AlertTriangle, Check, CheckCheck,
+  XCircle, AlertTriangle, Check, CheckCheck, Loader2, X,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { wsClient } from '../../lib/api/ws';
@@ -53,6 +53,16 @@ const FOLLOW_BOTTOM_FRACTION = 0.5;
 /** Distance from the bottom past which the scroll-to-bottom button appears. */
 const SHOW_JUMP_BUTTON_PX = 200;
 
+/** An image staged in the composer while its upload runs. */
+interface PendingImage {
+  /** Local object URL for the chip thumbnail — revoked when the chip goes away. */
+  preview: string;
+  /** Null until the upload + attach resolves; send waits for it. */
+  mediaId: number | null;
+  /** Identifies the in-flight upload so a stale one can't fill a newer chip. */
+  token: number;
+}
+
 interface Props {
   contractId: number | null;
   /** If null, image clicks are no-ops. Lift to parent to open MediaLightbox. */
@@ -86,6 +96,14 @@ export function ChatThreadPanel({
   const [composer, setComposer] = useState('');
   const [sendError, setSendError] = useState('');
   const [uploading, setUploading] = useState(false);
+  /**
+   * Image staged in the composer, waiting to be sent with an optional caption.
+   * Upload starts on paste/pick so send is instant: `preview` is a local
+   * object URL shown straight away, `mediaId` arrives when the upload lands.
+   * Send waits for `mediaId`; removing the chip before then abandons the
+   * upload (the orphan is collected by the media sweep).
+   */
+  const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
   const [selectedSlip, setSelectedSlip] = useState<SubmissionRow | null>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
   /** Bumped on send so the scroll effect re-runs immediately, not on the next poll. */
@@ -106,6 +124,8 @@ export function ChatThreadPanel({
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  /** Increments per upload so a superseded one can't fill the current chip. */
+  const uploadToken = useRef(0);
 
   const enabled = contractId !== null && !Number.isNaN(contractId);
 
@@ -487,6 +507,10 @@ export function ChatThreadPanel({
     onSuccess: () => {
       setComposer('');
       setSendError('');
+      setPendingImage(prev => {
+        if (prev) URL.revokeObjectURL(prev.preview);
+        return null;
+      });
       // Our own message always lands at the bottom, wherever the user was.
       // The bump re-runs the scroll effect, whose deps would otherwise not
       // change until the new row arrives from setQueryData.
@@ -513,11 +537,31 @@ export function ChatThreadPanel({
 
   const handleSend = () => {
     const text = composer.trim();
-    if (!text || sendMutation.isPending) return;
+    if (sendMutation.isPending) return;
+    // With an image staged, the text rides along as its caption; the backend
+    // stores both on one row. Wait for the upload so media_id is real.
+    if (pendingImage) {
+      if (pendingImage.mediaId === null) return;
+      sendMutation.mutate({ text, mediaId: pendingImage.mediaId });
+      return;
+    }
+    if (!text) return;
     sendMutation.mutate({ text, mediaId: null });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Backspace on an empty composer removes the staged image. Requiring the
+    // whole field to be empty (not just "caret at 0") keeps Home+Backspace
+    // while writing a caption from silently throwing the image away.
+    if (
+      e.key === 'Backspace'
+      && pendingImage
+      && e.currentTarget.value === ''
+    ) {
+      e.preventDefault();
+      clearPendingImage();
+      return;
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -555,6 +599,13 @@ export function ChatThreadPanel({
       return;
     }
     setSendError('');
+    // Stage the chip immediately with a local preview, then upload behind it —
+    // the caption can be typed while the bytes are still going up.
+    const token = ++uploadToken.current;
+    setPendingImage(prev => {
+      if (prev) URL.revokeObjectURL(prev.preview);
+      return { preview: URL.createObjectURL(file), mediaId: null, token };
+    });
     setUploading(true);
     try {
       // idx makes the R2 key unique per image (the leaf is chat-{idx}-{size}.{ext}).
@@ -593,15 +644,49 @@ export function ChatThreadPanel({
         p_sort_order: 0,
         p_caption: null,
       });
-      sendMutation.mutate({ text: '', mediaId: attached.media_id });
+      // Drop the result if the chip was removed or replaced mid-flight —
+      // otherwise a slow first upload would arm a chip the user has since
+      // swapped for a different image.
+      setPendingImage(prev =>
+        prev && prev.token === token ? { ...prev, mediaId: attached.media_id } : prev);
     } catch (err) {
-      setSendError(translateApiError(err, t));
+      if (uploadToken.current === token) {
+        setSendError(translateApiError(err, t));
+        setPendingImage(prev => {
+          if (prev?.token !== token) return prev;
+          URL.revokeObjectURL(prev.preview);
+          return null;
+        });
+      }
     } finally {
-      setUploading(false);
-      // Same reason as the send mutation: uploading disables the composer, so
-      // put the caret back once it is usable again.
+      if (uploadToken.current === token) setUploading(false);
       requestAnimationFrame(() => textareaRef.current?.focus());
     }
+  };
+
+  // Switching threads (or closing the panel) drops the staged image — it
+  // belongs to the contract it was pasted into, and its object URL would
+  // otherwise leak.
+  useEffect(() => {
+    return () => {
+      uploadToken.current++;
+      setPendingImage(prev => {
+        if (prev) URL.revokeObjectURL(prev.preview);
+        return null;
+      });
+      setUploading(false);
+    };
+  }, [contractId]);
+
+  /** Discard the staged image; an in-flight upload for it is abandoned. */
+  const clearPendingImage = () => {
+    uploadToken.current++;
+    setUploading(false);
+    setPendingImage(prev => {
+      if (prev) URL.revokeObjectURL(prev.preview);
+      return null;
+    });
+    requestAnimationFrame(() => textareaRef.current?.focus());
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -611,12 +696,12 @@ export function ChatThreadPanel({
   };
 
   /**
-   * Paste-to-send: screenshots land on the clipboard as an image item with no
-   * name. Text pastes carry no file item, so they fall through to the default
-   * textarea behaviour untouched.
+   * Paste an image to stage it in the composer: screenshots land on the
+   * clipboard as an image item with no name. Text pastes carry no file item,
+   * so they fall through to the default textarea behaviour untouched.
    */
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    if (sendMutation.isPending || uploading) return;
+    if (sendMutation.isPending) return;
     const item = Array.from(e.clipboardData.items).find(
       i => i.kind === 'file' && i.type.startsWith('image/'),
     );
@@ -848,7 +933,7 @@ export function ChatThreadPanel({
           </span>
           <span className="min-w-0 flex-1 truncate text-xs text-subtle">
             {pendingBelow.message_type === 'IMAGE'
-              ? t('chat.imageMessage')
+              ? (pendingBelow.message_text?.trim() || t('chat.imageMessage'))
               : (pendingBelow.message_text ?? '')}
           </span>
           <ChevronDown size={14} className="shrink-0 text-subtle" />
@@ -865,6 +950,31 @@ export function ChatThreadPanel({
           </div>
         )}
         <div className="rounded-lg md:rounded-2xl border border-line bg-bg shadow-sm flex flex-col">
+          {pendingImage && (
+            <div className="flex items-start gap-2 px-3 pt-3 animate-pop-in">
+              <div className="relative">
+                <img
+                  src={pendingImage.preview}
+                  alt={t('chat.imageMessage')}
+                  className="h-16 w-16 rounded-lg border border-line object-cover"
+                />
+                {pendingImage.mediaId === null && (
+                  <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/50">
+                    <Loader2 size={18} className="animate-spin text-white" />
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={clearPendingImage}
+                  aria-label={t('chat.removeImage')}
+                  title={t('chat.removeImage')}
+                  className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-line bg-surface-elevated text-subtle shadow-sm cursor-pointer hover:text-primary-fg"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            </div>
+          )}
           <textarea
             ref={textareaRef}
             rows={1}
@@ -872,8 +982,8 @@ export function ChatThreadPanel({
             onChange={e => setComposer(e.target.value)}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
-            placeholder={t('chat.composerPlaceholder')}
-            disabled={sendMutation.isPending || uploading}
+            placeholder={pendingImage ? t('chat.captionPlaceholder') : t('chat.composerPlaceholder')}
+            disabled={sendMutation.isPending}
             className="w-full resize-none bg-transparent border-0 outline-0 px-3 pt-3 pb-1 text-xs md:text-sm leading-5 placeholder:text-subtle"
             style={{ minHeight: TEXTAREA_LINE_HEIGHT_PX }}
           />
@@ -886,7 +996,7 @@ export function ChatThreadPanel({
                 startIcon={<ImageIcon size={18} />}
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => fileInputRef.current?.click()}
-                disabled={sendMutation.isPending || uploading}
+                disabled={sendMutation.isPending}
                 aria-label={t('chat.attachImage')}
                 title={t('chat.attachImage')}
               />
@@ -903,7 +1013,7 @@ export function ChatThreadPanel({
                     className="btn-icon-sm"
                     startIcon={<Smile size={18} />}
                     onClick={() => setEmojiOpen(o => !o)}
-                    disabled={sendMutation.isPending || uploading}
+                    disabled={sendMutation.isPending}
                     aria-label={t('chat.emoji.button')}
                     title={t('chat.emoji.button')}
                   />
@@ -921,7 +1031,12 @@ export function ChatThreadPanel({
                 size="sm"
                 className="btn-icon-sm"
                 startIcon={<Send size={16} />}
-                disabled={!composer.trim() || sendMutation.isPending || uploading}
+                // A staged image is sendable on its own; the caption is optional.
+                // Still blocked until its upload resolves into a media_id.
+                disabled={
+                  sendMutation.isPending
+                  || (pendingImage ? pendingImage.mediaId === null : !composer.trim())
+                }
                 // Keep the caret in the composer: without this the button takes
                 // focus, then goes disabled as the text clears, stranding focus
                 // on <body>.
@@ -1199,23 +1314,32 @@ function Bubble({ message, isStaff, onOpenImage }: {
   const { url: displayUrl } = useMediaUrl(thumbKey);
 
   if (message.message_type === 'IMAGE' && storageKey) {
+    // An image may carry a caption — same row, message_text alongside media_id.
+    const caption = message.message_text?.trim();
     return (
-      <button
-        type="button"
-        onClick={() => onOpenImage(storageKey)}
-        className={`rounded-2xl overflow-hidden ${isStaff ? 'self-end' : 'self-start'} border border-line block bg-transparent p-0 cursor-zoom-in`}
-        aria-label={t('chat.imageMessage')}
+      <div
+        className={`rounded-2xl overflow-hidden ${isStaff ? 'self-end' : 'self-start'} border border-line ${caption ? bubbleClass : ''}`}
       >
-        {thumbKey && displayUrl ? (
-          <ImageWithSkeleton src={displayUrl} alt={t('chat.imageMessage')} />
-        ) : thumbKey ? (
-          <Skeleton variant="rectangular" width={120} height={120} />
-        ) : (
-          <div className="flex items-center justify-center w-[120px] h-[120px] bg-surface text-subtle">
-            <ImageIcon size={32} />
-          </div>
+        <button
+          type="button"
+          onClick={() => onOpenImage(storageKey)}
+          className="block bg-transparent p-0 cursor-zoom-in"
+          aria-label={t('chat.imageMessage')}
+        >
+          {thumbKey && displayUrl ? (
+            <ImageWithSkeleton src={displayUrl} alt={caption || t('chat.imageMessage')} />
+          ) : thumbKey ? (
+            <Skeleton variant="rectangular" width={120} height={120} />
+          ) : (
+            <div className="flex items-center justify-center w-[120px] h-[120px] bg-surface text-subtle">
+              <ImageIcon size={32} />
+            </div>
+          )}
+        </button>
+        {caption && (
+          <div className="px-3 py-2 text-sm whitespace-pre-wrap break-words">{caption}</div>
         )}
-      </button>
+      </div>
     );
   }
 

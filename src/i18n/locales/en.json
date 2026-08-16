@@ -7052,6 +7052,8 @@
     "attachFile": "File",
     "attachFileComingSoon": "File attachments coming soon",
     "uploading": "Uploading…",
+    "removeImage": "Remove image",
+    "captionPlaceholder": "Add a caption",
     "imageInvalid": "Please choose an image file",
     "imageTooLarge": "Image is too large",
     "selectToView": "Select a conversation",
