@@ -44,7 +44,18 @@ function base(over: Partial<RemoteEnrollStatus> = {}): RemoteEnrollStatus {
     has_pull_key: false,
     has_push_key: false,
     push_key_applied_at: null,
-    completed: false,
+    // Steps 6–7. The RPC evaluates may_apply_light as the LINK ISSUER, so a
+    // default of false would mock a page nobody actually gets; an unenrolled
+    // device is blocked by NOT_IN_MDM, which is the honest reason.
+    nnf_app_installed: null,
+    nnf_app_checked_at: null,
+    escrow_window_status: null,
+    escrow_has_code: false,
+    escrow_days_remaining: null,
+    enforcement_badge: 'NOT_IN_MDM',
+    may_apply_light: false,
+    apply_light_blocked_reason: 'NOT_IN_MDM',
+    enforcement_verify_state: null,
     link_expires_at: new Date(Date.now() + 2 * 3600_000 + 14 * 60_000).toISOString(),
     ...over,
   };
@@ -81,6 +92,8 @@ export const MOCK_SCENARIOS: Scenario[] = [
     status: base({
       mdm_status: 'IN_MDM', prepare_status: 'READY', in_mdm: true, can_prepare: false,
       has_pull_key: true, has_push_key: false, lock_verdict_code: 'NO_ORG_LOCK_IN_ABM',
+      escrow_window_status: 'OK', escrow_has_code: true,
+      enforcement_badge: 'NONE', may_apply_light: true, apply_light_blocked_reason: null,
     }),
   },
   {
@@ -89,18 +102,70 @@ export const MOCK_SCENARIOS: Scenario[] = [
       mdm_status: 'IN_MDM', prepare_status: 'READY', in_mdm: true, can_prepare: false,
       has_pull_key: true, has_push_key: true, push_key_applied_at: null,
       lock_verdict_code: 'ORG_KEY_NOT_APPLIED',
+      escrow_window_status: 'OK', escrow_has_code: true,
+      enforcement_badge: 'NONE', may_apply_light: true, apply_light_blocked_reason: null,
     }),
   },
   {
-    key: 'protected', label: 'Enrolled + protected',
+    key: 'protected', label: 'Enrolled + keys OK — not locked yet',
     status: base({
       mdm_status: 'IN_MDM', prepare_status: 'READY', in_mdm: true, can_prepare: false,
       has_pull_key: true, has_push_key: true, push_key_applied_at: agoIso(3),
       lock_ready: true, lock_verdict_code: 'PROTECTED',
+      nnf_app_installed: true, nnf_app_checked_at: agoIso(4),
+      escrow_window_status: 'OK', escrow_has_code: true,
+      enforcement_badge: 'NONE', may_apply_light: true, apply_light_blocked_reason: null,
     }),
   },
   {
-    key: 'failed', label: 'Prepare failed → contact branch',
+    key: 'app-missing', label: 'Step 6 — NNF app not installed',
+    status: base({
+      mdm_status: 'IN_MDM', prepare_status: 'READY', in_mdm: true, can_prepare: false,
+      has_pull_key: true, has_push_key: true, push_key_applied_at: agoIso(9),
+      lock_ready: true, lock_verdict_code: 'PROTECTED',
+      nnf_app_installed: false, nnf_app_checked_at: agoIso(2),
+      escrow_window_status: 'OK', escrow_has_code: false, escrow_days_remaining: 11,
+      enforcement_badge: 'NONE', may_apply_light: true, apply_light_blocked_reason: null,
+    }),
+  },
+  {
+    key: 'locking', label: 'Step 7 — lock command in flight',
+    status: base({
+      mdm_status: 'IN_MDM', prepare_status: 'READY', in_mdm: true, can_prepare: false,
+      has_pull_key: true, has_push_key: true, push_key_applied_at: agoIso(6),
+      lock_ready: true, lock_verdict_code: 'PROTECTED',
+      nnf_app_installed: true, nnf_app_checked_at: agoIso(6),
+      escrow_window_status: 'OK', escrow_has_code: true,
+      enforcement_badge: 'APPLYING', may_apply_light: false,
+      apply_light_blocked_reason: 'COMMAND_IN_FLIGHT',
+    }),
+  },
+  {
+    key: 'no-lock-perm', label: 'Step 7 — issuer lacks lock permission',
+    status: base({
+      mdm_status: 'IN_MDM', prepare_status: 'READY', in_mdm: true, can_prepare: false,
+      has_pull_key: true, has_push_key: true, push_key_applied_at: agoIso(6),
+      lock_ready: true, lock_verdict_code: 'PROTECTED',
+      nnf_app_installed: true, nnf_app_checked_at: agoIso(6),
+      escrow_window_status: 'OK', escrow_has_code: true,
+      enforcement_badge: 'NONE', may_apply_light: false,
+      apply_light_blocked_reason: 'NO_PERMISSION',
+    }),
+  },
+  {
+    key: 'wallpaper', label: 'Step 7 — wallpaper only (looks locked, isn\'t)',
+    status: base({
+      mdm_status: 'IN_MDM', prepare_status: 'READY', in_mdm: true, can_prepare: false,
+      has_pull_key: true, has_push_key: true, push_key_applied_at: agoIso(20),
+      lock_ready: true, lock_verdict_code: 'PROTECTED',
+      nnf_app_installed: true, nnf_app_checked_at: agoIso(20),
+      escrow_window_status: 'OK', escrow_has_code: true,
+      enforcement_badge: 'WALLPAPER_ONLY', may_apply_light: true,
+      apply_light_blocked_reason: null,
+    }),
+  },
+  {
+    key: 'failed', label: 'Prepare failed → scan into ABM',
     status: base({ mdm_status: 'PREPARE_FAILED', prepare_status: 'NOT_ON_SERVER', can_prepare: true }),
   },
   {
@@ -114,7 +179,22 @@ export const MOCK_SCENARIOS: Scenario[] = [
     key: 'expiring', label: 'Link expiring in 8 min',
     status: base({ link_expires_at: new Date(Date.now() + 8 * 60_000).toISOString() }),
   },
-  { key: 'done', label: '✅ Finished', status: base({ mdm_status: 'IN_MDM', in_mdm: true, completed: true, lock_ready: true, has_pull_key: true, has_push_key: true, push_key_applied_at: agoIso(2), can_prepare: false }) },
+  {
+    // "Finished" is now lock_ready + a REAL lock badge (isReadyToHandOver) —
+    // there is no `completed` field any more. The page keeps polling and keeps
+    // the checklist on screen; only the banner above it changes.
+    key: 'done', label: '✅ Finished — ready to hand over',
+    status: base({
+      mdm_status: 'IN_MDM', prepare_status: 'READY', in_mdm: true, can_prepare: false,
+      has_pull_key: true, has_push_key: true, push_key_applied_at: agoIso(2),
+      lock_ready: true, lock_verdict_code: 'PROTECTED',
+      nnf_app_installed: true, nnf_app_checked_at: agoIso(3),
+      escrow_window_status: 'OK', escrow_has_code: true,
+      enforcement_badge: 'LIGHT', may_apply_light: false,
+      apply_light_blocked_reason: 'ALREADY_ENFORCED',
+      enforcement_verify_state: 'VERIFIED',
+    }),
+  },
   { key: 'expired', label: '⛔ Link expired', dead: 'EXPIRED' },
   { key: 'revoked', label: '⛔ Link revoked', dead: 'REVOKED' },
   { key: 'notfound', label: '⛔ Bad token', dead: 'NOT_FOUND' },

@@ -2,49 +2,48 @@
 // Sub-tab 1 — เตรียมเครื่อง (enroll → readiness). A 7-step READINESS CHECKLIST
 // answering one question at the top: "is this device ready to hand to a customer?"
 //
-//   1–5  enrollment (unchanged, derived from mdm_status): serial, ABM scan,
-//        send-enrollment [button], wipe, device reports in.
-//   6    two AUTO-DETECTED status badges (rewritten 2026-08-01 per
-//        UI_FEEDBACK/2026-08-01_IMPLEMENT_mdm_tab1_status_badges.md): the NNF-app
-//        scan result and the escrow (Activation-Lock bypass) key window. These
-//        used to be two checkboxes, which mis-read as a staff checklist — but the
-//        values are system-detected, the user never sets them, and the iCloud one
-//        had NO backing column at all. So: NO checkboxes, just badges.
-//   7    baseline lock — fn_mdm_apply_device_policy (preview→confirm), MDM.PROFILE.
+//   1–5  enrollment: serial, ABM scan, send-enrollment [button], wipe, reports in.
+//   6    two AUTO-DETECTED status badges: the NNF-app scan result and the escrow
+//        (Activation-Lock bypass) key window.
+//   7    baseline lock — preview→confirm, MDM.PROFILE.
 //
-// Step 7 has NO app/iCloud precondition — the DB never gated on it (may_profile
-// checks only the MDM.PROFILE permission). The button is always pressable; a
-// confirm dialog reminds staff to verify iCloud/Find-My/NNF-app first, but does
-// not force a tick. The only real protection is the restriction profile itself,
-// so delaying the lock just leaves the device unprotected longer.
+// ⭐ THIS FILE OWNS ALMOST NO MARKUP. All seven steps, the status band and the
+//    wait hints come from shared/ — the public /mdm-enroll token page renders
+//    the SAME components, so a change to any step changes both screens at once.
+//    Before 2026-08-17 the step strip existed in three copies and had already
+//    drifted. What stays here is what is genuinely tab-1's: the readiness
+//    summary, the RPC wiring (fn_mdm_prepare_asset / fn_mdm_apply_template),
+//    the device-info panel and the delegation panel.
+//
+// Step 7 has NO app/iCloud precondition — the DB never gated on it. The button
+// is always pressable; the confirm dialog reminds staff to verify
+// iCloud/Find-My/NNF-app first, but does not force a tick. The only real
+// protection is the restriction profile itself, so delaying the lock just leaves
+// the device unprotected longer.
 //
 // Escrow badge (why it matters): Apple lets us pull the Activation-Lock bypass
 // code only within 15 days of enroll — miss it and recovery is impossible
-// forever. This badge surfaces that deadline before it silently passes.
+// forever. That badge surfaces the deadline before it silently passes.
 //
-// "Is it locked?" and "can I lock it?" come from the DB, NOT from enforcement_level
-// (UI_SUMMARY 134): enforcement_badge answers the first (LIGHT/MEDIUM/HARD = yes;
-// NONE/WALLPAPER_ONLY = no, even at level 1), may_apply_light answers the second.
-// Readiness summary = steps 1–5 done + a real baseline lock present (badge).
+// "Is it locked?" and "can I lock it?" come from the DB, NOT from
+// enforcement_level (UI_SUMMARY 134): enforcement_badge answers the first
+// (LIGHT/MEDIUM/HARD = yes; NONE/WALLPAPER_ONLY = no, even at level 1),
+// may_apply_light answers the second.
 // ============================================================================
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button, Modal, Badge } from 'tsp-form';
-import {
-  ShieldCheck, RefreshCw, CheckCircle, AlertTriangle, Loader2,
-  XCircle, Lock, Cloud, CircleDashed,
-  PackageCheck, PackageOpen, KeyRound, HelpCircle, LockOpen, PauseCircle, Search,
-} from 'lucide-react';
+import { Button } from 'tsp-form';
+import { ShieldCheck, RefreshCw, PackageCheck, PackageOpen, Search } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { apiClient, ApiError } from '../../../lib/api';
 import { DateTime } from '../../../components/DateTime';
-import { RelativeDateTime } from './RelativeDateTime';
-import { applyLightLock, type AssetMdmStatus, type ApplyTemplateResult, type MdmEnforcementBadge } from './mdmApi';
-import { parseMdmError } from './mdmApi';
+import { applyLightLock, parseMdmError, type AssetMdmStatus } from './mdmApi';
 import { translateApiError } from '../../../lib/apiErrors';
 import { EnrollChecklist } from './shared/EnrollChecklist';
+import { EnrollReadinessSteps, isLockedBadge } from './shared/EnrollReadinessSteps';
+import { SerialZoomModal } from './shared/SerialDisplay';
 import { fromAssetStatus, enrollDoneCount } from './shared/enrollView';
 import { EnrollDelegationPanel } from './EnrollDelegationPanel';
 
@@ -63,53 +62,6 @@ type EnrollExtras = {
   device_info_at?: string | null;
 };
 type EnrollStatus = AssetMdmStatus & EnrollExtras;
-
-// The step model, the status band, and the escalating wait hint all moved to
-// shared/EnrollChecklist — the public token page renders the identical strip, so
-// a copy here would let the two screens drift apart while branch A reads this
-// one down the phone to branch B.
-
-// enforcement_badge values that mean a real restriction profile is on the device.
-// NONE / WALLPAPER_ONLY / APPLYING / PAUSED / NOT_IN_MDM are NOT "locked".
-const LOCKED_BADGES = new Set<MdmEnforcementBadge>(['LIGHT', 'MEDIUM', 'HARD']);
-
-type StepStatus = 'done' | 'current' | 'todo';
-
-function StepRow({
-  n, icon: Icon, title, where, state, last, children,
-}: {
-  n: number;
-  icon: typeof CheckCircle;
-  title: string;
-  where?: string;
-  state: StepStatus;
-  last?: boolean;
-  children?: React.ReactNode;
-}) {
-  return (
-    <div className="flex gap-3">
-      <div className="flex flex-col items-center shrink-0">
-        <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 ${
-          state === 'current' ? 'bg-primary border-primary text-primary-contrast'
-            : state === 'done' ? 'bg-success border-success text-success-contrast'
-              : 'bg-surface border-line text-subtle'
-        }`}>
-          {state === 'done' ? <CheckCircle size={13} /> : <Icon size={12} />}
-        </div>
-        {!last && <div className={`w-0.5 flex-1 min-h-[0.75rem] my-0.5 ${state === 'done' ? 'bg-success' : 'bg-line'}`} />}
-      </div>
-      <div className="pb-3 min-w-0 flex-1">
-        <div className={`text-sm font-medium leading-snug ${
-          state === 'current' ? 'text-primary-fg' : state === 'done' ? 'text-success-fg' : 'text-fg'
-        }`}>
-          <span className="text-subtler tabular-nums">{n}. </span>{title}
-        </div>
-        {where && <div className="text-xs text-subtle leading-snug mt-0.5">{where}</div>}
-        {children && <div className="mt-2">{children}</div>}
-      </div>
-    </div>
-  );
-}
 
 export function SubTabEnroll({
   status,
@@ -131,6 +83,8 @@ export function SubTabEnroll({
   // before sending the enrollment, so it renders BIG and letter-spaced.
   const [serialZoomOpen, setSerialZoomOpen] = useState(false);
 
+  const view = fromAssetStatus(status);
+
   const prepare = useMutation({
     mutationFn: () => apiClient.rpc<PrepareResponse>('fn_mdm_prepare_asset', { p_asset_id: status.asset_id }),
     onSuccess: () => {
@@ -150,65 +104,16 @@ export function SubTabEnroll({
   });
 
   // Step readiness.
-  const doneEnroll = enrollDoneCount(status);
-  const enrollComplete = doneEnroll >= 5;               // steps 1–5
+  const enrollComplete = enrollDoneCount(status) >= 5;   // steps 1–5
   // "Locked?" comes from the badge, not enforcement_level (wallpaper fakes level 1).
-  const isLocked = LOCKED_BADGES.has(status.enforcement_badge);
-  const isApplying = status.enforcement_badge === 'APPLYING';
-  const step7Done = isLocked;
+  const step7Done = isLockedBadge(status.enforcement_badge);
   // Handover needs BOTH keys, and the DB owns that rule (lock_ready) — never
   // recompute it from has_pull_key/has_push_key. A device with the Apple key but
   // no org key reads "safe" on every other field while a customer wipe would
   // lose it outright; that is exactly what shipped a device on 2026-08-11.
   // ⛔ lock_ready gates HANDOVER only. It must never reach the step-7 lock
-  //    button — see the comment there.
+  //    button — see the comment in EnrollReadinessSteps.
   const readyToHandOver = enrollComplete && step7Done && status.lock_ready;
-
-  // Step-7 apply flow (preview→confirm). The button gate is may_apply_light ALONE.
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [preview, setPreview] = useState<ApplyTemplateResult | null>(null);
-  const [policyBusy, setPolicyBusy] = useState(false);
-  const [policyErr, setPolicyErr] = useState<string | null>(null);
-  const [applied, setApplied] = useState(false);
-
-  const openStep7 = async () => {
-    setPolicyErr(null);
-    setPreview(null);
-    setConfirmOpen(true);
-    setPolicyBusy(true);
-    try {
-      if (actorId == null) throw new Error('no actor');
-      setPreview(await applyLightLock(status.asset_id, actorId, true));
-    } catch (err) {
-      setPolicyErr(parseMdmError(err, t).message);
-    } finally {
-      setPolicyBusy(false);
-    }
-  };
-
-  const applyStep7 = async () => {
-    setPolicyBusy(true);
-    setPolicyErr(null);
-    try {
-      if (actorId == null) throw new Error('no actor');
-      await applyLightLock(status.asset_id, actorId, false); // ⛔ false = real apply
-      setApplied(true);
-      setConfirmOpen(false);
-      queryClient.invalidateQueries({ queryKey: ['asset-mdm-status', status.asset_id] });
-      onRefresh();
-    } catch (err) {
-      setPolicyErr(parseMdmError(err, t).message);
-    } finally {
-      setPolicyBusy(false);
-    }
-  };
-
-  // Step 7 state for the strip. Step 6 no longer gates it — once 1–5 are done and
-  // the lock isn't applied yet, step 7 is the current action.
-  const step7State: StepStatus = step7Done ? 'done' : (enrollComplete ? 'current' : 'todo');
-  // Step 6 is a status readout, not a checklist item — mark it done once enrolled
-  // (its badges then carry the real state), current while enrolling.
-  const step6State: StepStatus = enrollComplete ? 'done' : 'current';
 
   return (
     <div className="flex flex-col gap-4">
@@ -225,7 +130,9 @@ export function SubTabEnroll({
         </div>
       </div>
 
-      {/* ⭐ Readiness summary — the one-glance answer (§6.5). */}
+      {/* ⭐ Readiness summary — the one-glance answer (§6.5). Staff-side only:
+          it is the branch's handover decision, phrased for someone with the
+          asset record in front of them. */}
       <div className={readyToHandOver ? 'alert alert-success' : 'alert alert-warning'}>
         {readyToHandOver ? <PackageCheck size={20} className="shrink-0" /> : <PackageOpen size={20} className="shrink-0" />}
         <div className="min-w-0">
@@ -242,18 +149,14 @@ export function SubTabEnroll({
         </div>
       </div>
 
-      {/* Steps 1–5 + the status band + the wait hints now come from the SHARED
-          checklist, which the public token page renders too. That is the point:
-          branch A reads this screen down the phone to whoever is holding the
-          device at branch B, so the two must word everything identically. Steps
-          6–7 are staff-only and passed as children. */}
+      {/* All 7 steps from shared/ — the same components the token page renders. */}
       <EnrollChecklist
-        view={fromAssetStatus(status)}
-        audience="staff"
+        view={view}
         onPrepare={() => prepare.mutate()}
         preparing={prepare.isPending}
         errorMessage={errorMsg}
         hideKeyBanner
+        showRawBlockedReason
         serialSlot={status.serial_number ? (
           <div className="flex items-center gap-2 flex-wrap mb-2">
             <span className="text-xs text-subtle">{t('asset.mdm.serialCheck.label')}</span>
@@ -269,103 +172,15 @@ export function SubTabEnroll({
           </div>
         ) : undefined}
       >
-          {/* Step 6 — AUTO-DETECTED status badges. Not checkboxes: the system
-              computes these, staff never sets them. The two keys are separate
-              lines on purpose — they protect against different things and one
-              without the other is not safety (IMPLEMENT 2026-08-12). */}
-          <StepRow
-            n={6}
-            icon={Cloud}
-            title={t('asset.mdm.step6.title')}
-            state={step6State}
-          >
-            <div className="flex flex-col gap-2">
-              <StatusLine label={t('asset.mdm.step6.nnfAppLabel')}>
-                <NnfAppBadge status={status} />
-              </StatusLine>
-              <StatusLine label={t('asset.mdm.step6.pullKeyLabel')}>
-                <PullKeyBadge status={status} />
-              </StatusLine>
-              <StatusLine label={t('asset.mdm.step6.pushKeyLabel')}>
-                <PushKeyBadge status={status} />
-              </StatusLine>
-              {/* The verdict in words + what to do about it. Only worth showing
-                  once enrolled; before that both keys read "not enrolled". */}
-              {status.in_mdm && !status.lock_ready && status.lock_verdict_code && (
-                <div className="text-xs text-warning-fg inline-flex items-start gap-1">
-                  <AlertTriangle size={12} className="shrink-0 mt-0.5" />
-                  <span>{t(`asset.mdm.lockVerdict.${status.lock_verdict_code}`)}</span>
-                </div>
-              )}
-            </div>
-          </StepRow>
-
-          {/* Step 7 — baseline lock. The "การล็อค" badge answers "locked yet?" from
-              enforcement_badge; the button shows/hides on may_apply_light alone.
-              ⛔ lock_ready must NEVER be added to this button's condition. A
-              device with no org key is the one that needs this lock MOST: without
-              the org key the system picks ENFORCEMENT_LIGHT, which closes the
-              iCloud menu so the customer cannot sign out — the only protection
-              such a device has. Disabling the button would strip it. Press it
-              early and often; the system upgrades to light_open by itself once
-              the org key lands. The gate belongs at handover, not here. */}
-          <StepRow
-            n={7}
-            icon={Lock}
-            title={t('asset.mdm.step7.title')}
-            state={step7State}
-            last
-          >
-            <div className="flex flex-col gap-2">
-              <StatusLine label={t('asset.mdm.step7.lockLabel')}>
-                <EnforcementBadge badge={status.enforcement_badge} />
-              </StatusLine>
-
-              {/* WALLPAPER_ONLY looks locked but has NO real restriction — warn. */}
-              {status.enforcement_badge === 'WALLPAPER_ONLY' && (
-                <div className="text-xs text-warning-fg inline-flex items-center gap-1">
-                  <AlertTriangle size={12} className="shrink-0" />{t('asset.mdm.step7.wallpaperOnlyWarn')}
-                </div>
-              )}
-
-              {isLocked ? (
-                status.enforcement_verify_state === 'PENDING' && (
-                  <div className="text-xs text-warning-fg inline-flex items-center gap-1">
-                    <CircleDashed size={13} className="animate-spin" />{t('asset.mdm.step7.verifyPending')}
-                  </div>
-                )
-              ) : isApplying ? (
-                <div className="text-xs text-info-fg inline-flex items-center gap-1">
-                  <CircleDashed size={13} className="animate-spin" />{t('asset.mdm.step7.applied')}
-                </div>
-              ) : (
-                <div className="flex flex-col gap-1.5">
-                  <p className="text-xs text-subtle">{t('asset.mdm.step7.desc')}</p>
-                  {status.may_apply_light ? (
-                    <div>
-                      <Button
-                        color="primary"
-                        size="sm"
-                        startIcon={<Lock size={15} />}
-                        onClick={openStep7}
-                      >
-                        {t('asset.mdm.step7.button')}
-                      </Button>
-                    </div>
-                  ) : status.apply_light_blocked_reason ? (
-                    <div className="text-xs text-subtler">
-                      {t(`asset.mdm.step7.blocked.${status.apply_light_blocked_reason}`)}
-                    </div>
-                  ) : null}
-                  {applied && (
-                    <div className="text-xs text-info-fg inline-flex items-center gap-1">
-                      <CircleDashed size={13} className="animate-spin" />{t('asset.mdm.step7.applied')}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </StepRow>
+        <EnrollReadinessSteps
+          view={view}
+          onApplyLight={actorId == null ? undefined : (preview) => applyLightLock(status.asset_id, actorId, preview)}
+          onApplied={() => {
+            queryClient.invalidateQueries({ queryKey: ['asset-mdm-status', status.asset_id] });
+            onRefresh();
+          }}
+          formatError={(err) => parseMdmError(err, t).message}
+        />
       </EnrollChecklist>
 
       {/* Hand the enrollment to someone outside this branch (migs 248-250).
@@ -382,209 +197,13 @@ export function SubTabEnroll({
         </div>
       )}
 
-      {/* Serial zoom — the whole point is legibility at arm's length while the
-          device is in the other hand, so: as wide as the viewport allows, the
-          characters spaced apart (Ohm: "A B C D E"), and a plain unspaced copy
-          underneath for reading it back normally. Always mounted (§Modal rule). */}
-      <Modal
+      <SerialZoomModal
         open={serialZoomOpen}
+        serial={status.serial_number}
         onClose={() => setSerialZoomOpen(false)}
-        maxWidth="min(64rem, 96vw)"
-        width="100%"
-      >
-        <div className="modal-header">
-          <h2 className="modal-title">{t('asset.mdm.serialCheck.title')}</h2>
-          <button type="button" className="modal-close-btn" onClick={() => setSerialZoomOpen(false)}>&times;</button>
-        </div>
-        <div className="modal-content min-w-0">
-          <div className="flex flex-col items-center gap-4 py-4 min-w-0 w-full">
-            {/* MUST stay on one line — a wrapped serial defeats the whole check.
-                Mono glyphs are 0.6em wide and each carries the letter-spacing,
-                so N chars ≈ N × 0.82em: size off the length, not a fixed clamp. */}
-            <div
-              className="font-mono font-bold text-center leading-tight whitespace-nowrap w-full select-all"
-              style={{
-                fontSize: `min(9vw, ${(90 / Math.max((status.serial_number?.length ?? 1) * 0.82, 1)).toFixed(2)}vw, 4rem)`,
-                letterSpacing: '0.22em',
-                textIndent: '0.22em', // trailing letter-space would push it off-centre
-              }}
-            >
-              {status.serial_number}
-            </div>
-            <div className="font-mono text-base text-subtle break-all text-center select-all">
-              {status.serial_number}
-            </div>
-            <p className="text-xs text-subtle text-center">{t('asset.mdm.serialCheck.hint')}</p>
-          </div>
-        </div>
-        <div className="modal-footer">
-          <Button variant="ghost" onClick={() => setSerialZoomOpen(false)}>{t('common.close')}</Button>
-        </div>
-      </Modal>
-
-      {/* Step-7 confirm modal (preview→apply). Always mounted (§Modal rule). */}
-      <Modal open={confirmOpen} onClose={() => !policyBusy && setConfirmOpen(false)} maxWidth="28rem" width="100%">
-        <div className="modal-header">
-          <h2 className="modal-title">{t('asset.mdm.step7.confirmTitle')}</h2>
-        </div>
-        <div className="modal-content">
-          {policyBusy && !preview ? (
-            <div className="flex items-center gap-2 text-sm text-subtle py-2">
-              <Loader2 size={16} className="animate-spin" />{t('common.loading')}
-            </div>
-          ) : policyErr ? (
-            <div className="alert alert-danger"><XCircle size={16} /><span>{policyErr}</span></div>
-          ) : preview ? (
-            <>
-              <p className="text-sm text-subtle">{t('asset.mdm.step7.confirmBody')}</p>
-              {status.serial_number && (
-                <p className="text-sm mt-2">
-                  <span className="text-subtle">{t('asset.mdm.dunning.deviceLabel')}:</span>{' '}
-                  <span className="font-mono">{status.serial_number}</span>
-                </p>
-              )}
-              <div className="alert alert-warning mt-3">
-                <AlertTriangle size={16} className="shrink-0" />
-                <div className="min-w-0">
-                  <div className="alert-title">{t('asset.mdm.step7.reminderTitle')}</div>
-                  <ul className="alert-description mt-1 flex flex-col gap-0.5 list-disc pl-4">
-                    <li>{t('asset.mdm.step7.reminderIcloud')}</li>
-                    <li>{t('asset.mdm.step7.reminderFindMy')}</li>
-                    <li>{t('asset.mdm.step7.reminderNnfApp')}</li>
-                  </ul>
-                </div>
-              </div>
-              <ul className="text-xs text-subtle mt-3 flex flex-col gap-1">
-                {preview.restrictions.map((r) => (
-                  <li key={r.key} className="inline-flex items-center gap-1.5">
-                    <Lock size={11} className="shrink-0" />
-                    {t(`asset.mdm.step7.flag.${r.key}`, { defaultValue: r.key })}
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : null}
-        </div>
-        <div className="modal-footer">
-          <Button variant="ghost" onClick={() => setConfirmOpen(false)} disabled={policyBusy}>{t('common.cancel')}</Button>
-          <Button color="primary" onClick={applyStep7} disabled={policyBusy || !preview} startIcon={<Lock size={15} />}>
-            {t('asset.mdm.step7.confirmButton')}
-          </Button>
-        </div>
-      </Modal>
+      />
     </div>
   );
-}
-
-/** A step-6 status readout row: label on the left, an auto-detected badge on
- *  the right. These replaced the old checkboxes — the values are system-computed. */
-function StatusLine({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-center gap-2 flex-wrap text-sm">
-      <span className="text-subtle">{label}</span>
-      {children}
-    </div>
-  );
-}
-
-/** "การล็อค" badge — the single answer to "locked yet?" (enforcement_badge).
- *  NONE / WALLPAPER_ONLY are deliberately NOT green: no real restriction on the
- *  device. NOT_IN_MDM renders nothing (step 7 is unreachable until enrolled). */
-const ENFORCEMENT_BADGE_STYLE: Record<
-  MdmEnforcementBadge,
-  { color: 'default' | 'success' | 'warning' | 'danger' | 'info'; icon: typeof Lock } | null
-> = {
-  NOT_IN_MDM: null,
-  APPLYING: { color: 'info', icon: CircleDashed },
-  NONE: { color: 'default', icon: LockOpen },
-  WALLPAPER_ONLY: { color: 'warning', icon: LockOpen },
-  LIGHT: { color: 'success', icon: Lock },
-  MEDIUM: { color: 'success', icon: Lock },
-  HARD: { color: 'success', icon: Lock },
-  PAUSED: { color: 'warning', icon: PauseCircle },
-};
-function EnforcementBadge({ badge }: { badge: MdmEnforcementBadge }) {
-  const { t } = useTranslation();
-  const style = ENFORCEMENT_BADGE_STYLE[badge];
-  if (!style) return <span className="text-xs text-subtler">{t(`asset.mdm.lock.${badge}`)}</span>;
-  const Icon = style.icon;
-  return (
-    <Badge color={style.color} startIcon={<Icon size={12} className={badge === 'APPLYING' ? 'animate-spin' : ''} />}>
-      {t(`asset.mdm.lock.${badge}`)}
-    </Badge>
-  );
-}
-
-/** NNF-app scan result. Three distinct states — null (never scanned) must NOT
- *  read as "not installed", or it accuses the customer before we've even checked. */
-function NnfAppBadge({ status }: { status: EnrollStatus }) {
-  const { t } = useTranslation();
-  if (status.nnf_app_installed == null) {
-    return <Badge color="default" startIcon={<HelpCircle size={12} />}>{t('asset.mdm.step6.nnfUnknown')}</Badge>;
-  }
-  if (status.nnf_app_installed) {
-    return (
-      <>
-        <Badge color="success" startIcon={<CheckCircle size={12} />}>{t('asset.mdm.step6.nnfInstalled')}</Badge>
-        {status.nnf_app_checked_at && <span className="text-xs text-subtler"><RelativeDateTime value={status.nnf_app_checked_at} /></span>}
-      </>
-    );
-  }
-  return (
-    <>
-      <Badge color="warning" startIcon={<XCircle size={12} />}>{t('asset.mdm.step6.nnfNotInstalled')}</Badge>
-      {status.nnf_app_checked_at && <span className="text-xs text-subtler"><RelativeDateTime value={status.nnf_app_checked_at} /></span>}
-    </>
-  );
-}
-
-/** 🍎 The APPLE key (pull) — unlocks the customer's iCloud when we repossess.
- *  Pulled from Apple inside a 15-day window; miss it and a repossessed device
- *  can never be unlocked. Order matters: window_status==null FIRST (not
- *  enrolled), else has_code, else OK vs EXPIRED — has_code alone means nothing,
- *  an unenrolled device also reports false. */
-function PullKeyBadge({ status }: { status: EnrollStatus }) {
-  const { t } = useTranslation();
-  if (status.escrow_window_status == null) {
-    return <Badge color="default" startIcon={<HelpCircle size={12} />}>{t('asset.mdm.step6.escrowNotEnrolled')}</Badge>;
-  }
-  if (status.escrow_has_code) {
-    return <Badge color="success" startIcon={<KeyRound size={12} />}>{t('asset.mdm.step6.escrowHasKey')}</Badge>;
-  }
-  if (status.escrow_window_status === 'OK') {
-    return (
-      <Badge color="warning" startIcon={<AlertTriangle size={12} />}>
-        {t('asset.mdm.step6.escrowRacing', { days: status.escrow_days_remaining ?? 0 })}
-      </Badge>
-    );
-  }
-  return <Badge color="danger" startIcon={<XCircle size={12} />}>{t('asset.mdm.step6.escrowMissed')}</Badge>;
-}
-
-/** 🏢 The ORG key (push) — generated by us and pushed into the device so a wipe
- *  leaves it unusable without our code. THREE states, not two: having the key is
- *  not the same as Apple having confirmed it landed (push_key_applied_at). Only
- *  the third state protects the device.
- *
- *  It arrives 30s–6min after supervision (vs 1–3s for the Apple key), so a
- *  freshly-enrolled device legitimately shows 🍎 green / 🏢 pending. That is not
- *  a hang — but it is also NOT safe to hand over. */
-function PushKeyBadge({ status }: { status: EnrollStatus }) {
-  const { t } = useTranslation();
-  if (!status.in_mdm) {
-    return <Badge color="default" startIcon={<HelpCircle size={12} />}>{t('asset.mdm.step6.escrowNotEnrolled')}</Badge>;
-  }
-  if (!status.has_push_key) {
-    return <Badge color="danger" startIcon={<XCircle size={12} />}>{t('asset.mdm.step6.orgKeyMissing')}</Badge>;
-  }
-  if (!status.push_key_applied_at) {
-    return (
-      <Badge color="warning" startIcon={<CircleDashed size={12} className="animate-spin" />}>
-        {t('asset.mdm.step6.orgKeyInstalling')}
-      </Badge>
-    );
-  }
-  return <Badge color="success" startIcon={<ShieldCheck size={12} />}>{t('asset.mdm.step6.orgKeyOk')}</Badge>;
 }
 
 function DeviceInfo({ status }: { status: EnrollStatus }) {

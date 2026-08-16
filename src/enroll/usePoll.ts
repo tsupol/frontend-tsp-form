@@ -29,10 +29,27 @@ function recent(iso: string | null | undefined, minutes: number): boolean {
 // Both rules matter: HOT decays (a wait for a human may never end — a real case
 // ran 108 minutes), and waiting on a person is never HOT (no polling frequency
 // gets a device scanned into ABM).
+//
+// Mirrors shared/useEnrollPoll.isHot, including the step-7 cases: this page now
+// renders all 7 steps, so a lock command in flight and the org key landing have
+// to tick at 5s here exactly as they do on tab-1 — the two people are on the
+// phone to each other watching the same badges.
 function isHot(s: RemoteEnrollStatus | null): boolean {
   if (!s) return false;
+  // The server is pushing the enrollment profile right now — done in ~10s.
   if (s.prepare_status === 'PENDING') return true;
+  // Profile pushed, waiting for a human to wipe. Hot for 10 minutes only.
   if (s.prepare_status === 'READY' && !s.in_mdm && recent(s.prepare_requested_at, 10)) return true;
+  // A lock command is in flight; the button un-disables when it settles.
+  if (s.enforcement_badge === 'APPLYING') return true;
+  // Enrolled but not yet safe to hand over, org key genuinely on its way
+  // (30s–6min). No in_mdm_since on this payload, so anchor the decay on the
+  // prepare timestamp — the same request that produced the enrollment.
+  if (
+    s.in_mdm && !s.lock_ready
+    && (s.lock_verdict_code === 'ORG_KEY_NOT_APPLIED' || s.lock_verdict_code === 'NO_ORG_LOCK_IN_ABM')
+    && recent(s.prepare_requested_at, 30)
+  ) return true;
   return false;
 }
 
@@ -64,9 +81,13 @@ export function usePoll(token: string | null): PollState {
       setData(row);
       setOffline(false);
       setUpdatedAt(Date.now());
-      // The link closes itself on completion; polling on would only collect
-      // COMPLETED rejections.
-      if (row.completed) { stopped.current = true; return; }
+      // ⛔ Do NOT stop on a "finished" state. Links used to close themselves once
+      //    the device was in MDM and locked; mig 251 removed that, because it
+      //    killed re-enroll links on their very first poll (the device is
+      //    already IN_MDM) and it cut the holder off before step 7. The link now
+      //    dies only by 3h expiry, revoke, or replace — all of which arrive as
+      //    an EnrollLinkDead below. So keep polling: the holder may still lock
+      //    the device, and the screen must keep reflecting it.
       timer.current = setTimeout(tick, isHot(row) ? POLL_HOT : POLL_IDLE);
     } catch (err) {
       if (err instanceof EnrollLinkDead) {

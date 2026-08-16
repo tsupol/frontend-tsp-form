@@ -58,6 +58,41 @@ export function enrollStringsPlugin() {
       const keysSrc = await readFile(path.join(root, 'enroll/enrollStringKeys.ts'), 'utf8');
       const keys = Array.from(keysSrc.matchAll(/'([^']+)'\s*,/g)).map((m) => m[1]);
 
+      // ── The INVERSE check: a key the page renders but nobody listed ─────────
+      // The allowlist below catches a listed key that vanished from the locale
+      // files. This catches the other direction, which is the one that actually
+      // bites now that /mdm-enroll renders the SAME components as MDM tab-1: add
+      // a t() call to shared/EnrollChecklist for tab-1, forget the allowlist,
+      // and the token page renders "asset.mdm.step7.newThing" as literal text on
+      // a stranger's phone. Nothing else would catch it — the admin app has the
+      // full locale file and looks perfectly fine.
+      //
+      // Static t('...') calls only; template keys (t(`a.b.${x}`)) can't be
+      // enumerated here and stay a manual responsibility.
+      const RENDERED_BY_ENROLL = [
+        'enroll/EnrollApp.tsx',
+        'pages/inventory/mdm/shared/EnrollChecklist.tsx',
+        'pages/inventory/mdm/shared/EnrollReadinessSteps.tsx',
+        'pages/inventory/mdm/shared/SerialDisplay.tsx',
+        'pages/inventory/mdm/shared/StepRow.tsx',
+      ];
+      const listed = new Set(keys);
+      const unlisted: string[] = [];
+      for (const rel of RENDERED_BY_ENROLL) {
+        const src = await readFile(path.join(root, rel), 'utf8');
+        for (const m of src.matchAll(/\bt\(\s*'([^']+)'/g)) {
+          if (!listed.has(m[1])) unlisted.push(`${rel}: ${m[1]}`);
+        }
+      }
+      if (unlisted.length) {
+        throw new Error(
+          `[enroll-strings] key(s) rendered by the enrollment page but missing from\n`
+          + `src/enroll/enrollStringKeys.ts — they would render as raw dotted text:\n  `
+          + `${unlisted.join('\n  ')}\n`
+          + `Add them to ENROLL_STRING_KEYS.`,
+        );
+      }
+
       const pick = (tree: unknown, dotted: string): string | undefined => {
         let cur: unknown = tree;
         for (const part of dotted.split('.')) {

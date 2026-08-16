@@ -2606,8 +2606,7 @@
         },
         "CHECK_SERIAL": {
           "title": "Wiped it already but it still hasn't enrolled?",
-          "body": "Check that the serial printed on the device or its box matches the serial on this asset. If they differ, the enrollment profile went to a different device and this one will never report in.",
-          "bodyRemote": "Check that the serial printed on the device or its box matches the one shown above. If they differ, contact the branch that sent you this link."
+          "body": "Check that the serial printed on the device or its box matches the serial shown above. If they differ, the enrollment profile went to a different device and this one will never report in."
         },
         "waiting": "Waiting {{time}}"
       },
@@ -2982,11 +2981,7 @@
         },
         "PREPARE_FAILED": {
           "title": "Couldn't send — the device may not be scanned into ABM yet",
-          "body": "Check in ABM that this device is there. The system will retry on its own within 1 hour."
-        },
-        "PREPARE_FAILED_REMOTE": {
-          "title": "Can't continue — please contact the branch",
-          "body": "This device needs to be set up by the branch that sent you this link. Call them and read them the serial number above."
+          "body": "Scan the device into ABM and choose MDM server: NNF-MDM-1. The system will retry on its own within 1 hour — or contact the branch that issued this link."
         },
         "IN_MDM": {
           "title": "Device is in the system",

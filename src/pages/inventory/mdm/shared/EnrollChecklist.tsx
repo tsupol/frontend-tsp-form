@@ -1,19 +1,19 @@
 // ============================================================================
-// EnrollChecklist — the enroll picture, rendered identically for both audiences.
+// EnrollChecklist — the enroll picture, rendered identically on both screens.
 //
-// One renderer, two hosts (IMPLEMENT 2026-08-15 §2: "render เหมือน tab-1 +
-// polling เหมือน tab-1"). Branch A watching tab-1 talks branch B through the
-// wipe over the phone; if the two screens word things differently the call goes
-// in circles. So the component is PRESENTATIONAL — it takes an EnrollView and
-// callbacks, and owns no query, no auth, no asset id.
+// One renderer, two hosts: MDM tab-1 and the public /mdm-enroll token page.
+// Branch A watching tab-1 talks the link holder through the wipe over the phone;
+// if the two screens word things differently the call goes in circles. So the
+// component is PRESENTATIONAL — it takes an EnrollView and callbacks, and owns
+// no query, no auth, no asset id.
 //
-// `audience` drives exactly two documented divergences and nothing else:
-//   · remote: a stuck enrollment says "call branch A" instead of "assign it in
-//     ABM" — the link holder has no ABM access and never will.
-//   · remote: steps 6/7 (keys, baseline lock) are branch A's business; the
-//     delegate sees enrollment only.
-// Resist adding a third: every extra branch is a way for the two screens to
-// disagree, which is the failure this component exists to prevent.
+// ⛔ THERE IS NO `audience` PROP ANY MORE, and nothing here may branch on who is
+//    looking. The original contract gave the token page a reduced subset (5 of 7
+//    steps, softer PREPARE_FAILED wording, no lock button); the owner overruled
+//    it on 2026-08-17 — the link holder is staff at another branch on the SAME
+//    ABM, so they can do everything tab-1 can, including scanning the device
+//    into ABM. Every re-introduced branch is a way for the two screens to
+//    disagree, which is the failure this component exists to prevent.
 // ============================================================================
 
 import type { ReactNode } from 'react';
@@ -24,8 +24,9 @@ import {
   Loader2, XCircle, HelpCircle, ShieldCheck, CircleDashed, PackageCheck,
   PackageOpen,
 } from 'lucide-react';
-import { enrollDoneCount, waitStage, type EnrollView, type EnrollAudience } from './enrollView';
+import { enrollDoneCount, waitStage, type EnrollView } from './enrollView';
 import { useTicker, secondsSince, splitDuration } from './useTicker';
+import { StepRow, type StepStatus } from './StepRow';
 
 // ── Step model ──────────────────────────────────────────────────────────────
 
@@ -36,47 +37,6 @@ const STEPS_1_5 = [
   { key: 'wipe', icon: RotateCcw, where: 'device' },
   { key: 'enrolled', icon: Smartphone, where: 'auto' },
 ] as const;
-
-type StepStatus = 'done' | 'current' | 'todo';
-
-function StepRow({
-  n, icon: Icon, title, where, state, last, children,
-}: {
-  n: number;
-  icon: typeof CheckCircle;
-  title: string;
-  where?: string;
-  state: StepStatus;
-  last?: boolean;
-  children?: ReactNode;
-}) {
-  return (
-    <div className="flex gap-3">
-      <div className="flex flex-col items-center shrink-0">
-        {/* motion-safe: the colour change is the only cue that the flow moved
-            forward, so it transitions rather than snapping — but a user who
-            asked for less motion gets it instantly. */}
-        <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 motion-safe:transition-colors motion-safe:duration-200 ${
-          state === 'current' ? 'bg-primary border-primary text-primary-contrast'
-            : state === 'done' ? 'bg-success border-success text-success-contrast'
-              : 'bg-surface border-line text-subtle'
-        }`}>
-          {state === 'done' ? <CheckCircle size={13} /> : <Icon size={12} />}
-        </div>
-        {!last && <div className={`w-0.5 flex-1 min-h-[0.75rem] my-0.5 motion-safe:transition-colors motion-safe:duration-200 ${state === 'done' ? 'bg-success' : 'bg-line'}`} />}
-      </div>
-      <div className="pb-3 min-w-0 flex-1">
-        <div className={`text-sm font-medium leading-snug motion-safe:transition-colors ${
-          state === 'current' ? 'text-primary-fg' : state === 'done' ? 'text-success-fg' : 'text-fg'
-        }`}>
-          <span className="text-subtler tabular-nums">{n}. </span>{title}
-        </div>
-        {where && <div className="text-xs text-subtle leading-snug mt-0.5">{where}</div>}
-        {children && <div className="mt-2">{children}</div>}
-      </div>
-    </div>
-  );
-}
 
 // ── The two-key banner ──────────────────────────────────────────────────────
 // 🍎 pull key  — pulled FROM Apple, expires 15 days after enroll. Unlocks the
@@ -165,7 +125,7 @@ const BAND_CLASS: Record<BandTone, string> = {
  * says "we're working on it", and staff sit watching it instead of going and
  * wiping the handset, which is the one thing that would move the flow forward.
  */
-function bandFor(view: EnrollView, audience: EnrollAudience): {
+function bandFor(view: EnrollView): {
   key: string; tone: BandTone; spin: boolean; instruction: boolean;
 } {
   // A re-enroll keeps mdm_status at IN_MDM (the view checks the binding first),
@@ -178,13 +138,12 @@ function bandFor(view: EnrollView, audience: EnrollAudience): {
     case 'NOT_STARTED': return { key: 'NOT_STARTED', tone: 'neutral', spin: false, instruction: false };
     case 'PREPARING': return { key: 'PREPARING', tone: 'info', spin: true, instruction: false };
     case 'PROFILE_READY': return { key: 'PROFILE_READY', tone: 'warning', spin: false, instruction: true };
-    case 'PREPARE_FAILED':
-      // The one wording split: B cannot scan a device into ABM, so telling them
-      // to do it is a dead end. They phone branch A instead.
-      return {
-        key: audience === 'remote' ? 'PREPARE_FAILED_REMOTE' : 'PREPARE_FAILED',
-        tone: 'danger', spin: false, instruction: false,
-      };
+    // ⛔ ONE wording for both screens. There used to be a PREPARE_FAILED_REMOTE
+    //    variant reading "contact branch A", on the belief that the link holder
+    //    had no ABM access. They do — same ABM, they just don't use NNF — so the
+    //    dead end was fictional and the real instruction (scan it into ABM,
+    //    pick MDM server NNF-MDM-1) applies to them too.
+    case 'PREPARE_FAILED': return { key: 'PREPARE_FAILED', tone: 'danger', spin: false, instruction: false };
     case 'IN_MDM': return { key: 'IN_MDM', tone: 'success', spin: false, instruction: false };
     default: return { key: 'NOT_STARTED', tone: 'neutral', spin: false, instruction: false };
   }
@@ -206,7 +165,6 @@ function WipeInstructions() {
 
 export interface EnrollChecklistProps {
   view: EnrollView;
-  audience: EnrollAudience;
   /** Host owns the RPC; this component only asks. Omit to hide the button. */
   onPrepare?: () => void;
   preparing?: boolean;
@@ -214,19 +172,23 @@ export interface EnrollChecklistProps {
   errorMessage?: string | null;
   /** Rendered inside step 3, under the serial (tab-1 puts its zoom button here). */
   serialSlot?: ReactNode;
-  /** Appended after step 5 — tab-1's steps 6 and 7. */
+  /** Steps 6 and 7 — <EnrollReadinessSteps>, wired to the host's RPC. */
   children?: ReactNode;
-  /** Hide the key banner (the remote page shows its own placement). */
+  /** Hide the key banner (a host that shows the same information elsewhere). */
   hideKeyBanner?: boolean;
+  /** Raw BE reason under a failed prepare. Engineer-facing English, so tab-1
+   *  shows it and the token page does not — a presentation choice the host
+   *  makes, not a divergence in what the flow MEANS. */
+  showRawBlockedReason?: boolean;
 }
 
 export function EnrollChecklist({
-  view, audience, onPrepare, preparing = false, errorMessage,
-  serialSlot, children, hideKeyBanner = false,
+  view, onPrepare, preparing = false, errorMessage,
+  serialSlot, children, hideKeyBanner = false, showRawBlockedReason = false,
 }: EnrollChecklistProps) {
   const { t } = useTranslation();
 
-  const band = bandFor(view, audience);
+  const band = bandFor(view);
   const doneEnroll = enrollDoneCount(view);
 
   // Waiting for a human to wipe: the profile is pushed and the device hasn't
@@ -263,9 +225,7 @@ export function EnrollChecklist({
           {/* An instruction state gets the literal steps, not a progress mood. */}
           {band.instruction && <WipeInstructions />}
 
-          {/* The raw BE reason, for staff only — it is engineer-facing English
-              and would only alarm a delegate who cannot act on it anyway. */}
-          {audience === 'staff' && view.mdm_status === 'PREPARE_FAILED' && view.prepare_blocked_reason && (
+          {showRawBlockedReason && view.mdm_status === 'PREPARE_FAILED' && view.prepare_blocked_reason && (
             <div className="alert-description font-mono break-words mt-1">{view.prepare_blocked_reason}</div>
           )}
 
@@ -287,11 +247,7 @@ export function EnrollChecklist({
           <HelpCircle size={20} className="shrink-0" />
           <div className="min-w-0">
             <div className="alert-title">{t(`asset.mdm.waitHint.${stage}.title`)}</div>
-            <div className="alert-description">
-              {t(audience === 'remote' && stage === 'CHECK_SERIAL'
-                ? 'asset.mdm.waitHint.CHECK_SERIAL.bodyRemote'
-                : `asset.mdm.waitHint.${stage}.body`)}
-            </div>
+            <div className="alert-description">{t(`asset.mdm.waitHint.${stage}.body`)}</div>
           </div>
         </div>
       )}

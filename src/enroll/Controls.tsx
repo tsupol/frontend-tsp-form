@@ -38,13 +38,25 @@ function write(key: string, value: string) {
   }
 }
 
+/**
+ * The page's starting language: ?lang, else the stored choice, else Thai — the
+ * reader is standing in a Thai shop.
+ *
+ * Exported because main.tsx needs it BEFORE the first render to seed i18next;
+ * having one function rather than two copies of the precedence keeps the
+ * pre-render language and the hook's initial state from disagreeing.
+ *
+ * ⛔ Never reads the admin app's `i18nextLng`, and nothing here writes it.
+ */
+export function readInitialLang(): Lang {
+  const req = new URLSearchParams(window.location.search).get('lang');
+  if (req === 'en' || req === 'th') return req;
+  return readStored<Lang>(LANG_KEY, LANGS) ?? 'th';
+}
+
 /** Thai default: the reader is standing in a Thai shop. ?lang=en overrides. */
 export function useLang(): [Lang, (l: Lang) => void] {
-  const [lang, setLangState] = useState<Lang>(() => {
-    const req = new URLSearchParams(window.location.search).get('lang');
-    if (req === 'en' || req === 'th') return req;
-    return readStored<Lang>(LANG_KEY, LANGS) ?? 'th';
-  });
+  const [lang, setLangState] = useState<Lang>(readInitialLang);
   const setLang = (l: Lang) => {
     write(LANG_KEY, l);
     setLangState(l);

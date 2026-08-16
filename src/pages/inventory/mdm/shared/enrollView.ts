@@ -7,9 +7,10 @@
 //   · /mdm-enroll (public token) ← fn_mdm_remote_enroll_status  → fromRemoteStatus
 //
 // BE deliberately gave the remote RPC the SAME field names as the view
-// (IMPLEMENT 2026-08-15 §2.1) precisely so one renderer can serve both: the
-// staffer at branch A on the phone must see what the link holder at branch B
-// sees, or they cannot talk each other through the wipe.
+// (IMPLEMENT 2026-08-15 §2.1, widened to the full row on 2026-08-17) precisely
+// so one renderer can serve both: the staffer at branch A on the phone must see
+// what the link holder at branch B sees, or they cannot talk each other through
+// the wipe.
 //
 // ⛔ WHY THIS FILE IS THE SECURITY BOUNDARY. The token page is anonymous by
 //    design — the token self-authenticates, so anyone holding the link renders
@@ -17,15 +18,15 @@
 //    it copies field-by-field (never spreads), so a customer name / contract /
 //    branch note added to some future response cannot silently reach the public
 //    DOM. issued_to_note in particular is internal-only: BE forbids it in the
-//    URL, the QR, and this page (§1.2). Keep every addition here explicit.
+//    URL, the QR, and this page (§1.2). Keep every addition here explicit —
+//    this stayed field-by-field even after the payload grew to the full row,
+//    which is the whole reason a future BE column cannot leak by accident.
 // ============================================================================
 
 import type {
   AssetMdmStatus, MdmStatusCode, MdmPrepareStatus, MdmLockVerdictCode,
+  MdmEnforcementBadge, MdmApplyLightBlockedReason, MdmVerifyState,
 } from '../mdmApi';
-
-/** Who is looking. Drives the two documented divergences, nothing else. */
-export type EnrollAudience = 'staff' | 'remote';
 
 export interface EnrollView {
   serial_number: string | null;
@@ -54,11 +55,27 @@ export interface EnrollView {
   /** null WITH has_push_key = key exists, Apple hasn't confirmed it landed. */
   push_key_applied_at: string | null;
 
-  // Tab-1 only. The remote RPC does not return these, and that is correct:
-  // the app scan takes 7–38 min (so it would read ⚪ for the link holder's whole
-  // session) and the lock state is none of a delegate's business.
-  nnf_app_installed?: boolean | null;
-  nnf_app_checked_at?: string | null;
+  // ── Step 6: the auto-detected readouts ────────────────────────────────────
+  // Both screens show these since 2026-08-17. The earlier contract withheld
+  // them from the token page on the reasoning that the app scan takes 7–38 min
+  // and the delegate could do nothing about it; the owner overruled that — the
+  // link holder is staff at another branch and gets the whole picture.
+  nnf_app_installed: boolean | null;
+  nnf_app_checked_at: string | null;
+  /** 🍎 Apple key window. null = not enrolled, so "no key" is not yet a fault. */
+  escrow_window_status: 'OK' | 'EXPIRED' | null;
+  escrow_has_code: boolean;
+  escrow_days_remaining: number | null;
+
+  // ── Step 7: the baseline lock ─────────────────────────────────────────────
+  // ⛔ enforcement_badge answers "is it locked", NOT enforcement_level —
+  //    wallpaper bumps the level to 1 with no real restriction.
+  // ⛔ may_apply_light is the ONE gate on the button. Never AND it with
+  //    lock_ready: a device with no org key needs the lock MOST.
+  enforcement_badge: MdmEnforcementBadge;
+  may_apply_light: boolean;
+  apply_light_blocked_reason: MdmApplyLightBlockedReason | null;
+  enforcement_verify_state: MdmVerifyState | null;
 }
 
 /** tab-1 — the logged-in staff view. */
@@ -80,16 +97,29 @@ export function fromAssetStatus(s: AssetMdmStatus): EnrollView {
     push_key_applied_at: s.push_key_applied_at,
     nnf_app_installed: s.nnf_app_installed,
     nnf_app_checked_at: s.nnf_app_checked_at,
+    escrow_window_status: s.escrow_window_status,
+    escrow_has_code: s.escrow_has_code,
+    escrow_days_remaining: s.escrow_days_remaining,
+    enforcement_badge: s.enforcement_badge,
+    may_apply_light: s.may_apply_light,
+    apply_light_blocked_reason: s.apply_light_blocked_reason,
+    enforcement_verify_state: s.enforcement_verify_state,
   };
 }
 
 /**
  * The public token page. Field-by-field on purpose — see the header.
  *
- * `may_prepare` is hard-coded true: the remote RPC has no permission column
- * because holding the link IS the authorisation (BE granted status/retry to
- * PUBLIC and self-gates on the token). `can_prepare` still decides whether the
- * button is offered, exactly as in tab-1.
+ * Since mig 251 the RPC returns the full v_asset_mdm_status row with the same
+ * field names, and evaluates the may_* permissions AS THE LINK ISSUER. So
+ * may_apply_light arrives already answered and is copied straight through — do
+ * NOT hard-code it, or a branch that lost the permission would still see the
+ * button and get a 403 on press.
+ *
+ * `may_prepare` is the one exception: the row has no such column for this path
+ * because holding the link IS the authorisation (BE granted status/retry/
+ * apply_light to PUBLIC and self-gates on the token). `can_prepare` still
+ * decides whether the button is offered, exactly as in tab-1.
  */
 export function fromRemoteStatus(r: RemoteEnrollStatus): EnrollView {
   return {
@@ -106,11 +136,19 @@ export function fromRemoteStatus(r: RemoteEnrollStatus): EnrollView {
     lock_verdict_code: r.lock_verdict_code,
     has_pull_key: r.has_pull_key,
     has_push_key: r.has_push_key,
-    // Not in the remote payload. undefined (not false) so the 🏢 badge shows
-    // "installing" rather than claiming Apple confirmed a key that we simply
-    // were not told about.
     push_key_applied_at: r.push_key_applied_at ?? null,
-    // Deliberately absent — see the interface comment.
+    nnf_app_installed: r.nnf_app_installed ?? null,
+    nnf_app_checked_at: r.nnf_app_checked_at ?? null,
+    escrow_window_status: r.escrow_window_status ?? null,
+    escrow_has_code: r.escrow_has_code ?? false,
+    escrow_days_remaining: r.escrow_days_remaining ?? null,
+    enforcement_badge: r.enforcement_badge ?? 'NOT_IN_MDM',
+    may_apply_light: r.may_apply_light ?? false,
+    apply_light_blocked_reason: r.apply_light_blocked_reason ?? null,
+    enforcement_verify_state: r.enforcement_verify_state ?? null,
+    // ⛔ Deliberately NOT copied, and there is no line to delete here — the
+    //    issuer-side block (may_enroll_delegate, enroll_link_*, issued_to_note)
+    //    must never reach the public DOM.
   };
 }
 
@@ -150,10 +188,19 @@ export function waitStage(requestedAt: string | null | undefined): WaitStage {
   return 'FRESH';                                     // 11 of 12 land inside 10 min
 }
 
-// ── The remote payload (IMPLEMENT 2026-08-15 §2.1) ──────────────────────────
+// ── The remote payload (mig 251, ANSWER 2026-08-17) ─────────────────────────
 // Declared here rather than in mdmApi because this file owns what may cross
 // into the public page; keeping the shape next to its normaliser makes an
 // unreviewed field addition obvious.
+//
+// The RPC now returns the FULL v_asset_mdm_status row, so it carries far more
+// than this. Only the fields the checklist renders are declared — an undeclared
+// field cannot be copied by fromRemoteStatus, which is the point.
+//
+// ⛔ `completed` was REMOVED by mig 251. Do not re-add it or read it: links no
+//    longer close themselves on success (that killed re-enroll links on the
+//    first poll). A link dies only by 3h expiry, revoke, or replace. "Finished"
+//    is now lock_ready && enforcement_badge is a real lock.
 
 export interface RemoteEnrollStatus {
   serial_number: string | null;
@@ -169,8 +216,34 @@ export interface RemoteEnrollStatus {
   has_pull_key: boolean;
   has_push_key: boolean;
   push_key_applied_at?: string | null;
-  /** true = the device is enrolled and safe; the link closes itself. */
-  completed: boolean;
+
+  // Steps 6–7, arriving since mig 251. Optional in the type because a link
+  // issued before the migration is still in flight against the old shape for
+  // its remaining 3 hours; the ?? defaults in fromRemoteStatus cover that.
+  nnf_app_installed?: boolean | null;
+  nnf_app_checked_at?: string | null;
+  escrow_window_status?: 'OK' | 'EXPIRED' | null;
+  escrow_has_code?: boolean;
+  escrow_days_remaining?: number | null;
+  enforcement_badge?: MdmEnforcementBadge;
+  may_apply_light?: boolean;
+  apply_light_blocked_reason?: MdmApplyLightBlockedReason | null;
+  enforcement_verify_state?: MdmVerifyState | null;
+
   /** When the link dies. Shown as a live countdown so nobody is surprised. */
   link_expires_at: string | null;
+}
+
+/**
+ * "Ready to hand over" — the finished state, for both screens.
+ *
+ * ⛔ NOT `completed`: mig 251 removed that field, so the shipped token page
+ *    reads undefined and its success screen can never appear. Steps 1–5 done +
+ *    a real baseline lock + both keys (lock_ready, DB-owned) is the same rule
+ *    tab-1's readiness banner uses.
+ */
+export function isReadyToHandOver(v: EnrollView): boolean {
+  return v.in_mdm
+    && v.lock_ready
+    && (v.enforcement_badge === 'LIGHT' || v.enforcement_badge === 'MEDIUM' || v.enforcement_badge === 'HARD');
 }

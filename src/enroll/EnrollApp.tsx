@@ -1,31 +1,43 @@
 // ============================================================================
-// The standalone enrollment page — branch B's whole world.
+// The standalone enrollment page — the QR link holder's whole world.
 //
-// WHO IS LOOKING: not our staff. A customer of branch A collects the handset at
-// branch B, which may have no NNF login at all. They scanned a QR on a phone and
-// have never seen this system. One column, big targets, plain language.
+// WHO IS LOOKING: staff at another branch, on the SAME ABM, who simply do not
+// use NNF. The owner's framing (2026-08-17): the link says "be MDM staff for
+// this one device — the customer walked into your shop." So they get ALL SEVEN
+// STEPS with nothing read-only. It is safe because the ceremony is impossible
+// without the physical handset AND the device being in our ABM; the token only
+// names WHICH device. Someone outside the ABM can hold this link and do nothing
+// with it — the scan fails and the device never appears.
 //
-// WHY IT DOESN'T IMPORT THE ADMIN COMPONENTS: it shares WORDING, not markup
-// (see strings.ts). Pulling in EnrollChecklist would drag tsp-form, i18next and
-// the theme layer back in, which is exactly the weight this entry exists to
-// avoid. The visual design is free to differ; the sentences are not.
+// ⭐ IT RENDERS THE SAME COMPONENTS AS MDM TAB-1. EnrollChecklist,
+//    EnrollReadinessSteps and SerialHero are imported from
+//    pages/inventory/mdm/shared/, not reimplemented. This file used to carry its
+//    own Steps / StatusBand / KeyBanner / SerialHero, on the reasoning that the
+//    two screens shared WORDING but not markup — and they immediately drifted.
+//    The rule now: if a step needs changing, it changes in shared/ and both
+//    screens move together. Do not add a lookalike here for any reason.
 //
-// ⛔ NO PII. The page renders only what fn_mdm_remote_enroll_status returns:
-//    serial and device state. The "issued to" note stays on tab-1 — BE forbids
-//    it in the URL, the QR and this page.
+// What legitimately stays local: the boot splash hand-off, the reveal
+// animation, the link-expiry countdown, the offline/dead terminal screens, the
+// viewer controls, and the polling — none of which tab-1 has.
+//
+// ⛔ NO PII. The page renders only what fn_mdm_remote_enroll_status returns, and
+//    fromRemoteStatus copies field-by-field so nothing else can arrive. The
+//    "issued to" note stays on tab-1 — BE forbids it in the URL, the QR and this
+//    page.
 // ============================================================================
 
-import { useEffect, useMemo, useState } from 'react';
-import { Button, Badge } from 'tsp-form';
-import {
-  Fingerprint, ScanLine, Send, RotateCcw, Smartphone, CheckCircle,
-} from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { CheckCircle } from 'lucide-react';
 import { usePoll } from './usePoll';
-import { makeT, type T } from './strings';
 import { useLang, useTheme, ViewerControls } from './Controls';
-import { requestPrepare, EnrollLinkDead, type DeadReason } from './api';
+import { requestPrepare, remoteEnrollApplyLight, EnrollLinkDead, type DeadReason } from './api';
 import { MOCK_SCENARIOS, ScenarioPicker, useMockScenario } from './mockScenarios';
-import type { RemoteEnrollStatus } from '../pages/inventory/mdm/shared/enrollView';
+import { EnrollChecklist } from '../pages/inventory/mdm/shared/EnrollChecklist';
+import { EnrollReadinessSteps } from '../pages/inventory/mdm/shared/EnrollReadinessSteps';
+import { SerialHero } from '../pages/inventory/mdm/shared/SerialDisplay';
+import { fromRemoteStatus, isReadyToHandOver } from '../pages/inventory/mdm/shared/enrollView';
 
 // ── Boot splash hand-off ────────────────────────────────────────────────────
 // Held a minimum from FIRST PAINT (stamped in enroll.html), not from when this
@@ -69,184 +81,6 @@ function useTicker(active: boolean, ms = 1000) {
   }, [active, ms]);
 }
 
-// ── Presentation ────────────────────────────────────────────────────────────
-
-/** Serial sized off its own length so it never wraps — a wrapped serial is useless. */
-function SerialHero({ serial, t }: { serial: string | null; t: T }) {
-  if (!serial) return null;
-  const size = `min(11vw, ${(90 / Math.max(serial.length * 0.82, 1)).toFixed(2)}vw, 2.75rem)`;
-  return (
-    <div className="flex flex-col items-center gap-1.5 w-full min-w-0 enroll-reveal">
-      <div className="text-xs text-subtle">{t('remoteEnroll.serialLabel')}</div>
-      <div
-        className="font-mono font-bold text-center leading-tight whitespace-nowrap w-full select-all"
-        style={{ fontSize: size, letterSpacing: '0.18em', textIndent: '0.18em' }}
-      >
-        {serial}
-      </div>
-      <p className="text-xs text-subtle text-center">{t('remoteEnroll.serialHint')}</p>
-    </div>
-  );
-}
-
-// Same icons, same order as tab-1's step strip. Sharing the icon set (rather
-// than falling back to plain numbers) is what makes the two screens legible to
-// each other when branch A is reading this page down the phone to branch B.
-const STEP_ICONS = [Fingerprint, ScanLine, Send, RotateCcw, Smartphone] as const;
-
-const STEP_KEYS = ['serial', 'scan', 'send', 'wipe', 'enrolled'] as const;
-
-/** How many of steps 1–5 are done. Same mapping as tab-1. */
-function doneCount(s: RemoteEnrollStatus): number {
-  switch (s.mdm_status) {
-    case 'NO_SERIAL': return 0;
-    case 'NOT_STARTED': return 1;
-    case 'PREPARING': return 2;
-    case 'PROFILE_READY': return 3;
-    case 'PREPARE_FAILED': return 1;
-    case 'IN_MDM': return 5;
-    default: return 0;
-  }
-}
-
-function Steps({ status, t }: { status: RemoteEnrollStatus; t: T }) {
-  const done = doneCount(status);
-  return (
-    <div className="border border-line rounded-md p-4 flex flex-col">
-      {STEP_KEYS.map((key, i) => {
-        const state = i < done ? 'done' : i === done ? 'current' : 'todo';
-        const last = i === STEP_KEYS.length - 1;
-        const Icon = STEP_ICONS[i];
-        return (
-          <div key={key} className="flex gap-3">
-            <div className="flex flex-col items-center shrink-0">
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 ${
-                state === 'current' ? 'bg-primary border-primary text-primary-contrast'
-                  : state === 'done' ? 'bg-success border-success text-success-contrast'
-                    : 'bg-surface border-line text-subtle'
-              }`}>
-                {state === 'done' ? <CheckCircle size={13} /> : <Icon size={12} />}
-              </div>
-              {!last && <div className={`w-0.5 flex-1 min-h-[0.75rem] my-0.5 ${state === 'done' ? 'bg-success' : 'bg-line'}`} />}
-            </div>
-            <div className="pb-3 min-w-0 flex-1">
-              <div className={`text-sm font-medium leading-snug ${
-                state === 'current' ? 'text-primary-fg' : state === 'done' ? 'text-success-fg' : 'text-fg'
-              }`}>
-                {t(`asset.mdm.step.${key}`)}
-              </div>
-              <div className="text-xs text-subtle leading-snug mt-0.5">
-                {t(`asset.mdm.stepWhere.${key === 'scan' || key === 'wipe' ? 'device' : key === 'enrolled' ? 'auto' : 'system'}`)}
-              </div>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/**
- * The headline state. PROFILE_READY is an INSTRUCTION, never a spinner: the
- * system finished its half in ~10 seconds and is now waiting on a PERSON to
- * wipe the device (134 §5.1). A spinner there makes people sit and watch
- * instead of going and wiping the handset.
- */
-function bandKey(s: RemoteEnrollStatus): { key: string; tone: string; instruction: boolean } {
-  if (s.prepare_is_reenroll && s.prepare_status === 'READY') {
-    return { key: 'REENROLL_READY', tone: 'warning', instruction: true };
-  }
-  switch (s.mdm_status) {
-    case 'NO_SERIAL': return { key: 'NO_SERIAL', tone: 'info', instruction: false };
-    case 'NOT_STARTED': return { key: 'NOT_STARTED', tone: 'info', instruction: false };
-    case 'PREPARING': return { key: 'PREPARING', tone: 'info', instruction: false };
-    case 'PROFILE_READY': return { key: 'PROFILE_READY', tone: 'warning', instruction: true };
-    // B cannot scan a device into ABM — telling them to is a dead end.
-    case 'PREPARE_FAILED': return { key: 'PREPARE_FAILED_REMOTE', tone: 'danger', instruction: false };
-    case 'IN_MDM': return { key: 'IN_MDM', tone: 'success', instruction: false };
-    default: return { key: 'NOT_STARTED', tone: 'info', instruction: false };
-  }
-}
-
-function waitStage(requestedAt: string | null): 'FRESH' | 'PROBABLY_NOT_WIPED' | 'CHECK_SERIAL' {
-  if (!requestedAt) return 'FRESH';
-  const ms = Date.now() - new Date(requestedAt).getTime();
-  if (!Number.isFinite(ms)) return 'FRESH';
-  if (ms > 60 * 60_000) return 'CHECK_SERIAL';
-  if (ms > 10 * 60_000) return 'PROBABLY_NOT_WIPED';
-  return 'FRESH';
-}
-
-function fmtWait(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  const mm = String(m).padStart(2, '0');
-  const ss = String(s).padStart(2, '0');
-  return h > 0 ? `${h}:${mm}:${ss}` : `${m}:${ss}`;
-}
-
-function StatusBand({ status, t }: { status: RemoteEnrollStatus; t: T }) {
-  const band = bandKey(status);
-  const waiting = status.prepare_status === 'READY' && !status.in_mdm;
-  useTicker(waiting);
-  const waited = waiting && status.prepare_requested_at
-    ? Math.max(0, Math.floor((Date.now() - new Date(status.prepare_requested_at).getTime()) / 1000))
-    : null;
-
-  return (
-    <div className={`alert alert-${band.tone} enroll-reveal enroll-reveal-2`}>
-      <div className="min-w-0 flex-1">
-        <div className="alert-title">{t(`asset.mdm.band.${band.key}.title`)}</div>
-        <div className="alert-description">{t(`asset.mdm.band.${band.key}.body`)}</div>
-        {band.instruction && (
-          <ol className="mt-2 flex flex-col gap-1 text-sm list-decimal pl-4">
-            <li>{t('asset.mdm.wipeSteps.s1')}</li>
-            <li>{t('asset.mdm.wipeSteps.s2')}</li>
-            <li>{t('asset.mdm.wipeSteps.s3')}</li>
-          </ol>
-        )}
-        {waited != null && waited >= 30 && (
-          <div className="alert-description mt-1 tabular-nums">
-            {t('asset.mdm.waitHint.waiting', { time: fmtWait(waited) })}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/** 🍎 Apple key unlocks the customer's iCloud · 🏢 org key survives a wipe. */
-function KeyBanner({ status, t }: { status: RemoteEnrollStatus; t: T }) {
-  const pull = status.has_pull_key;
-  // Three states, not two: holding the key ≠ Apple confirming it landed.
-  const push = !status.has_push_key ? 'missing' : !status.push_key_applied_at ? 'pending' : 'ok';
-  return (
-    <div className={`alert alert-${status.lock_ready ? 'success' : 'warning'} enroll-reveal enroll-reveal-3`}>
-      <div className="min-w-0 flex-1">
-        <div className="alert-title">
-          {t(status.lock_ready ? 'asset.mdm.keys.readyTitle' : 'asset.mdm.keys.notReadyTitle')}
-        </div>
-        {/* Badge chips, as on tab-1 — same shapes and colours, so a staffer
-            describing "the green one" over the phone is understood. */}
-        <div className="flex items-center gap-2 flex-wrap mt-1.5">
-          <Badge color={pull ? 'success' : 'danger'}>
-            <span className="mr-1" aria-hidden>🍎</span>{t('asset.mdm.keys.appleShort')}
-          </Badge>
-          <Badge color={push === 'ok' ? 'success' : push === 'pending' ? 'warning' : 'danger'}>
-            <span className="mr-1" aria-hidden>🏢</span>{t('asset.mdm.keys.orgShort')}
-          </Badge>
-        </div>
-        {!status.lock_ready && status.lock_verdict_code && (
-          <div className="alert-description mt-1.5">
-            {t(`asset.mdm.lockVerdict.${status.lock_verdict_code}`)}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function Shell({ children, controls }: { children: React.ReactNode; controls: React.ReactNode }) {
   return (
     // max-w-md, not 100vw: layout.css sets body{width:100vw}, which includes the
@@ -287,9 +121,16 @@ export function EnrollApp() {
   const params = new URLSearchParams(window.location.search);
   const token = params.get('token');
 
+  const { t, i18n } = useTranslation();
   const [lang, setLang] = useLang();
   const [theme, setTheme] = useTheme();
-  const t = useMemo(() => makeT(lang), [lang]);
+
+  // The language pill drives i18next. Kept in an effect rather than calling
+  // changeLanguage inside setLang so the URL's ?lang= (applied at init) and a
+  // later click go through exactly one path.
+  useEffect(() => {
+    if (i18n.language !== lang) i18n.changeLanguage(lang);
+  }, [lang, i18n]);
 
   // Dev-only: drive the page through every state without a device.
   const mock = useMockScenario();
@@ -304,7 +145,7 @@ export function EnrollApp() {
   const [preparing, setPreparing] = useState(false);
 
   useDismissSplash(!loading);
-  useTicker(true, 1000); // ages the "updated Ns ago" line
+  useTicker(true, 1000); // ages the "updated Ns ago" line and the expiry countdown
 
   const onPrepare = async () => {
     if (!token || mock.active) return;
@@ -335,38 +176,17 @@ export function EnrollApp() {
     );
   }
 
-  if (dead && dead !== 'COMPLETED') {
+  // A dead link is terminal — expiry, revoke, or replace. There is no COMPLETED
+  // case any more (mig 251 stopped links closing themselves on success); an old
+  // link that was already closed before the migration can still report it, so it
+  // falls through to the generic NOT_FOUND wording rather than crashing on a
+  // missing key.
+  if (dead) {
+    const key = dead === 'COMPLETED' ? 'NOT_FOUND' : dead;
     return (
       <Shell controls={controls}>
         {picker}
-        <Terminal icon="⚠️" title={t(`remoteEnroll.dead.${dead}.title`)} body={t(`remoteEnroll.dead.${dead}.body`)} />
-      </Shell>
-    );
-  }
-
-  if (dead === 'COMPLETED' || status?.completed) {
-    return (
-      <Shell controls={controls}>
-        {picker}
-        <div className="flex flex-col items-center text-center gap-4 pt-10">
-          <div className="w-20 h-20 rounded-full bg-success-soft border border-success-border flex items-center justify-center enroll-reveal">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
-                 strokeLinecap="round" strokeLinejoin="round"
-                 className="w-10 h-10 text-success-fg remote-enroll-check" aria-hidden>
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-          </div>
-          <div className="flex flex-col items-center gap-2 enroll-reveal enroll-reveal-2">
-            <h1 className="heading-2">{t('remoteEnroll.done.title')}</h1>
-            <p className="text-subtle">{t('remoteEnroll.done.body')}</p>
-            {status?.serial_number && (
-              <div className="font-mono text-sm text-subtle tracking-widest select-all">{status.serial_number}</div>
-            )}
-          </div>
-          <div className="alert alert-success mt-2 text-left enroll-reveal enroll-reveal-3">
-            <span>🎉 {t('remoteEnroll.done.tellBranch')}</span>
-          </div>
-        </div>
+        <Terminal icon="⚠️" title={t(`remoteEnroll.dead.${key}.title`)} body={t(`remoteEnroll.dead.${key}.body`)} />
       </Shell>
     );
   }
@@ -396,19 +216,24 @@ export function EnrollApp() {
     return <Shell controls={controls}>{picker}</Shell>;
   }
 
-  const stage = status.prepare_status === 'READY' && !status.in_mdm
-    ? waitStage(status.prepare_requested_at)
-    : 'FRESH';
+  const view = fromRemoteStatus(status);
+  const finished = isReadyToHandOver(view);
 
   const expirySecs = status.link_expires_at
     ? Math.max(0, Math.floor((new Date(status.link_expires_at).getTime() - Date.now()) / 1000))
     : null;
 
+  const applyLight = (mock.active || !token)
+    ? undefined
+    : (preview: boolean) => remoteEnrollApplyLight(token, preview);
+
   return (
     <Shell controls={controls}>
       {picker}
 
-      <SerialHero serial={status.serial_number} t={t} />
+      <div className="enroll-reveal">
+        <SerialHero serial={status.serial_number} />
+      </div>
 
       {expirySecs != null && (
         <div className={`text-center text-xs enroll-reveal enroll-reveal-1 ${expirySecs < 900 ? 'text-warning-fg' : 'text-subtle'}`}>
@@ -420,51 +245,45 @@ export function EnrollApp() {
         </div>
       )}
 
-      <StatusBand status={status} t={t} />
-
-      {stage !== 'FRESH' && (
-        <div className="alert alert-info enroll-reveal enroll-reveal-2">
+      {/* ⭐ Handover banner — the "you're done" moment. It replaces the old
+          full-screen success page, which keyed off a `completed` field mig 251
+          removed (so it could never appear again) and which also hid the
+          checklist the holder may still need. A banner above the live steps says
+          "finished" without taking the device off screen. */}
+      {finished && (
+        <div className="alert alert-success enroll-reveal enroll-reveal-1">
+          <CheckCircle size={20} className="shrink-0" />
           <div className="min-w-0">
-            <div className="alert-title">{t(`asset.mdm.waitHint.${stage}.title`)}</div>
-            <div className="alert-description">
-              {t(stage === 'CHECK_SERIAL'
-                ? 'asset.mdm.waitHint.CHECK_SERIAL.bodyRemote'
-                : `asset.mdm.waitHint.${stage}.body`)}
-            </div>
+            <div className="alert-title">{t('remoteEnroll.done.title')}</div>
+            <div className="alert-description">{t('remoteEnroll.done.tellBranch')}</div>
           </div>
         </div>
       )}
 
       {prepareError && (
-        <div className="alert alert-danger"><span>{prepareError}</span></div>
+        <div className="alert alert-danger enroll-reveal enroll-reveal-2"><span>{prepareError}</span></div>
       )}
 
-      {status.can_prepare && (
-        <div className="enroll-reveal enroll-reveal-2">
-          {/* tsp-form Button, same as tab-1's — a hand-rolled lookalike is how
-              the two screens drift apart, and this is the one control the
-              delegate actually presses. */}
-          <Button
-            color="primary"
-            className="w-full"
-            startIcon={status.mdm_status === 'PREPARE_FAILED' || status.prepare_is_reenroll
-              ? <RotateCcw size={15} />
-              : <Send size={15} />}
-            onClick={onPrepare}
-            disabled={preparing}
-          >
-            {status.mdm_status === 'PREPARE_FAILED'
-              ? t('asset.mdm.button.retry')
-              : status.prepare_is_reenroll
-                ? t('asset.mdm.button.reenroll')
-                : t('asset.mdm.button.prepare')}
-          </Button>
-        </div>
-      )}
-
-      <Steps status={status} t={t} />
-
-      {status.in_mdm && <KeyBanner status={status} t={t} />}
+      {/* All 7 steps, from the same components tab-1 renders. */}
+      <div className="enroll-reveal enroll-reveal-2">
+        <EnrollChecklist
+          view={view}
+          onPrepare={onPrepare}
+          preparing={preparing}
+        >
+          <EnrollReadinessSteps
+            view={view}
+            onApplyLight={applyLight}
+            onApplied={live.refetch}
+            // No apiErrors namespace on this page and no MDM error catalogue —
+            // a dead link is the one failure the holder can act on, and it is
+            // already terminal via polling. Everything else is "try again".
+            formatError={(err) => (err instanceof EnrollLinkDead
+              ? t('remoteEnroll.dead.NOT_FOUND.body')
+              : t('remoteEnroll.offline.body'))}
+          />
+        </EnrollChecklist>
+      </div>
 
       <div className="flex items-center justify-center gap-2 text-xs text-subtle">
         <span className={`w-1.5 h-1.5 rounded-full ${offline ? 'bg-warning-fg' : 'bg-success-fg'}`} aria-hidden />

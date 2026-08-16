@@ -1,17 +1,18 @@
 // ============================================================================
-// The two anonymous RPCs this page needs, over plain fetch.
+// The three anonymous RPCs this page needs, over plain fetch.
 //
 // Deliberately NOT src/lib/api.ts: that client carries auth-token refresh, a
 // 401 redirect to /login, holding-selection handling and snackbar plumbing —
 // all of which is meaningless here (there is no session; the token in the URL
 // is the entire authorisation) and all of which would be shipped to a stranger's
-// phone for two POSTs.
+// phone for three POSTs.
 //
-// BE granted fn_mdm_remote_enroll_status / _retry to PUBLIC on purpose and
-// self-gates on the token, so no Authorization header is ever sent.
+// BE granted fn_mdm_remote_enroll_status / _retry / _apply_light to PUBLIC on
+// purpose and self-gates on the token, so no Authorization header is ever sent.
 // ============================================================================
 
 import { config } from '../config/config';
+import type { ApplyTemplateResult } from '../pages/inventory/mdm/mdmApi';
 import type { RemoteEnrollStatus } from '../pages/inventory/mdm/shared/enrollView';
 
 const BASE = config.apiUrl.replace(/\/+$/, '');
@@ -84,4 +85,23 @@ export function fetchStatus(token: string): Promise<RemoteEnrollStatus> {
 
 export function requestPrepare(token: string): Promise<{ request_id: number; deduped?: boolean }> {
   return rpc('fn_mdm_remote_enroll_retry', { p_token: token });
+}
+
+/**
+ * Step 7's baseline lock, token-authenticated.
+ *
+ * The token counterpart of fn_mdm_apply_template, and BE made the response
+ * shape identical on purpose (ANSWER 2026-08-17) so EnrollReadinessSteps can
+ * drive either one without knowing which. The template is LIGHT and fixed
+ * server-side — there is no p_template_key to pass, and no actor id: the link
+ * issuer is the actor, and permission was already evaluated as them.
+ *
+ * ⚠️ p_preview defaults to TRUE server-side, as on the staff RPC. Always pass
+ *    it explicitly — a missing false is a silent no-op that looks like success.
+ */
+export function remoteEnrollApplyLight(token: string, preview: boolean): Promise<ApplyTemplateResult> {
+  return rpc<ApplyTemplateResult>('fn_mdm_remote_enroll_apply_light', {
+    p_token: token,
+    p_preview: preview,
+  });
 }
