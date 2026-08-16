@@ -16,6 +16,10 @@
 // ============================================================================
 
 import { useEffect, useMemo, useState } from 'react';
+import { Button, Badge } from 'tsp-form';
+import {
+  Fingerprint, ScanLine, Send, RotateCcw, Smartphone, CheckCircle,
+} from 'lucide-react';
 import { usePoll } from './usePoll';
 import { makeT, type T } from './strings';
 import { useLang, useTheme, ViewerControls } from './Controls';
@@ -85,6 +89,11 @@ function SerialHero({ serial, t }: { serial: string | null; t: T }) {
   );
 }
 
+// Same icons, same order as tab-1's step strip. Sharing the icon set (rather
+// than falling back to plain numbers) is what makes the two screens legible to
+// each other when branch A is reading this page down the phone to branch B.
+const STEP_ICONS = [Fingerprint, ScanLine, Send, RotateCcw, Smartphone] as const;
+
 const STEP_KEYS = ['serial', 'scan', 'send', 'wipe', 'enrolled'] as const;
 
 /** How many of steps 1–5 are done. Same mapping as tab-1. */
@@ -107,15 +116,16 @@ function Steps({ status, t }: { status: RemoteEnrollStatus; t: T }) {
       {STEP_KEYS.map((key, i) => {
         const state = i < done ? 'done' : i === done ? 'current' : 'todo';
         const last = i === STEP_KEYS.length - 1;
+        const Icon = STEP_ICONS[i];
         return (
           <div key={key} className="flex gap-3">
             <div className="flex flex-col items-center shrink-0">
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 text-xs font-semibold ${
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 ${
                 state === 'current' ? 'bg-primary border-primary text-primary-contrast'
                   : state === 'done' ? 'bg-success border-success text-success-contrast'
                     : 'bg-surface border-line text-subtle'
               }`}>
-                {state === 'done' ? '✓' : i + 1}
+                {state === 'done' ? <CheckCircle size={13} /> : <Icon size={12} />}
               </div>
               {!last && <div className={`w-0.5 flex-1 min-h-[0.75rem] my-0.5 ${state === 'done' ? 'bg-success' : 'bg-line'}`} />}
             </div>
@@ -217,9 +227,15 @@ function KeyBanner({ status, t }: { status: RemoteEnrollStatus; t: T }) {
         <div className="alert-title">
           {t(status.lock_ready ? 'asset.mdm.keys.readyTitle' : 'asset.mdm.keys.notReadyTitle')}
         </div>
-        <div className="flex items-center gap-3 mt-1.5 text-sm">
-          <span>🍎 {t('asset.mdm.keys.appleShort')} {pull ? '✓' : '✕'}</span>
-          <span>🏢 {t('asset.mdm.keys.orgShort')} {push === 'ok' ? '✓' : push === 'pending' ? '⏳' : '✕'}</span>
+        {/* Badge chips, as on tab-1 — same shapes and colours, so a staffer
+            describing "the green one" over the phone is understood. */}
+        <div className="flex items-center gap-2 flex-wrap mt-1.5">
+          <Badge color={pull ? 'success' : 'danger'}>
+            <span className="mr-1" aria-hidden>🍎</span>{t('asset.mdm.keys.appleShort')}
+          </Badge>
+          <Badge color={push === 'ok' ? 'success' : push === 'pending' ? 'warning' : 'danger'}>
+            <span className="mr-1" aria-hidden>🏢</span>{t('asset.mdm.keys.orgShort')}
+          </Badge>
         </div>
         {!status.lock_ready && status.lock_verdict_code && (
           <div className="alert-description mt-1.5">
@@ -425,18 +441,24 @@ export function EnrollApp() {
 
       {status.can_prepare && (
         <div className="enroll-reveal enroll-reveal-2">
-          <button
-            type="button"
+          {/* tsp-form Button, same as tab-1's — a hand-rolled lookalike is how
+              the two screens drift apart, and this is the one control the
+              delegate actually presses. */}
+          <Button
+            color="primary"
+            className="w-full"
+            startIcon={status.mdm_status === 'PREPARE_FAILED' || status.prepare_is_reenroll
+              ? <RotateCcw size={15} />
+              : <Send size={15} />}
             onClick={onPrepare}
             disabled={preparing}
-            className="w-full px-4 py-2.5 rounded-md bg-primary text-primary-contrast font-medium cursor-pointer border-none disabled:opacity-60"
           >
             {status.mdm_status === 'PREPARE_FAILED'
               ? t('asset.mdm.button.retry')
               : status.prepare_is_reenroll
                 ? t('asset.mdm.button.reenroll')
                 : t('asset.mdm.button.prepare')}
-          </button>
+          </Button>
         </div>
       )}
 

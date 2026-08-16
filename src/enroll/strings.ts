@@ -18,24 +18,18 @@
 // {{var}} replacement.
 // ============================================================================
 
-import en from '../i18n/locales/en.json';
-import th from '../i18n/locales/th.json';
+// A build-time SLICE of the same en.json/th.json the admin app uses — only the
+// keys in enrollStringKeys.ts, resolved by the enroll-strings plugin in
+// vite.config.ts. Importing the locale files directly would ship ~810kB of the
+// entire admin vocabulary to a page that shows a serial number: a runtime key
+// lookup keeps the whole object reachable, so none of it tree-shakes.
+// The strings are still the shared ones; only the delivery differs.
+import STRINGS from 'virtual:enroll-strings';
 
 export type Lang = 'th' | 'en';
 
 /** Thai first — this page is read in a Thai shop, usually not by our staff. */
 export const LANGS: Lang[] = ['th', 'en'];
-
-type Dict = Record<string, unknown>;
-
-function walk(root: Dict, dotted: string): string {
-  let cur: unknown = root;
-  for (const part of dotted.split('.')) {
-    if (typeof cur !== 'object' || cur === null) return dotted;
-    cur = (cur as Dict)[part];
-  }
-  return typeof cur === 'string' ? cur : dotted;
-}
 
 /**
  * Translate `key`, interpolating {{name}} placeholders.
@@ -45,9 +39,11 @@ function walk(root: Dict, dotted: string): string {
  * looks intentional and ships.
  */
 export function makeT(lang: Lang) {
-  const root = (lang === 'en' ? en : th) as unknown as Dict;
+  // Already flat: the plugin emits { en: { 'a.b.c': '…' }, th: {…} }, so this is
+  // a direct lookup rather than a walk down a nested tree.
+  const table = STRINGS[lang] ?? STRINGS.th;
   return function t(key: string, vars?: Record<string, string | number>): string {
-    let out = walk(root, key);
+    let out = table[key] ?? key;
     if (vars) {
       for (const [k, v] of Object.entries(vars)) {
         out = out.replace(new RegExp(`{{\\s*${k}\\s*}}`, 'g'), String(v));
