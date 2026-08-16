@@ -7099,6 +7099,7 @@
       "cancel": "ยกเลิก",
       "noPermission": "เฉพาะพนักงานสาขาเท่านั้นที่ตั้งสถานะได้",
       "setByLine": "{{user}} · {{when}}",
+      "setAtLine": "{{when}}",
       "setBySystem": "ระบบ",
       "setSuccess": "อัปเดตสถานะแล้ว",
       "setFailed": "อัปเดตสถานะไม่สำเร็จ"

@@ -7107,6 +7107,7 @@
       "cancel": "Cancel",
       "noPermission": "Only branch staff can set status",
       "setByLine": "{{user}} · {{when}}",
+      "setAtLine": "{{when}}",
       "setBySystem": "System",
       "setSuccess": "Status updated",
       "setFailed": "Could not update status"

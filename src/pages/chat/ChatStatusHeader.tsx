@@ -56,7 +56,11 @@ export function ChatStatusSetterLine({ row, lang }: { row: ChatInboxRow; lang: s
   const when = formatSmart(row.chat_status_set_at, lang);
   return (
     <span className="text-[11px] text-subtle truncate">
-      {t('chat.setStatus.setByLine', { user, when })}
+      {/* A set-by user whose username didn't come back leaves nothing to put
+          before the separator — show the date alone rather than "· 27 มิ.ย.". */}
+      {user
+        ? t('chat.setStatus.setByLine', { user, when })
+        : t('chat.setStatus.setAtLine', { when })}
     </span>
   );
 }
