@@ -10,6 +10,49 @@
 - **Batch actions with `browser_run_code`** — combine multiple steps (fill, click, wait) into one tool call instead of calling `browser_click`, `browser_fill_form` etc. individually
 - **Minimize snapshots** — only snapshot when you need to verify page state, not after every action
 
+## ⛔ Viewport — the content flows freely, DON'T pin it
+
+- **The MCP context runs with `viewport: null`** (check any time with
+  `page.viewportSize()` → `null`). The page has NO fixed viewport: it tracks the
+  real Chrome window and reflows like a normal browser. This is the desired
+  state — leave it that way.
+- **Do NOT call `browser_resize` or `page.setViewportSize()`.** Either one
+  replaces the null viewport with a fixed one and **freezes the page at that size
+  for the rest of the session** — content stops following the window, and only a
+  fresh browser session restores it. There is no undo mid-session.
+- If you're about to "work around" a viewport that looks wrong, re-read this
+  section: **the workaround IS the problem.**
+
+**It also never fixes what it looks like it fixes.** Every time it's been reached
+for here, the cause was something else and the resize did nothing:
+
+| Symptom that tempts a resize | Actual cause |
+|---|---|
+| Nav items missing from the DOM | **Side menu was collapsed** — click `Expand menu`, or read the badge off the collapsed dot |
+| `querySelectorAll('a[href]')` finds no menu rows | **The side menu renders `<button>`, not `<a href>`** — match on text, or use `browser_snapshot` |
+| Content "cut off" | The pane scrolls (`.better-scroll`), it isn't clipped — scroll it |
+
+### When you genuinely need a specific width
+
+Drive the OS window over CDP — this keeps the viewport null and the flow intact:
+
+```js
+const cdp = await page.context().newCDPSession(page);
+const { windowId } = await cdp.send('Browser.getWindowForTarget');
+await cdp.send('Browser.setWindowBounds', { windowId, bounds: { width: 1200, height: 900 } });
+await page.waitForTimeout(300);           // let the re-layout paint
+await cdp.detach();
+```
+
+- **Chrome enforces a ~917px minimum window width.** Asking for 420 lands at
+  ~917 — the same floor you hit dragging by hand. The real window therefore
+  CANNOT show the mobile layout.
+- **For mobile, emulate instead of resizing:** `Emulation.setDeviceMetricsOverride`
+  at 375×812, then `Emulation.clearDeviceMetricsOverride` when done. True 375
+  layout, no pinned viewport.
+- Before ending a turn: clear any emulation override and put the window back near
+  the user's own width.
+
 ## Login — use `/dev-login`, never the login form
 
 One URL. It logs in and lands you on the page you wanted:
