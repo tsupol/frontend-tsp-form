@@ -12,11 +12,17 @@ import { defaultScopeFor, scopeCounterParams, scopeCountersChannel, scopeKey } f
 // Side-menu badges always use the user's default scope (independent of any
 // dashboard scope picker).
 //
-// All 16 counters come from ONE RPC (`fn_branch_dashboard_counters`, mig 1067).
-// This replaced 15 separate `Prefer: count=exact` view queries — each of which
-// ran its view twice with no cap. Do not add a badge by fetching a view here;
-// ask BE to add a key to the RPC.
+// Almost every counter comes from ONE RPC (`fn_branch_dashboard_counters`, mig
+// 1067). This replaced 15 separate `Prefer: count=exact` view queries — each of
+// which ran its view twice with no cap. Do not add a badge by fetching a view
+// here; ask BE to add a key to the RPC.
 // See UI_FEEDBACK/2026-08-11_DELIVERY_counters_rpc_confirmed_filters.md.
+//
+// The one exception is the unassigned badge — BE removed the `unassigned` key in
+// mig 1111 because it cost half the RPC's runtime to serve a number the main
+// dashboard never shows. It now comes from its own count query below, which mig
+// 1110 made cheaper (~70ms) than the counter it replaced.
+// See UI_FEEDBACK/2026-08-17_DELIVERY_unassigned_view_perf_and_rpc_split.md.
 
 // Badges render "99+" past this (AppSideNav.iconWithCount), so counts only need
 // to be exact below it. The RPC caps every value at 100 server-side ("≥100").
@@ -58,6 +64,25 @@ export function useNavCounts() {
     retry: false,
   });
 
+  // Unassigned badge — own query since the RPC no longer carries it (mig 1111).
+  // `pool_reason=eq.NO_COLLECTOR` is mandatory: the view also returns contracts
+  // that are merely NOT_YET_DUE / on holiday / waiting on a slip, which are not
+  // work at all. Unfiltered this reads in the hundreds while real backlog is zero.
+  // Only OPS.ASSIGN.OVERSEE holders can see rows, so everyone else just gets 0.
+  const { data: unassignedCount } = useQuery({
+    queryKey: ['nav', 'unassigned-no-collector', sk],
+    queryFn: async () => {
+      const { totalCount } = await apiClient.getPaginated<{ contract_id: number }>(
+        '/v_unassigned_contracts?pool_reason=eq.NO_COLLECTOR&select=contract_id',
+        { page: 1, pageSize: 1 },
+      );
+      return totalCount;
+    },
+    refetchInterval: FALLBACK_POLL_MS,
+    refetchOnWindowFocus: true,
+    retry: false,
+  });
+
   // WS-driven refetch. The channel matches the scope tier the user belongs to;
   // SYSTEM_DEV unscoped has no channel and rides the fallback poll alone.
   const channel = scopeCountersChannel(scope);
@@ -66,7 +91,10 @@ export function useNavCounts() {
   useEffect(() => {
     if (!user) return;
 
-    const refetch = () => { void queryClient.invalidateQueries({ queryKey: ['nav', 'counters', sk] }); };
+    const refetch = () => {
+      void queryClient.invalidateQueries({ queryKey: ['nav', 'counters', sk] });
+      void queryClient.invalidateQueries({ queryKey: ['nav', 'unassigned-no-collector', sk] });
+    };
 
     // Rule 1: coalesce a burst into one refetch. An event already pending means
     // this one needs no timer of its own — the truth is in the RPC either way.
@@ -101,9 +129,17 @@ export function useNavCounts() {
   // would silently yield 0, not an error.
   const unclosedCount = isBranchUser ? n('unclosed_day_count') : n('unclosed_branch_count');
 
+  // Slips has two readings and the menu shows both above branch level: how many
+  // BRANCHES have slips waiting, and how many SLIPS that is in total. A branch
+  // user can only ever see their own branch, so the branch number is always 0 or
+  // 1 there and says nothing — they get the slip count alone.
+  // See UI_FEEDBACK/2026-08-17_DELIVERY_counters_payment_submissions_slips.md.
+  const pendingSlipBranches = isBranchUser ? 0 : n('payment_submissions');
+
   return {
     pendingApprovals: n('pending_approvals'),
-    pendingSlips: n('payment_submissions'),
+    pendingSlips: n('payment_submissions_slips'),
+    pendingSlipBranches,
     unclosedCount,
     pendingPairingCount: n('device_bind_delivery'),
     pendingSignCount: n('pending_sign'),
@@ -114,7 +150,7 @@ export function useNavCounts() {
     pausedContractsCount: n('paused'),
     unreadChatCount: n('chat_unread'),
     callCenterMineCount: n('my_book'),
-    unassignedNoCollectorCount: n('unassigned'),
+    unassignedNoCollectorCount: unassignedCount ?? 0,
     legalWaitCount: n('repo_pool'),
     unreadNotifCount: n('notifications'),
   };

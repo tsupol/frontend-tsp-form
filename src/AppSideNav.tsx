@@ -205,6 +205,7 @@ export const AppSideNav = () => {
   const {
     pendingApprovals,
     pendingSlips,
+    pendingSlipBranches,
     unclosedCount,
     pendingPairingCount,
     savingContractsCount,
@@ -222,10 +223,23 @@ export const AppSideNav = () => {
   // Render an icon with an optional count badge.
   // - Expanded: inline Badge to the right of the label (returned via `badge`).
   // - Collapsed: a small dot pinned to the top-right of the icon (returned via `icon` wrapper).
-  const iconWithCount = (icon: React.ReactNode, count: number): { icon: React.ReactNode; badge?: React.ReactNode } => {
+  //
+  // `groupCount` is for badges that carry two readings — how many groups have work
+  // waiting, and how much work that is in total. It renders as "3 (12)" and drives
+  // visibility off the total, so a menu never goes quiet while work is pending.
+  // Pass 0 to show the total alone.
+  const iconWithCount = (
+    icon: React.ReactNode,
+    count: number,
+    groupCount = 0,
+  ): { icon: React.ReactNode; badge?: React.ReactNode } => {
     if (count <= 0) return { icon };
-    const label = count > NAV_COUNT_CAP ? `${NAV_COUNT_CAP}+` : String(count);
+    const capped = (n: number) => (n > NAV_COUNT_CAP ? `${NAV_COUNT_CAP}+` : String(n));
+    const label = groupCount > 0 ? `${capped(groupCount)} (${capped(count)})` : capped(count);
     if (menuCollapsed && !isMobile) {
+      // The dot is a 14px pill riding the icon corner — only the total fits, so
+      // the two-number form collapses to the number that means "how much work".
+      const dotLabel = capped(count);
       return {
         icon: (
           <span key="icon-with-dot" className="relative inline-flex">
@@ -237,9 +251,9 @@ export const AppSideNav = () => {
                 background: 'var(--color-badge-warning-bg, color-mix(in srgb, var(--color-warning) 20%, var(--color-surface)))',
                 color: 'var(--color-badge-warning-fg, var(--color-warning-fade, var(--color-warning)))',
               }}
-              aria-label={`${label} pending`}
+              aria-label={`${dotLabel} pending`}
             >
-              {label}
+              {dotLabel}
             </span>
           </span>
         ),
@@ -279,7 +293,7 @@ export const AppSideNav = () => {
     },
     {
       key: 'payment-submissions',
-      ...iconWithCount(<Receipt size="1rem" />, pendingSlips),
+      ...iconWithCount(<Receipt size="1rem" />, pendingSlips, pendingSlipBranches),
       label: t('nav.paymentSubmissions'),
       path: '/admin/payment-submissions',
     },
