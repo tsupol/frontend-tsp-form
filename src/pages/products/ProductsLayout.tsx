@@ -14,8 +14,8 @@ export function ProductsLayout({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
 
   return (
-    <div className="flex h-dvh overflow-hidden">
-      <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-50 border-r border-line p-4 pt-7.5 h-full min-h-0 overflow-y-auto better-scroll">
+    <div className="flex min-h-full">
+      <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-50 border-r border-line p-4 pt-7.5 sticky top-0 h-dvh">
         <span className="subnav-group-label mb-1">
           {t('nav.products')}
         </span>
@@ -36,7 +36,7 @@ export function ProductsLayout({ children }: { children: ReactNode }) {
           </NavLink>
         ))}
       </nav>
-      <div className="flex-1 min-w-0 h-full min-h-0 better-scroll overflow-y-auto">
+      <div className="flex-1 min-w-0">
         {children}
       </div>
     </div>

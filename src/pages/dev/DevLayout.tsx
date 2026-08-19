@@ -34,7 +34,7 @@ function isLocalhost(): boolean {
 export function DevLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-dvh overflow-hidden">
-      <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-48 border-r border-line p-4 pt-8 h-full min-h-0 overflow-y-auto better-scroll">
+      <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-48 border-r border-line p-4 pt-8">
         <span className="subnav-group-label mb-1 flex items-center gap-1">
           <FlaskConical size={13} /> Dev
         </span>
@@ -65,7 +65,7 @@ export function DevLayout({ children }: { children: ReactNode }) {
           </a>
         ))}
       </nav>
-      <div className="flex-1 min-w-0 h-full min-h-0 better-scroll overflow-auto">
+      <div className="flex-1 min-w-0 h-full better-scroll overflow-auto">
         {!isLocalhost() && (
           <div className="alert alert-warning m-3 mb-0">
             <AlertTriangle size={16} />

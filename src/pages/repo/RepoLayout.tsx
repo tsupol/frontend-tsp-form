@@ -33,8 +33,8 @@ export function RepoLayout({ children }: { children: ReactNode }) {
   ], [isAdmin]);
 
   return (
-    <div className="flex h-dvh overflow-hidden">
-      <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-50 border-r border-line p-4 pt-7.5 h-full min-h-0 overflow-y-auto better-scroll">
+    <div className="flex min-h-full">
+      <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-50 border-r border-line p-4 pt-7.5 sticky top-0 h-dvh">
         {navItems.map((item, i) => {
           if (item.type === 'group') {
             return (
@@ -62,7 +62,7 @@ export function RepoLayout({ children }: { children: ReactNode }) {
           );
         })}
       </nav>
-      <div className="flex-1 min-w-0 h-full min-h-0 better-scroll overflow-y-auto">{children}</div>
+      <div className="flex-1 min-w-0">{children}</div>
     </div>
   );
 }
