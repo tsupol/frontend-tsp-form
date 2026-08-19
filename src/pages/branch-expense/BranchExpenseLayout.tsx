@@ -36,7 +36,7 @@ export function BranchExpenseLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-full">
-      <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-48 border-r border-line p-4 pt-7.5 sticky top-0 h-dvh">
+      <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-48 border-r border-line p-4 pt-7.5 sticky top-0 h-dvh overflow-y-auto better-scroll">
         {navItems.map((item, i) => {
           if (item.type === 'group') {
             return (

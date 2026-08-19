@@ -21,7 +21,7 @@ export function NnfExtraLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-full">
-      <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-50 border-r border-line p-4 pt-7.5 sticky top-0 h-dvh">
+      <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-50 border-r border-line p-4 pt-7.5 sticky top-0 h-dvh overflow-y-auto better-scroll">
         <span className="subnav-group-label mb-1">{t('nav.nnfExtra')}</span>
         {NAV_ITEMS.map(({ path, labelKey, icon: Icon }) => {
           // exact match — '/admin/nnf-extra/mdm' is a prefix of '…/mdm-devices',

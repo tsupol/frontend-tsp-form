@@ -34,7 +34,7 @@ function isLocalhost(): boolean {
 export function DevLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-dvh overflow-hidden">
-      <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-48 border-r border-line p-4 pt-8">
+      <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-48 border-r border-line p-4 pt-8 h-dvh overflow-y-auto better-scroll">
         <span className="subnav-group-label mb-1 flex items-center gap-1">
           <FlaskConical size={13} /> Dev
         </span>
