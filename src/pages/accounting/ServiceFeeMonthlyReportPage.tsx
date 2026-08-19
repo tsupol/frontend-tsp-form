@@ -335,7 +335,7 @@ export function ServiceFeeMonthlyReportPage() {
                     content={<ChartTooltip labels={{
                       feeQty: t('serviceFee.col.feeQty'),
                       fee: t('serviceFee.legendFee'),
-                      refundAmount: t('serviceFee.col.refundAmount'),
+                      refundAmount: t('serviceFee.sumRefundAmount'),
                       net: t('serviceFee.legendNet'),
                     }} lang={i18n.language} />}
                   />

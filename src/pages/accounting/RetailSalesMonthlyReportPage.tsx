@@ -344,7 +344,7 @@ export function RetailSalesMonthlyReportPage() {
                     content={<ChartTooltip labels={{
                       saleQty: t('retailSales.col.saleQty'),
                       sale: t('retailSales.legendSale'),
-                      returnAmount: t('retailSales.col.returnAmount'),
+                      returnAmount: t('retailSales.sumReturnAmount'),
                       net: t('retailSales.legendNet'),
                       gift: t('retailSales.tipGift'),
                     }} lang={i18n.language} />}

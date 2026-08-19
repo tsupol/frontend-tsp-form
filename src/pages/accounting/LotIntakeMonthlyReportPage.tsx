@@ -328,7 +328,7 @@ export function LotIntakeMonthlyReportPage() {
                     cursor={{ fill: 'var(--color-surface-hover)' }}
                     content={<ChartTooltip labels={{
                       receive: t('lotIntake.legendReceive'),
-                      correction: t('lotIntake.col.correctionQty'),
+                      correction: t('lotIntake.sumCorrectionQty'),
                       net: t('lotIntake.legendNet'),
                     }} lang={i18n.language} />}
                   />
