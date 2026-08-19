@@ -42,7 +42,7 @@ export function InventoryLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-dvh">
-      <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-48 border-r border-line p-4 pt-8 h-dvh overflow-y-auto better-scroll">
+      <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-48 border-r border-line p-4 pt-8">
         {navItems.map((item, i) => {
           if (item.type === 'group') {
             return (
