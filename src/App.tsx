@@ -116,6 +116,10 @@ import { ContractsOpenedReportPage } from './pages/accounting/ContractsOpenedRep
 import { OpenedByModelReportPage } from './pages/accounting/OpenedByModelReportPage';
 import { RetailSalesMonthlyReportPage } from './pages/accounting/RetailSalesMonthlyReportPage';
 import { RetailSalesByTypeReportPage } from './pages/accounting/RetailSalesByTypeReportPage';
+import { ServiceFeeMonthlyReportPage } from './pages/accounting/ServiceFeeMonthlyReportPage';
+import { ServiceFeeByTypeReportPage } from './pages/accounting/ServiceFeeByTypeReportPage';
+import { LotIntakeMonthlyReportPage } from './pages/accounting/LotIntakeMonthlyReportPage';
+import { LotIntakeByModelReportPage } from './pages/accounting/LotIntakeByModelReportPage';
 import { CollectionMonthlyReportPage } from './pages/accounting/CollectionMonthlyReportPage';
 import { CommissionMonthlyReportPage } from './pages/accounting/CommissionMonthlyReportPage';
 import { FinancierFormFeedPage } from './pages/accounting/FinancierFormFeedPage';
@@ -1258,6 +1262,46 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <AccountingLayout><RetailSalesByTypeReportPage /></AccountingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/accounting/service-fee"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <AccountingLayout><ServiceFeeMonthlyReportPage /></AccountingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/accounting/service-fee-by-type"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <AccountingLayout><ServiceFeeByTypeReportPage /></AccountingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/accounting/lot-intake"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <AccountingLayout><LotIntakeMonthlyReportPage /></AccountingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/accounting/lot-intake-by-model"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <AccountingLayout><LotIntakeByModelReportPage /></AccountingLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

@@ -516,7 +516,11 @@
     "notifications": "การแจ้งเตือน",
     "branchExpense": "ค่าใช้จ่ายสาขา",
     "overdueAging": "รายงานยอดค้างชำระ",
-    "commissionBranch": "ยอดสาขา"
+    "commissionBranch": "ยอดสาขา",
+    "serviceFee": "รายงานค่าบริการ",
+    "serviceFeeByType": "รายงานค่าบริการแบ่งตามประเภท",
+    "lotIntake": "รายงานเครื่องเข้า",
+    "lotIntakeByModel": "รายงานเครื่องเข้าตามรุ่น"
   },
   "ownerType": {
     "HOLDING": "Holding",
@@ -7387,6 +7391,88 @@
         "title": "ลิงก์นี้ถูกยกเลิกแล้ว",
         "body": "สาขาที่ส่งลิงก์มาได้ยกเลิกลิงก์นี้ ถ้ายังต้องตั้งค่าเครื่อง กรุณาติดต่อสาขา"
       }
+    }
+  },
+  "serviceFee": {
+    "title": "รายงานค่าบริการ",
+    "allBranches": "ทุกสาขา",
+    "exportCsv": "ส่งออก CSV",
+    "sumFeeQty": "จำนวนครั้ง",
+    "sumFeeAmount": "ยอดเก็บ",
+    "sumRefundAmount": "คืนเงิน",
+    "sumNetAmount": "สุทธิ",
+    "sumNetQty": "สุทธิ (ครั้ง)",
+    "legendFee": "ยอดเก็บ",
+    "legendNet": "สุทธิ",
+    "total": "รวม",
+    "noData": "ไม่มีค่าบริการในช่วงนี้",
+    "timesN": "{{count}} ครั้ง",
+    "netTimesN": "สุทธิ {{count}} ครั้ง",
+    "qtyBreakdown": "เก็บ {{fee}} · คืน {{ref}}",
+    "svcType": {
+      "SERVICE_CHARGE": "ค่าบริการ",
+      "SHIPPING_FEE": "ค่าจัดส่ง",
+      "ONSITE_DELIVERY_FEE": "ค่าจัดส่งถึงที่",
+      "REPAIR": "ค่าซ่อม"
+    },
+    "col": {
+      "day": "วันที่",
+      "branchCode": "รหัสสาขา",
+      "branchName": "ชื่อสาขา",
+      "feeQty": "จำนวน (ครั้ง)",
+      "feeAmount": "ยอดเก็บ (฿)",
+      "refundQty": "คืน (ครั้ง)",
+      "refundAmount": "ยอดคืน (฿)",
+      "netAmount": "สุทธิ (฿)",
+      "netQty": "สุทธิ (ครั้ง)"
+    }
+  },
+  "serviceFeeByType": {
+    "title": "รายงานค่าบริการแบ่งตามประเภท",
+    "allCompanies": "ทุกบริษัท",
+    "legendFeeAmount": "ยอดเก็บ (฿)",
+    "col": {
+      "type": "ประเภท",
+      "feePct": "% ของยอดเก็บ"
+    }
+  },
+  "lotIntake": {
+    "title": "รายงานเครื่องเข้า",
+    "allBranches": "ทุกสาขา",
+    "allChannels": "ทุกช่องทาง",
+    "exportCsv": "ส่งออก CSV",
+    "kindAll": "ทั้งหมด",
+    "kindDevice": "เครื่อง",
+    "kindRetail": "สินค้าขายปลีก",
+    "sumReceiveQty": "รับเข้า",
+    "sumCorrectionQty": "แก้ยอด",
+    "sumNetQty": "สุทธิ",
+    "legendReceive": "รับเข้า",
+    "legendNet": "สุทธิ",
+    "total": "รวม",
+    "noData": "ไม่มีการรับเข้าในช่วงนี้",
+    "channel": {
+      "PURCHASE": "ซื้อจาก supplier",
+      "BUYBACK": "ซื้อคืนจากลูกค้า",
+      "STOCK_GAIN": "ปรับเพิ่ม/ยอดยกมา"
+    },
+    "col": {
+      "day": "วันที่",
+      "branchCode": "รหัสสาขา",
+      "branchName": "ชื่อสาขา",
+      "receiveQty": "รับเข้า (ชิ้น)",
+      "correctionQty": "แก้ยอด (ชิ้น)",
+      "netQty": "สุทธิ (ชิ้น)"
+    }
+  },
+  "lotIntakeByModel": {
+    "title": "รายงานเครื่องเข้าตามรุ่น",
+    "allCompanies": "ทุกบริษัท",
+    "col": {
+      "brand": "แบรนด์",
+      "model": "รุ่น",
+      "kind": "ประเภท",
+      "receivePct": "% ของการรับเข้า"
     }
   }
 }

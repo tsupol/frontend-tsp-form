@@ -518,7 +518,11 @@
     "notifications": "Notifications",
     "branchExpense": "Branch Expense",
     "overdueAging": "Overdue Aging",
-    "commissionBranch": "Branch Performance"
+    "commissionBranch": "Branch Performance",
+    "serviceFee": "Service Fees",
+    "serviceFeeByType": "Service Fees by Type",
+    "lotIntake": "Goods Received",
+    "lotIntakeByModel": "Goods Received by Model"
   },
   "ownerType": {
     "HOLDING": "Holding",
@@ -7397,6 +7401,88 @@
         "title": "This link has been cancelled",
         "body": "The branch that sent it cancelled this link. Contact them if you still need to set up the device."
       }
+    }
+  },
+  "serviceFee": {
+    "title": "Service Fees",
+    "allBranches": "All branches",
+    "exportCsv": "Export CSV",
+    "sumFeeQty": "Charges",
+    "sumFeeAmount": "Charged",
+    "sumRefundAmount": "Refunds",
+    "sumNetAmount": "Net",
+    "sumNetQty": "Net charges",
+    "legendFee": "Charged",
+    "legendNet": "Net",
+    "total": "Total",
+    "noData": "No service fees in this period",
+    "timesN": "{{count}}×",
+    "netTimesN": "{{count}}× net",
+    "qtyBreakdown": "charged {{fee}}, refunded {{ref}}",
+    "svcType": {
+      "SERVICE_CHARGE": "Service charge",
+      "SHIPPING_FEE": "Shipping fee",
+      "ONSITE_DELIVERY_FEE": "Onsite delivery fee",
+      "REPAIR": "Repair fee"
+    },
+    "col": {
+      "day": "Day",
+      "branchCode": "Branch code",
+      "branchName": "Branch name",
+      "feeQty": "Charges",
+      "feeAmount": "Charged (฿)",
+      "refundQty": "Refunds",
+      "refundAmount": "Refunded (฿)",
+      "netAmount": "Net (฿)",
+      "netQty": "Net charges"
+    }
+  },
+  "serviceFeeByType": {
+    "title": "Service Fees by Type",
+    "allCompanies": "All companies",
+    "legendFeeAmount": "Charged (฿)",
+    "col": {
+      "type": "Type",
+      "feePct": "% of fees"
+    }
+  },
+  "lotIntake": {
+    "title": "Goods Received",
+    "allBranches": "All branches",
+    "allChannels": "All channels",
+    "exportCsv": "Export CSV",
+    "kindAll": "All",
+    "kindDevice": "Devices",
+    "kindRetail": "Retail goods",
+    "sumReceiveQty": "Received",
+    "sumCorrectionQty": "Corrections",
+    "sumNetQty": "Net",
+    "legendReceive": "Received",
+    "legendNet": "Net",
+    "total": "Total",
+    "noData": "No goods received in this period",
+    "channel": {
+      "PURCHASE": "Purchase",
+      "BUYBACK": "Buyback",
+      "STOCK_GAIN": "Stock gain"
+    },
+    "col": {
+      "day": "Day",
+      "branchCode": "Branch code",
+      "branchName": "Branch name",
+      "receiveQty": "Received (pcs)",
+      "correctionQty": "Corrections (pcs)",
+      "netQty": "Net (pcs)"
+    }
+  },
+  "lotIntakeByModel": {
+    "title": "Goods Received by Model",
+    "allCompanies": "All companies",
+    "col": {
+      "brand": "Brand",
+      "model": "Model",
+      "kind": "Kind",
+      "receivePct": "% of intake"
     }
   }
 }

@@ -5,7 +5,7 @@ import { Badge } from 'tsp-form';
 import {
   CalendarCheck, Scale, Receipt, ShieldAlert, Banknote, FileSpreadsheet,
   ClipboardList, Coins, ArrowUpRight, TrendingUp, ListChecks, Package, Wallet,
-  ShoppingBag, PieChart, Trophy, Store,
+  ShoppingBag, PieChart, Trophy, Store, Wrench, PackagePlus, Boxes,
 } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -53,6 +53,10 @@ export function AccountingLayout({ children }: { children: ReactNode }) {
       { type: 'link' as const, path: '/admin/accounting/opened-by-model', labelKey: 'nav.openedByModel', icon: Package },
       { type: 'link' as const, path: '/admin/accounting/retail-sales', labelKey: 'nav.retailSales', icon: ShoppingBag },
       { type: 'link' as const, path: '/admin/accounting/retail-sales-by-type', labelKey: 'nav.retailSalesByType', icon: PieChart },
+      { type: 'link' as const, path: '/admin/accounting/service-fee', labelKey: 'nav.serviceFee', icon: Wrench },
+      { type: 'link' as const, path: '/admin/accounting/service-fee-by-type', labelKey: 'nav.serviceFeeByType', icon: PieChart },
+      { type: 'link' as const, path: '/admin/accounting/lot-intake', labelKey: 'nav.lotIntake', icon: PackagePlus },
+      { type: 'link' as const, path: '/admin/accounting/lot-intake-by-model', labelKey: 'nav.lotIntakeByModel', icon: Boxes },
       { type: 'link' as const, path: '/admin/accounting/collection-monthly', labelKey: 'nav.collectionMonthly', icon: Wallet },
       { type: 'link' as const, path: '/admin/accounting/reports', labelKey: 'nav.dailyReports', icon: FileSpreadsheet },
     ] : []),
