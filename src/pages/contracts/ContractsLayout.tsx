@@ -23,7 +23,7 @@ export function ContractsLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-dvh overflow-hidden">
-      <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-48 border-r border-line p-4 pt-8">
+      <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-48 border-r border-line p-4 pt-8 h-full min-h-0 overflow-y-auto better-scroll">
         <span className="subnav-group-label mb-1">
           {t('nav.contracts')}
         </span>
@@ -53,7 +53,7 @@ export function ContractsLayout({ children }: { children: ReactNode }) {
           </NavLink>
         ))}
       </nav>
-      <div className="flex-1 min-w-0 h-full">
+      <div className="flex-1 min-w-0 h-full min-h-0 overflow-y-auto better-scroll">
         {children}
       </div>
     </div>

@@ -41,8 +41,8 @@ export function InventoryLayout({ children }: { children: ReactNode }) {
     .reduce<string | null>((best, it) => (best && best.length >= it.path.length ? best : it.path), null);
 
   return (
-    <div className="flex h-dvh">
-      <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-48 border-r border-line p-4 pt-8">
+    <div className="flex h-dvh overflow-hidden">
+      <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-48 border-r border-line p-4 pt-8 h-full min-h-0 overflow-y-auto better-scroll">
         {navItems.map((item, i) => {
           if (item.type === 'group') {
             return (
@@ -85,7 +85,7 @@ export function InventoryLayout({ children }: { children: ReactNode }) {
           );
         })}
       </nav>
-      <div className="flex-1 min-w-0 h-full">
+      <div className="flex-1 min-w-0 h-full min-h-0 overflow-y-auto better-scroll">
         {children}
       </div>
     </div>

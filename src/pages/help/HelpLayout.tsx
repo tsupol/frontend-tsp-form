@@ -15,8 +15,8 @@ export function HelpLayout({ children }: { children: ReactNode }) {
   ];
 
   return (
-    <div className="flex min-h-full">
-      <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-48 border-r border-line p-4 pt-7.5 sticky top-0 h-dvh">
+    <div className="flex h-dvh overflow-hidden">
+      <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-48 border-r border-line p-4 pt-7.5 h-full min-h-0 overflow-y-auto better-scroll">
         <span className="subnav-group-label mb-1">
           {t('help.title')}
         </span>
@@ -42,7 +42,7 @@ export function HelpLayout({ children }: { children: ReactNode }) {
           );
         })}
       </nav>
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 min-h-0 overflow-y-auto better-scroll">
         {children}
       </div>
     </div>
