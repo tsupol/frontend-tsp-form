@@ -153,7 +153,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-dvh">
       <AppSideNav />
-      <div className="flex-grow w-full better-scroll">
+      <div className="flex-grow w-full min-w-0 min-h-0 better-scroll">
         {children}
       </div>
       {/* Floating chat — fixed-position, so it sits outside the scroll pane and

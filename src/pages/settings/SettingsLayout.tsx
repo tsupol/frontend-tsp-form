@@ -36,7 +36,7 @@ export function SettingsLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-dvh overflow-hidden">
-      <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-48 border-r border-line p-4 pt-7.5 h-full overflow-y-auto better-scroll">
+      <nav className="hidden lg:flex flex-col gap-1 shrink-0 w-48 border-r border-line p-4 pt-7.5 h-full min-h-0 overflow-y-auto better-scroll">
         <span className="subnav-group-label mb-1">
           {t('settings.title')}
         </span>
@@ -62,7 +62,7 @@ export function SettingsLayout({ children }: { children: ReactNode }) {
           );
         })}
       </nav>
-      <div className="flex-1 min-w-0 h-full better-scroll overflow-y-auto">
+      <div className="flex-1 min-w-0 h-full min-h-0 better-scroll overflow-y-auto">
         {children}
       </div>
     </div>
