@@ -25,6 +25,10 @@ dist-ssr
 /tmp/
 .playwright-mcp/
 /screenshots/
+# Playwright/browser screenshots dropped at the repo root. A bare filename
+# passed to browser_take_screenshot lands here instead of the tool's output
+# dir, so catch them at the root (nested /public/*.png etc. stay tracked).
+/*.png
 
 # deploy artifacts
 nnf-ui.tar.gz

@@ -7,6 +7,7 @@
 ## Performance Rules
 
 - **Use `browser_snapshot` (DOM/accessibility tree), not `browser_take_screenshot`** — snapshot is faster and returns parseable text
+- **When you DO screenshot, write it to `screenshots/`** — `filename: 'screenshots/thing.png'`, never a bare `'thing.png'`. A bare name lands at the repo root and shows up as an untracked file in everyone else's `git status`; `screenshots/` is already gitignored. (Root `*.png` is now ignored too, but that's a net, not a licence to keep dropping files there.)
 - **Batch actions with `browser_run_code`** — combine multiple steps (fill, click, wait) into one tool call instead of calling `browser_click`, `browser_fill_form` etc. individually
 - **Minimize snapshots** — only snapshot when you need to verify page state, not after every action
 
