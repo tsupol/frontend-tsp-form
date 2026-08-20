@@ -74,6 +74,8 @@ function useBlacklistInvalidation() {
     queryClient.invalidateQueries({ queryKey: ['customer'] });
     queryClient.invalidateQueries({ queryKey: ['contract-detail'] });
     queryClient.invalidateQueries({ queryKey: ['contracts'] });
+    // the contract's customers tab renders a per-person badge off this one
+    queryClient.invalidateQueries({ queryKey: ['contract-customers'] });
   };
 }
 

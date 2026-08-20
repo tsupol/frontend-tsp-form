@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
@@ -32,6 +32,7 @@ import { BillReceipt } from './workspace/BillReceipt';
 import { ContractAddonModal } from './ContractAddonModal';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { CustomerPickerModal } from './CustomerPickerModal';
+import { AddToBlacklistModal, LiftBlacklistModal } from '../customers/BlacklistModals';
 import { SwapPrimaryCustomerModal } from './SwapPrimaryCustomerModal';
 import { ContractPhoneSyncPanel } from './ContractPhoneSyncPanel';
 import { BranchPinInput } from '../../components/BranchPinInput';
@@ -213,6 +214,9 @@ interface ContractCustomer {
   role: string;
   relation: string | null;
   created_at: string;
+  is_blacklisted: boolean;
+  /** Row id for fn_blacklist_lift — null unless is_blacklisted. */
+  active_blacklist_id: number | null;
 }
 
 interface ContractNote {
@@ -1386,6 +1390,55 @@ interface CustomerDetail {
   prefix: string | null;
 }
 
+/**
+ * Blacklist badge + per-person manage button for one contract party.
+ *
+ * Flags come from v_contract_customers (mig 1117), which carries them per
+ * person, so no extra fetch. The party may be missing (the PRIMARY row can lag
+ * a swap) — then there is nothing to show and nothing to act on.
+ *
+ * LIFT is COMPANY_ADMIN-only while ADD is also BRANCH_MANAGER, so the two
+ * buttons are permission-checked separately; a BM sees a flagged party's badge
+ * with no lift button rather than one that fails on submit.
+ */
+function PartyBlacklistControl({ party, customerName, onAdd, onLift }: {
+  party: ContractCustomer | null;
+  customerName: string;
+  onAdd: (p: { id: number; full_name: string }) => void;
+  onLift: (p: { blacklistId: number; customerName: string }) => void;
+}) {
+  const { t } = useTranslation();
+  const { can } = useAuth();
+  if (!party) return null;
+
+  if (party.is_blacklisted) {
+    return (
+      <>
+        <Badge size="xs" color="danger">{t('blacklist.badge')}</Badge>
+        {can('BLACKLIST.LIFT') && party.active_blacklist_id != null && (
+          <button
+            type="button"
+            className="text-xs text-primary-fg hover:underline bg-transparent border-none p-0 cursor-pointer"
+            onClick={() => onLift({ blacklistId: party.active_blacklist_id!, customerName })}
+          >
+            {t('blacklist.lift.action')}
+          </button>
+        )}
+      </>
+    );
+  }
+
+  return can('BLACKLIST.ADD') ? (
+    <button
+      type="button"
+      className="text-xs text-subtle hover:text-danger-fg hover:underline bg-transparent border-none p-0 cursor-pointer"
+      onClick={() => onAdd({ id: party.customer_id, full_name: customerName })}
+    >
+      {t('blacklist.add.action')}
+    </button>
+  ) : null;
+}
+
 function CustomersTab({ contractId, customerId, customerName, contractCode, contractState, t, onRequestDetachCustomer, onGoToSigning }: {
   contractId: number;
   customerId: number | null;
@@ -1401,17 +1454,28 @@ function CustomersTab({ contractId, customerId, customerName, contractCode, cont
   const [pickerMode, setPickerMode] = useState<'attach' | 'co_lessee' | null>(null);
   const [removeTarget, setRemoveTarget] = useState<ContractCustomer | null>(null);
   const [swapOpen, setSwapOpen] = useState(false);
+  const [blacklistAdd, setBlacklistAdd] = useState<{ id: number; full_name: string } | null>(null);
+  const [blacklistLift, setBlacklistLift] = useState<{ blacklistId: number; customerName: string } | null>(null);
 
   // v_contract_customers returns EVERY contract party — PRIMARY *and* CO_LESSEE
-  // (UI_FEEDBACK/2026-07-19_DISPLAY_RULES). Must filter role=eq.CO_LESSEE or the
-  // primary shows up a second time as a phantom co-lessee. This bit hard after a
-  // PRIMARY_SWAP: the swap deletes+recreates the PRIMARY row, so it's no longer
-  // "the first row" — never infer role from row order, always filter by role.
-  // The primary itself is read from contract.customer_id via props.
-  const { data: coLessees, isLoading } = useQuery({
+  // (UI_FEEDBACK/2026-07-19_DISPLAY_RULES). We fetch them all because the view
+  // carries each person's own blacklist flags (mig 1117) and the primary needs
+  // its flags too; the two lists are split by role BELOW. Never infer role from
+  // row order — after a PRIMARY_SWAP the swap deletes+recreates the PRIMARY row,
+  // so it is no longer "the first row". Filter by role, always.
+  const { data: allParties, isLoading } = useQuery({
     queryKey: ['contract-customers', contractId],
-    queryFn: () => apiClient.get<ContractCustomer[]>(`/v_contract_customers?contract_id=eq.${contractId}&role=eq.CO_LESSEE&order=created_at`),
+    queryFn: () => apiClient.get<ContractCustomer[]>(`/v_contract_customers?contract_id=eq.${contractId}&order=created_at`),
   });
+  const coLessees = useMemo(
+    () => (allParties ?? []).filter(p => p.role === 'CO_LESSEE'),
+    [allParties],
+  );
+  /** The PRIMARY row — the only source of the primary's blacklist flags. */
+  const primaryParty = useMemo(
+    () => (allParties ?? []).find(p => p.role === 'PRIMARY') ?? null,
+    [allParties],
+  );
 
   const successSnack = (msg: string) => {
     addSnackbar({
@@ -1437,7 +1501,7 @@ function CustomersTab({ contractId, customerId, customerName, contractCode, cont
     if (newCustomerId === customerId) {
       throw new Error(t('workspace.coLesseeCannotBeSelf', { defaultValue: 'Co-lessee cannot be the primary customer' }));
     }
-    if ((coLessees ?? []).some(g => g.customer_id === newCustomerId)) {
+    if (coLessees.some(g => g.customer_id === newCustomerId)) {
       throw new Error(t('workspace.coLesseeAlreadyAttached', { defaultValue: 'Already a co-lessee on this contract' }));
     }
     await apiClient.rpc('fn_contract_add_co_lessee', {
@@ -1468,7 +1532,7 @@ function CustomersTab({ contractId, customerId, customerName, contractCode, cont
   // Pull customer detail for primary + every co-lessee — gives us phone + ID number.
   const allCustomerIds = [
     ...(customerId ? [customerId] : []),
-    ...((coLessees ?? []).map(c => c.customer_id)),
+    ...coLessees.map(c => c.customer_id),
   ];
   const { data: customerDetails = [] } = useQuery({
     queryKey: ['customer-details', allCustomerIds.join(',')],
@@ -1481,7 +1545,7 @@ function CustomersTab({ contractId, customerId, customerName, contractCode, cont
 
   // Login state for primary + every co-lessee — one batched query so each row
   // can render its own CustomerLoginCard without N parallel hooks.
-  const coLesseeIds = (coLessees ?? []).map(c => c.customer_id);
+  const coLesseeIds = coLessees.map(c => c.customer_id);
   const { data: customerLogins = [] } = useQuery({
     queryKey: ['customer-logins', allCustomerIds.join(',')],
     queryFn: () => apiClient.get<CustomerLoginInfo[]>(
@@ -1493,7 +1557,7 @@ function CustomersTab({ contractId, customerId, customerName, contractCode, cont
 
   if (isLoading) return <div className="p-8 text-center text-subtler">{t('common.loading')}</div>;
 
-  const coLesseeList = coLessees ?? [];
+  const coLesseeList = coLessees;
   const primaryDetail = customerId != null ? detailById.get(customerId) : null;
 
   const renderCoLesseeRow = (c: ContractCustomer) => {
@@ -1520,6 +1584,12 @@ function CustomersTab({ contractId, customerId, customerName, contractCode, cont
               {c.relation && (
                 <span>{t('contract.relation')}: {c.relation}</span>
               )}
+              <PartyBlacklistControl
+                party={c}
+                customerName={c.customer_name}
+                onAdd={setBlacklistAdd}
+                onLift={setBlacklistLift}
+              />
             </div>
             <div className="text-xs text-subtler mt-1">
               <DateTime value={c.created_at} />
@@ -1569,6 +1639,12 @@ function CustomersTab({ contractId, customerId, customerName, contractCode, cont
               {primaryDetail?.id_number && (
                 <span className="inline-flex items-center gap-1"><IdCard size={11} />{primaryDetail.id_number}</span>
               )}
+              <PartyBlacklistControl
+                party={primaryParty}
+                customerName={customerName ?? primaryDetail?.full_name ?? ''}
+                onAdd={setBlacklistAdd}
+                onLift={setBlacklistLift}
+              />
             </div>
           </div>
           <Tooltip content={t('contract.detachCustomer', { defaultValue: 'Detach customer' })} placement="top">
@@ -1686,6 +1762,22 @@ function CustomersTab({ contractId, customerId, customerName, contractCode, cont
           if (pickerMode === 'attach') await handleAttach(cid, name);
           else if (pickerMode === 'co_lessee') await handleAddCoLessee(cid, name);
         }}
+      />
+
+      {/* Blacklist add/lift for whichever party's button was pressed. The
+          modals invalidate contract-customers themselves, so the badge on the
+          card follows without a manual refetch here. */}
+      <AddToBlacklistModal
+        open={!!blacklistAdd}
+        onClose={() => setBlacklistAdd(null)}
+        customer={blacklistAdd}
+        refContractId={contractId}
+      />
+
+      <LiftBlacklistModal
+        open={!!blacklistLift}
+        onClose={() => setBlacklistLift(null)}
+        entry={blacklistLift}
       />
 
       <RemoveCoLesseeModal
