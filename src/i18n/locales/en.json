@@ -7479,6 +7479,7 @@
     "title": "Goods Received by Model",
     "allCompanies": "All companies",
     "col": {
+      "product": "Product",
       "brand": "Brand",
       "model": "Model",
       "kind": "Kind",

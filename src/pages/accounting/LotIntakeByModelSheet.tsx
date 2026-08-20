@@ -2,18 +2,18 @@ import { useTranslation } from 'react-i18next';
 
 // ============================================================================
 // LotIntakeByModelSheet — printable A4 (landscape) lot-intake-by-model report.
-// One row per model in the DB's model_rank order, with the three intake
-// channels broken out, plus a grand-total footer. Every number comes straight
-// from fn_lot_intake_by_model — never derived here (receive_qty already equals
-// the three channels summed; net_qty is รับ − แก้). Prints via the browser-print
-// body-portal pattern, reusing the shared `retail-report` marker +
-// `.retail-report-sheet` styles.
+// One row per model in the DB's model_rank order, named by the RPC's
+// product_display_name (brand + family + model — model_name alone reads as a
+// bare "Base 128GB"), with the three intake channels broken out, plus a
+// grand-total footer. Every number comes straight from fn_lot_intake_by_model —
+// never derived here (receive_qty already equals the three channels summed;
+// net_qty is รับ − แก้). Prints via the browser-print body-portal pattern,
+// reusing the shared `retail-report` marker + `.retail-report-sheet` styles.
 // ============================================================================
 
 export interface ModelSheetRow {
   model_id: number;
-  brand_name: string;
-  model_name: string;
+  product_display_name: string;
   is_contractable: boolean;
   purchase_qty: number;
   buyback_qty: number;
@@ -54,8 +54,7 @@ export function LotIntakeByModelSheet({ title, subtitle, rows }: LotIntakeByMode
       <table className="rr-table">
         <thead>
           <tr>
-            <th className="rr-left">{t('lotIntakeByModel.col.brand')}</th>
-            <th className="rr-left">{t('lotIntakeByModel.col.model')}</th>
+            <th className="rr-left">{t('lotIntakeByModel.col.product')}</th>
             <th className="rr-left">{t('lotIntakeByModel.col.kind')}</th>
             <th>{t('lotIntake.channel.PURCHASE')}</th>
             <th>{t('lotIntake.channel.BUYBACK')}</th>
@@ -69,8 +68,7 @@ export function LotIntakeByModelSheet({ title, subtitle, rows }: LotIntakeByMode
         <tbody>
           {rows.map((r) => (
             <tr key={r.model_id}>
-              <td className="rr-left">{r.brand_name}</td>
-              <td className="rr-left">{r.model_name}</td>
+              <td className="rr-left">{r.product_display_name}</td>
               <td className="rr-left">
                 {r.is_contractable ? t('lotIntake.kindDevice') : t('lotIntake.kindRetail')}
               </td>
@@ -85,13 +83,13 @@ export function LotIntakeByModelSheet({ title, subtitle, rows }: LotIntakeByMode
           ))}
           {rows.length === 0 && (
             <tr>
-              <td className="rr-empty" colSpan={10}>{t('lotIntake.noData')}</td>
+              <td className="rr-empty" colSpan={9}>{t('lotIntake.noData')}</td>
             </tr>
           )}
         </tbody>
         <tfoot>
           <tr>
-            <td className="rr-left" colSpan={3}>{t('lotIntake.total')}</td>
+            <td className="rr-left" colSpan={2}>{t('lotIntake.total')}</td>
             <td>{totals.purchase_qty}</td>
             <td>{totals.buyback_qty}</td>
             <td>{totals.stock_gain_qty}</td>

@@ -24,6 +24,10 @@ import { LotIntakeByModelSheet, type ModelSheetRow } from './LotIntakeByModelShe
  * many models and the point is reading the per-channel numbers side by side.
  * Data: POST /rpc/fn_lot_intake_by_model — only models with activity in the
  * window, already in model_rank order (net desc); never re-sorted here.
+ * Rows are named by product_display_name (brand + family + model). model_name
+ * alone is the bare variant ("Base 128GB") and is unreadable without the
+ * family, so it stays out of the screen — it survives only in the CSV, where
+ * brand/model are separate machine-friendly columns.
  * receive_pct / net_qty are DB-computed, and receive_qty already equals the
  * three channels summed — the totals row here only adds up what's on screen.
  * Same counting rules as "รายงานเครื่องเข้า", so both screens always agree.
@@ -37,6 +41,7 @@ interface ModelRow {
   model_id: number;
   brand_name: string;
   model_name: string;
+  product_display_name: string;
   is_contractable: boolean;
   model_rank: number;
   purchase_qty: number;
@@ -150,12 +155,11 @@ export function LotIntakeByModelReportPage() {
 
   const columns = useMemo<ColumnDef<ModelRow>[]>(() => [
     {
-      accessorKey: 'model_name',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('lotIntakeByModel.col.model')} />,
+      accessorKey: 'product_display_name',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('lotIntakeByModel.col.product')} />,
       cell: ({ row }) => (
         <div className="min-w-0">
-          <div className="text-sm font-medium truncate">{row.original.model_name}</div>
-          <div className="text-xs text-subtle truncate">{row.original.brand_name}</div>
+          <div className="text-sm font-medium truncate">{row.original.product_display_name}</div>
         </div>
       ),
     },
@@ -217,6 +221,7 @@ export function LotIntakeByModelReportPage() {
   const handleExportCsv = useCallback(() => {
     if (rows.length === 0) return;
     const csvRows = rows.map((r) => ({
+      product_display_name: r.product_display_name,
       brand_name: r.brand_name,
       model_name: r.model_name,
       is_contractable: r.is_contractable ? t('lotIntake.kindDevice') : t('lotIntake.kindRetail'),
@@ -229,6 +234,7 @@ export function LotIntakeByModelReportPage() {
       net_qty: r.net_qty,
     }));
     const columnDefs = [
+      { key: 'product_display_name', label: t('lotIntakeByModel.col.product') },
       { key: 'brand_name', label: t('lotIntakeByModel.col.brand') },
       { key: 'model_name', label: t('lotIntakeByModel.col.model') },
       { key: 'is_contractable', label: t('lotIntakeByModel.col.kind') },
@@ -246,8 +252,7 @@ export function LotIntakeByModelReportPage() {
   const handlePrint = useCallback(() => {
     setPrintRows(rows.map((r) => ({
       model_id: r.model_id,
-      brand_name: r.brand_name,
-      model_name: r.model_name,
+      product_display_name: r.product_display_name,
       is_contractable: r.is_contractable,
       purchase_qty: r.purchase_qty,
       buyback_qty: r.buyback_qty,
@@ -430,8 +435,7 @@ export function LotIntakeByModelReportPage() {
               <div key={r.model_id} className="px-4 py-3">
                 <div className="flex items-baseline justify-between gap-3 min-w-0">
                   <div className="min-w-0">
-                    <div className="text-sm font-medium truncate">{r.model_name}</div>
-                    <div className="text-xs text-subtle truncate">{r.brand_name}</div>
+                    <div className="text-sm font-medium truncate">{r.product_display_name}</div>
                   </div>
                   <span className="shrink-0 text-sm tabular-nums font-semibold">
                     {r.net_qty}
