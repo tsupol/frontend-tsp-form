@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import {
   MobileHeader, Select, Button, Badge, InputDateRangePicker,
-  DataTable, DataTableColumnHeader, type ColumnDef,
+  DataTable, DataTableColumnHeader, Tooltip, type ColumnDef,
 } from 'tsp-form';
 import {
   ArrowRightFromLine, PackagePlus, Download, Printer, Keyboard,
@@ -157,10 +157,18 @@ export function LotIntakeByModelReportPage() {
     {
       accessorKey: 'product_display_name',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('lotIntakeByModel.col.product')} />,
+      // max-w, not w-: the table is `table-layout: auto`, so a width class is
+      // only a hint the browser overrides to fit the text — the longest name
+      // ("Apple iPad (9th gen) 10.2-inch 64GB Wi-Fi + Cellular") would stretch
+      // the column and push the whole table into horizontal scroll. A max-width
+      // on the cell's own div is what finally gives `truncate` a bound. Names
+      // stay readable truncated — the distinguishing part is at the front.
       cell: ({ row }) => (
-        <div className="min-w-0">
-          <div className="text-sm font-medium truncate">{row.original.product_display_name}</div>
-        </div>
+        <Tooltip content={row.original.product_display_name} placement="top">
+          <div className="max-w-60 truncate text-sm font-medium">
+            {row.original.product_display_name}
+          </div>
+        </Tooltip>
       ),
     },
     ...(showKind ? [{
