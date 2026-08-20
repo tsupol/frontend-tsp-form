@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Badge, Button, Input, Modal, TextArea, Tooltip, useSnackbarContext, resizeToVariants } from 'tsp-form';
-import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, Download, Pause, Play, Square, Ban, Settings2, AlertTriangle, CalendarClock, Repeat, MessageSquare } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, Download, Pause, Play, Square, Ban, Settings2, AlertTriangle, CalendarClock, Repeat, MessageSquare, ShieldAlert } from 'lucide-react';
 import { GenerateContractPdfModal } from './GenerateContractPdfModal';
 import type { BeMediaContractDoc } from '../../lib/beMedia';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -43,6 +43,19 @@ import { translateApiError } from '../../lib/apiErrors';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
+/** One blacklisted party on the contract, from v_contract_detail.blacklist_hits.
+ *  A blacklisted party blocks opening NEW contracts (the checklist surfaces
+ *  CONTRACT.VALIDATION.CUSTOMER_BLACKLISTED); this contract itself is unaffected. */
+interface BlacklistHit {
+  blacklist_id: number;
+  customer_id: number;
+  role: string;
+  blacklist_type: string;
+  reason_code: string | null;
+  reason: string | null;
+  created_at: string;
+}
+
 interface ContractDetail {
   id: number;
   code: string;
@@ -60,6 +73,9 @@ interface ContractDetail {
   commercial_model: string | null;
   customer_id: number | null;
   customer_name: string | null;
+  /** True when any party on this contract (lessee or co-lessee) is blacklisted. */
+  has_blacklisted_party: boolean;
+  blacklist_hits: BlacklistHit[];
   draft_note: string | null;
   device_id: number | null;
   device_identifier: string | null;
@@ -467,6 +483,39 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
         onTabChange={handleTabChange}
         renderLabel={(tab) => t(`contract.tab_${tab}`)}
       />
+
+      {/* Blacklisted party — sits above the tab content so it shows on every
+          tab. Management lives on the customer page (one place to add/lift),
+          so each hit is a link there rather than an action here. */}
+      {contract.has_blacklisted_party && contract.blacklist_hits.length > 0 && (
+        <div className="flex-none px-4 pt-3">
+          <div className="alert alert-danger">
+            <ShieldAlert size={16} className="shrink-0" />
+            <div className="min-w-0">
+              <div className="alert-description">{t('blacklist.contractBanner')}</div>
+              <div className="mt-1 space-y-0.5">
+                {contract.blacklist_hits.map((hit) => (
+                  <div key={hit.blacklist_id} className="text-xs">
+                    <Link
+                      to={`/admin/customers/${hit.customer_id}`}
+                      className="text-primary-fg hover:underline inline-flex items-center gap-1"
+                    >
+                      {t(`blacklist.role.${hit.role}`, { defaultValue: hit.role })}
+                      <ExternalLink size={11} />
+                    </Link>
+                    {hit.reason_code && (
+                      <span className="text-subtle">
+                        {' · '}
+                        {t(`blacklist.reason.${hit.reason_code}`, { defaultValue: hit.reason_code })}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tab content */}
       <div className="flex-1 overflow-auto better-scroll">

@@ -4491,7 +4491,8 @@
       "empty": "No blacklist entries found",
       "statusActive": "Active",
       "statusLifted": "Lifted",
-      "colStatus": "Status"
+      "colStatus": "Status",
+      "statusAll": "All statuses"
     },
     "icloud": {
       "title": "iCloud Pool",
@@ -7484,6 +7485,44 @@
       "model": "Model",
       "kind": "Kind",
       "receivePct": "% of intake"
+    }
+  },
+  "blacklist": {
+    "badge": "Blacklisted",
+    "contractBanner": "A party on this contract is blacklisted. New contracts for them will be blocked until it is lifted.",
+    "reasonCode": "Reason",
+    "reasonCodePlaceholder": "Select a reason",
+    "note": "Details",
+    "noteMinHint": "At least {{count}} characters ({{current}})",
+    "add": {
+      "action": "Blacklist",
+      "title": "Add to blacklist",
+      "confirm": "Add to blacklist",
+      "effectWarning": "This customer will not be able to open new contracts until the blacklist is lifted.",
+      "notePlaceholder": "What happened? Describe it for whoever reviews this later.",
+      "doneHeadline": "Added to blacklist"
+    },
+    "lift": {
+      "action": "Lift blacklist",
+      "title": "Lift from blacklist",
+      "confirm": "Lift blacklist",
+      "notePlaceholder": "Why is it being lifted?",
+      "doneHeadline": "Lifted from blacklist"
+    },
+    "role": {
+      "PRIMARY": "Lessee",
+      "CO_LESSEE": "Co-lessee"
+    },
+    "reason": {
+      "FRAUD": "Fraud / forged documents / identity theft",
+      "INTENT_RESALE": "Opened with intent to resell/unlock/part out the device",
+      "CHRONIC_LATE": "Chronic late payment / repeated default",
+      "DEVICE_NOT_RETURNED": "Device not recovered / not returned",
+      "ABUSIVE": "Abusive or threatening behaviour toward staff",
+      "DEBT_CLEARED": "Debt fully cleared",
+      "DATA_ERROR": "Incorrect or outdated data",
+      "NEGOTIATED": "Settled by negotiation",
+      "OTHER": "Other"
     }
   }
 }

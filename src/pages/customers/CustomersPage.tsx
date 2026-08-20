@@ -4,7 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, DataTableFooter, Input, Select, Button, Badge, Modal, LabeledCheckbox, FormErrorMessage, useSnackbarContext } from 'tsp-form';
-import { ArrowRightFromLine, ArrowLeft, Users, CheckCircle, XCircle, Trash2, Star, Plus, Pencil, MapPin, UserPlus, ExternalLink } from 'lucide-react';
+import { ArrowRightFromLine, ArrowLeft, Users, CheckCircle, XCircle, Trash2, Star, Plus, Pencil, MapPin, UserPlus, ExternalLink, ShieldAlert, ShieldOff } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { toLocalDateStr, parseLocalDate, formatTel, formatCid } from '../../lib/format';
@@ -18,6 +18,7 @@ import { EditIdentityModal } from '../../components/EditIdentityModal';
 import { ContractDetailPanel } from '../contracts/ContractDetailPanel';
 import { useAuth } from '../../contexts/AuthContext';
 import { SearchInput } from '../../components/SearchInput';
+import { AddToBlacklistModal, LiftBlacklistModal } from './BlacklistModals';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -48,6 +49,9 @@ interface Customer {
   failed_login_count: number;
   locked_until: string | null;
   is_currently_locked: boolean;
+  is_blacklisted: boolean;
+  /** Row id to lift — null unless is_blacklisted. */
+  active_blacklist_id: number | null;
 }
 
 // Row shape from fn_customer_search — a subset of the view columns the list
@@ -413,6 +417,8 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
   const [editReference, setEditReference] = useState<CustomerReference | null>(null);
   const [contractModalId, setContractModalId] = useState<number | null>(null);
   const [editIdentityOpen, setEditIdentityOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [liftOpen, setLiftOpen] = useState(false);
 
   // Reset modals when customer changes
   useEffect(() => {
@@ -422,6 +428,8 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
     setAddReferenceOpen(false);
     setEditReference(null);
     setEditIdentityOpen(false);
+    setAddOpen(false);
+    setLiftOpen(false);
   }, [customerId]);
 
   const invalidateLogin = useInvalidateLoginInfo();
@@ -453,6 +461,9 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
               <Badge size="xs" color={customer.is_active ? 'success' : 'default'}>
                 {customer.is_active ? t('customer.active') : t('customer.inactive')}
               </Badge>
+              {customer.is_blacklisted && (
+                <Badge size="xs" color="danger">{t('blacklist.badge')}</Badge>
+              )}
               <span className="text-xs text-subtle tabular-nums">{customer.id_type}: {formatCid(customer.id_number)}</span>
               {canEditIdentity && (
                 <button
@@ -467,9 +478,35 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
               )}
             </div>
           </div>
-          <Button variant="outline" size="sm" startIcon={<Pencil size={14} />} onClick={() => setEditInfoOpen(true)}>
-            {t('common.edit')}
-          </Button>
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Blacklist: add when clean, lift when flagged. LIFT is
+                COMPANY_ADMIN-only, so a BM sees a flagged customer with no lift
+                button rather than one that fails on submit. */}
+            {customer.is_blacklisted
+              ? can('BLACKLIST.LIFT') && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  startIcon={<ShieldOff size={14} className="text-success" />}
+                  onClick={() => setLiftOpen(true)}
+                >
+                  {t('blacklist.lift.action')}
+                </Button>
+              )
+              : can('BLACKLIST.ADD') && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  startIcon={<ShieldAlert size={14} className="text-danger" />}
+                  onClick={() => setAddOpen(true)}
+                >
+                  {t('blacklist.add.action')}
+                </Button>
+              )}
+            <Button variant="outline" size="sm" startIcon={<Pencil size={14} />} onClick={() => setEditInfoOpen(true)}>
+              {t('common.edit')}
+            </Button>
+          </div>
         </div>
 
         {/* ── Basic Info ── */}
@@ -597,6 +634,20 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
         onClose={() => setEditInfoOpen(false)}
         customer={customer}
         onSuccess={() => { setEditInfoOpen(false); refreshAll(); showSuccess(t('customer.saveSuccess')); }}
+      />
+
+      <AddToBlacklistModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        customer={{ id: customer.id, full_name: customer.full_name }}
+      />
+
+      <LiftBlacklistModal
+        open={liftOpen}
+        onClose={() => setLiftOpen(false)}
+        entry={customer.active_blacklist_id
+          ? { blacklistId: customer.active_blacklist_id, customerName: customer.full_name }
+          : null}
       />
 
       <EditIdentityModal

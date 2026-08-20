@@ -1,21 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useForm } from 'react-hook-form';
-import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import {
-  DataTable, DataTableColumnHeader, DataTableFooter, Button, Input,
-  PopOver, MenuItem, Badge, Modal, MobileHeader,
-  useSnackbarContext, FormErrorMessage,
+  DataTable, DataTableColumnHeader, DataTableFooter,
+  PopOver, MenuItem, Badge, Select, MobileHeader,
   type ColumnDef, type SortingState,
 } from 'tsp-form';
-import {
-  Plus, MoreHorizontal, ShieldOff, XCircle, CheckCircle, ArrowRightFromLine,
-} from 'lucide-react';
+import { MoreHorizontal, ShieldOff, ArrowRightFromLine } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { apiClient, ApiError } from '../../lib/api';
+import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { SearchInput } from '../../components/SearchInput';
-import { translateApiError } from '../../lib/apiErrors';
+import { DateTime } from '../../components/DateTime';
+import { LiftBlacklistModal } from '../customers/BlacklistModals';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -40,18 +37,8 @@ interface BlacklistEntry {
   created_by: number;
   created_at: string;
   holding_id: number;
-}
-
-interface AddForm {
-  customer_id: string;
-  national_id: string;
-  reason: string;
-  ref_contract_id: string;
-  expires_at: string;
-}
-
-interface LiftForm {
-  lift_reason: string;
+  reason_code: string | null;
+  lift_reason_code: string | null;
 }
 
 // ── Row Actions ──────────────────────────────────────────────────────────────
@@ -61,7 +48,12 @@ function RowActions({ entry, onLift }: {
   onLift: (e: BlacklistEntry) => void;
 }) {
   const { t } = useTranslation();
+  const { can } = useAuth();
   const [open, setOpen] = useState(false);
+
+  // Lift is COMPANY_ADMIN-only; a lifted row has nothing to act on. Either way
+  // there is no menu worth opening.
+  if (!can('BLACKLIST.LIFT') || !entry.is_active) return null;
 
   return (
     <PopOver
@@ -86,228 +78,9 @@ function RowActions({ entry, onLift }: {
           icon={<ShieldOff size={14} />}
           label={t('settings.blacklist.liftFromBlacklist')}
           onClick={() => { setOpen(false); onLift(entry); }}
-          disabled={!entry.is_active}
         />
       </div>
     </PopOver>
-  );
-}
-
-// ── Add to Blacklist Modal ───────────────────────────────────────────────────
-
-function AddBlacklistModal({ open, onClose }: {
-  open: boolean;
-  onClose: () => void;
-}) {
-  const { t } = useTranslation();
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
-  const { addSnackbar } = useSnackbarContext();
-  const [errorMessage, setErrorMessage] = useState('');
-  const [errorKey, setErrorKey] = useState(0);
-  const [isPending, setIsPending] = useState(false);
-
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<AddForm>({
-    defaultValues: {
-      customer_id: '',
-      national_id: '',
-      reason: '',
-      ref_contract_id: '',
-      expires_at: '',
-    },
-  });
-
-  useEffect(() => {
-    if (open) {
-      reset({
-        customer_id: '',
-        national_id: '',
-        reason: '',
-        ref_contract_id: '',
-        expires_at: '',
-      });
-      setErrorMessage('');
-    }
-  }, [open, reset]);
-
-  const onSubmit = async (data: AddForm) => {
-    if (!user) return;
-    setIsPending(true);
-    setErrorMessage('');
-
-    const start = Date.now();
-    try {
-      await apiClient.rpc('fn_blacklist_add', {
-        p_customer_id: Number(data.customer_id),
-        p_reason: data.reason,
-        p_national_id: data.national_id || null,
-        p_ref_contract_id: data.ref_contract_id ? Number(data.ref_contract_id) : null,
-        p_expires_at: data.expires_at || null,
-        p_added_by: user.user_id,
-      });
-      addSnackbar({
-        message: <div className="alert alert-success"><CheckCircle size={16} /><span className="alert-description">{t('settings.blacklist.added')}</span></div>,
-        type: 'success',
-      });
-      queryClient.invalidateQueries({ queryKey: ['blacklist'] });
-      onClose();
-    } catch (err) {
-      if (err instanceof ApiError) {
-        const translated = translateApiError(err, t);
-        setErrorMessage(translated || err.message);
-      } else {
-        setErrorMessage(t('common.error'));
-      }
-      setErrorKey(k => k + 1);
-    } finally {
-      const elapsed = Date.now() - start;
-      if (elapsed < 300) await new Promise(r => setTimeout(r, 300 - elapsed));
-      setIsPending(false);
-    }
-  };
-
-  return (
-    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
-      <form className="flex flex-col overflow-hidden" onSubmit={handleSubmit(onSubmit)}>
-        <div className="modal-header">
-          <h2 className="modal-title">{t('settings.blacklist.addToBlacklist')}</h2>
-        </div>
-        <div className="modal-content">
-          {errorMessage && (
-            <div key={errorKey} className="alert alert-danger mb-4 animate-pop-in">
-              <XCircle size={18} />
-              <div><div className="alert-description">{errorMessage}</div></div>
-            </div>
-          )}
-          <div className="form-grid">
-            <div className="flex flex-col">
-              <label className="form-label">{t('settings.blacklist.customerId')}</label>
-              <Input {...register('customer_id', { required: t('common.required') })} type="number" className="w-full" />
-              <FormErrorMessage error={errors.customer_id} />
-            </div>
-            <div className="flex flex-col">
-              <label className="form-label">{t('settings.blacklist.nationalId')}</label>
-              <Input {...register('national_id')} className="w-full" />
-            </div>
-            <div className="flex flex-col">
-              <label className="form-label">{t('settings.blacklist.reason')}</label>
-              <Input {...register('reason', { required: t('common.required') })} className="w-full" />
-              <FormErrorMessage error={errors.reason} />
-            </div>
-            <div className="flex flex-col">
-              <label className="form-label">{t('settings.blacklist.refContract')}</label>
-              <Input {...register('ref_contract_id')} type="number" className="w-full" />
-            </div>
-            <div className="flex flex-col">
-              <label className="form-label">{t('settings.blacklist.expiresAt')}</label>
-              <Input {...register('expires_at')} type="datetime-local" className="w-full" />
-            </div>
-          </div>
-        </div>
-        <div className="modal-footer">
-          <Button type="button" onClick={onClose}>{t('common.cancel')}</Button>
-          <Button type="submit" color="primary" disabled={isPending}>
-            {isPending ? t('common.saving') : t('common.create')}
-          </Button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
-
-// ── Lift from Blacklist Modal ────────────────────────────────────────────────
-
-function LiftBlacklistModal({ open, onClose, entry }: {
-  open: boolean;
-  onClose: () => void;
-  entry: BlacklistEntry | null;
-}) {
-  const { t } = useTranslation();
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
-  const { addSnackbar } = useSnackbarContext();
-  const [errorMessage, setErrorMessage] = useState('');
-  const [errorKey, setErrorKey] = useState(0);
-  const [isPending, setIsPending] = useState(false);
-
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<LiftForm>({
-    defaultValues: { lift_reason: '' },
-  });
-
-  useEffect(() => {
-    if (open) {
-      reset({ lift_reason: '' });
-      setErrorMessage('');
-    }
-  }, [open, reset]);
-
-  const onSubmit = async (data: LiftForm) => {
-    if (!user || !entry) return;
-    setIsPending(true);
-    setErrorMessage('');
-
-    const start = Date.now();
-    try {
-      await apiClient.rpc('fn_blacklist_lift', {
-        p_blacklist_id: entry.id,
-        p_lift_reason: data.lift_reason,
-        p_lifted_by: user.user_id,
-      });
-      addSnackbar({
-        message: <div className="alert alert-success"><CheckCircle size={16} /><span className="alert-description">{t('settings.blacklist.lifted')}</span></div>,
-        type: 'success',
-      });
-      queryClient.invalidateQueries({ queryKey: ['blacklist'] });
-      onClose();
-    } catch (err) {
-      if (err instanceof ApiError) {
-        const translated = translateApiError(err, t);
-        setErrorMessage(translated || err.message);
-      } else {
-        setErrorMessage(t('common.error'));
-      }
-      setErrorKey(k => k + 1);
-    } finally {
-      const elapsed = Date.now() - start;
-      if (elapsed < 300) await new Promise(r => setTimeout(r, 300 - elapsed));
-      setIsPending(false);
-    }
-  };
-
-  return (
-    <Modal open={open} onClose={onClose} maxWidth="24rem" width="100%">
-      <form className="flex flex-col overflow-hidden" onSubmit={handleSubmit(onSubmit)}>
-        <div className="modal-header">
-          <h2 className="modal-title">{t('settings.blacklist.liftFromBlacklist')}</h2>
-        </div>
-        <div className="modal-content">
-          {errorMessage && (
-            <div key={errorKey} className="alert alert-danger mb-4 animate-pop-in">
-              <XCircle size={18} />
-              <div><div className="alert-description">{errorMessage}</div></div>
-            </div>
-          )}
-          {entry && (
-            <div className="text-sm text-subtle mb-4">
-              {entry.customer_name} ({entry.national_id})
-            </div>
-          )}
-          <div className="form-grid">
-            <div className="flex flex-col">
-              <label className="form-label">{t('settings.blacklist.liftReason')}</label>
-              <Input {...register('lift_reason', { required: t('common.required') })} className="w-full" />
-              <FormErrorMessage error={errors.lift_reason} />
-            </div>
-          </div>
-        </div>
-        <div className="modal-footer">
-          <Button type="button" onClick={onClose}>{t('common.cancel')}</Button>
-          <Button type="submit" color="primary" disabled={isPending}>
-            {isPending ? t('common.saving') : t('common.confirm')}
-          </Button>
-        </div>
-      </form>
-    </Modal>
   );
 }
 
@@ -321,11 +94,16 @@ export function BlacklistPage() {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
 
-  const [createOpen, setCreateOpen] = useState(false);
+  // v_blacklist now returns lifted history too, so the list needs its own
+  // status filter — default to the active rows, which is what the old
+  // active-only view used to return.
+  const [status, setStatus] = useState<'active' | 'lifted' | ''>('active');
   const [liftEntry, setLiftEntry] = useState<BlacklistEntry | null>(null);
 
   const buildEndpoint = () => {
     const params: string[] = ['order=created_at.desc'];
+    if (status === 'active') params.push('is_active=is.true');
+    if (status === 'lifted') params.push('is_active=is.false');
     if (search.trim()) {
       params.push(`or=(customer_name.ilike.*${encodeURIComponent(search.trim())}*,national_id.ilike.*${encodeURIComponent(search.trim())}*,reason.ilike.*${encodeURIComponent(search.trim())}*)`);
     }
@@ -333,7 +111,7 @@ export function BlacklistPage() {
   };
 
   const { data, isFetching, isLoading } = useQuery({
-    queryKey: ['blacklist', pageIndex, pageSize, search],
+    queryKey: ['blacklist', pageIndex, pageSize, search, status],
     queryFn: () => apiClient.getPaginated<BlacklistEntry>(buildEndpoint(), { page: pageIndex + 1, pageSize }),
     placeholderData: keepPreviousData,
   });
@@ -341,14 +119,14 @@ export function BlacklistPage() {
   const entries = data?.data ?? [];
   const totalCount = data?.totalCount ?? 0;
 
+  const statusOptions = [
+    { value: 'active', label: t('settings.blacklist.statusActive') },
+    { value: 'lifted', label: t('settings.blacklist.statusLifted') },
+  ];
+
   const handleSearch = (value: string) => {
     setSearch(value);
     setPageIndex(0);
-  };
-
-  const formatExpiry = (expires_at: string | null) => {
-    if (!expires_at) return null;
-    return new Date(expires_at).toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
 
   const columns: ColumnDef<BlacklistEntry>[] = [
@@ -370,8 +148,15 @@ export function BlacklistPage() {
       id: 'reason',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('settings.blacklist.reason')} />,
       cell: ({ row }) => (
-        <div>
-          <div className="text-xs font-medium">{row.original.reason}</div>
+        <div className="min-w-0">
+          <div className="text-xs font-medium truncate">
+            {row.original.reason_code
+              ? t(`blacklist.reason.${row.original.reason_code}`, { defaultValue: row.original.reason_code })
+              : row.original.reason}
+          </div>
+          {row.original.reason_code && row.original.reason && (
+            <div className="text-[11px] text-subtle truncate">{row.original.reason}</div>
+          )}
           {row.original.contract_code_display && (
             <div className="text-[11px] text-subtler">{row.original.contract_code_display}</div>
           )}
@@ -386,8 +171,10 @@ export function BlacklistPage() {
           <Badge color={row.original.is_active ? 'danger' : 'default'} size="sm">
             {row.original.is_active ? t('settings.blacklist.statusActive') : t('settings.blacklist.statusLifted')}
           </Badge>
-          {row.original.expires_at && (
-            <div className="text-[11px] text-subtler mt-0.5">{t('settings.blacklist.expiresAt')}: {formatExpiry(row.original.expires_at)}</div>
+          {!row.original.is_active && row.original.lifted_at && (
+            <div className="text-[11px] text-subtler mt-0.5">
+              <DateTime value={row.original.lifted_at} showTime={false} />
+            </div>
           )}
         </div>
       ),
@@ -421,15 +208,7 @@ export function BlacklistPage() {
         <div className="mobile-header-title mobile-header-title-truncate">
           {t('settings.blacklist.title')}
         </div>
-        <div className="mobile-header-end">
-          <button
-            className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-primary-fg"
-            onClick={() => setCreateOpen(true)}
-            aria-label={t('settings.blacklist.addToBlacklist')}
-          >
-            <Plus size={20} />
-          </button>
-        </div>
+        <div className="mobile-header-end w-nav" />
       </MobileHeader>
 
       <div className="page-content responsive-dvh-mobile-header">
@@ -439,9 +218,6 @@ export function BlacklistPage() {
             <h1 className="heading-2">{t('settings.blacklist.title')}</h1>
             <p className="text-sm text-subtle mt-1">{t('settings.blacklist.description')}</p>
           </div>
-          <Button color="primary" startIcon={<Plus size={16} />} onClick={() => setCreateOpen(true)}>
-            {t('settings.blacklist.addToBlacklist')}
-          </Button>
         </div>
 
         {/* Filter bar */}
@@ -454,6 +230,18 @@ export function BlacklistPage() {
                 onDebouncedChange={handleSearch}
                 size="sm"
                 className="w-full"
+              />
+            </div>
+            <div className="w-36 shrink-0">
+              <Select
+                options={statusOptions}
+                value={status || null}
+                onChange={(v) => { setStatus((v as 'active' | 'lifted') ?? ''); setPageIndex(0); }}
+                placeholder={t('settings.blacklist.statusAll')}
+                size="sm"
+                searchable={false}
+                showChevron
+                clearable
               />
             </div>
           </div>
@@ -514,7 +302,7 @@ export function BlacklistPage() {
                       >
                         {entry.national_id}
                       </Link>
-                      <div className="text-xs text-fg/40 mt-0.5">{entry.reason}</div>
+                      <div className="text-xs text-subtle mt-0.5">{entry.reason}</div>
                     </div>
                     <RowActions
                       entry={entry}
@@ -539,15 +327,10 @@ export function BlacklistPage() {
         </div>
       </div>
 
-      {/* Modals */}
-      <AddBlacklistModal
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-      />
       <LiftBlacklistModal
         open={!!liftEntry}
         onClose={() => setLiftEntry(null)}
-        entry={liftEntry}
+        entry={liftEntry ? { blacklistId: liftEntry.id, customerName: liftEntry.customer_name } : null}
       />
     </>
   );

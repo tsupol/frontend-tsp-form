@@ -4486,7 +4486,8 @@
       "empty": "ไม่พบรายการบัญชีดำ",
       "statusActive": "ใช้งาน",
       "statusLifted": "ยกเลิกแล้ว",
-      "colStatus": "สถานะ"
+      "colStatus": "สถานะ",
+      "statusAll": "ทุกสถานะ"
     },
     "icloud": {
       "title": "iCloud Pool",
@@ -7474,6 +7475,44 @@
       "model": "รุ่น",
       "kind": "ประเภท",
       "receivePct": "% ของการรับเข้า"
+    }
+  },
+  "blacklist": {
+    "badge": "ติด Blacklist",
+    "contractBanner": "มีผู้เกี่ยวข้องในสัญญานี้ติด blacklist — จะเปิดสัญญาใหม่ให้ไม่ได้จนกว่าจะปลด",
+    "reasonCode": "เหตุผล",
+    "reasonCodePlaceholder": "เลือกเหตุผล",
+    "note": "รายละเอียด",
+    "noteMinHint": "อย่างน้อย {{count}} ตัวอักษร ({{current}})",
+    "add": {
+      "action": "เข้า Blacklist",
+      "title": "นำเข้า blacklist",
+      "confirm": "นำเข้า blacklist",
+      "effectWarning": "ลูกค้ารายนี้จะเปิดสัญญาใหม่ไม่ได้จนกว่าจะปลด blacklist",
+      "notePlaceholder": "เกิดอะไรขึ้น? ระบุให้คนที่มาตรวจสอบภายหลังเข้าใจ",
+      "doneHeadline": "นำเข้า blacklist แล้ว"
+    },
+    "lift": {
+      "action": "ปลด Blacklist",
+      "title": "ปลดจาก blacklist",
+      "confirm": "ปลด blacklist",
+      "notePlaceholder": "เหตุผลที่ปลด",
+      "doneHeadline": "ปลดจาก blacklist แล้ว"
+    },
+    "role": {
+      "PRIMARY": "ผู้เช่า",
+      "CO_LESSEE": "ผู้เช่าร่วม"
+    },
+    "reason": {
+      "FRAUD": "ฉ้อโกง / ปลอมแปลงเอกสาร / สวมตัวตน",
+      "INTENT_RESALE": "จงใจเปิดสัญญาเพื่อนำเครื่องไปขาย/ปลดล็อค/แยกอะไหล่",
+      "CHRONIC_LATE": "ค้างชำระเรื้อรัง / ผิดนัดซ้ำซาก",
+      "DEVICE_NOT_RETURNED": "ยึดเครื่องไม่ได้ / ไม่คืนเครื่อง",
+      "ABUSIVE": "คุกคาม / ข่มขู่พนักงาน",
+      "DEBT_CLEARED": "เคลียร์หนี้ครบแล้ว",
+      "DATA_ERROR": "ข้อมูลผิด / ข้อมูลเก่า",
+      "NEGOTIATED": "เจรจาตกลงกันได้",
+      "OTHER": "อื่น ๆ"
     }
   }
 }
