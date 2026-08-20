@@ -1412,8 +1412,10 @@ function PartyBlacklistControl({ party, customerName, onAdd, onLift }: {
   if (!party) return null;
 
   if (party.is_blacklisted) {
+    // Badge + its action stay in one inline-flex so the parent's wrap can't
+    // strand the link on a line of its own, reading as unrelated to the badge.
     return (
-      <>
+      <span className="inline-flex items-center gap-1.5">
         <Badge size="xs" color="danger">{t('blacklist.badge')}</Badge>
         {can('BLACKLIST.LIFT') && party.active_blacklist_id != null && (
           <button
@@ -1424,7 +1426,7 @@ function PartyBlacklistControl({ party, customerName, onAdd, onLift }: {
             {t('blacklist.lift.action')}
           </button>
         )}
-      </>
+      </span>
     );
   }
 
