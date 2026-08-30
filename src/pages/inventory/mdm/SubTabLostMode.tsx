@@ -34,7 +34,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import {
   enableLostMode, enableLostModeFromTemplate, disableLostMode, playLostModeSound,
   requestLocation, readLocations, signalLocationLoop, stopLocationLoop,
-  fetchLostModeCompliance, fetchActiveLoop, fetchLockTemplates, parseMdmError,
+  fetchLostModeCompliance, fetchActiveLoop, fetchLastLocationAt, fetchLockTemplates, parseMdmError,
   type AssetMdmStatus, type MdmLocation, type MdmActiveLoop, type ParsedMdmError,
 } from './mdmApi';
 import { useMdmCommand } from './useMdmCommand';
@@ -124,40 +124,58 @@ export function SubTabLostMode({
     }
   };
 
-  // §8.3 row "ขอตำแหน่ง 1 ครั้ง": after firing a one-shot request, backoff-read
-  // until a newer fix shows up, then render it — the staffer asked to see the
-  // location, so these (few, ~2 min worst case) PDPA-logged reads are the ask
-  // being served, not spam.
-  const locBackoff = useBackoffPoll(() => { void readLatest(); });
+  // §8.3 row "ขอตำแหน่ง 1 ครั้ง", pattern per DONE 2026-08-30 §1: backoff-poll
+  // the FREE last_location_at timestamp (not a PDPA access), and fire the
+  // audited read exactly once when a fix newer than the press-time baseline
+  // lands. Audit log = 1 line per location the staffer actually saw.
+  const [probedFixAt, setProbedFixAt] = useState<string | null>(null);
+  const locBackoff = useBackoffPoll(() => {
+    void fetchLastLocationAt(status.asset_id).then(setProbedFixAt).catch(() => {});
+  });
+  const locReqBaseline = useRef<string | null>(null);
+
+  // Newest fix the system knows about, from whichever free source answered
+  // last: the loop row (fastest while looping), the tab's polled status row,
+  // or the post-press probe. ISO strings from the same API compare lexically.
+  const newestFixAt = [loop?.last_location_at, status.last_location_at, probedFixAt]
+    .filter((v): v is string => v != null)
+    .sort()
+    .at(-1) ?? null;
 
   // §8.3 "เห็นผลแล้ว → หยุดถาม": each backoff ends quietly the moment its
   // awaited value flips (the old code ran the full 2 min and then showed
-  // "เครื่องยังไม่ตอบ" even after success).
+  // "เครื่องยังไม่ตอบ" even after success). The location backoff waits for a
+  // fix NEWER than the baseline — a pre-existing fix must not satisfy it.
   const stopWhenFlipped = (backoff: { active: boolean; stop: () => void }) => {
     if (backoff.active) backoff.stop();
   };
   /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => stopWhenFlipped(lostBackoff), [lostOn]);
   useEffect(() => stopWhenFlipped(loopBackoff), [loop != null]);
-  useEffect(() => stopWhenFlipped(locBackoff), [loc?.reported_at]);
+  useEffect(() => {
+    if (locBackoff.active && newestFixAt
+      && (locReqBaseline.current == null || newestFixAt > locReqBaseline.current)) {
+      locBackoff.stop();
+    }
+  }, [newestFixAt]);
   /* eslint-enable react-hooks/exhaustive-deps */
 
-  // While a loop is running, the loop row we already poll tells us when a new
-  // fix landed (last_location_at). Read the coordinates once per new fix so the
-  // card follows the device instead of freezing at the last button press. One
-  // audited read per fix that is actually shown on screen — the viewer has the
-  // panel open, so the PDPA access record is accurate. Ref guards re-reads when
-  // ingest lag keeps read_locations behind last_location_at for a beat.
+  // Fetch coordinates once per new fix so the card follows the device instead
+  // of freezing at the last button press — but only when showing it is clearly
+  // the viewer's intent (a loop is running, they already viewed a location this
+  // session, or they just pressed ขอตำแหน่ง), so each audited read maps to a
+  // location that was really on their screen. Ref guards re-reads when ingest
+  // lag keeps read_locations behind the free timestamp for a beat.
   const autoReadForRef = useRef<string | null>(null);
   useEffect(() => {
-    const at = loop?.last_location_at;
-    if (!at || locLoading) return;
-    if (autoReadForRef.current === at) return;
-    autoReadForRef.current = at;
-    if (loc && loc.reported_at >= at) return; // already showing this fix
+    if (!newestFixAt || locLoading) return;
+    if (!(loop != null || locFetched || locBackoff.active)) return;
+    if (autoReadForRef.current === newestFixAt) return;
+    autoReadForRef.current = newestFixAt;
+    if (loc && loc.reported_at >= newestFixAt) return; // already showing this fix
     void readLatest();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loop?.last_location_at, locLoading]);
+  }, [newestFixAt, locLoading, locBackoff.active]);
 
   const run = (fire: () => Promise<{ intent_id: number }>, after?: () => void) =>
     cmd.run(fire, (r) => [r.intent_id]).then((res) => { if (res) after?.(); return res; });
@@ -299,7 +317,10 @@ export function SubTabLostMode({
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" startIcon={<MapPin size={15} />}
               disabled={cmd.pending || actorId == null || !lostOn || locBackoff.active}
-              onClick={() => actorId != null && run(() => requestLocation(status.asset_id, actorId), () => locBackoff.start())}>
+              onClick={() => actorId != null && run(() => requestLocation(status.asset_id, actorId), () => {
+                locReqBaseline.current = newestFixAt; // only a fix newer than this answers the press
+                locBackoff.start();
+              })}>
               {t('asset.mdm.location.request')}
             </Button>
             <Button variant="outline" size="sm" startIcon={<LocateFixed size={15} />}

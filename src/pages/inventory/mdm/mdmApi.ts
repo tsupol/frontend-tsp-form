@@ -115,6 +115,13 @@ export interface AssetMdmStatus {
   may_pause_indefinite: boolean; // sub-tab 7 indefinite option
   may_profile: boolean;          // sub-tab 1 step 7 (apply device policy)
 
+  // DONE 2026-08-30 (mig 1129) — timestamp of the device's latest location fix,
+  // no coordinates, so polling it is free (NOT a PDPA access). null = never
+  // reported / past retention. This is THE signal for "a new fix exists":
+  // poll it, and call the audited fn_mdm_read_locations exactly once when it
+  // advances. Same freshness rule as the RPC, so the two never disagree.
+  last_location_at: string | null;
+
   // ── §3.0 status box: "what's happening now" (DONE 2026-07-27) ──────────────
   // All on the same row — no extra query. activity_code is the single header
   // driver (icon/colour/sentence); the rest fill in the detail lines.
@@ -967,6 +974,17 @@ export function fetchLostModeCompliance(assetId: number): Promise<MdmLostModeCom
   return apiClient
     .get<MdmLostModeCompliance[]>(`/v_mdm_device_lost_mode_compliance?device_id=eq.${assetId}`)
     .then((r) => r[0] ?? null);
+}
+
+// Cheap "did a new fix land?" probe (DONE 2026-08-30 §1) — timestamp only, not
+// audited. BE measured ~25ms with the select= trim vs ~61ms full row; always
+// filter by asset_id (serial filtering is 5× slower on this view).
+export function fetchLastLocationAt(assetId: number): Promise<string | null> {
+  return apiClient
+    .get<{ asset_id: number; last_location_at: string | null }[]>(
+      `/v_asset_mdm_status?asset_id=eq.${assetId}&select=asset_id,last_location_at`,
+    )
+    .then((r) => r[0]?.last_location_at ?? null);
 }
 
 // fn_mdm_read_locations — uses p_enrollment_id (NOT asset_id), no p_actor_id.
