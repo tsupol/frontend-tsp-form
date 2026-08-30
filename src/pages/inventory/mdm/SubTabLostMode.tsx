@@ -34,7 +34,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import {
   enableLostMode, enableLostModeFromTemplate, disableLostMode, playLostModeSound,
   requestLocation, readLocations, signalLocationLoop, stopLocationLoop,
-  fetchDeviceOverview, fetchActiveLoop, fetchLockTemplates, parseMdmError,
+  fetchLostModeCompliance, fetchActiveLoop, fetchLockTemplates, parseMdmError,
   type AssetMdmStatus, type MdmLocation, type MdmActiveLoop, type ParsedMdmError,
 } from './mdmApi';
 import { useMdmCommand } from './useMdmCommand';
@@ -66,29 +66,42 @@ export function SubTabLostMode({
   const [message, setMessage] = useState('');
   const [phone, setPhone] = useState('');
 
-  const { data: overview, refetch: refetchOverview } = useQuery({
-    queryKey: ['mdm-device-overview', status.asset_id],
-    queryFn: () => fetchDeviceOverview(status.asset_id),
+  // Lost-mode signals — the ack-driven state machine flag, not the slow
+  // device-reported one (see fetchLostModeCompliance). Owner asked this panel
+  // to keep itself fresh (2026-08-30), so both status queries poll at the tab's
+  // idle cadence while visible; the next_poll_at timer and post-action backoffs
+  // layer faster reloads on top when something is actually moving.
+  const { data: compliance, refetch: refetchLost } = useQuery({
+    queryKey: ['mdm-lost-compliance', status.asset_id],
+    queryFn: () => fetchLostModeCompliance(status.asset_id),
     ...MDM_NO_CACHE,
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
   });
-  const lostOn = overview?.is_mdm_lost_mode_enabled === true;
+  const lostOn = compliance?.state_machine_lost_mode_active === true;
+  // We commanded one thing, the device hasn't confirmed the other yet.
+  const lostSwitching =
+    compliance?.expected_enabled != null && compliance.expected_enabled !== lostOn;
 
   const { data: templates = [] } = useQuery({
     queryKey: ['mdm-lock-templates', i18n.language],
     queryFn: () => fetchLockTemplates(i18n.language === 'th' ? 'th' : 'en'),
   });
 
-  // Active location loop (§8.1) — polled by next_poll_at (§8.2).
+  // Active location loop (§8.1) — polled by next_poll_at (§8.2) + the same
+  // 30s keep-fresh baseline (a loop another staffer starts/stops shows up too).
   const { data: loop, refetch: refetchLoop } = useQuery({
     queryKey: ['mdm-active-loop', status.asset_id],
     queryFn: () => fetchActiveLoop(status.asset_id),
     ...MDM_NO_CACHE,
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
   });
   useNextPollAt(loop?.next_poll_at ?? null, refetchLoop);
 
   // Post-action backoff (§8.3): after firing, poll the relevant view until the
   // awaited value flips, then stop.
-  const lostBackoff = useBackoffPoll(refetchOverview);
+  const lostBackoff = useBackoffPoll(refetchLost);
   const loopBackoff = useBackoffPoll(refetchLoop);
 
   // Latest location — fetched on demand (button), PDPA-logged read.
@@ -110,6 +123,41 @@ export function SubTabLostMode({
       setLocLoading(false);
     }
   };
+
+  // §8.3 row "ขอตำแหน่ง 1 ครั้ง": after firing a one-shot request, backoff-read
+  // until a newer fix shows up, then render it — the staffer asked to see the
+  // location, so these (few, ~2 min worst case) PDPA-logged reads are the ask
+  // being served, not spam.
+  const locBackoff = useBackoffPoll(() => { void readLatest(); });
+
+  // §8.3 "เห็นผลแล้ว → หยุดถาม": each backoff ends quietly the moment its
+  // awaited value flips (the old code ran the full 2 min and then showed
+  // "เครื่องยังไม่ตอบ" even after success).
+  const stopWhenFlipped = (backoff: { active: boolean; stop: () => void }) => {
+    if (backoff.active) backoff.stop();
+  };
+  /* eslint-disable react-hooks/exhaustive-deps */
+  useEffect(() => stopWhenFlipped(lostBackoff), [lostOn]);
+  useEffect(() => stopWhenFlipped(loopBackoff), [loop != null]);
+  useEffect(() => stopWhenFlipped(locBackoff), [loc?.reported_at]);
+  /* eslint-enable react-hooks/exhaustive-deps */
+
+  // While a loop is running, the loop row we already poll tells us when a new
+  // fix landed (last_location_at). Read the coordinates once per new fix so the
+  // card follows the device instead of freezing at the last button press. One
+  // audited read per fix that is actually shown on screen — the viewer has the
+  // panel open, so the PDPA access record is accurate. Ref guards re-reads when
+  // ingest lag keeps read_locations behind last_location_at for a beat.
+  const autoReadForRef = useRef<string | null>(null);
+  useEffect(() => {
+    const at = loop?.last_location_at;
+    if (!at || locLoading) return;
+    if (autoReadForRef.current === at) return;
+    autoReadForRef.current = at;
+    if (loc && loc.reported_at >= at) return; // already showing this fix
+    void readLatest();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loop?.last_location_at, locLoading]);
 
   const run = (fire: () => Promise<{ intent_id: number }>, after?: () => void) =>
     cmd.run(fire, (r) => [r.intent_id]).then((res) => { if (res) after?.(); return res; });
@@ -138,9 +186,15 @@ export function SubTabLostMode({
           <div className="flex items-center gap-2">
             <MapPin size={16} className="text-danger" />
             <span className="text-sm font-semibold">{t('asset.mdm.lost.title')}</span>
-            <span className={`ml-auto text-xs px-2 py-0.5 rounded-full border ${lostOn ? 'bg-danger-soft border-danger-border text-danger-fg' : 'bg-surface border-line text-subtle'}`}>
-              {lostOn ? t('asset.mdm.lost.on') : t('asset.mdm.lost.off')}
-            </span>
+            {lostSwitching ? (
+              <span className="ml-auto text-xs px-2 py-0.5 rounded-full border bg-warning-soft border-warning-border text-warning-fg inline-flex items-center gap-1">
+                <Loader2 size={11} className="animate-spin" />{t('asset.mdm.lost.switching')}
+              </span>
+            ) : (
+              <span className={`ml-auto text-xs px-2 py-0.5 rounded-full border ${lostOn ? 'bg-danger-soft border-danger-border text-danger-fg' : 'bg-surface border-line text-subtle'}`}>
+                {lostOn ? t('asset.mdm.lost.on') : t('asset.mdm.lost.off')}
+              </span>
+            )}
           </div>
 
           {lostBackoff.timedOut && (
@@ -244,8 +298,8 @@ export function SubTabLostMode({
 
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" startIcon={<MapPin size={15} />}
-              disabled={cmd.pending || actorId == null || !lostOn}
-              onClick={() => actorId != null && run(() => requestLocation(status.asset_id, actorId))}>
+              disabled={cmd.pending || actorId == null || !lostOn || locBackoff.active}
+              onClick={() => actorId != null && run(() => requestLocation(status.asset_id, actorId), () => locBackoff.start())}>
               {t('asset.mdm.location.request')}
             </Button>
             <Button variant="outline" size="sm" startIcon={<LocateFixed size={15} />}
@@ -287,6 +341,17 @@ export function SubTabLostMode({
 
           <MdmErrorAlert error={locError} />
 
+          {locBackoff.active && (
+            <div className="text-xs text-subtle flex items-center gap-1">
+              <Loader2 size={12} className="animate-spin" />{t('asset.mdm.location.waitingFix')}
+            </div>
+          )}
+          {locBackoff.timedOut && (
+            <div className="text-xs text-warning-fg flex items-center gap-1">
+              <AlertTriangle size={12} />{t('asset.mdm.lost.noAnswer')}
+            </div>
+          )}
+
           {locFetched && !loc && !locError && (
             <div className="text-xs text-subtle">{t('asset.mdm.location.none')}</div>
           )}
@@ -314,7 +379,11 @@ function ModeTab({ active, onClick, label }: { active: boolean; onClick: () => v
 
 function LoopStatus({ loop }: { loop: MdmActiveLoop }) {
   const { t } = useTranslation();
-  const pct = loop.progress != null ? Math.round(loop.progress * 100) : null;
+  // NOT loop.progress — that column is text ("7/20"), which as a number is NaN
+  // and silently killed this bar for weeks.
+  const pct = loop.attempts_made != null && loop.max_attempts
+    ? Math.round((loop.attempts_made / loop.max_attempts) * 100)
+    : null;
   return (
     <div className="rounded-md border border-info-border bg-info-soft p-3 flex flex-col gap-1.5">
       <div className="flex items-center gap-1.5 text-xs text-info-fg font-medium">
@@ -384,7 +453,8 @@ const BACKOFF_STEPS = [3000, 5000, 8000, 13000, 20000, 30000]; // §8.3
 
 /** After an action, refetch on a widening backoff for ~2 min, then give up with
  *  a "device hasn't answered" flag (§8.3) — never surfaced as an error. `step`
- *  is state so each tick re-schedules the next (wider) delay. */
+ *  is state so each tick re-schedules the next (wider) delay. Callers `stop()`
+ *  when the awaited value flips, so success never shows the timeout note. */
 function useBackoffPoll(refetch: () => void) {
   const [step, setStep] = useState(-1); // -1 = idle
   const [timedOut, setTimedOut] = useState(false);
@@ -392,6 +462,7 @@ function useBackoffPoll(refetch: () => void) {
   refetchRef.current = refetch;
 
   const start = () => { setTimedOut(false); setStep(0); };
+  const stop = () => { setTimedOut(false); setStep(-1); };
 
   useEffect(() => {
     if (step < 0) return;
@@ -403,5 +474,5 @@ function useBackoffPoll(refetch: () => void) {
     return () => clearTimeout(id);
   }, [step]);
 
-  return { active: step >= 0, timedOut, start };
+  return { active: step >= 0, timedOut, start, stop };
 }

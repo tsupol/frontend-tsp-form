@@ -2857,12 +2857,14 @@
         "modeCustom": "Custom message",
         "template": "Message template",
         "templatePlaceholder": "Choose a message",
-        "noAnswer": "The device hasn't answered yet — the command is still queued. It'll update when the device comes online."
+        "noAnswer": "The device hasn't answered yet — the command is still queued. It'll update when the device comes online.",
+        "switching": "Switching…"
       },
       "location": {
         "title": "Location",
         "needLostMode": "Location is only available while Lost Mode is on.",
         "request": "Request location",
+        "waitingFix": "Waiting for the device to report its location…",
         "readLatest": "Show latest location",
         "none": "No location reported yet. Enable Lost Mode, then request a location.",
         "current": "Current location ·",

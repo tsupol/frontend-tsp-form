@@ -925,9 +925,11 @@ export function fetchLockTemplates(locale: string): Promise<MdmLockTemplate[]> {
 
 // §8.1 — active location loop for a device (device_id === asset_id). No row =
 // no loop; a row = looping. Poll by next_poll_at (§8.2), NOT a fixed interval.
+// ⚠️ `progress` is TEXT ("7/20"), not a ratio — compute percentages from
+// attempts_made / max_attempts.
 export interface MdmActiveLoop {
   device_id: number;
-  progress: number | null;
+  progress: string | null;
   attempts_made: number | null;
   max_attempts: number | null;
   seconds_to_timeout: number | null;
@@ -943,14 +945,27 @@ export function fetchActiveLoop(assetId: number): Promise<MdmActiveLoop | null> 
     .then((r) => r[0] ?? null);
 }
 
-// v_mdm_device_overview — the device-reported lost-mode flag (§3, §6).
-export interface MdmDeviceOverview {
-  asset_id: number;
-  is_mdm_lost_mode_enabled: boolean | null;
+// v_mdm_device_lost_mode_compliance — the three lost-mode signals, keyed by
+// device_id (= asset_id). Replaces v_mdm_device_overview here (2026-08-30):
+// the overview's is_mdm_lost_mode_enabled is the device-REPORTED value, which
+// only refreshes when a device-info observation lands (up to hours). This view
+// also carries the ack-driven state machine flag, which flips within seconds
+// of the device executing the command — the right thing to drive the badge and
+// the "may request location" rule. No row = device has no MDM state yet.
+export interface MdmLostModeCompliance {
+  device_id: number;
+  /** What we last commanded (flips the moment the RPC is accepted). */
+  expected_enabled: boolean | null;
+  /** Ack-driven: the device confirmed the command (seconds). Drive UI off this. */
+  state_machine_lost_mode_active: boolean | null;
+  /** Device-reported at last observation (slow confirmation, up to hours). */
+  observed_enabled: boolean | null;
+  compliance_status: string | null;
+  last_observation_at: string | null;
 }
-export function fetchDeviceOverview(assetId: number): Promise<MdmDeviceOverview | null> {
+export function fetchLostModeCompliance(assetId: number): Promise<MdmLostModeCompliance | null> {
   return apiClient
-    .get<MdmDeviceOverview[]>(`/v_mdm_device_overview?asset_id=eq.${assetId}`)
+    .get<MdmLostModeCompliance[]>(`/v_mdm_device_lost_mode_compliance?device_id=eq.${assetId}`)
     .then((r) => r[0] ?? null);
 }
 
