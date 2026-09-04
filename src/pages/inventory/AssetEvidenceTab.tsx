@@ -131,7 +131,9 @@ export function AssetEvidenceTab({ assetId, assetCode }: {
     mutationFn: (p: EvidencePhoto) =>
       apiClient.rpc('fn_media_detach', { p_entity_media_id: p.entity_media_id }),
     onSuccess: () => { setError(''); setConfirmRemove(null); refresh(); },
-    onError: (err) => setError(translateErr(err, t)),
+    // Close the confirm dialog too — the error banner lives at tab level and
+    // would otherwise sit invisible behind the open dialog.
+    onError: (err) => { setError(translateErr(err, t)); setConfirmRemove(null); },
   });
 
   // Keep modal bodies alive through the close transition.
