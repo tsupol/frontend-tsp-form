@@ -1916,6 +1916,27 @@
     "termRemoved": "Term removed",
     "enterMonths": "Months"
   },
+  "assetEvidence": {
+    "title": "Evidence Photos",
+    "missing": "No photo yet",
+    "addPhoto": "Add photo",
+    "captureFromPhone": "Capture from phone",
+    "emptySlot": "No photos in this slot",
+    "cover": "Cover",
+    "photoActions": "Photo actions",
+    "makeCover": "Make cover",
+    "moveToSlot": "Move to slot",
+    "replace": "Replace",
+    "replaceTitle": "Replace photo",
+    "confirmRemove": "Remove this photo?",
+    "moveTitle": "Move photo",
+    "moveTarget": "Target slot",
+    "selectSlot": "Select slot",
+    "errorPickImage": "Pick an image first",
+    "captureScanHint": "Scan the QR with a phone to open the camera — photos land in this slot automatically.",
+    "captureCount_one": "{{count}} / {{max}} uploaded",
+    "captureCount_other": "{{count}} / {{max}} uploaded"
+  },
   "fin1Config": {
     "title": "FIN1 Installment Rates",
     "months_one": "{{count}} month",
@@ -2524,6 +2545,7 @@
     "addToQueue": "Add to print queue",
     "removeFromQueue": "Remove from print queue",
     "tab_overview": "Overview",
+    "tab_evidence": "Evidence Photos",
     "tab_mdm": "MDM",
     "tab_security": "Device Lock",
     "mdm": {

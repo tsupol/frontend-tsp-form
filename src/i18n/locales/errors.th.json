@@ -952,5 +952,12 @@
   "pricing.fin1.no_retail_price": "สินค้านี้ยังไม่มีราคาตั้งในระบบ — แจ้ง holding ให้กรอกตารางราคาก่อน",
   "pricing.fin1.uplift": "ราคาปรับขึ้นต้องอยู่ระหว่าง 0 ถึงเพดานที่ตั้งไว้",
   "pricing.fin1.monthly_too_low": "ค่างวดที่ขอต่ำกว่าค่างวดของงวดยาวสุด — เพิ่มเงินดาวน์",
-  "pricing.variant.not_found": "ไม่พบสินค้านี้ในแคตตาล็อกของ holding (หรือไม่เปิดให้ทำสัญญา)"
+  "pricing.variant.not_found": "ไม่พบสินค้านี้ในแคตตาล็อกของ holding (หรือไม่เปิดให้ทำสัญญา)",
+  "inv.evidence.slot_invalid": "ช่องรูปนี้ไม่มีหรือไม่เปิดใช้ใน holding นี้",
+  "inv.evidence.slot_full": "ช่องรูปนี้เต็มแล้ว — ลบหรือย้ายรูปก่อน",
+  "inv.evidence.same_slot": "รูปอยู่ในช่องนี้อยู่แล้ว",
+  "inv.evidence.not_asset_album": "รายการนี้ไม่ใช่รูปหลักฐานสินทรัพย์",
+  "media.validation.reorder_scope_mismatch": "รายการรูปเปลี่ยนไปแล้ว — รีเฟรชแล้วลองใหม่",
+  "media.validation.key_reused": "ไฟล์นี้ถูกผูกไปแล้ว — อัปโหลดไฟล์ใหม่",
+  "media.validation.invalid_path": "ไฟล์ที่อัปโหลดไม่ใช่ของเครื่องนี้"
 }

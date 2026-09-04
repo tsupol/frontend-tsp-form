@@ -1912,6 +1912,27 @@
     "termRemoved": "ลบเงื่อนไขสำเร็จ",
     "enterMonths": "เดือน"
   },
+  "assetEvidence": {
+    "title": "รูปหลักประกัน",
+    "missing": "ยังไม่มีรูป",
+    "addPhoto": "เพิ่มรูป",
+    "captureFromPhone": "ถ่ายด้วยมือถือ",
+    "emptySlot": "ยังไม่มีรูปในช่องนี้",
+    "cover": "รูปหลัก",
+    "photoActions": "จัดการรูป",
+    "makeCover": "ตั้งเป็นรูปหลัก",
+    "moveToSlot": "ย้ายไปช่องอื่น",
+    "replace": "แทนที่",
+    "replaceTitle": "แทนที่รูป (ถ่ายใหม่)",
+    "confirmRemove": "ลบรูปนี้?",
+    "moveTitle": "ย้ายรูป",
+    "moveTarget": "ช่องปลายทาง",
+    "selectSlot": "เลือกช่อง",
+    "errorPickImage": "เลือกรูปก่อน",
+    "captureScanHint": "สแกน QR ด้วยมือถือเพื่อเปิดกล้อง — รูปจะเข้าช่องนี้อัตโนมัติ",
+    "captureCount_one": "อัปโหลดแล้ว {{count}} / {{max}}",
+    "captureCount_other": "อัปโหลดแล้ว {{count}} / {{max}}"
+  },
   "fin1Config": {
     "title": "เรทผ่อน FIN1",
     "months_one": "{{count}} เดือน",
@@ -2520,6 +2541,7 @@
     "addToQueue": "เพิ่มเข้าคิวพิมพ์",
     "removeFromQueue": "เอาออกจากคิวพิมพ์",
     "tab_overview": "ภาพรวม",
+    "tab_evidence": "รูปหลักประกัน",
     "tab_mdm": "MDM",
     "tab_security": "ล็อกเครื่อง",
     "mdm": {

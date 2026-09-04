@@ -244,6 +244,8 @@ export function beMediaCanPresign(key: string): boolean {
     /^private\/branches\/\d+\/signatory-/.test(k) ||
     /^private\/companies\/\d+\/signatory-/.test(k) ||
     /^private\/buyback\/\d+\/condition-/.test(k) ||
+    // asset evidence album (mig 1141 shape H — staff in holding can view).
+    /^private\/assets\/\d+\/evidence-/.test(k) ||
     /^private\/asset_check\/\d+\/photo-/.test(k) ||
     /^private\/sell_out\/\d+\/condition-/.test(k) ||
     // repair photo album (mig 633 prefix private/repairs/{repair_order_id}/).
@@ -443,6 +445,23 @@ export const REPAIR_CONDITION_RESIZE: ResizeOptions = {
   maxWidth: 1280, maxHeight: 1280, mode: 'contain', format: 'webp', quality: 0.82,
 };
 
+// ── asset_evidence — asset evidence album (DELIVERY 2026-09-04, PRIVATE) ─
+// Slot-organized photos of a registered device (front/back/box/screen/about/
+// other — slots configured per holding in ref_asset_evidence_slots). Leaf is
+// `evidence-{idx}-{size}.{ext}` with the idx SERVER-MINTED (never collides, so
+// no client idx). Two sizes per photo: lg (display/zoom) + sm (thumb). After
+// upload the keys go to fn_asset_evidence_attach — NOT the generic
+// fn_media_attach (the wrapper enforces slot validity + max_shots).
+// The QR bridge twin is `asset_evidence_bridge` (slot rides in session meta).
+export const ASSET_EVIDENCE_TYPE = 'asset_evidence';
+export const ASSET_EVIDENCE_SIZES = ['sm', 'lg'] as const;
+export type AssetEvidenceSize = (typeof ASSET_EVIDENCE_SIZES)[number];
+
+export const ASSET_EVIDENCE_RESIZE: Record<AssetEvidenceSize, ResizeOptions> = {
+  sm: { maxWidth: 320, maxHeight: 320, mode: 'contain', format: 'webp', quality: 0.82 },
+  lg: { maxWidth: 1280, maxHeight: 1280, mode: 'contain', format: 'webp', quality: 0.82 },
+};
+
 // ── bank_account_qr — payment QR image on a bank account (PUBLIC) ─────
 // The scannable PromptPay/transfer QR staff show customers. One live QR per
 // account; replacing soft-deletes the old one. Lands at
@@ -553,6 +572,14 @@ export const UPLOAD_SPECS: Record<string, BeMediaSpec> = {
   user_profile: {
     type: 'user_profile', privacy: 'public', resize_mode: 'cover', aspect_ratio: '1:1', quality: 0.80,
     sizes: [{ label: 'sm', width: 320 }], path_params: ['user_id'],
+  },
+  asset_evidence: {
+    // mig 1141: DB required_path_params = ['asset_id','slot']; leaf idx is
+    // server-minted so it is NOT a param here. max per slot comes from
+    // ref_asset_evidence_slots (default 3, OTHER 5) — not a fixed max_files.
+    type: 'asset_evidence', privacy: 'private', resize_mode: 'contain', quality: 0.82,
+    sizes: [{ label: 'sm', width: 320 }, { label: 'lg', width: 1280 }],
+    path_params: ['asset_id', 'slot'],
   },
 };
 

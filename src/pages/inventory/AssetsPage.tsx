@@ -23,6 +23,7 @@ import { ImeiInput } from '../../components/ImeiInput';
 import { getBucketLabel, getBucketColor, getConditionLabel, getConditionTextColor, CONDITION_VALUES, codeDisplay } from './inventoryUtils';
 import { RegisterAssetModal } from './RegisterAssetModal';
 import { AssetMdmTab } from './AssetMdmTab';
+import { AssetEvidenceTab } from './AssetEvidenceTab';
 import { ScrollableTabs } from './ScrollableTabs';
 import { SellExternalModal } from './SellExternalModal';
 import { SellOutRequestModal } from './SellOutRequestModal';
@@ -1013,8 +1014,8 @@ export function AssetsPage() {
 // Detail tabs
 // ============================================================================
 
-type AssetTab = 'overview' | 'mdm' | 'security';
-const ASSET_TABS: AssetTab[] = ['overview', 'mdm', 'security'];
+type AssetTab = 'overview' | 'evidence' | 'mdm' | 'security';
+const ASSET_TABS: AssetTab[] = ['overview', 'evidence', 'mdm', 'security'];
 
 // ============================================================================
 // Detail panel
@@ -1114,6 +1115,13 @@ function AssetDetailPanel({
         onTabChange={handleTabChange}
         renderLabel={(tab) => t(`asset.tab_${tab}`)}
       />
+
+      {activeTab === 'evidence' && (
+        <AssetEvidenceTab
+          assetId={asset.asset_id}
+          assetCode={codeDisplay(asset.asset_code_display, asset.asset_code)}
+        />
+      )}
 
       {activeTab === 'mdm' && (
         <AssetMdmTab assetId={asset.asset_id} onRefresh={onRefresh} />

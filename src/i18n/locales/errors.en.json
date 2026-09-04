@@ -952,5 +952,12 @@
   "pricing.fin1.no_retail_price": "This product has no retail price set yet — ask the holding to fill in the pricebook.",
   "pricing.fin1.uplift": "The price uplift must be between 0 and the configured maximum.",
   "pricing.fin1.monthly_too_low": "The requested monthly amount is below the longest term's installment — raise the down payment.",
-  "pricing.variant.not_found": "This product is not in the holding's catalog (or not open for contracts)."
+  "pricing.variant.not_found": "This product is not in the holding's catalog (or not open for contracts).",
+  "inv.evidence.slot_invalid": "This photo slot doesn't exist or is disabled for this holding.",
+  "inv.evidence.slot_full": "This slot is full — remove or move a photo first.",
+  "inv.evidence.same_slot": "The photo is already in this slot.",
+  "inv.evidence.not_asset_album": "This item is not an asset evidence photo.",
+  "media.validation.reorder_scope_mismatch": "The photo list changed — refresh and try again.",
+  "media.validation.key_reused": "This file was already attached — upload a fresh one.",
+  "media.validation.invalid_path": "The uploaded file doesn't belong to this device."
 }
