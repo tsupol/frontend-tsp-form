@@ -1,65 +1,27 @@
-# Playwright MCP Usage Guide
+# Playwright MCP — nnf frontend
 
-> **Start every session with `await page.emulateMedia({ colorScheme: 'dark' });`**
-> — the user reviews in dark mode. See "Dark mode" below for why setting
-> `data-theme` by hand does not work.
+**Read `C:\Users\tonsu\.claude\playwright-guide.md` first** — viewport, dark
+mode, screenshots, batching and the common gotchas live there. This file only
+adds what is specific to this app.
 
-## Performance Rules
+Two reminders that bite here: start with
+`await page.emulateMedia({ colorScheme: 'dark' })`, and write screenshots to
+`screenshots/` (gitignored), never a bare filename.
 
-- **Use `browser_snapshot` (DOM/accessibility tree), not `browser_take_screenshot`** — snapshot is faster and returns parseable text
-- **When you DO screenshot, write it to `screenshots/`** — `filename: 'screenshots/thing.png'`, never a bare `'thing.png'`. A bare name lands at the repo root and shows up as an untracked file in everyone else's `git status`; `screenshots/` is already gitignored. (Root `*.png` is now ignored too, but that's a net, not a licence to keep dropping files there.)
-- **Batch actions with `browser_run_code`** — combine multiple steps (fill, click, wait) into one tool call instead of calling `browser_click`, `browser_fill_form` etc. individually
-- **Minimize snapshots** — only snapshot when you need to verify page state, not after every action
+Project-specific viewport traps — all three have tempted a `browser_resize`, and
+none of them are a viewport problem:
 
-## ⛔ Viewport — the content flows freely, DON'T pin it
-
-- **The MCP context runs with `viewport: null`** (check any time with
-  `page.viewportSize()` → `null`). The page has NO fixed viewport: it tracks the
-  real Chrome window and reflows like a normal browser. This is the desired
-  state — leave it that way.
-- **Do NOT call `browser_resize` or `page.setViewportSize()`.** Either one
-  replaces the null viewport with a fixed one and **freezes the page at that size
-  for the rest of the session** — content stops following the window, and only a
-  fresh browser session restores it. There is no undo mid-session.
-- If you're about to "work around" a viewport that looks wrong, re-read this
-  section: **the workaround IS the problem.**
-
-**It also never fixes what it looks like it fixes.** Every time it's been reached
-for here, the cause was something else and the resize did nothing:
-
-| Symptom that tempts a resize | Actual cause |
+| Symptom | Actual cause |
 |---|---|
-| Nav items missing from the DOM | **Side menu was collapsed** — click `Expand menu`, or read the badge off the collapsed dot |
-| `querySelectorAll('a[href]')` finds no menu rows | **The side menu renders `<button>`, not `<a href>`** — match on text, or use `browser_snapshot` |
+| Nav items missing from the DOM | Side menu is collapsed — click `Expand menu`, or read the badge off the collapsed dot |
+| `querySelectorAll('a[href]')` finds no menu rows | The side menu renders `<button>`, not `<a href>` — match on text, or use `browser_snapshot` |
 | Content "cut off" | The pane scrolls (`.better-scroll`), it isn't clipped — scroll it |
-
-### When you genuinely need a specific width
-
-Drive the OS window over CDP — this keeps the viewport null and the flow intact:
-
-```js
-const cdp = await page.context().newCDPSession(page);
-const { windowId } = await cdp.send('Browser.getWindowForTarget');
-await cdp.send('Browser.setWindowBounds', { windowId, bounds: { width: 1200, height: 900 } });
-await page.waitForTimeout(300);           // let the re-layout paint
-await cdp.detach();
-```
-
-- **Chrome enforces a ~917px minimum window width.** Asking for 420 lands at
-  ~917 — the same floor you hit dragging by hand. The real window therefore
-  CANNOT show the mobile layout.
-- **For mobile, emulate instead of resizing:** `Emulation.setDeviceMetricsOverride`
-  at 375×812, then `Emulation.clearDeviceMetricsOverride` when done. True 375
-  layout, no pinned viewport.
-- Before ending a turn: clear any emulation override and put the window back near
-  the user's own width.
 
 ## Login — use `/dev-login`, never the login form
 
 One URL. It logs in and lands you on the page you wanted:
 
 ```js
-await page.emulateMedia({ colorScheme: 'dark' });   // see Dark mode below
 await page.goto('https://localhost:5173/dev-login?u=company_admin&to=/admin/contracts/search');
 ```
 
@@ -197,41 +159,19 @@ roles, then submit. The panel drives the `ui_*` set; `BR_COLL` is
 
 Use `browser_snapshot` to get the DOM tree, then interact via `browser_run_code` for multi-step flows or individual `browser_click`/`browser_fill_form` for single actions.
 
-## Dark mode — ALWAYS use it. Do this first, before any screenshot.
-
-**The user reviews this app in dark mode. A light-mode screenshot is a wasted
-screenshot.** Run this once per session, right after the first `page.goto`:
-
-```js
-await page.emulateMedia({ colorScheme: 'dark' });
-```
-
-That's the whole fix. It is **sticky for the browser context** — it survives
-navigation, `reload()`, and login redirects, so there is nothing to re-apply.
-
-### Why the old `setAttribute` recipe kept failing
+## Dark mode — why the old `setAttribute` recipe failed here
 
 `ThemeContext` defaults to `theme = 'system'` (nothing in `localStorage` on a
-fresh profile) and resolves it from `prefers-color-scheme`, which Playwright
-reports as **light** by default. It then writes `data-theme` on `<html>` from a
-`useEffect`. So hand-setting the attribute only wins until React's next theme
-effect overwrites it — which is exactly why dark kept "randomly" reverting after
-a navigation. Emulating the media query fixes the *input* React reads, so the
-app itself chooses dark and keeps choosing it.
+fresh profile) and resolves it from `prefers-color-scheme`, then writes
+`data-theme` on `<html>` from a `useEffect`. Hand-setting the attribute only
+wins until React's next theme effect overwrites it — which is why dark kept
+"randomly" reverting after a navigation. `emulateMedia` fixes the input React
+reads, so the app itself chooses dark.
 
 Verified 2026-08-06: before → `data-theme="light"`, `localStorage.theme = null`;
 after `emulateMedia` + reload → `data-theme="dark"`.
 
-Forcing the explicit (non-`system`) setting instead — only if you're
-specifically testing the theme toggle — means seeding storage *before* the app
-boots, not after:
-
-```js
-await page.addInitScript(() => localStorage.setItem('theme', 'dark'));
-```
-
 ## Gotchas found in practice
 
-- **Icon-only buttons that share an `aria-label` cause strict-mode violations.** e.g. multiple reset-key buttons on a list page all had `aria-label="Reset password"`, same as the modal's confirm button. Scope to the dialog: `page.getByRole('dialog').getByRole('button', { name: 'X' })`.
-- **Verify i18n plural keys render, not just that the page loads.** A `foo_one`/`foo_other` key only pluralizes when the interpolation var is named **`count`**. Passing `{ n: x }` or `{ days: x }` fails selection → i18next falls back to the base key `foo` (which doesn't exist) → the raw key string renders on screen. Screenshot and read the actual text.
-- **Never click a disabled button — it burns a 30s actionability timeout.** Check `disabled` first. On backend-driven action footers the reason is on the button as `data-blocked-reason` (the visible reason is a hover-only portal tooltip, unreadable from the DOM). See `.claude/playwright-affordances.md`.
+- **Multiple reset-key buttons share `aria-label="Reset password"`** with the modal's confirm button — a strict-mode violation. Scope to the dialog: `page.getByRole('dialog').getByRole('button', { name: 'X' })`.
+- **Disabled action-footer buttons carry the reason as `data-blocked-reason`** on the button; the visible reason is a hover-only portal tooltip, unreadable from the DOM. See `.claude/playwright-affordances.md`.
