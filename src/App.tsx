@@ -28,6 +28,8 @@ import { Fin1RatesPage } from './pages/pricing/Fin1RatesPage';
 import { Fin2RatesPage } from './pages/pricing/Fin2RatesPage';
 import { DiscountPoliciesPage } from './pages/pricing/DiscountPoliciesPage';
 import { DealPartnerRatesPage } from './pages/pricing/DealPartnerRatesPage';
+import { Fin1RateConfigPage } from './pages/pricing/Fin1RateConfigPage';
+import { Fin1CalculatorPage } from './pages/Fin1CalculatorPage';
 import { InventoryLayout } from './pages/inventory/InventoryLayout';
 import { StockDashboardPage } from './pages/inventory/StockDashboardPage';
 import { BranchStockPage } from './pages/inventory/BranchStockPage';
@@ -424,6 +426,26 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <PricingLayout><Fin1RatesPage /></PricingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/pricing/fin1-rate-config"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <PricingLayout><Fin1RateConfigPage /></PricingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/installment-calculator"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <Fin1CalculatorPage />
             </AdminLayout>
           </ProtectedRoute>
         }

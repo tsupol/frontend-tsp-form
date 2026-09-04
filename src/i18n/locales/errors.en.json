@@ -940,5 +940,17 @@
   "core.conflict.already_blacklisted": "This customer is already on the blacklist.",
   "core.not_found.blacklist": "That blacklist entry no longer exists — it may have been lifted already.",
   "sale.auth.permission_denied": "You do not have permission to do this.",
-  "contract.validation.customer_blacklisted": "A party on this contract is blacklisted, so a new contract cannot be opened. Lift the blacklist first."
+  "contract.validation.customer_blacklisted": "A party on this contract is blacklisted, so a new contract cannot be opened. Lift the blacklist first.",
+  "pricing.fin1.input": "Invalid price/down/term — price must be > 0 and the down payment below the price.",
+  "pricing.fin1.term_inactive": "This term is not offered (no active rate).",
+  "pricing.fin1.down_below_min": "The down payment is below the holding's minimum.",
+  "pricing.fin1.down_percent": "The down % must be within the configured range.",
+  "pricing.fin1.multiplier": "The multiplier must be between 1.000 and 9.999 for terms 1–60.",
+  "pricing.fin1.multiplier_scale": "The multiplier can have at most 2 decimal places (e.g. 2.35).",
+  "pricing.fin1.multiplier_order": "Out of the allowed range {{allowed_min}}–{{allowed_max}} — installments must decrease and total interest increase as the term grows.",
+  "pricing.fin1.policy_key": "Unknown policy key or invalid value.",
+  "pricing.fin1.no_retail_price": "This product has no retail price set yet — ask the holding to fill in the pricebook.",
+  "pricing.fin1.uplift": "The price uplift must be between 0 and the configured maximum.",
+  "pricing.fin1.monthly_too_low": "The requested monthly amount is below the longest term's installment — raise the down payment.",
+  "pricing.variant.not_found": "This product is not in the holding's catalog (or not open for contracts)."
 }

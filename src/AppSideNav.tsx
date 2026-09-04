@@ -65,6 +65,7 @@ import { useTheme } from './contexts/ThemeContext';
 import { useNavGuard } from './contexts/NavGuardContext';
 import { isLocalDev } from './lib/devEnv';
 import { useNavCounts, NAV_COUNT_CAP } from './hooks/useNavCounts';
+import { useIsDealPartnerBranch } from './hooks/useBranchType';
 import { useChatDock } from './contexts/ChatDockContext';
 import { NotificationMenuItem } from './components/NotificationMenu';
 import { SystemSignalSection, SystemSignalDialog, type SignalRow } from './components/SystemSignalSection';
@@ -200,6 +201,7 @@ export const AppSideNav = () => {
   const isRepoRole = ['COMPANY_REPO', 'HOLDING_REPO', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
   const isRepoAdmin = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
   const canChat = can('CONTRACT.CHAT');
+  const isDealPartnerBranch = useIsDealPartnerBranch();
   const { visible: dockVisible, toggleDock } = useChatDock();
 
   const {
@@ -518,6 +520,12 @@ export const AppSideNav = () => {
       ],
     },
     { key: 'price-check', icon: <Calculator size="1rem" />, label: t('nav.priceCheck'), path: '/admin/price-check' },
+    // NOTICE 2026-09-05: the installment calculator shows ONLY to deal-partner
+    // branches (branch_type DEAL_PARTNER). Internal branches and holding/company
+    // roles don't get the menu — visibility is UX, the backend enforces the data.
+    ...(isDealPartnerBranch ? [
+      { key: 'installment-calculator', icon: <Calculator size="1rem" />, label: t('nav.installmentCalculator'), path: '/admin/installment-calculator' },
+    ] : []),
     {
       key: 'products', icon: <Package size="1rem" />, label: t('nav.products'),
       path: '/admin/products/models',
@@ -533,6 +541,10 @@ export const AppSideNav = () => {
       path: '/admin/pricing/pricebook',
       children: [
         { key: 'pricebook', icon: <DollarSign size="1rem" />, label: t('nav.pricebook'), path: '/admin/pricing/pricebook' },
+        // NOTICE 2026-09-05: FIN1 rate config is holding/company-side only — never in branch menus.
+        ...(role.startsWith('HOLDING_') || role.startsWith('COMPANY_') || role === 'SYSTEM_DEV' ? [
+          { key: 'fin1-rate-config', icon: <SlidersHorizontal size="1rem" />, label: t('nav.fin1RateConfig'), path: '/admin/pricing/fin1-rate-config' },
+        ] : []),
         { key: 'fin1-rates', icon: <Calculator size="1rem" />, label: t('nav.fin1Rates'), path: '/admin/pricing/fin1-rates' },
         { key: 'fin2-rates', icon: <TrendingUp size="1rem" />, label: t('nav.fin2Rates'), path: '/admin/pricing/fin2-rates' },
         { key: 'discount-policies', icon: <Percent size="1rem" />, label: t('nav.discountPolicies'), path: '/admin/pricing/discount-policies' },
