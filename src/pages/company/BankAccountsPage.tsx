@@ -493,6 +493,7 @@ export function BankAccountsPage() {
   const [pageSize, setPageSize] = useState(25);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
+  const [filterBranch, setFilterBranch] = useState<string>('');
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -524,15 +525,20 @@ export function BankAccountsPage() {
     ? accounts.find(a => a.id === editAccount.id) ?? editAccount
     : null;
 
-  const filtered = search.trim()
-    ? accounts.filter(a => {
-        const term = search.trim().toLowerCase();
-        return a.branch_name.toLowerCase().includes(term)
-          || a.bank_name.toLowerCase().includes(term)
-          || a.account_number.includes(term)
-          || a.account_name.toLowerCase().includes(term);
-      })
-    : accounts;
+  // Branch options come from the account rows themselves (not v_branches) so
+  // branches that hold accounts but are now inactive still appear in the filter.
+  const branchOptions = [...new Map(accounts.map(a => [a.branch_id, a.branch_name]))]
+    .map(([id, name]) => ({ value: String(id), label: name }));
+
+  const filtered = accounts.filter(a => {
+    if (filterBranch && String(a.branch_id) !== filterBranch) return false;
+    if (!search.trim()) return true;
+    const term = search.trim().toLowerCase();
+    return a.branch_name.toLowerCase().includes(term)
+      || a.bank_name.toLowerCase().includes(term)
+      || a.account_number.includes(term)
+      || a.account_name.toLowerCase().includes(term);
+  });
 
   const totalCount = filtered.length;
   const paginated = filtered.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize);
@@ -759,6 +765,17 @@ export function BankAccountsPage() {
                 onChange={(e) => handleSearch(e.target.value)}
                 size="sm"
                 className="w-full"
+              />
+            </div>
+            <div className="w-44 shrink-0">
+              <Select
+                options={branchOptions}
+                value={filterBranch || null}
+                onChange={(val) => { setFilterBranch((val as string) ?? ''); setPageIndex(0); }}
+                placeholder={t('settings.bankAccounts.allBranches')}
+                size="sm"
+                showChevron
+                clearable
               />
             </div>
           </div>

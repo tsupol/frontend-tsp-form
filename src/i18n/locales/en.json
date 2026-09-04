@@ -4430,6 +4430,7 @@
       "deactivated": "Account deactivated",
       "empty": "No bank accounts found",
       "colBranch": "Branch",
+      "allBranches": "All branches",
       "colBank": "Bank / Account",
       "colPromptpay": "PromptPay",
       "colQr": "QR",

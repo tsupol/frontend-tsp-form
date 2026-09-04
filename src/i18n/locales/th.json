@@ -4425,6 +4425,7 @@
       "deactivated": "ปิดใช้งานบัญชีแล้ว",
       "empty": "ไม่พบบัญชีธนาคาร",
       "colBranch": "สาขา",
+      "allBranches": "ทุกสาขา",
       "colBank": "ธนาคาร / บัญชี",
       "colPromptpay": "PromptPay",
       "colQr": "QR",
