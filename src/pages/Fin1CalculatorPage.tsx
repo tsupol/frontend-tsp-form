@@ -268,7 +268,12 @@ export function Fin1CalculatorPage() {
           <h1 className="heading-2">{t('fin1Calc.title')}</h1>
         </div>
 
+        {/* Desktop / iPad-landscape (lg ≈ 1024px+): controls left, summary
+            pinned right so the numbers update beside the sliders — the staff
+            works the left half while the customer watches the right. Below lg
+            it stays one column with the summary underneath. */}
         <div className="flex-1 min-h-0 overflow-auto better-scroll pb-8">
+          <div className="max-w-5xl lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] lg:gap-8 lg:items-start">
           <div className="max-w-2xl flex flex-col gap-4">
 
             {/* ── Product ─────────────────────────────────────────────── */}
@@ -448,50 +453,53 @@ export function Fin1CalculatorPage() {
                     <span>{planError}</span>
                   </div>
                 )}
-
-                {/* ── Summary ────────────────────────────────────────── */}
-                {summary && (
-                  <div className={`rounded-md border border-line overflow-hidden ${(tableLoading || planLoading) ? 'opacity-60' : ''} transition-opacity`}>
-                    <div className="px-4 py-3 bg-surface flex flex-col gap-1">
-                      <div className="text-sm text-subtle">{t('fin1Calc.summaryTitle')}</div>
-                      <div className="text-lg font-semibold tabular-nums">
-                        {t('fin1Calc.summaryMonthly', {
-                          amount: fmtCurrency(summary.monthly),
-                          count: summary.last !== summary.monthly ? summary.months - 1 : summary.months,
-                        })}
-                      </div>
-                      {summary.last !== summary.monthly && (
-                        <div className="text-sm tabular-nums">
-                          {t('fin1Calc.summaryLast', { amount: fmtCurrency(summary.last) })}
-                        </div>
-                      )}
-                      {monthlyMode && plan && !plan.exact && (
-                        <div className="text-xs text-warning-fg">
-                          {t('fin1Calc.notExact', { count: plan.term_months, amount: fmtCurrency(plan.installment_amount) })}
-                        </div>
-                      )}
-                    </div>
-                    <div className="border-t border-line">
-                      {[
-                        { label: t('fin1Calc.rowDown'), value: fmtCurrency(summary.down) },
-                        { label: t('fin1Calc.rowMonths'), value: t('fin1Calc.months', { count: summary.months }) },
-                        { label: t('fin1Calc.rowTotal'), value: fmtCurrency(summary.total) },
-                        { label: t('fin1Calc.rowDocFee'), value: t('fin1Calc.docFeeValue', { amount: fmtCurrency(summary.docFee) }) },
-                      ].map((r, i) => (
-                        <div key={i} className="flex items-center justify-between px-4 py-2 border-b border-line last:border-b-0">
-                          <span className="text-sm text-subtle">{r.label}</span>
-                          <span className="text-sm tabular-nums font-medium">{r.value}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </>
             )}
 
             {variant && !table && tableLoading && (
               <div className="p-6 text-center text-subtle text-sm">{t('common.loading')}</div>
             )}
+          </div>
+
+          {/* ── Summary ──────────────────────────────────────────────── */}
+          {summary && (
+            <div className="mt-4 lg:mt-0 lg:sticky lg:top-0 max-w-2xl">
+              <div className={`rounded-md border border-line overflow-hidden ${(tableLoading || planLoading) ? 'opacity-60' : ''} transition-opacity`}>
+                <div className="px-4 py-3 bg-surface flex flex-col gap-1">
+                  <div className="text-sm text-subtle">{t('fin1Calc.summaryTitle')}</div>
+                  <div className="text-xl lg:text-2xl font-semibold tabular-nums">
+                    {t('fin1Calc.summaryMonthly', {
+                      amount: fmtCurrency(summary.monthly),
+                      count: summary.last !== summary.monthly ? summary.months - 1 : summary.months,
+                    })}
+                  </div>
+                  {summary.last !== summary.monthly && (
+                    <div className="text-sm lg:text-base tabular-nums">
+                      {t('fin1Calc.summaryLast', { amount: fmtCurrency(summary.last) })}
+                    </div>
+                  )}
+                  {monthlyMode && plan && !plan.exact && (
+                    <div className="text-xs text-warning-fg">
+                      {t('fin1Calc.notExact', { count: plan.term_months, amount: fmtCurrency(plan.installment_amount) })}
+                    </div>
+                  )}
+                </div>
+                <div className="border-t border-line">
+                  {[
+                    { label: t('fin1Calc.rowDown'), value: fmtCurrency(summary.down) },
+                    { label: t('fin1Calc.rowMonths'), value: t('fin1Calc.months', { count: summary.months }) },
+                    { label: t('fin1Calc.rowTotal'), value: fmtCurrency(summary.total) },
+                    { label: t('fin1Calc.rowDocFee'), value: t('fin1Calc.docFeeValue', { amount: fmtCurrency(summary.docFee) }) },
+                  ].map((r, i) => (
+                    <div key={i} className="flex items-center justify-between px-4 py-2 border-b border-line last:border-b-0">
+                      <span className="text-sm text-subtle">{r.label}</span>
+                      <span className="text-sm tabular-nums font-medium">{r.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
           </div>
         </div>
       </div>
