@@ -560,8 +560,9 @@ export function Fin1RateConfigPage() {
 
   const [samplePrice, setSamplePrice] = useState('');
   // Staff think in down % of the device price, not a baht amount (OHM 09-06) —
-  // the % is converted to the baht `p_down` the preview RPC expects.
-  const [sampleDownPct, setSampleDownPct] = useState('15');
+  // picked from the policy's own down range, converted to the baht `p_down`
+  // the preview RPC expects.
+  const [sampleDownPct, setSampleDownPct] = useState('25');
   const [addOpen, setAddOpen] = useState(false);
 
   const sampleDownAmount = useMemo(() => {
@@ -582,6 +583,16 @@ export function Fin1RateConfigPage() {
     staleTime: 60 * 1000,
   });
   const policy = policyRows[0] ?? null;
+
+  // 5%-step choices spanning the policy's own down range (e.g. 10–40 → 10,15,…,40).
+  const downPctOptions = useMemo(() => {
+    const min = policy?.min_down_percent ?? 10;
+    const max = policy?.max_down_percent ?? 40;
+    const steps: number[] = [];
+    for (let p = min; p < max; p += 5) steps.push(p);
+    steps.push(max);
+    return steps.map(p => ({ value: String(p), label: `${p}%` }));
+  }, [policy]);
 
   const refetchAll = () => {
     queryClient.invalidateQueries({ queryKey: ['fin1-multipliers'] });
@@ -641,14 +652,13 @@ export function Fin1RateConfigPage() {
               </div>
               <div className="flex flex-col w-28">
                 <label className="form-label text-xs">{t('fin1Config.sampleDown')}</label>
-                <MaskedInput
-                  mask="number"
-                  size="sm"
-                  decimalScale={0}
+                <Select
+                  options={downPctOptions}
                   value={sampleDownPct}
-                  onChange={(raw) => setSampleDownPct(raw)}
-                  suffix="%"
-                  placeholder={policy ? String(policy.min_down_percent) : ''}
+                  onChange={(val) => setSampleDownPct(val as string)}
+                  size="sm"
+                  searchable={false}
+                  showChevron
                 />
               </div>
               <div className="text-xs text-subtle pb-2">

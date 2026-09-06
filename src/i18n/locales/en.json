@@ -1960,7 +1960,7 @@
     "savePolicy": "Save Policy",
     "samplePrice": "Sample price",
     "sampleDown": "Down %",
-    "sampleHint": "Preview figures only — blank price uses 30,000.",
+    "sampleHint": "Preview figures only — nothing here is saved.",
     "empty": "No installment terms configured yet",
     "policy": {
       "min_down_percent": "Min down %",
