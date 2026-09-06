@@ -397,7 +397,6 @@
     "pricing": "ราคา",
     "pricebook": "ตารางราคา",
     "fin1RateConfig": "เรทผ่อน FIN1",
-    "installmentCalculator": "คำนวณค่างวด",
     "fin1Rates": "อัตรา FIN1",
     "fin2Rates": "อัตรา FIN2",
     "discountPolicies": "นโยบายส่วนลด",
@@ -1973,7 +1972,6 @@
     "downMaxTag": "สูงสุดตามนโยบาย"
   },
   "fin1Calc": {
-    "title": "คำนวณค่างวด",
     "product": "สินค้า",
     "searchPlaceholder": "ค้นหาสินค้า (ยี่ห้อ รุ่น SKU)",
     "changeProduct": "เปลี่ยนสินค้า",

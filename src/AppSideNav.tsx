@@ -65,7 +65,6 @@ import { useTheme } from './contexts/ThemeContext';
 import { useNavGuard } from './contexts/NavGuardContext';
 import { isLocalDev } from './lib/devEnv';
 import { useNavCounts, NAV_COUNT_CAP } from './hooks/useNavCounts';
-import { useIsDealPartnerBranch } from './hooks/useBranchType';
 import { useChatDock } from './contexts/ChatDockContext';
 import { NotificationMenuItem } from './components/NotificationMenu';
 import { SystemSignalSection, SystemSignalDialog, type SignalRow } from './components/SystemSignalSection';
@@ -201,7 +200,6 @@ export const AppSideNav = () => {
   const isRepoRole = ['COMPANY_REPO', 'HOLDING_REPO', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
   const isRepoAdmin = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
   const canChat = can('CONTRACT.CHAT');
-  const isDealPartnerBranch = useIsDealPartnerBranch();
   const { visible: dockVisible, toggleDock } = useChatDock();
 
   const {
@@ -519,13 +517,10 @@ export const AppSideNav = () => {
         ] : []),
       ],
     },
+    // One เช็คราคา for everyone (OHM 09-06) — the route itself shows the FIN1
+    // negotiation calculator to deal-partner branches and the pricebook quote
+    // table to everyone else.
     { key: 'price-check', icon: <Calculator size="1rem" />, label: t('nav.priceCheck'), path: '/admin/price-check' },
-    // NOTICE 2026-09-05: the installment calculator shows ONLY to deal-partner
-    // branches (branch_type DEAL_PARTNER). Internal branches and holding/company
-    // roles don't get the menu — visibility is UX, the backend enforces the data.
-    ...(isDealPartnerBranch ? [
-      { key: 'installment-calculator', icon: <Calculator size="1rem" />, label: t('nav.installmentCalculator'), path: '/admin/installment-calculator' },
-    ] : []),
     {
       key: 'products', icon: <Package size="1rem" />, label: t('nav.products'),
       path: '/admin/products/models',

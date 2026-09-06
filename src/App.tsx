@@ -29,7 +29,6 @@ import { Fin2RatesPage } from './pages/pricing/Fin2RatesPage';
 import { DiscountPoliciesPage } from './pages/pricing/DiscountPoliciesPage';
 import { DealPartnerRatesPage } from './pages/pricing/DealPartnerRatesPage';
 import { Fin1RateConfigPage } from './pages/pricing/Fin1RateConfigPage';
-import { Fin1CalculatorPage } from './pages/Fin1CalculatorPage';
 import { InventoryLayout } from './pages/inventory/InventoryLayout';
 import { StockDashboardPage } from './pages/inventory/StockDashboardPage';
 import { BranchStockPage } from './pages/inventory/BranchStockPage';
@@ -44,7 +43,7 @@ import { RepairsPage } from './pages/inventory/RepairsPage';
 import { BuybackPage } from './pages/inventory/BuybackPage';
 import { BuybackWizardPage } from './pages/inventory/BuybackWizardPage';
 import { BarcodesPage } from './pages/inventory/BarcodesPage';
-import { PriceCheckPage } from './pages/PriceCheckPage';
+import { PriceCheckRoute } from './pages/PriceCheckRoute';
 import { DunningTargetsPage } from './pages/legal/DunningTargetsPage';
 import { StaffCommissionPage } from './pages/commission/StaffCommissionPage';
 import { ApprovalsPage } from './pages/approvals/ApprovalsPage';
@@ -440,16 +439,8 @@ function App() {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/admin/installment-calculator"
-        element={
-          <ProtectedRoute>
-            <AdminLayout>
-              <Fin1CalculatorPage />
-            </AdminLayout>
-          </ProtectedRoute>
-        }
-      />
+      {/* Merged into price-check (one เช็คราคา page for everyone) — keep old links working */}
+      <Route path="/admin/installment-calculator" element={<Navigate to="/admin/price-check" replace />} />
       <Route
         path="/admin/pricing/fin2-rates"
         element={
@@ -631,7 +622,7 @@ function App() {
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <PriceCheckPage />
+              <PriceCheckRoute />
             </AdminLayout>
           </ProtectedRoute>
         }

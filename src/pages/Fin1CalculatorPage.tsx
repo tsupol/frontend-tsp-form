@@ -258,14 +258,14 @@ export function Fin1CalculatorPage() {
           </button>
         </div>
         <div className="mobile-header-title mobile-header-title-truncate">
-          {t('fin1Calc.title')}
+          {t('nav.priceCheck')}
         </div>
         <div className="mobile-header-end w-nav" />
       </MobileHeader>
 
       <div className="page-content responsive-dvh-mobile-header">
         <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
-          <h1 className="heading-2">{t('fin1Calc.title')}</h1>
+          <h1 className="heading-2">{t('nav.priceCheck')}</h1>
         </div>
 
         {/* Desktop / iPad-landscape (lg ≈ 1024px+): controls left, summary

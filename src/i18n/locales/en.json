@@ -399,7 +399,6 @@
     "pricing": "Pricing",
     "pricebook": "Pricebook",
     "fin1RateConfig": "FIN1 Installment Rates",
-    "installmentCalculator": "Installment Calculator",
     "fin1Rates": "FIN1 Rates",
     "fin2Rates": "FIN2 Rates",
     "discountPolicies": "Discount Policies",
@@ -1977,7 +1976,6 @@
     "downMaxTag": "Policy maximum"
   },
   "fin1Calc": {
-    "title": "Installment Calculator",
     "product": "Product",
     "searchPlaceholder": "Search product (brand, model, SKU)",
     "changeProduct": "Change product",
