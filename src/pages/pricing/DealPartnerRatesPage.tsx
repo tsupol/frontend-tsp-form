@@ -1,34 +1,62 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm, Controller } from 'react-hook-form';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   DataTable, DataTableColumnHeader, DataTableFooter, MobileHeader,
-  Button, Select, Modal, Badge, TextArea, MaskedInput,
-  useSnackbarContext, FormErrorMessage,
+  Button, Select, Modal, Badge, TextArea, MaskedInput, FormErrorMessage,
   type ColumnDef, type SortingState,
 } from 'tsp-form';
-import { ArrowRightFromLine, Plus, XCircle, CheckCircle, Pencil } from 'lucide-react';
-import { apiClient, ApiError } from '../../lib/api';
+import { ArrowRightFromLine, Pencil, Undo2 } from 'lucide-react';
+import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { translateApiError } from '../../lib/apiErrors';
+import { ModalErrorBand } from '../../components/ModalErrorBand';
+import { ActionDoneView } from '../contracts/ActionDoneView';
 
-// ── Types ────────────────────────────────────────────────────────────────────
+// ============================================================================
+// Deal partner commission — mig 1154/1155 model.
+//
+// Two levels, nothing in between:
+//   1. Holding policy (v_deal_partner_policy, 1 row): allowed range for the
+//      TOTAL commission (branch % + company %) plus the defaults a brand-new
+//      DEAL_PARTNER branch is seeded with (trigger-side, no FE involvement).
+//      Edited via fn_deal_partner_policy_set {p_patch}.
+//   2. Per-branch config (v_deal_partner_branch_configs, 1 row per partner
+//      branch): branch % + company %, whose sum must stay inside the policy
+//      range. company % > 0 derives risk_party = COMPANY — display-only fact,
+//      never a separate input. Edited via fn_deal_partner_branch_config_set.
+//
+// The old scoped rates (fn_deal_partner_rate_upsert / set_active) are
+// deprecated — any p_scope other than HOLDING now answers DEPRECATED_SCOPE.
+// ============================================================================
 
-interface DealPartnerRate {
-  id: number;
+interface PolicyRow {
   holding_id: number;
   holding_name: string;
+  total_min: number;
+  total_max: number;
+  branch_rate_default: number;
+  company_rate_default: number;
+  total_default: number;
+  updated_at: string;
+}
+
+interface BranchConfigRow {
+  branch_id: number;
+  branch_name: string;
   company_id: number;
-  company_name: string;
-  branch_id: number | null;
-  branch_name: string | null;
-  rate_percent: number;
+  company_name: string | null;
+  branch_rate_percent: number;
+  company_rate_percent: number;
+  total_rate_percent: number;
+  risk_party: 'BRANCH' | 'COMPANY';
+  total_min: number;
+  total_max: number;
+  return_to_branch_id: number | null;
+  return_to_branch_name: string | null;
   is_active: boolean;
   note: string | null;
-  scope_level: string;
-  created_by: number;
-  created_at: string;
   updated_at: string;
 }
 
@@ -37,193 +65,189 @@ interface BranchLookup {
   name: string;
 }
 
-// ── Upsert Modal ────────────────────────────────────────────────────────────
+const fmtPct = (n: number) => `${Number(n)}%`;
 
-interface RateFormData {
-  scope: string;
-  branch_id: string;
-  rate_percent: string;
-  note: string;
+// ── Policy modal ─────────────────────────────────────────────────────────────
+
+interface PolicyFormData {
+  total_min: string;
+  total_max: string;
+  branch_rate_default: string;
+  company_rate_default: string;
 }
 
-function RateModal({ open, onClose, editRate, branches, onSuccess }: {
+function PolicyModal({ open, onClose, policy, onSaved }: {
   open: boolean;
   onClose: () => void;
-  editRate: DealPartnerRate | null;
-  branches: BranchLookup[];
-  onSuccess: () => void;
+  policy: PolicyRow | null;
+  onSaved: () => void;
 }) {
   const { t } = useTranslation();
-  const { user } = useAuth();
-
-  const { register, handleSubmit, control, formState: { errors, isDirty }, reset, watch, setValue } = useForm<RateFormData>({
-    defaultValues: { scope: 'BRANCH', branch_id: '', rate_percent: '', note: '' },
-  });
-
-  // Register scope and branch_id so they participate in form data + validation
-  register('scope');
-  register('branch_id', {
-    validate: (val) => {
-      if (watch('scope') === 'BRANCH' && !val) return t('dealPartnerRate.branchRequired');
-      return true;
-    },
-  });
-
+  const [view, setView] = useState<'form' | 'done'>('form');
+  const [result, setResult] = useState<PolicyRow | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
 
-  const scope = watch('scope');
+  const { handleSubmit, control, formState: { errors, isDirty }, reset, watch } = useForm<PolicyFormData>({
+    defaultValues: { total_min: '', total_max: '', branch_rate_default: '', company_rate_default: '' },
+  });
 
+  // Seed only when the modal opens (or the holding changes) — NOT on every
+  // `policy` object identity change: saving invalidates the query, the refetch
+  // produces a new object, and a dep on it would reset view='done' back to the
+  // form the moment the save lands.
+  const policyRef = useRef(policy);
+  policyRef.current = policy;
   useEffect(() => {
     if (open) {
-      if (editRate) {
-        reset({
-          scope: editRate.scope_level,
-          branch_id: editRate.branch_id ? String(editRate.branch_id) : '',
-          rate_percent: String(editRate.rate_percent),
-          note: editRate.note ?? '',
-        });
-      } else {
-        reset({ scope: 'BRANCH', branch_id: '', rate_percent: '', note: '' });
-      }
+      const p = policyRef.current;
+      reset(p ? {
+        total_min: String(p.total_min),
+        total_max: String(p.total_max),
+        branch_rate_default: String(p.branch_rate_default),
+        company_rate_default: String(p.company_rate_default),
+      } : { total_min: '', total_max: '', branch_rate_default: '', company_rate_default: '' });
+      setView('form');
+      setResult(null);
       setErrorMessage('');
     }
-  }, [open, editRate, reset]);
+  }, [open, policy?.holding_id, reset]);
 
-  const onSubmit = async (data: RateFormData) => {
+  const vMin = parseFloat(watch('total_min'));
+  const vMax = parseFloat(watch('total_max'));
+  const vBr = parseFloat(watch('branch_rate_default'));
+  const vCo = parseFloat(watch('company_rate_default'));
+  const allFilled = [vMin, vMax, vBr, vCo].every(n => !Number.isNaN(n));
+  const defaultTotal = allFilled ? vBr + vCo : null;
+  const rangeInvalid = allFilled && vMax < vMin;
+  const totalInvalid = allFilled && !rangeInvalid && (defaultTotal! < vMin || defaultTotal! > vMax);
+
+  const onSubmit = async (data: PolicyFormData) => {
     setIsSaving(true);
     setErrorMessage('');
     try {
-      await apiClient.rpc('fn_deal_partner_rate_upsert', {
-        p_rate_percent: parseFloat(data.rate_percent),
-        p_scope: data.scope,
-        p_branch_id: data.scope === 'BRANCH' ? parseInt(data.branch_id) : null,
-        p_note: data.note.trim() || null,
-        p_updated_by: user?.user_id,
+      const saved = await apiClient.rpc<PolicyRow>('fn_deal_partner_policy_set', {
+        p_patch: {
+          total_min: parseFloat(data.total_min),
+          total_max: parseFloat(data.total_max),
+          branch_rate_default: parseFloat(data.branch_rate_default),
+          company_rate_default: parseFloat(data.company_rate_default),
+        },
       });
-      onSuccess();
-      onClose();
+      setResult(saved);
+      setView('done');
+      onSaved();
     } catch (err) {
-      if (err instanceof ApiError) {
-        const translated = translateApiError(err, t);
-        setErrorMessage(translated || err.message);
-      } else {
-        setErrorMessage(t('common.error'));
-      }
+      setErrorMessage(translateApiError(err, t));
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleClose = () => {
+    if (view === 'done') { forceClose(); return; }
     if (isDirty) { setConfirmCloseOpen(true); return; }
     forceClose();
   };
-
   const forceClose = () => {
-    reset({ scope: 'BRANCH', branch_id: '', rate_percent: '', note: '' });
-    setErrorMessage('');
     setConfirmCloseOpen(false);
     onClose();
   };
 
-  const scopeOptions = [
-    { value: 'BRANCH', label: t('dealPartnerRate.scopeBranch') },
-    { value: 'COMPANY', label: t('dealPartnerRate.scopeCompany') },
-    { value: 'HOLDING', label: t('dealPartnerRate.scopeHolding') },
-  ];
-
-  const branchOptions = useMemo(
-    () => branches.map(b => ({ value: String(b.id), label: b.name })),
-    [branches],
+  const pctField = (name: keyof PolicyFormData, label: string) => (
+    <div className="flex flex-col">
+      <label className="form-label">{label}</label>
+      <Controller
+        name={name}
+        control={control}
+        rules={{ required: t('dealPartnerRate.rateRequired') }}
+        render={({ field }) => (
+          <MaskedInput
+            mask="number"
+            decimalScale={2}
+            value={field.value}
+            onChange={(raw) => field.onChange(raw)}
+            suffix="%"
+          />
+        )}
+      />
+      <FormErrorMessage error={errors[name]} />
+    </div>
   );
 
   return (
     <>
-    <Modal open={open} onClose={handleClose} maxWidth="24rem" width="100%">
-      <form className="flex flex-col overflow-hidden" onSubmit={handleSubmit(onSubmit)}>
-        <div className="modal-header">
-          <h2 className="modal-title">
-            {editRate ? t('dealPartnerRate.editRate') : t('dealPartnerRate.addRate')}
-          </h2>
-          <button type="button" className="modal-close-btn" onClick={handleClose} aria-label="Close">&times;</button>
-        </div>
-        <div className="modal-content">
-          <div className="form-grid">
-            {errorMessage && (
-              <div className="alert alert-danger">
-                <XCircle size={16} />
-                <div><div className="alert-description text-xs">{errorMessage}</div></div>
+    <Modal open={open} onClose={handleClose} maxWidth="26rem" width="100%">
+      {view === 'done' && result ? (
+        <>
+          <div className="modal-header">
+            <h2 className="modal-title">{t('dealPartnerRate.editPolicy')}</h2>
+            <button type="button" className="modal-close-btn" onClick={forceClose} aria-label="Close">&times;</button>
+          </div>
+          <ActionDoneView
+            headline={t('dealPartnerRate.policySaved')}
+            contractCode={policy?.holding_name ?? ''}
+            detailRows={[
+              { label: t('dealPartnerRate.totalRange'), value: `${fmtPct(result.total_min)} – ${fmtPct(result.total_max)}` },
+              { label: t('dealPartnerRate.branchDefault'), value: fmtPct(result.branch_rate_default) },
+              { label: t('dealPartnerRate.companyDefault'), value: fmtPct(result.company_rate_default) },
+              { label: t('dealPartnerRate.totalDefault'), value: fmtPct(result.branch_rate_default + result.company_rate_default), emphasis: true },
+            ]}
+            onClose={forceClose}
+          />
+        </>
+      ) : (
+        <form className="flex flex-col overflow-hidden" onSubmit={handleSubmit(onSubmit)}>
+          <div className="modal-header">
+            <h2 className="modal-title">{t('dealPartnerRate.editPolicy')}</h2>
+            <button type="button" className="modal-close-btn" onClick={handleClose} aria-label="Close">&times;</button>
+          </div>
+          <div className="modal-content">
+            <div className="form-grid">
+              <div className="px-3 py-2.5 rounded-md bg-surface border border-line">
+                <div className="font-medium text-sm">{policy?.holding_name ?? '—'}</div>
+                <div className="text-xs text-subtle">{t('dealPartnerRate.defaultsHint')}</div>
               </div>
-            )}
 
-            <div className="flex flex-col">
-              <label className="form-label">{t('dealPartnerRate.scope')}</label>
-              <Select
-                options={scopeOptions}
-                value={scope}
-                onChange={val => { setValue('scope', val as string, { shouldDirty: true }); if (val !== 'BRANCH') setValue('branch_id', ''); }}
-                showChevron
-                searchable={false}
-                disabled={!!editRate}
-              />
-            </div>
-
-            {scope === 'BRANCH' && (
-              <div className="flex flex-col">
-                <label className="form-label">{t('dealPartnerRate.branch')}</label>
-                <Select
-                  options={branchOptions}
-                  value={watch('branch_id')}
-                  onChange={val => setValue('branch_id', val as string, { shouldDirty: true })}
-                  placeholder={t('dealPartnerRate.selectBranch')}
-                  searchable
-                  showChevron
-                  disabled={!!editRate}
-                />
-                <FormErrorMessage error={errors.branch_id} />
+              <div className="grid grid-cols-2 gap-3">
+                {pctField('total_min', t('dealPartnerRate.totalMin'))}
+                {pctField('total_max', t('dealPartnerRate.totalMax'))}
               </div>
-            )}
+              <div className="grid grid-cols-2 gap-3">
+                {pctField('branch_rate_default', t('dealPartnerRate.branchDefault'))}
+                {pctField('company_rate_default', t('dealPartnerRate.companyDefault'))}
+              </div>
 
-            <div className="flex flex-col">
-              <label className="form-label">{t('dealPartnerRate.ratePercent')}</label>
-              <Controller
-                name="rate_percent"
-                control={control}
-                rules={{ required: t('dealPartnerRate.rateRequired') }}
-                render={({ field }) => (
-                  <MaskedInput
-                    mask="number"
-                    decimalScale={2}
-                    value={field.value}
-                    onChange={(raw) => field.onChange(raw)}
-                    suffix="%"
-                  />
-                )}
-              />
-              <FormErrorMessage error={errors.rate_percent} />
-            </div>
-
-            <div className="flex flex-col">
-              <label className="form-label">{t('dealPartnerRate.note')}</label>
-              <TextArea
-                rows={2}
-                {...register('note')}
-                placeholder={t('dealPartnerRate.notePlaceholder')}
-              />
+              <div className={`text-sm flex items-center justify-between px-3 py-2 rounded-md border ${
+                rangeInvalid || totalInvalid
+                  ? 'bg-danger-soft border-danger-border text-danger-fg'
+                  : 'bg-surface border-line'
+              }`}>
+                <span>{t('dealPartnerRate.totalDefault')}</span>
+                <span className="tabular-nums font-medium">
+                  {defaultTotal !== null ? fmtPct(defaultTotal) : '—'}
+                </span>
+              </div>
+              {rangeInvalid && (
+                <p className="text-xs text-danger-fg -mt-3">{t('dealPartnerRate.maxBelowMin')}</p>
+              )}
+              {totalInvalid && (
+                <p className="text-xs text-danger-fg -mt-3">
+                  {t('dealPartnerRate.rangeHint', { min: vMin, max: vMax })}
+                </p>
+              )}
             </div>
           </div>
-        </div>
-        <div className="modal-footer">
-          <Button variant="outline" onClick={handleClose} type="button">
-            {t('common.cancel')}
-          </Button>
-          <Button color="primary" type="submit" disabled={isSaving}>
-            {isSaving ? t('pricing.saving') : t('common.save')}
-          </Button>
-        </div>
-      </form>
+          <ModalErrorBand message={errorMessage} onDismiss={() => setErrorMessage('')} />
+          <div className="modal-footer">
+            <Button variant="outline" onClick={handleClose} type="button">{t('common.cancel')}</Button>
+            <Button color="primary" type="submit" disabled={isSaving || rangeInvalid || totalInvalid}>
+              {isSaving ? t('pricing.saving') : t('common.save')}
+            </Button>
+          </div>
+        </form>
+      )}
     </Modal>
 
     <Modal open={confirmCloseOpen} onClose={() => setConfirmCloseOpen(false)} maxWidth="24rem" width="100%">
@@ -238,127 +262,332 @@ function RateModal({ open, onClose, editRate, branches, onSuccess }: {
   );
 }
 
-// ── Main Page ────────────────────────────────────────────────────────────────
+// ── Branch config modal ──────────────────────────────────────────────────────
+
+interface ConfigFormData {
+  branch_rate_percent: string;
+  company_rate_percent: string;
+  return_to_branch_id: string;
+  note: string;
+}
+
+function BranchConfigModal({ open, onClose, config, internalBranches, onSaved }: {
+  open: boolean;
+  onClose: () => void;
+  config: BranchConfigRow | null;
+  internalBranches: BranchLookup[];
+  onSaved: () => void;
+}) {
+  const { t } = useTranslation();
+  const [view, setView] = useState<'form' | 'done'>('form');
+  const [result, setResult] = useState<BranchConfigRow | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+
+  const { handleSubmit, control, formState: { errors, isDirty }, reset, watch, setValue } = useForm<ConfigFormData>({
+    defaultValues: { branch_rate_percent: '', company_rate_percent: '', return_to_branch_id: '', note: '' },
+  });
+
+  useEffect(() => {
+    if (open) {
+      reset(config ? {
+        branch_rate_percent: String(config.branch_rate_percent),
+        company_rate_percent: String(config.company_rate_percent),
+        return_to_branch_id: config.return_to_branch_id ? String(config.return_to_branch_id) : '',
+        note: config.note ?? '',
+      } : { branch_rate_percent: '', company_rate_percent: '', return_to_branch_id: '', note: '' });
+      setView('form');
+      setResult(null);
+      setErrorMessage('');
+    }
+  }, [open, config, reset]);
+
+  const vBr = parseFloat(watch('branch_rate_percent'));
+  const vCo = parseFloat(watch('company_rate_percent'));
+  const bothFilled = !Number.isNaN(vBr) && !Number.isNaN(vCo);
+  const total = bothFilled ? vBr + vCo : null;
+  const outOfRange = config != null && total !== null && (total < config.total_min || total > config.total_max);
+  const riskParty: 'BRANCH' | 'COMPANY' = bothFilled && vCo > 0 ? 'COMPANY' : 'BRANCH';
+
+  const onSubmit = async (data: ConfigFormData) => {
+    if (!config) return;
+    setIsSaving(true);
+    setErrorMessage('');
+    try {
+      const retId = data.return_to_branch_id ? parseInt(data.return_to_branch_id) : null;
+      const saved = await apiClient.rpc<BranchConfigRow>('fn_deal_partner_branch_config_set', {
+        p_branch_id: config.branch_id,
+        p_branch_rate_percent: parseFloat(data.branch_rate_percent),
+        p_company_rate_percent: parseFloat(data.company_rate_percent),
+        p_return_to_branch_id: retId,
+        // NULL params mean "keep current" on the BE, so clearing the Select
+        // needs the explicit flag.
+        p_clear_return_branch: retId === null && config.return_to_branch_id !== null,
+        p_note: data.note.trim(),
+      });
+      setResult(saved);
+      setView('done');
+      onSaved();
+    } catch (err) {
+      setErrorMessage(translateApiError(err, t));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleClose = () => {
+    if (view === 'done') { forceClose(); return; }
+    if (isDirty) { setConfirmCloseOpen(true); return; }
+    forceClose();
+  };
+  const forceClose = () => {
+    setConfirmCloseOpen(false);
+    onClose();
+  };
+
+  const branchOptions = useMemo(
+    () => internalBranches.map(b => ({ value: String(b.id), label: b.name })),
+    [internalBranches],
+  );
+
+  const riskLabel = (p: 'BRANCH' | 'COMPANY') =>
+    p === 'COMPANY' ? t('dealPartnerRate.riskCompany') : t('dealPartnerRate.riskBranch');
+
+  return (
+    <>
+    <Modal open={open} onClose={handleClose} maxWidth="26rem" width="100%">
+      {view === 'done' && result ? (
+        <>
+          <div className="modal-header">
+            <h2 className="modal-title">{t('dealPartnerRate.editConfig')}</h2>
+            <button type="button" className="modal-close-btn" onClick={forceClose} aria-label="Close">&times;</button>
+          </div>
+          <ActionDoneView
+            headline={t('dealPartnerRate.configSaved')}
+            contractCode={config?.branch_name ?? ''}
+            detailRows={[
+              { label: t('dealPartnerRate.branchRate'), value: fmtPct(result.branch_rate_percent) },
+              { label: t('dealPartnerRate.companyRate'), value: fmtPct(result.company_rate_percent) },
+              { label: t('dealPartnerRate.totalRate'), value: fmtPct(result.total_rate_percent), emphasis: true },
+              { label: t('dealPartnerRate.riskParty'), value: riskLabel(result.risk_party) },
+              { label: t('dealPartnerRate.returnBranch'), value: result.return_to_branch_name ?? '—' },
+            ]}
+            onClose={forceClose}
+          />
+        </>
+      ) : (
+        <form className="flex flex-col overflow-hidden" onSubmit={handleSubmit(onSubmit)}>
+          <div className="modal-header">
+            <h2 className="modal-title">{t('dealPartnerRate.editConfig')}</h2>
+            <button type="button" className="modal-close-btn" onClick={handleClose} aria-label="Close">&times;</button>
+          </div>
+          <div className="modal-content">
+            <div className="form-grid">
+              <div className="px-3 py-2.5 rounded-md bg-surface border border-line">
+                <div className="font-medium text-sm">{config?.branch_name ?? '—'}</div>
+                <div className="text-xs text-subtle">
+                  {config?.company_name}
+                  {config && ` · ${t('dealPartnerRate.rangeHint', { min: config.total_min, max: config.total_max })}`}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col">
+                  <label className="form-label">{t('dealPartnerRate.branchRate')}</label>
+                  <Controller
+                    name="branch_rate_percent"
+                    control={control}
+                    rules={{ required: t('dealPartnerRate.rateRequired') }}
+                    render={({ field }) => (
+                      <MaskedInput mask="number" decimalScale={2} value={field.value} onChange={(raw) => field.onChange(raw)} suffix="%" />
+                    )}
+                  />
+                  <FormErrorMessage error={errors.branch_rate_percent} />
+                </div>
+                <div className="flex flex-col">
+                  <label className="form-label">{t('dealPartnerRate.companyRate')}</label>
+                  <Controller
+                    name="company_rate_percent"
+                    control={control}
+                    rules={{ required: t('dealPartnerRate.rateRequired') }}
+                    render={({ field }) => (
+                      <MaskedInput mask="number" decimalScale={2} value={field.value} onChange={(raw) => field.onChange(raw)} suffix="%" />
+                    )}
+                  />
+                  <FormErrorMessage error={errors.company_rate_percent} />
+                </div>
+              </div>
+
+              <div className={`text-sm px-3 py-2 rounded-md border ${
+                outOfRange ? 'bg-danger-soft border-danger-border text-danger-fg' : 'bg-surface border-line'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <span>{t('dealPartnerRate.totalRate')}</span>
+                  <span className="tabular-nums font-medium">{total !== null ? fmtPct(total) : '—'}</span>
+                </div>
+                <div className={`flex items-center justify-between mt-1 text-xs ${outOfRange ? '' : 'text-subtle'}`}>
+                  <span>{t('dealPartnerRate.riskParty')}</span>
+                  <span>{riskLabel(riskParty)}</span>
+                </div>
+              </div>
+              {outOfRange && config && (
+                <p className="text-xs text-danger-fg -mt-3">
+                  {t('dealPartnerRate.rangeHint', { min: config.total_min, max: config.total_max })}
+                </p>
+              )}
+
+              <div className="flex flex-col">
+                <label className="form-label">{t('dealPartnerRate.returnBranch')}</label>
+                <Select
+                  options={branchOptions}
+                  value={watch('return_to_branch_id') || null}
+                  onChange={val => setValue('return_to_branch_id', (val as string) ?? '', { shouldDirty: true })}
+                  placeholder={t('dealPartnerRate.noReturnBranch')}
+                  searchable
+                  showChevron
+                  clearable
+                />
+                <p className="text-xs text-subtle mt-1">{t('dealPartnerRate.returnBranchHint')}</p>
+              </div>
+
+              <div className="flex flex-col">
+                <label className="form-label">{t('dealPartnerRate.note')}</label>
+                <Controller
+                  name="note"
+                  control={control}
+                  render={({ field }) => (
+                    <TextArea rows={2} value={field.value} onChange={field.onChange} placeholder={t('dealPartnerRate.notePlaceholder')} />
+                  )}
+                />
+              </div>
+            </div>
+          </div>
+          <ModalErrorBand message={errorMessage} onDismiss={() => setErrorMessage('')} />
+          <div className="modal-footer">
+            <Button variant="outline" onClick={handleClose} type="button">{t('common.cancel')}</Button>
+            <Button color="primary" type="submit" disabled={isSaving || outOfRange}>
+              {isSaving ? t('pricing.saving') : t('common.save')}
+            </Button>
+          </div>
+        </form>
+      )}
+    </Modal>
+
+    <Modal open={confirmCloseOpen} onClose={() => setConfirmCloseOpen(false)} maxWidth="24rem" width="100%">
+      <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
+      <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={() => setConfirmCloseOpen(false)}>{t('common.cancel')}</Button>
+        <Button color="danger" onClick={forceClose}>{t('common.discard')}</Button>
+      </div>
+    </Modal>
+    </>
+  );
+}
+
+// ── Main page ────────────────────────────────────────────────────────────────
 
 export function DealPartnerRatesPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const { addSnackbar } = useSnackbarContext();
   const { user } = useAuth();
   const canManage = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(user?.role_code ?? '');
 
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editRate, setEditRate] = useState<DealPartnerRate | null>(null);
+  const [policyModalOpen, setPolicyModalOpen] = useState(false);
+  const [editConfig, setEditConfig] = useState<BranchConfigRow | null>(null);
+  const [configModalOpen, setConfigModalOpen] = useState(false);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(10);
 
-  const { data: rates = [], isFetching } = useQuery({
-    queryKey: ['deal-partner-rates'],
-    queryFn: () => apiClient.get<DealPartnerRate[]>('/v_deal_partner_rates?order=scope_level,branch_name.asc.nullslast'),
+  const { data: policies = [] } = useQuery({
+    queryKey: ['deal-partner-policy'],
+    queryFn: () => apiClient.get<PolicyRow[]>('/v_deal_partner_policy'),
+    staleTime: 30 * 1000,
+  });
+  const policy = policies[0] ?? null;
+
+  const { data: configs = [], isFetching } = useQuery({
+    queryKey: ['deal-partner-branch-configs'],
+    queryFn: () => apiClient.get<BranchConfigRow[]>('/v_deal_partner_branch_configs?order=branch_name'),
     staleTime: 30 * 1000,
   });
 
-  const { data: branches = [] } = useQuery({
-    queryKey: ['branches-deal-partner'],
-    queryFn: () => apiClient.get<BranchLookup[]>('/v_branches?select=id,name&branch_type=eq.DEAL_PARTNER&is_active=is.true&order=name'),
+  const { data: internalBranches = [] } = useQuery({
+    queryKey: ['branches-internal'],
+    queryFn: () => apiClient.get<BranchLookup[]>('/v_branches?select=id,name&branch_type=eq.INTERNAL&is_active=is.true&order=name'),
     staleTime: 5 * 60 * 1000,
   });
 
-  const totalCount = rates.length;
-  const paginatedRates = rates.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize);
+  const totalCount = configs.length;
+  const paginated = configs.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize);
 
-  const handleCreate = () => {
-    setEditRate(null);
-    setModalOpen(true);
+  const handleEdit = (row: BranchConfigRow) => {
+    setEditConfig(row);
+    setConfigModalOpen(true);
   };
 
-  const handleEdit = (rate: DealPartnerRate) => {
-    setEditRate(rate);
-    setModalOpen(true);
+  const handleSaved = () => {
+    queryClient.invalidateQueries({ queryKey: ['deal-partner-policy'] });
+    queryClient.invalidateQueries({ queryKey: ['deal-partner-branch-configs'] });
   };
 
+  const riskBadge = (p: 'BRANCH' | 'COMPANY') => (
+    <Badge size="sm" color={p === 'COMPANY' ? 'warning' : 'info'}>
+      {p === 'COMPANY' ? t('dealPartnerRate.riskCompany') : t('dealPartnerRate.riskBranch')}
+    </Badge>
+  );
 
-
-  const handleSuccess = () => {
-    addSnackbar({
-      message: (
-        <div className="alert alert-success">
-          <CheckCircle size={16} />
-          <span>{t('dealPartnerRate.saved')}</span>
-        </div>
-      ),
-    });
-    queryClient.invalidateQueries({ queryKey: ['deal-partner-rates'] });
-  };
-
-  const scopeLabel = (level: string) => {
-    switch (level) {
-      case 'BRANCH': return t('dealPartnerRate.scopeBranch');
-      case 'COMPANY': return t('dealPartnerRate.scopeCompany');
-      case 'HOLDING': return t('dealPartnerRate.scopeHolding');
-      default: return level;
-    }
-  };
-
-  const scopeBadgeColor = (scope: string): 'info' | 'warning' | 'success' => {
-    switch (scope) {
-      case 'HOLDING': return 'warning';
-      case 'COMPANY': return 'info';
-      case 'BRANCH': return 'success';
-      default: return 'info';
-    }
-  };
-
-  const columns: ColumnDef<DealPartnerRate>[] = [
-    {
-      accessorKey: 'scope_level',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.scope')} />,
-      cell: ({ row }) => <Badge size="sm" color={scopeBadgeColor(row.original.scope_level)}>{scopeLabel(row.original.scope_level)}</Badge>,
-      className: 'w-24',
-    },
-    {
-      accessorKey: 'company_name',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.company')} />,
-      cell: ({ row }) => (
-        <span className="text-sm">{row.original.company_name ?? '—'}</span>
-      ),
-    },
+  const columns: ColumnDef<BranchConfigRow>[] = [
     {
       accessorKey: 'branch_name',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.branch')} />,
       cell: ({ row }) => (
-        <span className="text-sm">{row.original.branch_name ?? '—'}</span>
+        <div className="min-w-0">
+          <div className="text-sm font-medium truncate">{row.original.branch_name}</div>
+          <div className="text-xs text-subtle truncate">{row.original.company_name ?? '—'}</div>
+        </div>
       ),
     },
     {
-      accessorKey: 'rate_percent',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.ratePercent')} />,
+      accessorKey: 'branch_rate_percent',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.branchRate')} />,
+      cell: ({ row }) => <span className="text-sm tabular-nums">{fmtPct(row.original.branch_rate_percent)}</span>,
+      className: 'w-24',
+    },
+    {
+      accessorKey: 'company_rate_percent',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.companyRate')} />,
+      cell: ({ row }) => <span className="text-sm tabular-nums">{fmtPct(row.original.company_rate_percent)}</span>,
+      className: 'w-24',
+    },
+    {
+      accessorKey: 'total_rate_percent',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.totalRate')} />,
+      cell: ({ row }) => <span className="text-sm tabular-nums font-medium">{fmtPct(row.original.total_rate_percent)}</span>,
+      className: 'w-24',
+    },
+    {
+      accessorKey: 'risk_party',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.riskParty')} />,
+      cell: ({ row }) => riskBadge(row.original.risk_party),
+      className: 'w-28 max-md:hidden',
+    },
+    {
+      accessorKey: 'return_to_branch_name',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.returnBranch')} />,
       cell: ({ row }) => (
-        <span className="text-sm tabular-nums">{row.original.rate_percent}%</span>
+        <span className="text-sm text-subtle truncate max-w-36 block">
+          {row.original.return_to_branch_name ?? '—'}
+        </span>
       ),
-      className: 'w-28',
-    },
-    {
-      accessorKey: 'note',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.note')} />,
-      cell: ({ row }) => (
-        <span className="text-sm text-subtle truncate max-w-40 block">{row.original.note ?? '—'}</span>
-      ),
-      className: 'max-md:hidden',
-    },
-    {
-      accessorKey: 'is_active',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.active')} />,
-      cell: ({ row }) => row.original.is_active
-        ? <Badge size="sm" color="success" startIcon={<CheckCircle />} />
-        : <Badge size="sm" color="default" startIcon={<XCircle />} />,
-      className: 'w-16',
+      className: 'max-lg:hidden',
     },
     ...(canManage ? [{
       id: 'actions',
       header: () => null,
-      cell: ({ row }: { row: { original: DealPartnerRate } }) => (
+      cell: ({ row }: { row: { original: BranchConfigRow } }) => (
         <button
           className="flex items-center justify-center w-8 h-8 rounded hover:bg-surface-hover cursor-pointer text-subtle hover:text-fg"
           onClick={() => handleEdit(row.original)}
@@ -371,6 +600,13 @@ export function DealPartnerRatesPage() {
       className: 'w-10',
     }] : []),
   ];
+
+  const policyStat = (label: string, value: string, emphasis = false) => (
+    <div className="flex flex-col gap-0.5 min-w-0">
+      <span className="text-xs text-subtle truncate">{label}</span>
+      <span className={`text-sm tabular-nums ${emphasis ? 'font-semibold' : 'font-medium'}`}>{value}</span>
+    </div>
+  );
 
   return (
     <>
@@ -386,30 +622,43 @@ export function DealPartnerRatesPage() {
         <div className="mobile-header-title mobile-header-title-truncate">
           {t('dealPartnerRate.title')}
         </div>
-        <div className="mobile-header-end px-2">
-          {canManage && (
-            <button
-              className="flex items-center justify-center w-8 h-8 rounded hover:bg-surface-hover cursor-pointer text-current"
-              onClick={handleCreate}
-            >
-              <Plus size={18} />
-            </button>
-          )}
-        </div>
+        <div className="mobile-header-end w-nav" />
       </MobileHeader>
 
       <div className="page-content responsive-dvh-mobile-header">
         <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
           <h1 className="heading-2">{t('dealPartnerRate.title')}</h1>
-          {canManage && (
-            <Button color="primary" startIcon={<Plus size={16} />} onClick={handleCreate}>
-              {t('dealPartnerRate.addRate')}
-            </Button>
+        </div>
+
+        {/* Holding policy — the default every new deal partner branch starts from */}
+        <div className="flex-none rounded-lg border border-line p-4 mb-4 max-md:mt-3">
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div className="min-w-0">
+              <div className="font-medium">{t('dealPartnerRate.policyTitle')}</div>
+              <div className="text-xs text-subtle mt-0.5">{t('dealPartnerRate.defaultsHint')}</div>
+            </div>
+            {canManage && (
+              <Button variant="outline" size="sm" startIcon={<Pencil size={14} />} onClick={() => setPolicyModalOpen(true)}>
+                {t('common.edit')}
+              </Button>
+            )}
+          </div>
+          {policy ? (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {policyStat(t('dealPartnerRate.totalRange'), `${fmtPct(policy.total_min)} – ${fmtPct(policy.total_max)}`)}
+              {policyStat(t('dealPartnerRate.branchDefault'), fmtPct(policy.branch_rate_default))}
+              {policyStat(t('dealPartnerRate.companyDefault'), fmtPct(policy.company_rate_default))}
+              {policyStat(t('dealPartnerRate.totalDefault'), fmtPct(policy.total_default), true)}
+            </div>
+          ) : (
+            <div className="text-sm text-subtle">—</div>
           )}
         </div>
 
-        <DataTable<DealPartnerRate>
-          data={paginatedRates}
+        <div className="flex-none text-sm font-medium mb-2">{t('dealPartnerRate.branchConfigs')}</div>
+
+        <DataTable<BranchConfigRow>
+          data={paginated}
           columns={columns}
           sorting={sorting}
           onSortingChange={setSorting}
@@ -419,37 +668,44 @@ export function DealPartnerRatesPage() {
           pageSizeOptions={[10, 25, 50]}
           rowCount={totalCount}
           onPageChange={({ pageIndex: pi, pageSize: ps }) => { setPageIndex(pi); setPageSize(ps); }}
-          className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
+          className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60' : ''} transition-opacity`}
           noResults={<div className="p-8 text-center text-subtle">{t('dealPartnerRate.empty')}</div>}
         />
 
         {/* Mobile cards */}
-        <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
+        <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60' : ''} transition-opacity`}>
           <div className="flex-1 overflow-auto better-scroll pb-8">
-            {rates.length === 0 ? (
+            {configs.length === 0 ? (
               <div className="p-8 text-center text-subtle">{t('dealPartnerRate.empty')}</div>
             ) : (
-              <div className="flex flex-col divide-y divide-line">
-                {paginatedRates.map(rate => (
+              <div className="flex flex-col divide-y divide-line border-b border-line">
+                {paginated.map(row => (
                   <div
-                    key={rate.id}
+                    key={row.branch_id}
                     className="px-1 py-3 cursor-pointer active:bg-surface-hover"
-                    onClick={() => canManage && handleEdit(rate)}
+                    onClick={() => canManage && handleEdit(row)}
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">{rate.branch_name ?? scopeLabel(rate.scope_level)}</div>
-                        {rate.company_name && <div className="text-xs text-subtle">{rate.company_name}</div>}
+                        <div className="font-medium truncate">{row.branch_name}</div>
+                        <div className="text-xs text-subtle truncate">{row.company_name ?? '—'}</div>
                       </div>
-                      <Badge size="sm" color={rate.is_active ? 'success' : 'default'}>
-                        {rate.is_active ? t('dealPartnerRate.activeLabel') : t('dealPartnerRate.inactiveLabel')}
-                      </Badge>
+                      {riskBadge(row.risk_party)}
                     </div>
-                    <div className="flex items-center justify-between mt-1 text-sm">
-                      <Badge size="xs" color="info">{scopeLabel(rate.scope_level)}</Badge>
-                      <span className="tabular-nums font-medium">{rate.rate_percent}%</span>
+                    <div className="flex items-center justify-between mt-1.5 text-sm">
+                      <span className="text-xs text-subtle">
+                        {t('dealPartnerRate.branchRate')} {fmtPct(row.branch_rate_percent)}
+                        {' · '}
+                        {t('dealPartnerRate.companyRate')} {fmtPct(row.company_rate_percent)}
+                      </span>
+                      <span className="tabular-nums font-medium">{fmtPct(row.total_rate_percent)}</span>
                     </div>
-                    {rate.note && <div className="text-xs text-subtle mt-1 truncate">{rate.note}</div>}
+                    {row.return_to_branch_name && (
+                      <div className="flex items-center gap-1 text-xs text-subtle mt-1">
+                        <Undo2 size={12} />
+                        <span className="truncate">{row.return_to_branch_name}</span>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -469,12 +725,18 @@ export function DealPartnerRatesPage() {
         </div>
       </div>
 
-      <RateModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        editRate={editRate}
-        branches={branches}
-        onSuccess={handleSuccess}
+      <PolicyModal
+        open={policyModalOpen}
+        onClose={() => setPolicyModalOpen(false)}
+        policy={policy}
+        onSaved={handleSaved}
+      />
+      <BranchConfigModal
+        open={configModalOpen}
+        onClose={() => setConfigModalOpen(false)}
+        config={editConfig}
+        internalBranches={internalBranches}
+        onSaved={handleSaved}
       />
     </>
   );
