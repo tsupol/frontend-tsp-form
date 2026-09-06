@@ -1974,7 +1974,6 @@
   "fin1Calc": {
     "product": "สินค้า",
     "searchPlaceholder": "ค้นหาสินค้า (ยี่ห้อ รุ่น SKU)",
-    "changeProduct": "เปลี่ยนสินค้า",
     "priceUplift": "ราคา",
     "upliftNone": "+0",
     "baht": "บาท",
@@ -1998,7 +1997,9 @@
     "rowMonths": "ระยะเวลาผ่อน",
     "rowTotal": "รวมผ่อนทั้งหมด",
     "rowDocFee": "ค่าทำสัญญา",
-    "docFeeValue": "{{amount}} จ่ายวันทำสัญญา"
+    "docFeeValue": "{{amount}} จ่ายวันทำสัญญา",
+    "railHint": "ค้นหาสินค้าเพื่อเริ่มคำนวณ",
+    "pickHint": "เลือกสินค้าเพื่อดูแผนผ่อนชำระ"
   },
   "fin1": {
     "title": "บัตรอัตรา FIN1",

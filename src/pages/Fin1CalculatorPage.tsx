@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { Button, Input, MaskedInput, MobileHeader, Slider } from 'tsp-form';
-import { ArrowRightFromLine, Search, ShieldCheck, X, XCircle } from 'lucide-react';
+import { Button, DataTable, Input, MaskedInput, MobileHeader, PageNav, PageNavPanel, Slider } from 'tsp-form';
+import { ArrowLeft, ArrowRightFromLine, Calculator, Search, ShieldCheck, X, XCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../lib/api';
 import { translateApiError } from '../lib/apiErrors';
 import { fmtCurrency } from '../lib/format';
 import { isSearchable, isBelowSearchMin, SEARCH_MIN_CHARS } from '../lib/searchKeyword';
 
 // ============================================================================
-// คำนวณค่างวด — deal-partner branch calculator (DELIVERY 2026-09-04).
+// เช็คราคา — deal-partner face (DELIVERY 2026-09-04, merged 09-06).
 //
 // The customer looks at this screen together with the staff, so it shows ONLY
 // down / per-month / last installment / total / doc fee — no rates, no interest,
@@ -21,6 +21,10 @@ import { isSearchable, isBelowSearchMin, SEARCH_MIN_CHARS } from '../lib/searchK
 // requests while sliding. The "customer says X per month" mode is the one
 // exception: it asks fn_fin1_plan_by_monthly, which does the bank-style search
 // (pay X for n−1 months, lighter final installment settles the remainder).
+//
+// Layout: PageNav two-panel like the internal price-check face — product rail
+// left, negotiation right. mobileBreakpoint 1024 so iPad portrait gets the
+// stacked pick-then-negotiate flow instead of two cramped panels.
 // ============================================================================
 
 interface VariantSearchRow {
@@ -82,6 +86,9 @@ interface PlanByMonthly {
 const variantLabel = (v: VariantSearchRow) =>
   [v.brand_name, v.family_name, v.model_name].filter(Boolean).join(' ');
 
+const variantSubLabel = (v: VariantSearchRow) =>
+  [v.variant_name, v.manufacturer_color].filter(Boolean).join(' · ');
+
 export function Fin1CalculatorPage() {
   const { t } = useTranslation();
 
@@ -97,6 +104,8 @@ export function Fin1CalculatorPage() {
     return () => clearTimeout(tm);
   }, [keyword]);
 
+  // The rail stays live after a pick — "what about this one?" mid-negotiation
+  // is one click, so the query is not gated on having no selection.
   const { data: searchResults, isFetching: searching } = useQuery({
     queryKey: ['fin1-calc-variant-search', debounced],
     queryFn: () =>
@@ -105,7 +114,7 @@ export function Fin1CalculatorPage() {
         p_only_contractable: true,
         p_limit: 20,
       }),
-    enabled: !variant && debounced.length > 0,
+    enabled: debounced.length > 0,
     placeholderData: keepPreviousData,
     staleTime: 30 * 1000,
   });
@@ -200,19 +209,12 @@ export function Fin1CalculatorPage() {
   }, [monthlyMode, monthlyStr, downPct, uplift, variant?.variant_id]);
 
   const pickVariant = (v: VariantSearchRow) => {
+    if (v.variant_id !== variant?.variant_id) {
+      setUplift(0);
+      setMonthlyStr('');
+      setPlan(null);
+    }
     setVariant(v);
-    setKeyword('');
-    setDebounced('');
-    setUplift(0);
-    setMonthlyStr('');
-    setPlan(null);
-  };
-
-  const clearVariant = () => {
-    setVariant(null);
-    setUplift(0);
-    setMonthlyStr('');
-    setPlan(null);
   };
 
   const tableErrorMsg = tableError
@@ -243,43 +245,48 @@ export function Fin1CalculatorPage() {
       });
 
   const searchRows = searchResults?.rows ?? [];
-  const showSearchList = !variant && (searchRows.length > 0 || searching || debounced.length > 0);
 
   return (
-    <>
-      <MobileHeader className="mobile-header-bordered md:hidden">
-        <div className="mobile-header-start">
-          <button
-            className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
-            aria-label="Open menu"
-            onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}
-          >
-            <ArrowRightFromLine size={18} />
-          </button>
-        </div>
-        <div className="mobile-header-title mobile-header-title-truncate">
-          {t('nav.priceCheck')}
-        </div>
-        <div className="mobile-header-end w-nav" />
-      </MobileHeader>
+    <PageNav panels={['list', 'detail']} mobileBreakpoint={1024} className="h-dvh overflow-hidden">
+      {({ isMobile, isRoot, goTo, goBack }) => (
+        <>
+          {isMobile && (
+            <MobileHeader className="mobile-header-bordered">
+              <div className="mobile-header-start">
+                {isRoot ? (
+                  <button
+                    className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
+                    aria-label="Open menu"
+                    onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}
+                  >
+                    <ArrowRightFromLine size={18} />
+                  </button>
+                ) : (
+                  <button
+                    className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
+                    aria-label={t('common.back')}
+                    onClick={goBack}
+                  >
+                    <ArrowLeft size={18} />
+                  </button>
+                )}
+              </div>
+              <div className="mobile-header-title mobile-header-title-truncate">
+                {t('nav.priceCheck')}
+              </div>
+              <div className="mobile-header-end w-nav" />
+            </MobileHeader>
+          )}
+          {!isMobile && (
+            <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
+              <h1 className="heading-2">{t('nav.priceCheck')}</h1>
+            </div>
+          )}
 
-      <div className="page-content responsive-dvh-mobile-header">
-        <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
-          <h1 className="heading-2">{t('nav.priceCheck')}</h1>
-        </div>
-
-        {/* Desktop / iPad-landscape (lg ≈ 1024px+): controls left, summary
-            pinned right so the numbers update beside the sliders — the staff
-            works the left half while the customer watches the right. Below lg
-            it stays one column with the summary underneath. */}
-        <div className="flex-1 min-h-0 overflow-auto better-scroll pb-8">
-          <div className="max-w-5xl lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] lg:gap-8 lg:items-start">
-          <div className="max-w-2xl flex flex-col gap-4">
-
-            {/* ── Product ─────────────────────────────────────────────── */}
-            {!variant ? (
-              <div className="flex flex-col">
-                <label className="form-label">{t('fin1Calc.product')}</label>
+          <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
+            {/* ── Left: product rail ── */}
+            <PageNavPanel id="list" className={isMobile ? '' : 'w-2/5 xl:w-1/3 border-r border-line flex flex-col'}>
+              <div className="flex-none p-2 border-b border-line">
                 <Input
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
@@ -290,219 +297,227 @@ export function Fin1CalculatorPage() {
                         {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
                       </span>
                     : undefined}
-                  className="w-full"
-                  autoFocus
-                />
-                {showSearchList && (
-                  <div className="mt-2 max-h-72 overflow-auto better-scroll border border-line rounded-md">
-                    {searching && searchRows.length === 0 && (
-                      <div className="p-3 text-xs text-subtle text-center">{t('common.loading')}</div>
-                    )}
-                    {!searching && searchRows.length === 0 && (
-                      <div className="p-3 text-xs text-subtler text-center">{t('common.noData')}</div>
-                    )}
-                    {searchRows.map((r) => (
-                      <button
-                        key={r.variant_id}
-                        type="button"
-                        className="block w-full min-w-0 text-left px-3 py-2 border-b border-line last:border-b-0 hover:bg-surface-hover cursor-pointer"
-                        onClick={() => pickVariant(r)}
-                      >
-                        <div className="min-w-0 text-sm font-medium truncate">{variantLabel(r)}</div>
-                        <div className="min-w-0 text-xs text-subtle truncate">
-                          {[r.variant_name, r.manufacturer_color].filter(Boolean).join(' · ')}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="flex items-center gap-3 px-3 py-2.5 rounded-md bg-surface border border-line">
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">{variantLabel(variant)}</div>
-                  <div className="text-xs text-subtle truncate">
-                    {[variant.variant_name, variant.manufacturer_color].filter(Boolean).join(' · ')}
-                  </div>
-                </div>
-                <Button
-                  variant="outline"
                   size="sm"
-                  startIcon={<X size={14} />}
-                  onClick={clearVariant}
-                  aria-label={t('fin1Calc.changeProduct')}
+                  className="w-full"
+                  autoFocus={!isMobile}
                 />
               </div>
-            )}
-
-            {tableErrorMsg && (
-              <div className="alert alert-warning">
-                <XCircle size={16} />
-                <span>{tableErrorMsg}</span>
-              </div>
-            )}
-
-            {variant && table && (
-              <>
-                {/* ── Price + uplift ─────────────────────────────────── */}
-                <div className="flex flex-col gap-2">
-                  <label className="form-label mb-0">{t('fin1Calc.priceUplift')}</label>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {(table.uplift_options ?? [0]).map(u => (
-                      <Button
-                        key={u}
-                        size="sm"
-                        variant={u === uplift ? 'primary' : 'outline'}
-                        onClick={() => setUplift(u)}
-                      >
-                        {u === 0 ? t('fin1Calc.upliftNone') : `+${fmtCurrency(u)}`}
-                      </Button>
-                    ))}
-                  </div>
-                  <div className="text-sm tabular-nums">
-                    {uplift > 0 && table.base_price != null ? (
-                      <>
-                        <span className="text-subtle">{fmtCurrency(table.base_price)} + {fmtCurrency(uplift)} = </span>
-                        <span className="font-semibold">{fmtCurrency(table.price)}</span>
-                      </>
-                    ) : (
-                      <span className="font-semibold">{fmtCurrency(table.price)}</span>
-                    )}
-                    <span className="text-subtle"> {t('fin1Calc.baht')}</span>
-                    {table.guarantee_days != null && (
-                      <span className="inline-flex items-center gap-1 ml-3 text-xs text-success">
-                        <ShieldCheck size={13} />
-                        {t('fin1Calc.guaranteeDays', { days: table.guarantee_days })}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* ── Down % ─────────────────────────────────────────── */}
-                {downPct != null && row && (
-                  <div className="flex flex-col gap-1">
-                    <label className="form-label mb-0">
-                      {t('fin1Calc.downLabel', { pct: downPct, amount: fmtCurrency(row.down_amount) })}
-                    </label>
-                    <Slider
-                      value={downPct}
-                      onChange={(v) => setDownPct(Math.round(v))}
-                      min={table.policy.min_down_percent}
-                      max={table.policy.max_down_percent}
-                      step={1}
-                      showMinMax
-                    />
-                  </div>
+              <DataTable<VariantSearchRow>
+                data={searchRows}
+                getRowProps={r => ({ 'data-state': r.original.variant_id === variant?.variant_id ? 'selected' : undefined })}
+                enableKeyboardNav={!isMobile}
+                keyboardActivateMode="manual"
+                onRowActivate={r => pickVariant(r.original)}
+                renderRow={r => (
+                  <button
+                    type="button"
+                    className="w-full text-left px-4 py-2.5 transition-colors cursor-pointer"
+                    onClick={() => { pickVariant(r.original); if (isMobile) goTo('detail'); }}
+                  >
+                    <div className="min-w-0 text-sm font-medium truncate">{variantLabel(r.original)}</div>
+                    <div className="min-w-0 text-xs text-subtle truncate">{variantSubLabel(r.original)}</div>
+                  </button>
                 )}
+                className={`flex-1 min-h-0 panel-datatable ${searching ? 'opacity-60' : ''} transition-opacity`}
+                noResults={
+                  <div className="p-8 text-center text-subtler text-sm">
+                    {debounced.length === 0
+                      ? t('fin1Calc.railHint')
+                      : searching ? t('common.loading') : t('common.noData')}
+                  </div>
+                }
+              />
+            </PageNavPanel>
 
-                {/* ── Months ─────────────────────────────────────────── */}
-                {termMonths != null && terms.length > 0 && (
-                  <div className={`flex flex-col gap-1 ${monthlyMode ? 'opacity-50' : ''}`}>
-                    <label className="form-label mb-0">
-                      {monthlyMode && plan
-                        ? t('fin1Calc.monthsFromMonthly', { count: plan.term_months })
-                        : t('fin1Calc.monthsLabel', { count: termMonths })}
-                    </label>
-                    <Slider
-                      value={terms.indexOf(termMonths)}
-                      onChange={(v) => {
-                        const idx = Math.min(terms.length - 1, Math.max(0, Math.round(v)));
-                        setTermMonths(terms[idx]);
-                        setMonthlyStr('');
-                      }}
-                      min={0}
-                      max={terms.length - 1}
-                      step={1}
-                      disabled={monthlyMode}
-                    />
-                    <div className="flex justify-between text-[11px] text-subtler tabular-nums">
-                      <span>{t('fin1Calc.months', { count: terms[0] })}</span>
-                      <span>{t('fin1Calc.months', { count: terms[terms.length - 1] })}</span>
+            {/* ── Right: negotiation panel ── */}
+            <PageNavPanel id="detail" className={isMobile ? '' : 'flex-1 min-w-0 flex flex-col'}>
+              {variant ? (
+                <>
+                  <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2 min-w-0">
+                    <span className="text-sm font-medium truncate">{variantLabel(variant)}</span>
+                    <span className="text-xs text-subtle truncate">{variantSubLabel(variant)}</span>
+                  </div>
+                  <div className="flex-1 overflow-auto better-scroll px-4 py-3">
+                    <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] xl:gap-8 xl:items-start">
+                      <div className="flex flex-col gap-4">
+                        {tableErrorMsg && (
+                          <div className="alert alert-warning">
+                            <XCircle size={16} />
+                            <span>{tableErrorMsg}</span>
+                          </div>
+                        )}
+
+                        {table && (
+                          <>
+                            {/* ── Price + uplift ─────────────────────────── */}
+                            <div className="flex flex-col gap-2">
+                              <label className="form-label mb-0">{t('fin1Calc.priceUplift')}</label>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {(table.uplift_options ?? [0]).map(u => (
+                                  <Button
+                                    key={u}
+                                    size="sm"
+                                    variant={u === uplift ? 'primary' : 'outline'}
+                                    onClick={() => setUplift(u)}
+                                  >
+                                    {u === 0 ? t('fin1Calc.upliftNone') : `+${fmtCurrency(u)}`}
+                                  </Button>
+                                ))}
+                              </div>
+                              <div className="text-sm tabular-nums">
+                                {uplift > 0 && table.base_price != null ? (
+                                  <>
+                                    <span className="text-subtle">{fmtCurrency(table.base_price)} + {fmtCurrency(uplift)} = </span>
+                                    <span className="font-semibold">{fmtCurrency(table.price)}</span>
+                                  </>
+                                ) : (
+                                  <span className="font-semibold">{fmtCurrency(table.price)}</span>
+                                )}
+                                <span className="text-subtle"> {t('fin1Calc.baht')}</span>
+                                {table.guarantee_days != null && (
+                                  <span className="inline-flex items-center gap-1 ml-3 text-xs text-success">
+                                    <ShieldCheck size={13} />
+                                    {t('fin1Calc.guaranteeDays', { days: table.guarantee_days })}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* ── Down % ─────────────────────────────────── */}
+                            {downPct != null && row && (
+                              <div className="flex flex-col gap-1">
+                                <label className="form-label mb-0">
+                                  {t('fin1Calc.downLabel', { pct: downPct, amount: fmtCurrency(row.down_amount) })}
+                                </label>
+                                <Slider
+                                  value={downPct}
+                                  onChange={(v) => setDownPct(Math.round(v))}
+                                  min={table.policy.min_down_percent}
+                                  max={table.policy.max_down_percent}
+                                  step={1}
+                                  showMinMax
+                                />
+                              </div>
+                            )}
+
+                            {/* ── Months ─────────────────────────────────── */}
+                            {termMonths != null && terms.length > 0 && (
+                              <div className={`flex flex-col gap-1 ${monthlyMode ? 'opacity-50' : ''}`}>
+                                <label className="form-label mb-0">
+                                  {monthlyMode && plan
+                                    ? t('fin1Calc.monthsFromMonthly', { count: plan.term_months })
+                                    : t('fin1Calc.monthsLabel', { count: termMonths })}
+                                </label>
+                                <Slider
+                                  value={terms.indexOf(termMonths)}
+                                  onChange={(v) => {
+                                    const idx = Math.min(terms.length - 1, Math.max(0, Math.round(v)));
+                                    setTermMonths(terms[idx]);
+                                    setMonthlyStr('');
+                                  }}
+                                  min={0}
+                                  max={terms.length - 1}
+                                  step={1}
+                                  disabled={monthlyMode}
+                                />
+                                <div className="flex justify-between text-[11px] text-subtler tabular-nums">
+                                  <span>{t('fin1Calc.months', { count: terms[0] })}</span>
+                                  <span>{t('fin1Calc.months', { count: terms[terms.length - 1] })}</span>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* ── Customer's target monthly ──────────────── */}
+                            <div className="flex flex-col">
+                              <label className="form-label">{t('fin1Calc.monthlyTarget')}</label>
+                              <div className="w-44">
+                                <MaskedInput
+                                  mask="number"
+                                  decimalScale={0}
+                                  value={monthlyStr}
+                                  onChange={(raw) => setMonthlyStr(raw)}
+                                  placeholder={cell ? fmtCurrency(cell.installment_amount) : ''}
+                                  endIcon={monthlyStr
+                                    ? <button
+                                        type="button"
+                                        className="bg-transparent border-none p-0 cursor-pointer text-current flex items-center"
+                                        onClick={() => setMonthlyStr('')}
+                                        aria-label={t('common.clear', { defaultValue: 'Clear' })}
+                                      >
+                                        <X size={14} />
+                                      </button>
+                                    : undefined}
+                                />
+                              </div>
+                              <span className="text-xs text-subtle mt-1">{t('fin1Calc.monthlyTargetHint')}</span>
+                            </div>
+
+                            {planError && (
+                              <div className="alert alert-warning">
+                                <XCircle size={16} />
+                                <span>{planError}</span>
+                              </div>
+                            )}
+                          </>
+                        )}
+
+                        {!table && tableLoading && (
+                          <div className="p-6 text-center text-subtle text-sm">{t('common.loading')}</div>
+                        )}
+                      </div>
+
+                      {/* ── Summary ────────────────────────────────────── */}
+                      {summary && (
+                        <div className="mt-4 xl:mt-0 xl:sticky xl:top-0">
+                          <div className={`rounded-md border border-line overflow-hidden ${(tableLoading || planLoading) ? 'opacity-60' : ''} transition-opacity`}>
+                            <div className="px-4 py-3 bg-surface flex flex-col gap-1">
+                              <div className="text-sm text-subtle">{t('fin1Calc.summaryTitle')}</div>
+                              <div className="text-xl xl:text-2xl font-semibold tabular-nums">
+                                {t('fin1Calc.summaryMonthly', {
+                                  amount: fmtCurrency(summary.monthly),
+                                  count: summary.last !== summary.monthly ? summary.months - 1 : summary.months,
+                                })}
+                              </div>
+                              {summary.last !== summary.monthly && (
+                                <div className="text-sm xl:text-base tabular-nums">
+                                  {t('fin1Calc.summaryLast', { amount: fmtCurrency(summary.last) })}
+                                </div>
+                              )}
+                              {monthlyMode && plan && !plan.exact && (
+                                <div className="text-xs text-warning-fg">
+                                  {t('fin1Calc.notExact', { count: plan.term_months, amount: fmtCurrency(plan.installment_amount) })}
+                                </div>
+                              )}
+                            </div>
+                            <div className="border-t border-line">
+                              {[
+                                { label: t('fin1Calc.rowDown'), value: fmtCurrency(summary.down) },
+                                { label: t('fin1Calc.rowMonths'), value: t('fin1Calc.months', { count: summary.months }) },
+                                { label: t('fin1Calc.rowTotal'), value: fmtCurrency(summary.total) },
+                                { label: t('fin1Calc.rowDocFee'), value: t('fin1Calc.docFeeValue', { amount: fmtCurrency(summary.docFee) }) },
+                              ].map((r, i) => (
+                                <div key={i} className="flex items-center justify-between px-4 py-2 border-b border-line last:border-b-0">
+                                  <span className="text-sm text-subtle">{r.label}</span>
+                                  <span className="text-sm tabular-nums font-medium">{r.value}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
-                )}
-
-                {/* ── Customer's target monthly ──────────────────────── */}
-                <div className="flex flex-col">
-                  <label className="form-label">{t('fin1Calc.monthlyTarget')}</label>
-                  <div className="w-44">
-                    <MaskedInput
-                      mask="number"
-                      decimalScale={0}
-                      value={monthlyStr}
-                      onChange={(raw) => setMonthlyStr(raw)}
-                      placeholder={cell ? fmtCurrency(cell.installment_amount) : ''}
-                      endIcon={monthlyStr
-                        ? <button
-                            type="button"
-                            className="bg-transparent border-none p-0 cursor-pointer text-current flex items-center"
-                            onClick={() => setMonthlyStr('')}
-                            aria-label={t('common.clear', { defaultValue: 'Clear' })}
-                          >
-                            <X size={14} />
-                          </button>
-                        : undefined}
-                    />
-                  </div>
-                  <span className="text-xs text-subtle mt-1">{t('fin1Calc.monthlyTargetHint')}</span>
+                </>
+              ) : (
+                <div className="flex-1 h-full flex flex-col items-center justify-center text-subtler gap-2">
+                  <Calculator size={28} className="opacity-30" />
+                  <div className="text-sm">{t('fin1Calc.pickHint')}</div>
                 </div>
-
-                {planError && (
-                  <div className="alert alert-warning">
-                    <XCircle size={16} />
-                    <span>{planError}</span>
-                  </div>
-                )}
-              </>
-            )}
-
-            {variant && !table && tableLoading && (
-              <div className="p-6 text-center text-subtle text-sm">{t('common.loading')}</div>
-            )}
+              )}
+            </PageNavPanel>
           </div>
-
-          {/* ── Summary ──────────────────────────────────────────────── */}
-          {summary && (
-            <div className="mt-4 lg:mt-0 lg:sticky lg:top-0 max-w-2xl">
-              <div className={`rounded-md border border-line overflow-hidden ${(tableLoading || planLoading) ? 'opacity-60' : ''} transition-opacity`}>
-                <div className="px-4 py-3 bg-surface flex flex-col gap-1">
-                  <div className="text-sm text-subtle">{t('fin1Calc.summaryTitle')}</div>
-                  <div className="text-xl lg:text-2xl font-semibold tabular-nums">
-                    {t('fin1Calc.summaryMonthly', {
-                      amount: fmtCurrency(summary.monthly),
-                      count: summary.last !== summary.monthly ? summary.months - 1 : summary.months,
-                    })}
-                  </div>
-                  {summary.last !== summary.monthly && (
-                    <div className="text-sm lg:text-base tabular-nums">
-                      {t('fin1Calc.summaryLast', { amount: fmtCurrency(summary.last) })}
-                    </div>
-                  )}
-                  {monthlyMode && plan && !plan.exact && (
-                    <div className="text-xs text-warning-fg">
-                      {t('fin1Calc.notExact', { count: plan.term_months, amount: fmtCurrency(plan.installment_amount) })}
-                    </div>
-                  )}
-                </div>
-                <div className="border-t border-line">
-                  {[
-                    { label: t('fin1Calc.rowDown'), value: fmtCurrency(summary.down) },
-                    { label: t('fin1Calc.rowMonths'), value: t('fin1Calc.months', { count: summary.months }) },
-                    { label: t('fin1Calc.rowTotal'), value: fmtCurrency(summary.total) },
-                    { label: t('fin1Calc.rowDocFee'), value: t('fin1Calc.docFeeValue', { amount: fmtCurrency(summary.docFee) }) },
-                  ].map((r, i) => (
-                    <div key={i} className="flex items-center justify-between px-4 py-2 border-b border-line last:border-b-0">
-                      <span className="text-sm text-subtle">{r.label}</span>
-                      <span className="text-sm tabular-nums font-medium">{r.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-          </div>
-        </div>
-      </div>
-    </>
+        </>
+      )}
+    </PageNav>
   );
 }

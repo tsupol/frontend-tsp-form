@@ -1978,7 +1978,6 @@
   "fin1Calc": {
     "product": "Product",
     "searchPlaceholder": "Search product (brand, model, SKU)",
-    "changeProduct": "Change product",
     "priceUplift": "Price",
     "upliftNone": "+0",
     "baht": "baht",
@@ -2002,7 +2001,9 @@
     "rowMonths": "Term",
     "rowTotal": "Total installments",
     "rowDocFee": "Contract fee",
-    "docFeeValue": "{{amount}} on signing day"
+    "docFeeValue": "{{amount}} on signing day",
+    "railHint": "Search for a product to start",
+    "pickHint": "Pick a product to see the installment plan"
   },
   "fin1": {
     "title": "FIN1 Rate Cards",
