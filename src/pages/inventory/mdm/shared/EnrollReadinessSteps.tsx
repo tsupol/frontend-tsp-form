@@ -24,7 +24,7 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, Badge } from 'tsp-form';
+import { Button, Modal, Badge, LabeledCheckbox } from 'tsp-form';
 import {
   CheckCircle, AlertTriangle, Loader2, XCircle, Lock, Cloud, CircleDashed,
   ShieldCheck, KeyRound, HelpCircle, LockOpen, PauseCircle,
@@ -75,6 +75,25 @@ function NnfAppBadge({ view }: { view: EnrollView }) {
       {view.nnf_app_checked_at && <span className="text-xs text-subtler"><RelativeDateTime value={view.nnf_app_checked_at} /></span>}
     </>
   );
+}
+
+/** mig 1156 — did the CUSTOMER log in to the NNF app during this MDM life?
+ *  Customer-level: iOS hides the serial from the app, so green proves the
+ *  customer logged in SOMEWHERE, not on this handset — which is why step 7
+ *  still asks for a manual tick, and why this must never be merged with the
+ *  installed badge above it (134 Mistake 8). Re-enroll = new MDM life = the
+ *  stamp resets to false by itself; the existing poll shows the flip. */
+function NnfLoginBadge({ view }: { view: EnrollView }) {
+  const { t } = useTranslation();
+  if (view.nnf_login_this_life) {
+    return (
+      <>
+        <Badge color="success" startIcon={<CheckCircle size={12} />}>{t('asset.mdm.step6.nnfLoggedIn')}</Badge>
+        {view.nnf_login_last_at && <span className="text-xs text-subtler"><RelativeDateTime value={view.nnf_login_last_at} /></span>}
+      </>
+    );
+  }
+  return <Badge color="warning" startIcon={<XCircle size={12} />}>{t('asset.mdm.step6.nnfNotLoggedIn')}</Badge>;
 }
 
 /** 🍎 The APPLE key (pull) — unlocks the customer's iCloud when we repossess.
@@ -202,10 +221,26 @@ export function EnrollReadinessSteps({
   const [err, setErr] = useState<string | null>(null);
   const [applied, setApplied] = useState(false);
 
+  // The pre-lock checklist (131 §1.5). Apple MDM cannot verify any of these,
+  // so the system never blocks — the staffer ticks each one and the Apply
+  // button opens only when all are ticked. Two are pre-ticked from data the
+  // system DOES have (the app scan, the mig-1156 login stamp); iCloud and
+  // Find My are on-this-device facts only the person holding it can confirm.
+  const [ticks, setTicks] = useState({ icloud: false, findMy: false, nnfApp: false, nnfLogin: false });
+  const allTicked = ticks.icloud && ticks.findMy && ticks.nnfApp && ticks.nnfLogin;
+  const tick = (key: keyof typeof ticks) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setTicks((s) => ({ ...s, [key]: e.target.checked }));
+
   const openConfirm = async () => {
     if (!onApplyLight) return;
     setErr(null);
     setPreview(null);
+    setTicks({
+      icloud: false,
+      findMy: false,
+      nnfApp: view.nnf_app_installed === true,
+      nnfLogin: view.nnf_login_this_life === true,
+    });
     setConfirmOpen(true);
     setBusy(true);
     try {
@@ -244,6 +279,20 @@ export function EnrollReadinessSteps({
           <StatusLine label={t('asset.mdm.step6.nnfAppLabel')}>
             <NnfAppBadge view={view} />
           </StatusLine>
+          {/* Two lines, two truths — installed comes from the DEVICE's app scan,
+              login from the CUSTOMER's own RPC. Both true≠false combinations
+              occur on prod; never compute a merged "ready" badge from them. */}
+          {view.nnf_login_this_life != null && (
+            <StatusLine label={t('asset.mdm.step6.nnfLoginLabel')}>
+              <NnfLoginBadge view={view} />
+            </StatusLine>
+          )}
+          {view.nnf_login_this_life === false && view.in_mdm && (
+            <div className="text-xs text-warning-fg inline-flex items-start gap-1">
+              <AlertTriangle size={12} className="shrink-0 mt-0.5" />
+              <span>{t('asset.mdm.step6.nnfLoginHint')}</span>
+            </div>
+          )}
           <StatusLine label={t('asset.mdm.step6.pullKeyLabel')}>
             <PullKeyBadge view={view} />
           </StatusLine>
@@ -338,15 +387,19 @@ export function EnrollReadinessSteps({
                   <span className="font-mono">{view.serial_number}</span>
                 </p>
               )}
+              {/* Tick-to-confirm, not bullets (131 §1.5): the system cannot
+                  verify any of these, so the staffer vouches item by item and
+                  Apply stays disabled until all four are ticked. */}
               <div className="alert alert-warning mt-3">
                 <AlertTriangle size={16} className="shrink-0" />
                 <div className="min-w-0">
                   <div className="alert-title">{t('asset.mdm.step7.reminderTitle')}</div>
-                  <ul className="alert-description mt-1 flex flex-col gap-0.5 list-disc pl-4">
-                    <li>{t('asset.mdm.step7.reminderIcloud')}</li>
-                    <li>{t('asset.mdm.step7.reminderFindMy')}</li>
-                    <li>{t('asset.mdm.step7.reminderNnfApp')}</li>
-                  </ul>
+                  <div className="alert-description mt-1.5 flex flex-col gap-1">
+                    <LabeledCheckbox label={t('asset.mdm.step7.reminderIcloud')} checked={ticks.icloud} onChange={tick('icloud')} />
+                    <LabeledCheckbox label={t('asset.mdm.step7.reminderFindMy')} checked={ticks.findMy} onChange={tick('findMy')} />
+                    <LabeledCheckbox label={t('asset.mdm.step7.reminderNnfApp')} checked={ticks.nnfApp} onChange={tick('nnfApp')} />
+                    <LabeledCheckbox label={t('asset.mdm.step7.reminderNnfLogin')} checked={ticks.nnfLogin} onChange={tick('nnfLogin')} />
+                  </div>
                 </div>
               </div>
               <ul className="text-xs text-subtle mt-3 flex flex-col gap-1">
@@ -362,7 +415,7 @@ export function EnrollReadinessSteps({
         </div>
         <div className="modal-footer">
           <Button variant="ghost" onClick={() => setConfirmOpen(false)} disabled={busy}>{t('common.cancel')}</Button>
-          <Button color="primary" onClick={commit} disabled={busy || !preview} startIcon={<Lock size={15} />}>
+          <Button color="primary" onClick={commit} disabled={busy || !preview || !allTicked} startIcon={<Lock size={15} />}>
             {t('asset.mdm.step7.confirmButton')}
           </Button>
         </div>

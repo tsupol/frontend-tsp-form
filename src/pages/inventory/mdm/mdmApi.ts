@@ -166,6 +166,16 @@ export interface AssetMdmStatus {
   nnf_app_installed: boolean | null;     // sub-tab 1 step 6 — auto-detected app scan (com.nnf.customer)
   nnf_app_checked_at: string | null;
 
+  // mig 1156 — the contract customer logged in to the NNF app during THIS MDM
+  // life (stamped on inv.asset_mdm_binding, so re-enroll = new life = flips
+  // back to false by itself). Customer-level, not device-level: iOS hides the
+  // serial from the app, so true proves the CUSTOMER logged in somewhere, not
+  // on this handset — never merge with nnf_app_installed (134 Mistake 8).
+  // No null: the source is our own login RPC, "never checked" cannot happen.
+  nnf_login_this_life: boolean;
+  nnf_login_last_at: string | null;
+  nnf_login_first_at: string | null;
+
   // Escrow key window (mig 933) — Apple lets us pull the Activation-Lock bypass
   // code only within 15 days of enroll; miss it and the device is permanently
   // unrecoverable. window_status null = not enrolled (check FIRST); has_code

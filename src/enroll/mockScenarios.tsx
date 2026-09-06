@@ -50,6 +50,10 @@ function base(over: Partial<RemoteEnrollStatus> = {}): RemoteEnrollStatus {
     // device is blocked by NOT_IN_MDM, which is the honest reason.
     nnf_app_installed: null,
     nnf_app_checked_at: null,
+    // mig 1156 login stamp. false, not null: the live view has no null, so the
+    // default mocks what every real payload carries.
+    nnf_login_this_life: false,
+    nnf_login_last_at: null,
     escrow_window_status: null,
     escrow_has_code: false,
     escrow_days_remaining: null,
@@ -160,7 +164,10 @@ export const MOCK_SCENARIOS: Scenario[] = [
       mdm_status: 'IN_MDM', prepare_status: 'READY', in_mdm: true, can_prepare: false,
       has_pull_key: true, has_push_key: true, push_key_applied_at: agoIso(9),
       lock_ready: true, lock_verdict_code: 'PROTECTED',
+      // login true + app false is a REAL combination (Mistake 8): the customer
+      // logged in from another handset while this one lost the app.
       nnf_app_installed: false, nnf_app_checked_at: agoIso(2),
+      nnf_login_this_life: true, nnf_login_last_at: agoIso(35),
       escrow_window_status: 'OK', escrow_has_code: false, escrow_days_remaining: 11,
       enforcement_badge: 'NONE', may_apply_light: true, apply_light_blocked_reason: null,
     }),
@@ -226,6 +233,7 @@ export const MOCK_SCENARIOS: Scenario[] = [
       has_pull_key: true, has_push_key: true, push_key_applied_at: agoIso(2),
       lock_ready: true, lock_verdict_code: 'PROTECTED',
       nnf_app_installed: true, nnf_app_checked_at: agoIso(3),
+      nnf_login_this_life: true, nnf_login_last_at: agoIso(8),
       escrow_window_status: 'OK', escrow_has_code: true,
       enforcement_badge: 'LIGHT', may_apply_light: false,
       apply_light_blocked_reason: 'ALREADY_ENFORCED',

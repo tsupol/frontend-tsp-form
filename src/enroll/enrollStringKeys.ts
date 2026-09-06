@@ -119,6 +119,10 @@ export const ENROLL_STRING_KEYS = [
   'asset.mdm.step6.nnfInstalled',
   'asset.mdm.step6.nnfNotInstalled',
   'asset.mdm.step6.nnfUnknown',
+  'asset.mdm.step6.nnfLoginLabel',
+  'asset.mdm.step6.nnfLoggedIn',
+  'asset.mdm.step6.nnfNotLoggedIn',
+  'asset.mdm.step6.nnfLoginHint',
   'asset.mdm.step6.pullKeyLabel',
   'asset.mdm.step6.pushKeyLabel',
   'asset.mdm.step6.escrowNotEnrolled',
@@ -144,6 +148,7 @@ export const ENROLL_STRING_KEYS = [
   'asset.mdm.step7.reminderIcloud',
   'asset.mdm.step7.reminderFindMy',
   'asset.mdm.step7.reminderNnfApp',
+  'asset.mdm.step7.reminderNnfLogin',
   'asset.mdm.dunning.deviceLabel',
 
   // Why the lock button is unavailable

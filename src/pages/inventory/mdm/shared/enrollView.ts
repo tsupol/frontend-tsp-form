@@ -62,6 +62,12 @@ export interface EnrollView {
   // link holder is staff at another branch and gets the whole picture.
   nnf_app_installed: boolean | null;
   nnf_app_checked_at: string | null;
+  /** mig 1156 — the contract customer logged in to the NNF app during THIS MDM
+   *  life. Customer-level, not this-device (134 Mistake 8) — never merge with
+   *  nnf_app_installed. The view has no null; null here means a pre-mig remote
+   *  payload → hide the line. */
+  nnf_login_this_life: boolean | null;
+  nnf_login_last_at: string | null;
   /** 🍎 Apple key window. null = not enrolled, so "no key" is not yet a fault. */
   escrow_window_status: 'OK' | 'EXPIRED' | null;
   escrow_has_code: boolean;
@@ -97,6 +103,8 @@ export function fromAssetStatus(s: AssetMdmStatus): EnrollView {
     push_key_applied_at: s.push_key_applied_at,
     nnf_app_installed: s.nnf_app_installed,
     nnf_app_checked_at: s.nnf_app_checked_at,
+    nnf_login_this_life: s.nnf_login_this_life,
+    nnf_login_last_at: s.nnf_login_last_at,
     escrow_window_status: s.escrow_window_status,
     escrow_has_code: s.escrow_has_code,
     escrow_days_remaining: s.escrow_days_remaining,
@@ -139,6 +147,8 @@ export function fromRemoteStatus(r: RemoteEnrollStatus): EnrollView {
     push_key_applied_at: r.push_key_applied_at ?? null,
     nnf_app_installed: r.nnf_app_installed ?? null,
     nnf_app_checked_at: r.nnf_app_checked_at ?? null,
+    nnf_login_this_life: r.nnf_login_this_life ?? null,
+    nnf_login_last_at: r.nnf_login_last_at ?? null,
     escrow_window_status: r.escrow_window_status ?? null,
     escrow_has_code: r.escrow_has_code ?? false,
     escrow_days_remaining: r.escrow_days_remaining ?? null,
@@ -222,6 +232,8 @@ export interface RemoteEnrollStatus {
   // its remaining 3 hours; the ?? defaults in fromRemoteStatus cover that.
   nnf_app_installed?: boolean | null;
   nnf_app_checked_at?: string | null;
+  nnf_login_this_life?: boolean;
+  nnf_login_last_at?: string | null;
   escrow_window_status?: 'OK' | 'EXPIRED' | null;
   escrow_has_code?: boolean;
   escrow_days_remaining?: number | null;
