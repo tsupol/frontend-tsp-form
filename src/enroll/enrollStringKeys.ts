@@ -171,6 +171,9 @@ export const ENROLL_STRING_KEYS = [
   'asset.mdm.step7.flag.allowAppRemoval',
   'asset.mdm.step7.flag.allowCloudPrivateRelay',
   'asset.mdm.step7.flag.allowESIMOutgoingTransfers',
+  'asset.mdm.step7.flag.allowAppsToBeHidden',
+  'asset.mdm.step7.flag.allowAppsToBeLocked',
+  'asset.mdm.step7.flag.allowUIConfigurationProfileInstallation',
 
   // The lock badge
   'asset.mdm.lock.NOT_IN_MDM',

@@ -2643,7 +2643,10 @@
           "allowSystemAppRemoval": "ลบแอประบบไม่ได้",
           "allowAppRemoval": "ลบแอปไม่ได้",
           "allowCloudPrivateRelay": "ปิด iCloud Private Relay",
-          "allowESIMOutgoingTransfers": "โอน eSIM ออกไม่ได้"
+          "allowESIMOutgoingTransfers": "โอน eSIM ออกไม่ได้",
+          "allowAppsToBeHidden": "ซ่อนแอปไม่ได้",
+          "allowAppsToBeLocked": "ล็อกแอปด้วย Face ID ไม่ได้",
+          "allowUIConfigurationProfileInstallation": "ติดตั้งโปรไฟล์เองไม่ได้"
         }
       },
       "lock": {

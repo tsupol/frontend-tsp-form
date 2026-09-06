@@ -2647,7 +2647,10 @@
           "allowSystemAppRemoval": "Can't remove system apps",
           "allowAppRemoval": "Can't remove apps",
           "allowCloudPrivateRelay": "iCloud Private Relay off",
-          "allowESIMOutgoingTransfers": "Can't transfer eSIM out"
+          "allowESIMOutgoingTransfers": "Can't transfer eSIM out",
+          "allowAppsToBeHidden": "Can't hide apps",
+          "allowAppsToBeLocked": "Can't lock apps with Face ID",
+          "allowUIConfigurationProfileInstallation": "Can't install profiles manually"
         }
       },
       "lock": {
