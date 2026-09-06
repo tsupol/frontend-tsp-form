@@ -517,7 +517,9 @@ function PolicyPanel({ policy, canManage, onSaved }: {
 
   return (
     <CollapsiblePanel title={t('fin1Config.policyTitle')}>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-1">
+      {/* cpanel-content-inner ships unpadded — px matches the header title's 1rem */}
+      <div className="px-4 py-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {POLICY_FIELDS.map(({ key, suffix, decimalScale }) => (
           <div key={key} className="flex flex-col">
             <label className="form-label text-xs">{t(`fin1Config.policy.${key}`)}</label>
@@ -546,6 +548,7 @@ function PolicyPanel({ policy, canManage, onSaved }: {
           </Button>
         </div>
       )}
+      </div>
     </CollapsiblePanel>
   );
 }
