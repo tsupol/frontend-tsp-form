@@ -190,7 +190,9 @@ export function PriceCheckPage() {
   const listItems = isSearching ? (models ?? []) : [];
 
   return (
-    <PageNav panels={['list', 'detail']} className="h-dvh">
+    // mobileBreakpoint 1024: iPad portrait gets the stacked pick-then-view
+    // flow instead of two cramped panels — same as the deal-partner face.
+    <PageNav panels={['list', 'detail']} mobileBreakpoint={1024} className="h-dvh overflow-hidden">
       {({ isMobile, isRoot, goTo, goBack }) => (
         <>
           {scannerEl}
