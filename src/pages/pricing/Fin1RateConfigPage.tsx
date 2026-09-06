@@ -559,8 +559,16 @@ export function Fin1RateConfigPage() {
   const canManage = can('PRICING.FIN1_RATE_MANAGE');
 
   const [samplePrice, setSamplePrice] = useState('');
-  const [sampleDown, setSampleDown] = useState('');
+  // Staff think in down % of the device price, not a baht amount (OHM 09-06) —
+  // the % is converted to the baht `p_down` the preview RPC expects.
+  const [sampleDownPct, setSampleDownPct] = useState('15');
   const [addOpen, setAddOpen] = useState(false);
+
+  const sampleDownAmount = useMemo(() => {
+    const pct = parseFloat(sampleDownPct);
+    if (Number.isNaN(pct) || pct <= 0 || pct >= 100) return '';
+    return String(Math.round((parseFloat(samplePrice) || 30000) * pct / 100));
+  }, [samplePrice, sampleDownPct]);
 
   const { data: rows = [], isFetching } = useQuery({
     queryKey: ['fin1-multipliers'],
@@ -631,18 +639,24 @@ export function Fin1RateConfigPage() {
                   placeholder="30,000"
                 />
               </div>
-              <div className="flex flex-col w-36">
+              <div className="flex flex-col w-28">
                 <label className="form-label text-xs">{t('fin1Config.sampleDown')}</label>
                 <MaskedInput
                   mask="number"
                   size="sm"
                   decimalScale={0}
-                  value={sampleDown}
-                  onChange={(raw) => setSampleDown(raw)}
-                  placeholder={policy ? fmtCurrency(Math.round((parseFloat(samplePrice) || 30000) * policy.min_down_percent / 100)) : ''}
+                  value={sampleDownPct}
+                  onChange={(raw) => setSampleDownPct(raw)}
+                  suffix="%"
+                  placeholder={policy ? String(policy.min_down_percent) : ''}
                 />
               </div>
-              <div className="text-xs text-subtle pb-2">{t('fin1Config.sampleHint')}</div>
+              <div className="text-xs text-subtle pb-2">
+                {sampleDownAmount && (
+                  <span className="text-fg tabular-nums">= {fmtCurrency(parseFloat(sampleDownAmount))} · </span>
+                )}
+                {t('fin1Config.sampleHint')}
+              </div>
             </div>
           )}
 
@@ -656,7 +670,7 @@ export function Fin1RateConfigPage() {
                 row={row}
                 canManage={canManage}
                 samplePrice={samplePrice}
-                sampleDown={sampleDown}
+                sampleDown={sampleDownAmount}
                 onSaved={refetchAll}
               />
             ))}
