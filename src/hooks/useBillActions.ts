@@ -16,7 +16,9 @@ export type BillActionCode =
   | 'VOID_BILL'
   | 'CANCEL_CLOSED_DAY'
   | 'REVERSE_BILL'
-  | 'REVERSE_CREDIT_NOTE';
+  | 'REVERSE_CREDIT_NOTE'
+  // mig 1159: waive the late fee on an already-issued CONTRACT_FEE bill
+  | 'WAIVE_LATE_FEE';
 
 export type BillActionCategory = 'PAYMENT' | 'LINE' | 'APPROVAL' | 'LIFECYCLE';
 
@@ -32,7 +34,10 @@ export type BillBlockingReason =
   // or not (only CANCEL_BILL/VOID_BILL), and a reversed bill blocks all of them.
   | 'day_closed'
   | 'day_not_closed'
-  | 'bill_already_reversed';
+  | 'bill_already_reversed'
+  // WAIVE_LATE_FEE guards (mig 1159): not a late-fee bill / nothing unpaid left to waive
+  | 'charge_type_not_match'
+  | 'nothing_remaining';
 
 export interface BillAction {
   action_code: BillActionCode;

@@ -24,6 +24,7 @@ import { type Branch, type BillRow, type BillDetail, type BillPayment, type Bill
 import { CorrectLineModal } from './CorrectLineModal';
 import { CreditNoteReverseModal } from './CreditNoteReverseModal';
 import { CancelClosedDayModal } from './CancelClosedDayModal';
+import { WaiveLateFeeModal } from './WaiveLateFeeModal';
 import { useBillActions, type BillAction, type BillActionCode } from '../../hooks/useBillActions';
 import { useVoidReasons } from '../../hooks/useVoidReasons';
 import { SearchInput } from '../../components/SearchInput';
@@ -471,6 +472,8 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
   const [voidPayment, setVoidPayment] = useState<BillPayment | null>(null);
   const [reverseCnOpen, setReverseCnOpen] = useState(false);
   const [cancelClosedDayOpen, setCancelClosedDayOpen] = useState(false);
+  // ยกเว้นค่าปรับบนบิลที่ออกแล้ว (WAIVE_LATE_FEE, mig 1159)
+  const [waiveLateFeeOpen, setWaiveLateFeeOpen] = useState(false);
 
   // Line-amount correction — the line the user chose to fix (opens the modal)
   const [correctLine, setCorrectLine] = useState<BillLineItem | null>(null);
@@ -633,6 +636,14 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
       onBillChanged(enriched);
     } catch (err) {
       if (err instanceof ApiError) {
+        // Late-fee bills can't be cancelled by design — the BE answers
+        // LATE_FEE_BILL_CANNOT_CANCEL with hint_code USE_LATE_FEE_WAIVE
+        // (mig 1159). Route the user straight into the waive dialog.
+        if (err.messageParams?.hint_code === 'USE_LATE_FEE_WAIVE') {
+          setVoidOpen(false);
+          setWaiveLateFeeOpen(true);
+          return;
+        }
         const translated = translateApiError(err, t);
         setVoidError(translated || err.message);
       } else {
@@ -1001,6 +1012,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
         onVoidOrCancel={() => { setVoidOpen(true); setVoidError(''); setVoidReason(''); setVoidReasonCode(''); setVoidPin(''); }}
         onCancelClosedDay={() => setCancelClosedDayOpen(true)}
         onReverseCreditNote={() => setReverseCnOpen(true)}
+        onWaiveLateFee={() => setWaiveLateFeeOpen(true)}
       />
 
       {/* ── Print render — portaled into body so no panel ancestor becomes the
@@ -1091,6 +1103,20 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
         billCode={detail.bill_code_display}
         billAmount={detail.total_amount}
         onReversed={() => {
+          queryClient.invalidateQueries({ queryKey: ['accounting', 'bill-detail', billId] });
+          queryClient.invalidateQueries({ queryKey: ['bill-actions', billId] });
+          onBillChanged();
+        }}
+      />
+
+      {/* ── ยกเว้นค่าปรับบนบิลที่ออกแล้ว (WAIVE_LATE_FEE) ── */}
+      <WaiveLateFeeModal
+        open={waiveLateFeeOpen}
+        onClose={() => setWaiveLateFeeOpen(false)}
+        billId={billId}
+        billCode={detail.bill_code_display}
+        remaining={remaining}
+        onWaived={() => {
           queryClient.invalidateQueries({ queryKey: ['accounting', 'bill-detail', billId] });
           queryClient.invalidateQueries({ queryKey: ['bill-actions', billId] });
           onBillChanged();
@@ -1304,13 +1330,19 @@ const BILL_CATEGORY_ORDER = ['PAYMENT', 'LINE', 'APPROVAL', 'LIFECYCLE', 'PRINT'
 // reverse the whole bill) — the real bill-level ops for an accountant reviewing a
 // bill. Do NOT "restore" the other categories to match the show-all pattern:
 // that was the bug (a wall of not-wired Wrench buttons). Keep it scoped.
+// One named exception: WAIVE_LATE_FEE (category PAYMENT, mig 1159) — a bill-level
+// reduction with no inline home (the pay form collects money, it can't waive), so
+// it rides in the footer alongside the lifecycle verbs.
 const FOOTER_CATEGORIES: ReadonlySet<string> = new Set(['LIFECYCLE']);
+const FOOTER_EXTRA_ACTIONS: ReadonlySet<BillActionCode> = new Set<BillActionCode>(['WAIVE_LATE_FEE']);
 
 // Per-status: which actions get rendered as primary buttons (first row).
 // The rest collapse under "More". Empty array → everything goes under More.
 const PRIMARY_BY_STATUS: Record<string, BillActionCode[]> = {
-  OPEN: ['CANCEL_BILL'],
-  PARTIAL: ['CANCEL_BILL'],
+  // WAIVE_LATE_FEE only reaches the footer on late-fee bills (filtered below),
+  // where it's the main verb for an unpaid bill — surface it beside Cancel.
+  OPEN: ['WAIVE_LATE_FEE', 'CANCEL_BILL'],
+  PARTIAL: ['WAIVE_LATE_FEE', 'CANCEL_BILL'],
   // On a PAID bill whose day is still open, VOID_BILL is the primary verb; once the
   // day is closed VOID_BILL is blocked and CANCEL_CLOSED_DAY takes its place. Both
   // are primary — only one is ever is_available, so only one shows.
@@ -1326,6 +1358,7 @@ const WIRED_ACTIONS: ReadonlySet<BillActionCode> = new Set<BillActionCode>([
   'VOID_BILL',
   'CANCEL_CLOSED_DAY',
   'REVERSE_CREDIT_NOTE',
+  'WAIVE_LATE_FEE',
 ]);
 
 interface BillActionBarProps {
@@ -1334,9 +1367,10 @@ interface BillActionBarProps {
   onVoidOrCancel: () => void;
   onCancelClosedDay: () => void;
   onReverseCreditNote: () => void;
+  onWaiveLateFee: () => void;
 }
 
-function BillActionBar({ actions, suppressLifecycle, onVoidOrCancel, onCancelClosedDay, onReverseCreditNote }: BillActionBarProps) {
+function BillActionBar({ actions, suppressLifecycle, onVoidOrCancel, onCancelClosedDay, onReverseCreditNote, onWaiveLateFee }: BillActionBarProps) {
   const { t } = useTranslation();
   const [moreOpen, setMoreOpen] = useState(false);
   const moreTriggerRef = useRef<HTMLButtonElement>(null);
@@ -1346,13 +1380,18 @@ function BillActionBar({ actions, suppressLifecycle, onVoidOrCancel, onCancelClo
   // with things they can't do at all), and suppress LIFECYCLE on already-voided
   // bills.
   const visibleBeActions = actions
-    .filter(a => FOOTER_CATEGORIES.has(a.category))
+    .filter(a => FOOTER_CATEGORIES.has(a.category) || FOOTER_EXTRA_ACTIONS.has(a.action_code))
+    // WAIVE_LATE_FEE is only meaningful on a late-fee bill — on every other bill
+    // the evaluator reports charge_type_not_match, which would render as a
+    // permanently-disabled button. Hide it there instead of teasing it.
+    .filter(a => !(a.action_code === 'WAIVE_LATE_FEE' && a.blocking_reason === 'charge_type_not_match'))
     // REVERSE_BILL is a DEPRECATED alias — fn_bill_reverse just calls
     // fn_bill_cancel (same signature, same effect). Drop it so it isn't a
     // redundant duplicate of Cancel/Void (and doesn't show as a not-wired wrench).
     .filter(a => a.action_code !== 'REVERSE_BILL')
     .filter(a => a.blocking_reason !== 'permission_denied')
-    .filter(a => !(suppressLifecycle && a.category === 'LIFECYCLE'))
+    // suppressLifecycle = bill already cancelled; the waive verb is just as dead there.
+    .filter(a => !(suppressLifecycle && (a.category === 'LIFECYCLE' || FOOTER_EXTRA_ACTIONS.has(a.action_code))))
     .slice()
     .sort((a, b) => a.sort_order - b.sort_order);
 
@@ -1400,6 +1439,10 @@ function BillActionBar({ actions, suppressLifecycle, onVoidOrCancel, onCancelClo
     }
     if (a.action_code === 'REVERSE_CREDIT_NOTE') {
       onReverseCreditNote();
+      return;
+    }
+    if (a.action_code === 'WAIVE_LATE_FEE') {
+      onWaiveLateFee();
       return;
     }
     // Other actions: not wired yet — buttons are disabled, this never fires.
