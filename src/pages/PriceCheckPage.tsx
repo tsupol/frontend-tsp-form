@@ -138,17 +138,29 @@ export function PriceCheckPage() {
   }, [addSnackbar, t]);
   const { open: openScanner, scannerEl } = useBarcodeScanner({ onScan: handleBarcodeScan });
 
-  // Search models
+  // Search models — fn_product_search (fuzzy, relevance-ranked). The old
+  // v_product_model_list ilike filter was substring-only and 400s on ordered
+  // scans (orphaned family row poisons the view's computed column).
   const { data: models, isFetching: modelsLoading } = useQuery({
     queryKey: ['price-check-models', debouncedSearch],
-    queryFn: () => {
-      let url = '/v_product_model_list?is_active=is.true&order=brand_name,family_name,model_name&limit=30';
-      if (debouncedSearch) {
-        const term = debouncedSearch.replace(/\s+/g, '*');
-        url += `&search_name=ilike.*${encodeURIComponent(term)}*`;
-      }
-      return apiClient.get<ProductModel[]>(url);
-    },
+    queryFn: () =>
+      apiClient.rpc<{ rows: Array<{
+        model_id: number;
+        model_name: string;
+        family_name: string | null;
+        brand_name: string | null;
+        is_active: boolean;
+        variants: unknown[] | null;
+      }> }>('fn_product_search', { p_q: debouncedSearch, p_limit: 30 })
+        .then(res => (res.rows ?? [])
+          .filter(r => r.is_active)
+          .map((r): ProductModel => ({
+            model_id: r.model_id,
+            model_name: r.model_name,
+            family_name: r.family_name ?? '',
+            brand_name: r.brand_name ?? '',
+            variant_count: r.variants?.length ?? 0,
+          }))),
     staleTime: 2 * 60 * 1000,
     // SearchInput only reports a keyword once it clears the shared minimum, so
     // a non-empty value is already long enough to search.
