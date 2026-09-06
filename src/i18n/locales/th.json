@@ -1968,7 +1968,9 @@
       "guarantee_days_uplift": "ประกันเมื่อปรับราคา (วัน)",
       "settlement_discount_pct": "ส่วนลดปิดสัญญา %",
       "approved_ttl_days": "อายุใบอนุมัติ (วัน)"
-    }
+    },
+    "downMinTag": "ขั้นต่ำตามนโยบาย",
+    "downMaxTag": "สูงสุดตามนโยบาย"
   },
   "fin1Calc": {
     "title": "คำนวณค่างวด",

@@ -1972,7 +1972,9 @@
       "guarantee_days_uplift": "Guarantee w/ uplift (days)",
       "settlement_discount_pct": "Early-settlement discount %",
       "approved_ttl_days": "Approval TTL (days)"
-    }
+    },
+    "downMinTag": "Policy minimum",
+    "downMaxTag": "Policy maximum"
   },
   "fin1Calc": {
     "title": "Installment Calculator",

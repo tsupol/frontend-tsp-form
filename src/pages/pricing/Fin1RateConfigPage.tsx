@@ -585,14 +585,22 @@ export function Fin1RateConfigPage() {
   const policy = policyRows[0] ?? null;
 
   // 5%-step choices spanning the policy's own down range (e.g. 10–40 → 10,15,…,40).
+  // Each option carries the baht amount at the current sample price, and the
+  // range ends are tagged as the policy min/max.
   const downPctOptions = useMemo(() => {
     const min = policy?.min_down_percent ?? 10;
     const max = policy?.max_down_percent ?? 40;
+    const price = parseFloat(samplePrice) || 30000;
     const steps: number[] = [];
     for (let p = min; p < max; p += 5) steps.push(p);
     steps.push(max);
-    return steps.map(p => ({ value: String(p), label: `${p}%` }));
-  }, [policy]);
+    return steps.map(p => ({
+      value: String(p),
+      label: `${p}%`,
+      amount: fmtCurrency(Math.round(price * p / 100)),
+      tag: p === min ? t('fin1Config.downMinTag') : p === max ? t('fin1Config.downMaxTag') : null,
+    }));
+  }, [policy, samplePrice, t]);
 
   const refetchAll = () => {
     queryClient.invalidateQueries({ queryKey: ['fin1-multipliers'] });
@@ -659,6 +667,18 @@ export function Fin1RateConfigPage() {
                   size="sm"
                   searchable={false}
                   showChevron
+                  renderOption={(opt) => {
+                    const o = opt as (typeof downPctOptions)[number];
+                    return (
+                      <div className="min-w-0 py-0.5">
+                        <div className="flex items-center justify-between gap-4">
+                          <span>{o.label}</span>
+                          <span className="text-xs text-subtle tabular-nums">{o.amount}</span>
+                        </div>
+                        {o.tag && <div className="text-[11px] text-subtle">{o.tag}</div>}
+                      </div>
+                    );
+                  }}
                 />
               </div>
               <div className="text-xs text-subtle pb-2">
