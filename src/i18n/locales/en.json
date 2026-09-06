@@ -4984,6 +4984,8 @@
     "settlementRefund_notePlaceholder": "Reason for the negotiated refund",
     "goToDeviceTabToUnbind": "Unbind the device first",
     "goToRepairTicket": "Open repair ticket {{code}}",
+    "goIssueLateFeeBill": "Issue the late-fee bill (collect / waive)",
+    "goToOpenBills": "Go to the open bills",
     "action_resume": "Resume",
     "action_resume_success": "Contract resumed",
     "action_appointment_create": "Create Appointment",
@@ -6432,8 +6434,23 @@
         "CANCEL_CLOSED_DAY": "Cancel bill (day closed)",
         "REVERSE_BILL": "Reverse (credit note)",
         "REVERSE_CREDIT_NOTE": "Reverse refund",
+        "WAIVE_LATE_FEE": "Waive late fee",
         "PRINT": "Print",
         "DOWNLOAD_PDF": "Download PDF"
+      },
+      "waiveLateFee": {
+        "title": "Waive late fee",
+        "amount": "Amount to waive",
+        "reason": "Reason",
+        "reasonPlaceholder": "Why is the late fee being waived?",
+        "netAfter": "Left to collect after waive",
+        "confirm": "Confirm waive",
+        "doneHeadline": "Late fee waived",
+        "waived": "Waived",
+        "remainingAfter": "Remaining on bill",
+        "autoClosed": "Nothing left to pay — the bill was closed as PAID automatically.",
+        "confirmFailed": "The waive was recorded, but the bill could not be closed automatically — confirm the bill manually.",
+        "exceedsRemaining": "Cannot exceed the unpaid amount ({{max}})"
       },
       "cancelClosedDay": {
         "title": "Cancel bill (day already closed)",
@@ -7315,6 +7332,7 @@
     "blockNoBalance": "No outstanding late fee",
     "blockNoCollect": "Enter an amount to collect",
     "blockWaiveExceeds": "Waive amount cannot exceed the collected amount",
+    "blockWaiveAmount": "Enter the amount to waive",
     "blockWaiveReason": "Enter a reason for the waive",
     "notePlaceholderWaive": "Reason for the waive (required)"
   },

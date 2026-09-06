@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, Modal, MaskedInput, Select, TextArea, useSnackbarContext } from 'tsp-form';
-import { CheckCircle, XCircle, PiggyBank, CreditCard, ShieldCheck, ArrowRight, ChevronsRight, Loader2, Plus, Trash2, Receipt } from 'lucide-react';
+import { CheckCircle, XCircle, PiggyBank, CreditCard, ShieldCheck, ArrowRight, ChevronsRight, ExternalLink, Loader2, Plus, Trash2, Receipt } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { BranchPaymentAccountField } from '../../components/BranchPaymentAccountField';
@@ -140,6 +140,11 @@ interface Props {
   action: ClosureAction;
   onClose: () => void;
   onSuccess: (msgKey: string) => void;
+  /** For error hints that lead out of the flow (e.g. open bills → Money tab → Bills). */
+  onNavigateTab?: (
+    tab: 'overview' | 'device' | 'notes' | 'customers' | 'money' | 'signing',
+    moneySection?: 'installments' | 'txns' | 'wallets' | 'bills',
+  ) => void;
 }
 
 const WALLET_ORDER: WalletType[] = ['SAVING', 'CREDIT', 'INSURANCE'];
@@ -168,7 +173,7 @@ type TerminateReason = typeof TERMINATE_REASONS[number];
 
 // ── Modal ────────────────────────────────────────────────────────────────────
 
-export function CompleteContractModal({ open, contract, action, onClose, onSuccess: _onSuccess }: Props) {
+export function CompleteContractModal({ open, contract, action, onClose, onSuccess: _onSuccess, onNavigateTab }: Props) {
   const { t } = useTranslation();
   const { addSnackbar } = useSnackbarContext();
   const queryClient = useQueryClient();
@@ -186,6 +191,9 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
   const [pin, setPin] = useState('');
   const [terminateReason, setTerminateReason] = useState<TerminateReason>('CUSTOMER_REQUEST');
   const [error, setError] = useState('');
+  /** BE error code + params — drive the "go fix it" hint links under the alert
+   *  (mig 1158 ships params.hint_code on the close blockers). */
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [errorKey, setErrorKey] = useState(0);
 
   // Early-payoff state — only meaningful when isEarlyPayoff
@@ -208,6 +216,7 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
       setPin('');
       setTerminateReason('CUSTOMER_REQUEST');
       setError('');
+      setErrorCode(null);
       setPayments([{ method: '', amount: 0, bank_account_id: null }]);
       setConflictBill(null);
       setConflictPin('');
@@ -224,8 +233,10 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
       const translated =
         translateApiError(err, t);
       setError(translated || err.message);
+      setErrorCode(err.code ?? null);
     } else {
       setError(err instanceof Error ? err.message : String(err));
+      setErrorCode(null);
     }
     setErrorKey(k => k + 1);
   };
@@ -399,7 +410,33 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
           {error && view !== 'clear-wallet' && (
             <div key={errorKey} className="alert alert-danger mb-4 animate-pop-in">
               <XCircle size={16} />
-              <span>{error}</span>
+              <div className="flex flex-col gap-1">
+                <span>{error}</span>
+                {/* Late fee not billed yet (hint_code USE_LATE_FEE_COLLECT, mig 1158)
+                    → the fee modal is part of this flow; open it in place. */}
+                {errorCode === 'SALE.STATE.LATE_FEE_NOT_CLEARED' && (
+                  <button
+                    type="button"
+                    onClick={() => setFeeModalOpen(true)}
+                    className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer self-start"
+                  >
+                    {t('contract.goIssueLateFeeBill', { defaultValue: 'Issue the late-fee bill (collect / waive)' })}
+                    <ExternalLink size={12} />
+                  </button>
+                )}
+                {/* OPEN/PARTIAL bills block the close → send the user to the
+                    contract's bill list to settle or waive them. */}
+                {errorCode === 'SALE.STATE.BILLS_PENDING_RESOLVE_FIRST' && onNavigateTab && (
+                  <button
+                    type="button"
+                    onClick={() => { onClose(); onNavigateTab('money', 'bills'); }}
+                    className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer self-start"
+                  >
+                    {t('contract.goToOpenBills', { defaultValue: 'Go to the open bills' })}
+                    <ExternalLink size={12} />
+                  </button>
+                )}
+              </div>
             </div>
           )}
 

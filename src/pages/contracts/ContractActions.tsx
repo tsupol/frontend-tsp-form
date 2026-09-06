@@ -1126,6 +1126,7 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
         action={{ kind: 'complete', closeReason: 'EARLY_PAYOFF' }}
         onClose={() => setActiveAction(null)}
         onSuccess={handleSuccess}
+        onNavigateTab={onNavigateTab}
       />
       <PendingPaymentModal
         open={isContinuePay}
@@ -1151,6 +1152,7 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
         action={{ kind: 'complete', closeReason: 'NORMAL' }}
         onClose={() => setActiveAction(null)}
         onSuccess={handleSuccess}
+        onNavigateTab={onNavigateTab}
       />
       <CompleteContractModal
         open={isTerminate}
@@ -1158,6 +1160,7 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
         action={{ kind: 'terminate' }}
         onClose={() => setActiveAction(null)}
         onSuccess={handleSuccess}
+        onNavigateTab={onNavigateTab}
       />
       <LoanAssignModal
         open={isLoanAssign}

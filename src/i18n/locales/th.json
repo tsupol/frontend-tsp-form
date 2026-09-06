@@ -4978,6 +4978,8 @@
     "settlementRefund_notePlaceholder": "เหตุผลการคืนเงินเจรจา",
     "goToDeviceTabToUnbind": "ถอดเครื่องออกจากสัญญาก่อน",
     "goToRepairTicket": "เปิดใบซ่อม {{code}}",
+    "goIssueLateFeeBill": "ออกบิลค่าปรับ (เก็บ / ยกเว้น)",
+    "goToOpenBills": "ไปที่บิลค้างชำระ",
     "action_resume": "เปิดสัญญาต่อ",
     "action_resume_success": "เปิดสัญญาต่อสำเร็จ",
     "action_appointment_create": "นัดชำระ",
@@ -6426,8 +6428,23 @@
         "CANCEL_CLOSED_DAY": "ยกเลิกบิล (วันปิดแล้ว)",
         "REVERSE_BILL": "ทำใบลดหนี้ (Reverse)",
         "REVERSE_CREDIT_NOTE": "กลับรายการคืนเงิน",
+        "WAIVE_LATE_FEE": "ยกเว้นค่าปรับ",
         "PRINT": "พิมพ์ใบเสร็จ",
         "DOWNLOAD_PDF": "ดาวน์โหลด PDF"
+      },
+      "waiveLateFee": {
+        "title": "ยกเว้นค่าปรับ",
+        "amount": "จำนวนที่ยกเว้น",
+        "reason": "เหตุผล",
+        "reasonPlaceholder": "เหตุผลในการยกเว้นค่าปรับ",
+        "netAfter": "เหลือต้องเก็บหลังยกเว้น",
+        "confirm": "ยืนยันยกเว้น",
+        "doneHeadline": "ยกเว้นค่าปรับแล้ว",
+        "waived": "ยกเว้น",
+        "remainingAfter": "คงเหลือบนบิล",
+        "autoClosed": "ไม่เหลือยอดต้องชำระ — ระบบปิดบิลเป็น PAID ให้อัตโนมัติ",
+        "confirmFailed": "บันทึกการยกเว้นแล้ว แต่ปิดบิลอัตโนมัติไม่สำเร็จ — กดยืนยันบิลเองอีกครั้ง",
+        "exceedsRemaining": "ต้องไม่เกินยอดที่ยังไม่จ่าย ({{max}})"
       },
       "cancelClosedDay": {
         "title": "ยกเลิกบิล (วันปิดยอดไปแล้ว)",
@@ -7307,6 +7324,7 @@
     "blockNoBalance": "ไม่มีค่าปรับค้างชำระ",
     "blockNoCollect": "ระบุจำนวนที่เรียกเก็บ",
     "blockWaiveExceeds": "ยอดยกเว้นต้องไม่เกินยอดที่เรียกเก็บ",
+    "blockWaiveAmount": "ระบุจำนวนที่ยกเว้น",
     "blockWaiveReason": "ระบุเหตุผลในการยกเว้นค่าปรับ",
     "notePlaceholderWaive": "เหตุผลในการยกเว้น (บังคับกรอก)"
   },
