@@ -256,7 +256,7 @@ export function PriceCheckPage() {
                   ) : listItems.length === 0 ? (
                     <div className="p-4 text-center text-subtle text-sm">{t('priceCheck.noModels')}</div>
                   ) : (
-                    <div className="flex flex-col divide-y divide-line">
+                    <div className="flex flex-col divide-y divide-line border-b border-line">
                       {listItems.map(model => (
                         <ModelItem
                           key={model.model_id}
@@ -282,7 +282,7 @@ export function PriceCheckPage() {
                         {t('priceCheck.clearAll')}
                       </button>
                     </div>
-                    <div className="flex flex-col divide-y divide-line">
+                    <div className="flex flex-col divide-y divide-line border-b border-line">
                       {recentModels.map(model => (
                         <ModelItem
                           key={model.model_id}
