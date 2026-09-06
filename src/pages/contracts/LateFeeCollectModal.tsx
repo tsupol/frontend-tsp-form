@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Button, MaskedInput, Input, LabeledCheckbox } from 'tsp-form';
-import { XCircle, AlertCircle, Loader2, CheckCircle } from 'lucide-react';
+import { XCircle, AlertCircle, Loader2, CheckCircle, ChevronsRight } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
@@ -73,10 +73,13 @@ export function LateFeeCollectModal({ open, contract, onClose, onSuccess }: {
     setConfirmClose(false);
   };
 
+  // Reset ONLY on open — not on balance. onSuccess() refetches the contract,
+  // which changes late_fee_balance and used to re-fire this effect mid-"done"
+  // view, wiping the receipt and showing "no outstanding late fee" instead.
   useEffect(() => {
     if (open) resetForm();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, balance]);
+  }, [open]);
 
   const collect = Math.min(parseFloat(amount) || 0, balance);
   const waive = waiveOn ? (parseFloat(waiveAmount) || 0) : 0;
@@ -88,9 +91,13 @@ export function LateFeeCollectModal({ open, contract, onClose, onSuccess }: {
   const blockReasons: string[] = [];
   if (balance <= 0) blockReasons.push(t('lateFee.blockNoBalance'));
   if (balance > 0 && collect <= 0) blockReasons.push(t('lateFee.blockNoCollect'));
+  // Ticked waive box with an empty/zero amount must never submit — it silently
+  // became p_waive_amount:0 and produced an unwaivable full-price bill
+  // (CT-2608-000081-8, see UI_FEEDBACK 2026-09-06 late-fee-waive NOTICE).
+  if (waiveOn && waive <= 0) blockReasons.push(t('lateFee.blockWaiveAmount'));
   if (waive > collect) blockReasons.push(t('lateFee.blockWaiveExceeds'));
   // Waiving part of a fee must be justified (audit trail) — reason mandatory on waive.
-  if (waive > 0 && !note.trim()) blockReasons.push(t('lateFee.blockWaiveReason'));
+  if (waiveOn && !note.trim()) blockReasons.push(t('lateFee.blockWaiveReason'));
   const canSubmit = blockReasons.length === 0 && !submitting && !!contract;
 
   const handleConfirm = async () => {
@@ -190,7 +197,12 @@ export function LateFeeCollectModal({ open, contract, onClose, onSuccess }: {
                       <LabeledCheckbox
                         label={t('lateFee.waiveSome')}
                         checked={waiveOn}
-                        onChange={(e) => { setWaiveOn(e.target.checked); if (!e.target.checked) setWaiveAmount(''); }}
+                        onChange={(e) => {
+                          setWaiveOn(e.target.checked);
+                          // Ticking defaults to waiving the full billed amount (net 0) —
+                          // an empty field here once shipped p_waive_amount:0 silently.
+                          setWaiveAmount(e.target.checked && collect > 0 ? String(collect) : '');
+                        }}
                       />
                       {waiveOn && (
                         <MaskedInput
@@ -201,6 +213,8 @@ export function LateFeeCollectModal({ open, contract, onClose, onSuccess }: {
                           size="sm"
                           className="w-full"
                           placeholder="0.00"
+                          endIcon={collect > 0 ? <ChevronsRight size={14} /> : undefined}
+                          onEndIconClick={collect > 0 ? () => setWaiveAmount(String(collect)) : undefined}
                         />
                       )}
                     </div>
@@ -219,13 +233,12 @@ export function LateFeeCollectModal({ open, contract, onClose, onSuccess }: {
                       />
                     </div>
 
-                    {/* Net preview */}
-                    {waive > 0 && (
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-subtle">{t('lateFee.netCharged')}</span>
-                        <span className="font-semibold tabular-nums">{fmtCurrency(net)}</span>
-                      </div>
-                    )}
+                    {/* Net preview — always visible so the staffer sees what the
+                        customer will actually be charged BEFORE confirming. */}
+                    <div className="flex justify-between items-center p-3 rounded-lg border border-line bg-surface-subtle text-sm">
+                      <span className="text-subtle">{t('lateFee.netCharged')}</span>
+                      <span className="font-semibold tabular-nums">{fmtCurrency(net)}</span>
+                    </div>
                   </div>
                 )}
 
