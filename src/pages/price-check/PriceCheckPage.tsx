@@ -3,10 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Input, Badge, MaskedInput, Button, useSnackbarContext } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine, ScanBarcode, Calculator, Clock, Trash2, X, ArrowUp, Info, XCircle } from 'lucide-react';
-import { apiClient } from '../lib/api';
-import { useBarcodeScanner } from '../components/BarcodeScanner';
-import { SearchInput } from '../components/SearchInput';
-import { lookupBarcode } from '../lib/barcodeLookup';
+import { apiClient } from '../../lib/api';
+import { useBarcodeScanner } from '../../components/BarcodeScanner';
+import { SearchInput } from '../../components/SearchInput';
+import { lookupBarcode } from '../../lib/barcodeLookup';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -511,12 +511,9 @@ function PricingDetail({ model, quoteData, loading, t }: {
     ).then(rows => rows[0]?.commercial_models ?? null),
     staleTime: 60_000,
   });
-  const fin1Enabled = branchModels?.FIN1 !== false;
   const fin2Enabled = branchModels?.FIN2 !== false;
 
-  const fin1Rows = useMemo(() => dedupedQuotes.filter(r => r.finance_model === 'FIN1'), [dedupedQuotes]);
   const fin2Rows = useMemo(() => dedupedQuotes.filter(r => r.finance_model === 'FIN2'), [dedupedQuotes]);
-  const fin1Terms = useMemo(() => [...new Set(fin1Rows.map(r => r.term_months))].sort((a, b) => a - b), [fin1Rows]);
   const fin2Terms = useMemo(() => [...new Set(fin2Rows.map(r => r.term_months))].sort((a, b) => a - b), [fin2Rows]);
 
   const retailPrice = dedupedQuotes[0]?.retail_price;
@@ -535,20 +532,13 @@ function PricingDetail({ model, quoteData, loading, t }: {
 
         {loading ? (
           <div className="p-8 text-center text-subtle">{t('common.loading')}</div>
-        ) : dedupedQuotes.length === 0 ? (
+        ) : fin2Rows.length === 0 ? (
           <div className="p-8 text-center text-subtle">{t('priceCheck.noQuotes')}</div>
         ) : (
           <div className="flex flex-col gap-6">
-            {/* FIN1 — Fixed Rate */}
-            {fin1Enabled && fin1Rows.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <Badge size="sm" color="info">FIN1</Badge>
-                  <span className="text-sm font-medium">{t('priceCheck.fin1Desc')}</span>
-                </div>
-                <PricingTable rows={fin1Rows} terms={fin1Terms} type="fin1" t={t} />
-              </div>
-            )}
+            {/* FIN1 rows hidden (NOTICE 2026-09-05): the quote RPC still emits
+                them from the retired pre-09-04 rate cards, so the numbers are
+                not real. Real FIN1 lives on the FIN1 calculator page. */}
 
             {/* FIN2 — Negotiable */}
             {fin2Enabled && fin2Rows.length > 0 && (

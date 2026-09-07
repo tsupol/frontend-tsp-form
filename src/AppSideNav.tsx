@@ -28,6 +28,8 @@ import {
   Tag, Layers, SlidersHorizontal, Box,
   // Fanout child icons — Pricing
   TrendingUp, Percent, Handshake,
+  // Fanout child icons — Price check
+  Table2,
   // Fanout child icons — Inventory
   BarChart3, Boxes, ClipboardList, PackagePlus, ArrowLeftRight, Wrench, RotateCcw, HandCoins, ShoppingCart, Barcode, UserCog,
   // Retail
@@ -65,6 +67,7 @@ import { useTheme } from './contexts/ThemeContext';
 import { useNavGuard } from './contexts/NavGuardContext';
 import { isLocalDev } from './lib/devEnv';
 import { useNavCounts, NAV_COUNT_CAP } from './hooks/useNavCounts';
+import { useMyCommercialModels } from './hooks/useMyCommercialModels';
 import { useChatDock } from './contexts/ChatDockContext';
 import { NotificationMenuItem } from './components/NotificationMenu';
 import { SystemSignalSection, SystemSignalDialog, type SignalRow } from './components/SystemSignalSection';
@@ -194,6 +197,7 @@ export const AppSideNav = () => {
   const navGuard = useNavGuard();
   const { user, can } = useAuth();
   const role = user?.role_code ?? '';
+  const { showFin1, showFin2 } = useMyCommercialModels();
   const canApprove = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
   // Repo/legal access is grant-based at the DB, but nav visibility is by role:
   // repo staff + admins see the section (DB returns empty rows for anyone without a grant).
@@ -517,10 +521,25 @@ export const AppSideNav = () => {
         ] : []),
       ],
     },
-    // One เช็คราคา for everyone (OHM 09-06) — the route itself shows the FIN1
-    // negotiation calculator to deal-partner branches and the pricebook quote
-    // table to everyone else.
-    { key: 'price-check', icon: <Calculator size="1rem" />, label: t('nav.priceCheck'), path: '/admin/price-check' },
+    // เช็คราคา fan-out (owner-final 09-07): FIN2 calculator · FIN1 calculator ·
+    // FIN1 finance rates. Branch users see children per their branch's
+    // commercial_models; holding/company users see all three. Keep in sync with
+    // PriceCheckLayout (dual-nav rule).
+    ...(showFin1 || showFin2 ? [{
+      key: 'price-check',
+      icon: <Calculator size="1rem" />,
+      label: t('nav.priceCheck'),
+      path: showFin2 ? '/admin/price-check/fin2' : '/admin/price-check/fin1',
+      children: [
+        ...(showFin2 ? [
+          { key: 'pc-fin2', icon: <Calculator size="1rem" />, label: t('nav.priceCheckFin2'), path: '/admin/price-check/fin2' },
+        ] : []),
+        ...(showFin1 ? [
+          { key: 'pc-fin1', icon: <Calculator size="1rem" />, label: t('nav.priceCheckFin1'), path: '/admin/price-check/fin1' },
+          { key: 'pc-finance-rates', icon: <Table2 size="1rem" />, label: t('nav.financeRates'), path: '/admin/price-check/finance-rates' },
+        ] : []),
+      ],
+    }] : []),
     {
       key: 'products', icon: <Package size="1rem" />, label: t('nav.products'),
       path: '/admin/products/models',

@@ -43,7 +43,10 @@ import { RepairsPage } from './pages/inventory/RepairsPage';
 import { BuybackPage } from './pages/inventory/BuybackPage';
 import { BuybackWizardPage } from './pages/inventory/BuybackWizardPage';
 import { BarcodesPage } from './pages/inventory/BarcodesPage';
-import { PriceCheckRoute } from './pages/PriceCheckRoute';
+import { PriceCheckLayout, PriceCheckIndexRedirect } from './pages/price-check/PriceCheckLayout';
+import { PriceCheckPage } from './pages/price-check/PriceCheckPage';
+import { Fin1CalculatorPage } from './pages/price-check/Fin1CalculatorPage';
+import { FinanceRatesPage } from './pages/price-check/FinanceRatesPage';
 import { DunningTargetsPage } from './pages/legal/DunningTargetsPage';
 import { StaffCommissionPage } from './pages/commission/StaffCommissionPage';
 import { ApprovalsPage } from './pages/approvals/ApprovalsPage';
@@ -616,13 +619,44 @@ function App() {
       <Route path="/admin/inventory/sale" element={<Navigate to="/admin/inventory/assets?bucket=ON_HAND_AVAILABLE" replace />} />
       <Route path="/admin/inventory/assets/sale" element={<Navigate to="/admin/inventory/assets?bucket=ON_HAND_AVAILABLE" replace />} />
 
-      {/* Price Check */}
+      {/* เช็คราคา — parent with 3 children (owner-final 09-07):
+          FIN2 calculator (the original page), FIN1 calculator, FIN1 finance rates. */}
       <Route
         path="/admin/price-check"
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <PriceCheckRoute />
+              <PriceCheckIndexRedirect />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/price-check/fin2"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <PriceCheckLayout><PriceCheckPage /></PriceCheckLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/price-check/fin1"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <PriceCheckLayout><Fin1CalculatorPage /></PriceCheckLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/price-check/finance-rates"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <PriceCheckLayout><FinanceRatesPage /></PriceCheckLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Button, DataTable, Input, MaskedInput, MobileHeader, PageNav, PageNavPanel, Slider } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine, Calculator, Search, ShieldCheck, X, XCircle } from 'lucide-react';
-import { apiClient, ApiError } from '../lib/api';
-import { translateApiError } from '../lib/apiErrors';
-import { fmtCurrency } from '../lib/format';
-import { isSearchable, isBelowSearchMin, SEARCH_MIN_CHARS } from '../lib/searchKeyword';
+import { apiClient, ApiError } from '../../lib/api';
+import { translateApiError } from '../../lib/apiErrors';
+import { fmtCurrency } from '../../lib/format';
+import { isSearchable, isBelowSearchMin, SEARCH_MIN_CHARS } from '../../lib/searchKeyword';
 
 // ============================================================================
 // เช็คราคา — deal-partner face (DELIVERY 2026-09-04, merged 09-06).
@@ -93,7 +94,10 @@ export function Fin1CalculatorPage() {
   const { t } = useTranslation();
 
   // ── Product selection ──────────────────────────────────────────────────────
-  const [keyword, setKeyword] = useState('');
+  // ?q= seeds the search — the finance-rates page's per-model "คำนวณ" button
+  // jumps here with the model name so the rail opens on its variants.
+  const [searchParams] = useSearchParams();
+  const [keyword, setKeyword] = useState(() => searchParams.get('q') ?? '');
   const [debounced, setDebounced] = useState('');
   const [variant, setVariant] = useState<VariantSearchRow | null>(null);
   const [uplift, setUplift] = useState(0);
