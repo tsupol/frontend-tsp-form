@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   Button, Input, MaskedInput, MobileHeader, Modal, PageNav, PageNavPanel, Select, Badge,
+  type SelectItem,
 } from 'tsp-form';
 import { ArrowRightFromLine, Calculator, Pencil, ShieldCheck, Table2, XCircle, AlertTriangle } from 'lucide-react';
 import { apiClient } from '../../lib/api';
@@ -410,8 +411,10 @@ export function FinanceRatesPage() {
   const { hasPermission } = useMyPermissions();
   const canEdit = hasPermission('PRICING.PRICEBOOK_MANAGE');
 
-  const [filterBrand, setFilterBrand] = useState<string>('');
-  const [filterFamily, setFilterFamily] = useState<string>('');
+  // One combobox picks either a whole brand ("b:5") or a family ("f:178") —
+  // typing "appl" surfaces the Apple brand row plus every Apple family.
+  const [pick, setPick] = useState<string>('');
+  const [search, setSearch] = useState('');
   const [editModel, setEditModel] = useState<SheetModel | null>(null);
 
   const { data: familyRows } = useQuery({
@@ -420,30 +423,91 @@ export function FinanceRatesPage() {
     staleTime: 5 * 60_000,
   });
 
-  const brandOptions = useMemo(() => {
-    const seen = new Map<number, string>();
-    for (const r of familyRows ?? []) if (!seen.has(r.brand_id)) seen.set(r.brand_id, r.brand_name);
-    return [...seen.entries()].map(([id, name]) => ({ value: String(id), label: name }));
+  const brands = useMemo(() => {
+    const map = new Map<number, { name: string; families: number; models: number }>();
+    for (const r of familyRows ?? []) {
+      const b = map.get(r.brand_id) ?? { name: r.brand_name, families: 0, models: 0 };
+      b.families += 1;
+      b.models += r.models_total;
+      map.set(r.brand_id, b);
+    }
+    return map;
   }, [familyRows]);
 
-  const familyOptions = useMemo(() => (familyRows ?? [])
-    .filter(r => !filterBrand || String(r.brand_id) === filterBrand)
-    .map(r => {
-      let label = `${r.family_name} — ${t('financeRates.modelCount', { n: r.models_total })}`;
-      if (r.models_unpriced > 0) label += ` · ${t('financeRates.unpricedCount', { n: r.models_unpriced })}`;
-      else if (r.price_min != null && r.price_max != null) {
-        label += ` · ${r.price_min === r.price_max ? fmtCurrency(r.price_min) : `${fmtCurrency(r.price_min)}–${fmtCurrency(r.price_max)}`}`;
-      }
-      return { value: String(r.family_id), label };
-    }), [familyRows, filterBrand, t]);
+  const familyByValue = useMemo(() => {
+    const map = new Map<string, SheetFamilyRow>();
+    for (const r of familyRows ?? []) map.set(`f:${r.family_id}`, r);
+    return map;
+  }, [familyRows]);
 
-  const hasSelection = !!filterFamily || !!filterBrand;
+  // Token-AND matching over "brand family" — "apple 15", "iphone 15" and "15"
+  // all hit iPhone 15. The Select's own single-substring filter is bypassed
+  // (filterOptions={false}); we pre-filter here.
+  const pickOptions = useMemo<SelectItem[]>(() => {
+    const tokens = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const match = (hay: string) => tokens.every(tk => hay.toLowerCase().includes(tk));
+
+    const brandOpts = [...brands.entries()]
+      .filter(([, b]) => tokens.length === 0 || match(b.name))
+      .map(([id, b]) => ({ value: `b:${id}`, label: b.name }));
+
+    const first = tokens[0] ?? '';
+    const familyOpts = (familyRows ?? [])
+      .filter(r => tokens.length === 0 || match(`${r.brand_name} ${r.family_name}`))
+      .sort((a, b) => {
+        const ap = a.family_name.toLowerCase().startsWith(first) ? 0 : 1;
+        const bp = b.family_name.toLowerCase().startsWith(first) ? 0 : 1;
+        return ap - bp;
+      })
+      .map(r => ({ value: `f:${r.family_id}`, label: `${r.brand_name} ${r.family_name}` }));
+
+    return [
+      ...(brandOpts.length ? [{ type: 'group' as const, label: t('financeRates.groupBrands') }, ...brandOpts] : []),
+      ...(familyOpts.length ? [{ type: 'group' as const, label: t('financeRates.groupFamilies') }, ...familyOpts] : []),
+    ];
+  }, [brands, familyRows, search, t]);
+
+  const renderPickOption = (opt: { value: string; label: string }) => {
+    if (opt.value.startsWith('b:')) {
+      const b = brands.get(Number(opt.value.slice(2)));
+      return (
+        <div className="flex items-center gap-2 min-w-0 w-full">
+          <span className="truncate font-medium">{b?.name ?? opt.label}</span>
+          <Badge size="xs" color="info">{t('financeRates.brandBadge')}</Badge>
+          <span className="ml-auto text-xs text-subtle whitespace-nowrap tabular-nums">
+            {t('financeRates.familyCount', { n: b?.families ?? 0 })} · {t('financeRates.modelCount', { n: b?.models ?? 0 })}
+          </span>
+        </div>
+      );
+    }
+    const f = familyByValue.get(opt.value);
+    if (!f) return <span className="truncate">{opt.label}</span>;
+    const range = f.price_min != null && f.price_max != null
+      ? (f.price_min === f.price_max ? fmtCurrency(f.price_min) : `${fmtCurrency(f.price_min)}–${fmtCurrency(f.price_max)}`)
+      : null;
+    return (
+      <div className="min-w-0 w-full">
+        <div className="flex items-baseline gap-1.5 min-w-0">
+          <span className="truncate">{f.family_name}</span>
+          <span className="text-xs text-subtler shrink-0">{f.brand_name}</span>
+        </div>
+        <div className="text-xs text-subtle truncate tabular-nums">
+          {t('financeRates.modelCount', { n: f.models_total })}
+          {f.models_unpriced > 0 && (
+            <span className="text-warning-fg"> · {t('financeRates.unpricedCount', { n: f.models_unpriced })}</span>
+          )}
+          {range && <> · {range}</>}
+        </div>
+      </div>
+    );
+  };
+
   const { data: sheetData, isFetching, error: sheetError } = useQuery({
-    queryKey: ['fin1-rate-sheet', filterBrand, filterFamily],
+    queryKey: ['fin1-rate-sheet', pick],
     queryFn: () => apiClient.rpc<RateSheet>('fn_fin1_rate_sheet',
-      filterFamily ? { p_family_id: Number(filterFamily) } : { p_brand_id: Number(filterBrand) },
+      pick.startsWith('f:') ? { p_family_id: Number(pick.slice(2)) } : { p_brand_id: Number(pick.slice(2)) },
     ),
-    enabled: hasSelection,
+    enabled: !!pick,
     placeholderData: keepPreviousData,
     staleTime: 60_000,
     retry: false,
@@ -488,34 +552,25 @@ export function FinanceRatesPage() {
           )}
 
           <div className="flex-none p-2 border-b border-line flex items-center gap-2 flex-wrap">
-            <div className="w-40">
+            <div className="w-96 max-w-full">
               <Select
-                options={brandOptions}
-                value={filterBrand || null}
-                onChange={(val) => { setFilterBrand((val as string) ?? ''); setFilterFamily(''); }}
-                placeholder={t('financeRates.selectBrand')}
+                options={pickOptions}
+                value={pick || null}
+                onChange={(val) => setPick((val as string) ?? '')}
+                onSearchChange={setSearch}
+                filterOptions={false}
+                renderOption={renderPickOption}
+                placeholder={t('financeRates.searchPlaceholder')}
                 size="sm"
                 showChevron
                 clearable
-              />
-            </div>
-            <div className="w-72 max-w-full">
-              <Select
-                options={familyOptions}
-                value={filterFamily || null}
-                onChange={(val) => setFilterFamily((val as string) ?? '')}
-                placeholder={t('financeRates.selectFamily')}
-                size="sm"
-                showChevron
-                clearable
-                disabled={!filterBrand}
               />
             </div>
           </div>
 
           <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
             <PageNavPanel id="list" className="flex-1 min-w-0 min-h-0 overflow-auto better-scroll">
-              {!hasSelection ? (
+              {!pick ? (
                 <div className="flex flex-col items-center justify-center h-full text-subtler gap-2 p-8 text-center">
                   <Table2 size={32} />
                   <span className="text-sm">{t('financeRates.pickPrompt')}</span>
