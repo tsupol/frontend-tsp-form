@@ -55,7 +55,8 @@ interface Fin1Policy {
   clawback_min_paid: number;
   clawback_notice_days: number;
   approved_ttl_days: number;
-  settlement_discount_pct: number;
+  settlement_discount_min: number;
+  settlement_discount_max: number;
 }
 
 interface PreviewResult {
@@ -464,7 +465,8 @@ const POLICY_FIELDS: Array<{ key: keyof Fin1Policy; suffix?: string; decimalScal
   { key: 'uplift_max', decimalScale: 0 },
   { key: 'guarantee_days', decimalScale: 0 },
   { key: 'guarantee_days_uplift', decimalScale: 0 },
-  { key: 'settlement_discount_pct', suffix: '%', decimalScale: 0 },
+  { key: 'settlement_discount_min', suffix: '%', decimalScale: 0 },
+  { key: 'settlement_discount_max', suffix: '%', decimalScale: 0 },
   { key: 'approved_ttl_days', decimalScale: 0 },
 ];
 

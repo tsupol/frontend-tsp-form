@@ -1973,7 +1973,8 @@
       "uplift_max": "Max price uplift (฿)",
       "guarantee_days": "Guarantee (days)",
       "guarantee_days_uplift": "Guarantee w/ uplift (days)",
-      "settlement_discount_pct": "Early-settlement discount %",
+      "settlement_discount_min": "Early-settlement discount min %",
+      "settlement_discount_max": "Early-settlement discount max %",
       "approved_ttl_days": "Approval TTL (days)"
     },
     "downMinTag": "Policy minimum",

@@ -1969,7 +1969,8 @@
       "uplift_max": "เพดานราคาปรับขึ้น (บาท)",
       "guarantee_days": "ประกัน (วัน)",
       "guarantee_days_uplift": "ประกันเมื่อปรับราคา (วัน)",
-      "settlement_discount_pct": "ส่วนลดปิดสัญญา %",
+      "settlement_discount_min": "ส่วนลดปิดสัญญา ต่ำสุด %",
+      "settlement_discount_max": "ส่วนลดปิดสัญญา สูงสุด %",
       "approved_ttl_days": "อายุใบอนุมัติ (วัน)"
     },
     "downMinTag": "ขั้นต่ำตามนโยบาย",
