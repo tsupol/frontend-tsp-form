@@ -1928,6 +1928,7 @@
     "photoActions": "Photo actions",
     "makeCover": "Make cover",
     "moveToSlot": "Move to slot",
+    "dragToSort": "Drag to reorder or move to another slot",
     "replace": "Replace",
     "replaceTitle": "Replace photo",
     "confirmRemove": "Remove this photo?",

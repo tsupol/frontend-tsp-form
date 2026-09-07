@@ -1924,6 +1924,7 @@
     "photoActions": "จัดการรูป",
     "makeCover": "ตั้งเป็นรูปหลัก",
     "moveToSlot": "ย้ายไปช่องอื่น",
+    "dragToSort": "ลากเพื่อจัดเรียงหรือย้ายช่อง",
     "replace": "แทนที่",
     "replaceTitle": "แทนที่รูป (ถ่ายใหม่)",
     "confirmRemove": "ลบรูปนี้?",

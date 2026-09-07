@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Modal, Button, ImageUploader, PopOver, MenuItem, MenuSeparator, Select, Badge } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
+import { DndContext, DragOverlay, pointerWithin, useDroppable, type DragStartEvent, type DragOverEvent, type DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, useSortable, rectSortingStrategy, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { QRCodeSVG } from 'qrcode.react';
-import { XCircle, Plus, Smartphone, ImageOff, MoreHorizontal, Star, FolderInput, RefreshCw, Trash2, X } from 'lucide-react';
+import { XCircle, Plus, Smartphone, ImageOff, MoreHorizontal, Star, FolderInput, RefreshCw, Trash2, X, GripVertical } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
@@ -61,6 +64,20 @@ interface EvidenceSlot {
 
 const evidenceKey = (assetId: number) => ['asset-evidence', assetId] as const;
 
+// dnd ids: photos are `p{entity_media_id}`, slot drop areas are `s:{slot}`.
+// Both photo tiles and slot sections are drop targets in ONE DndContext, so the
+// prefixes keep the id spaces from colliding.
+const photoDndId = (p: EvidencePhoto) => `p${p.entity_media_id}`;
+const slotDndId = (slot: string) => `s:${slot}`;
+const parsePhotoDndId = (id: unknown): number | null => {
+  const s = String(id);
+  return s.startsWith('p') && /^\d+$/.test(s.slice(1)) ? Number(s.slice(1)) : null;
+};
+const parseSlotDndId = (id: unknown): string | null => {
+  const s = String(id);
+  return s.startsWith('s:') ? s.slice(2) : null;
+};
+
 // storage_path is the lg frame; sm rides in variants_json.
 const thumbKey = (p: EvidencePhoto) => p.variants_json?.sm ?? p.storage_path;
 const fullKey = (p: EvidencePhoto) => p.storage_path;
@@ -109,6 +126,144 @@ export function AssetEvidenceTab({ assetId, assetCode }: {
   });
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: evidenceKey(assetId) });
+
+  // ── drag to sort / move across slots ───────────────────────────────────────
+  // Same mechanism as the reference drag UIs: pointerWithin collision, the
+  // grid reorders LIVE in onDragOver by mutating the React Query cache, and
+  // onDragEnd only diffs against a snapshot and persists (move slot → reorder).
+  // Cancel or RPC failure restores the snapshot.
+
+  const [activeDragPhoto, setActiveDragPhoto] = useState<EvidencePhoto | null>(null);
+  const [dragOverSlot, setDragOverSlot] = useState<string | null>(null);
+  const dragSnapshotRef = useRef<EvidenceSlot[] | null>(null);
+
+  const setSlotsCache = useCallback((updater: (prev: EvidenceSlot[]) => EvidenceSlot[]) => {
+    const prev = queryClient.getQueryData<EvidenceSlot[]>(evidenceKey(assetId));
+    if (prev) queryClient.setQueryData<EvidenceSlot[]>(evidenceKey(assetId), updater(prev));
+  }, [assetId, queryClient]);
+
+  const restoreSnapshot = useCallback(() => {
+    const snap = dragSnapshotRef.current;
+    dragSnapshotRef.current = null;
+    if (snap) queryClient.setQueryData<EvidenceSlot[]>(evidenceKey(assetId), snap);
+  }, [assetId, queryClient]);
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    const emId = parsePhotoDndId(event.active.id);
+    if (emId == null) return;
+    const current = queryClient.getQueryData<EvidenceSlot[]>(evidenceKey(assetId)) ?? [];
+    dragSnapshotRef.current = JSON.parse(JSON.stringify(current));
+    setActiveDragPhoto(
+      current.flatMap(s => s.photos ?? []).find(p => p.entity_media_id === emId) ?? null,
+    );
+  }, [assetId, queryClient]);
+
+  const handleDragOver = useCallback((event: DragOverEvent) => {
+    const { active, over } = event;
+    if (!over) { setDragOverSlot(null); return; }
+    const emId = parsePhotoDndId(active.id);
+    if (emId == null) return;
+
+    const current = queryClient.getQueryData<EvidenceSlot[]>(evidenceKey(assetId)) ?? [];
+    const source = current.find(s => (s.photos ?? []).some(p => p.entity_media_id === emId));
+    if (!source) return;
+
+    // Resolve the target: over a photo tile → its slot at that index; over a
+    // slot section (incl. an empty one) → that slot, at the end.
+    let targetKey: string;
+    let overIndex: number;
+    const overEm = parsePhotoDndId(over.id);
+    if (overEm != null) {
+      const targetS = current.find(s => (s.photos ?? []).some(p => p.entity_media_id === overEm));
+      if (!targetS) return;
+      targetKey = targetS.slot;
+      overIndex = (targetS.photos ?? []).findIndex(p => p.entity_media_id === overEm);
+    } else {
+      const slotKey = parseSlotDndId(over.id);
+      const targetS = slotKey ? current.find(s => s.slot === slotKey) : undefined;
+      if (!targetS) return;
+      targetKey = targetS.slot;
+      overIndex = (targetS.photos ?? []).length;
+    }
+
+    if (source.slot === targetKey) {
+      setDragOverSlot(targetKey);
+      const photos = source.photos ?? [];
+      const oldIndex = photos.findIndex(p => p.entity_media_id === emId);
+      if (oldIndex === -1 || oldIndex === overIndex) return;
+      setSlotsCache(ss => ss.map(s =>
+        s.slot === source.slot ? { ...s, photos: arrayMove(s.photos ?? [], oldIndex, overIndex) } : s,
+      ));
+    } else {
+      // Cross-slot: a full target refuses the preview (the drop then snaps
+      // home, matching the server's SLOT_FULL rule).
+      const targetS = current.find(s => s.slot === targetKey);
+      if (!targetS || (targetS.photos ?? []).length >= targetS.max_shots) { setDragOverSlot(null); return; }
+      setDragOverSlot(targetKey);
+      const photo = (source.photos ?? []).find(p => p.entity_media_id === emId);
+      if (!photo) return;
+      setSlotsCache(ss => ss.map(s => {
+        if (s.slot === source.slot) {
+          return { ...s, photo_count: s.photo_count - 1, photos: (s.photos ?? []).filter(p => p.entity_media_id !== emId) };
+        }
+        if (s.slot === targetKey) {
+          const updated = [...(s.photos ?? [])];
+          updated.splice(Math.min(overIndex, updated.length), 0, photo);
+          return { ...s, photo_count: s.photo_count + 1, photos: updated };
+        }
+        return s;
+      }));
+    }
+  }, [assetId, queryClient, setSlotsCache]);
+
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    setActiveDragPhoto(null);
+    setDragOverSlot(null);
+    const snapshot = dragSnapshotRef.current;
+    dragSnapshotRef.current = null;
+    const emId = parsePhotoDndId(event.active.id);
+    if (!snapshot || emId == null) return;
+
+    const current = queryClient.getQueryData<EvidenceSlot[]>(evidenceKey(assetId)) ?? [];
+    const origSlot = snapshot.find(s => (s.photos ?? []).some(p => p.entity_media_id === emId));
+    const finalSlot = current.find(s => (s.photos ?? []).some(p => p.entity_media_id === emId));
+    if (!origSlot || !finalSlot) return;
+
+    const finalIds = (finalSlot.photos ?? []).map(p => p.media_id);
+    const origIds = ((snapshot.find(s => s.slot === finalSlot.slot)?.photos) ?? []).map(p => p.media_id);
+    const crossSlot = origSlot.slot !== finalSlot.slot;
+    if (!crossSlot && JSON.stringify(finalIds) === JSON.stringify(origIds)) return;
+
+    try {
+      if (crossSlot) {
+        // Move appends at the target's end server-side; the reorder then puts
+        // it where it was actually dropped.
+        await apiClient.rpc('fn_asset_evidence_move', {
+          p_entity_media_id: emId,
+          p_to_slot: finalSlot.slot,
+        });
+      }
+      await apiClient.rpc('fn_media_reorder', {
+        p_entity_type: 'ASSET',
+        p_entity_id: assetId,
+        p_usage_type: finalSlot.slot,
+        p_media_ids: finalIds,
+      });
+      setError('');
+      refresh();
+    } catch (err) {
+      setError(translateErr(err, t));
+      queryClient.setQueryData<EvidenceSlot[]>(evidenceKey(assetId), snapshot);
+      refresh();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assetId, queryClient, t]);
+
+  const handleDragCancel = useCallback(() => {
+    setActiveDragPhoto(null);
+    setDragOverSlot(null);
+    restoreSnapshot();
+  }, [restoreSnapshot]);
 
   // ── mutations ──────────────────────────────────────────────────────────────
 
@@ -166,23 +321,35 @@ export function AssetEvidenceTab({ assetId, assetCode }: {
         <div className="p-6 text-center text-subtle text-sm">{t('common.loading')}</div>
       )}
 
-      <div className="flex flex-col gap-4 pb-6">
-        {slots.map(slot => (
-          <SlotSection
-            key={slot.slot}
-            slot={slot}
-            canManage={canManage}
-            busy={makeCover.isPending || remove.isPending}
-            onAdd={() => setAddSlot(slot)}
-            onCapture={() => setQrSlot(slot)}
-            onView={(index) => setLightbox({ slot: slot.slot, index })}
-            onMakeCover={(p) => makeCover.mutate({ slot, photo: p })}
-            onMove={(p) => setMovePhoto({ photo: p, from: slot })}
-            onReplace={(p) => setReplacePhoto({ photo: p, slot: slot.slot })}
-            onRemove={(p) => setConfirmRemove(p)}
-          />
-        ))}
-      </div>
+      <DndContext
+        collisionDetection={pointerWithin}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+      >
+        <div className="flex flex-col gap-4 pb-6">
+          {slots.map(slot => (
+            <SlotSection
+              key={slot.slot}
+              slot={slot}
+              canManage={canManage}
+              busy={makeCover.isPending || remove.isPending}
+              isDropTarget={dragOverSlot === slot.slot}
+              onAdd={() => setAddSlot(slot)}
+              onCapture={() => setQrSlot(slot)}
+              onView={(index) => setLightbox({ slot: slot.slot, index })}
+              onMakeCover={(p) => makeCover.mutate({ slot, photo: p })}
+              onMove={(p) => setMovePhoto({ photo: p, from: slot })}
+              onReplace={(p) => setReplacePhoto({ photo: p, slot: slot.slot })}
+              onRemove={(p) => setConfirmRemove(p)}
+            />
+          ))}
+        </div>
+        <DragOverlay dropAnimation={null}>
+          {activeDragPhoto && <PhotoDragGhost photo={activeDragPhoto} />}
+        </DragOverlay>
+      </DndContext>
 
       <AddEvidenceModal
         open={addSlot != null}
@@ -240,10 +407,11 @@ export function AssetEvidenceTab({ assetId, assetCode }: {
 
 // ── Slot section ─────────────────────────────────────────────────────────────
 
-function SlotSection({ slot, canManage, busy, onAdd, onCapture, onView, onMakeCover, onMove, onReplace, onRemove }: {
+function SlotSection({ slot, canManage, busy, isDropTarget, onAdd, onCapture, onView, onMakeCover, onMove, onReplace, onRemove }: {
   slot: EvidenceSlot;
   canManage: boolean;
   busy: boolean;
+  isDropTarget: boolean;
   onAdd: () => void;
   onCapture: () => void;
   onView: (index: number) => void;
@@ -255,9 +423,12 @@ function SlotSection({ slot, canManage, busy, onAdd, onCapture, onView, onMakeCo
   const { t } = useTranslation();
   const photos = slot.photos ?? [];
   const full = photos.length >= slot.max_shots;
+  // Whole section is a drop target so a drag can land in an empty slot (or the
+  // padding around the grid), not just on top of another tile.
+  const { setNodeRef } = useDroppable({ id: slotDndId(slot.slot) });
 
   return (
-    <div className="rounded-md border border-line p-3">
+    <div ref={setNodeRef} className={`rounded-md border p-3 transition-colors ${isDropTarget ? 'border-primary bg-primary-light/20' : 'border-line'}`}>
       <div className="flex items-center gap-2 mb-2 flex-wrap">
         {/* Slot labels are holding config (v_asset_evidence_slots), served in Thai. */}
         <span className="text-sm font-medium">{slot.label_th}</span>
@@ -288,26 +459,30 @@ function SlotSection({ slot, canManage, busy, onAdd, onCapture, onView, onMakeCo
         )}
       </div>
 
-      {photos.length === 0 ? (
-        <div className="text-xs text-subtler py-2">{t('assetEvidence.emptySlot')}</div>
-      ) : (
-        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-          {photos.map((p, i) => (
-            <PhotoTile
-              key={p.entity_media_id}
-              photo={p}
-              isCover={i === 0}
-              canManage={canManage}
-              busy={busy}
-              onView={() => onView(i)}
-              onMakeCover={i > 0 ? () => onMakeCover(p) : undefined}
-              onMove={() => onMove(p)}
-              onReplace={() => onReplace(p)}
-              onRemove={() => onRemove(p)}
-            />
-          ))}
-        </div>
-      )}
+      {/* SortableContext stays mounted even when empty so cross-slot drops
+          always have a live container to land in. */}
+      <SortableContext id={slot.slot} items={photos.map(photoDndId)} strategy={rectSortingStrategy}>
+        {photos.length === 0 ? (
+          <div className="text-xs text-subtler py-2">{t('assetEvidence.emptySlot')}</div>
+        ) : (
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+            {photos.map((p, i) => (
+              <PhotoTile
+                key={p.entity_media_id}
+                photo={p}
+                isCover={i === 0}
+                canManage={canManage}
+                busy={busy}
+                onView={() => onView(i)}
+                onMakeCover={i > 0 ? () => onMakeCover(p) : undefined}
+                onMove={() => onMove(p)}
+                onReplace={() => onReplace(p)}
+                onRemove={() => onRemove(p)}
+              />
+            ))}
+          </div>
+        )}
+      </SortableContext>
     </div>
   );
 }
@@ -328,9 +503,17 @@ function PhotoTile({ photo, isCover, canManage, busy, onView, onMakeCover, onMov
   const { t } = useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
   const { url } = useMediaUrl(normalizeKey(thumbKey(photo)));
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: photoDndId(photo),
+    disabled: !canManage,
+  });
 
   return (
-    <div className="relative rounded-md border border-line overflow-hidden bg-surface aspect-square">
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition: transition ?? undefined }}
+      className={`relative rounded-md border border-line overflow-hidden bg-surface aspect-square ${isDragging ? 'opacity-30' : ''}`}
+    >
       {url ? (
         <button
           type="button"
@@ -349,6 +532,18 @@ function PhotoTile({ photo, isCover, canManage, busy, onView, onMakeCover, onMov
           <Star size={9} />
           {t('assetEvidence.cover')}
         </span>
+      )}
+
+      {canManage && (
+        <button
+          type="button"
+          className="absolute top-1 left-1 w-6 h-6 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center cursor-grab active:cursor-grabbing touch-none border-none p-0"
+          aria-label={t('assetEvidence.dragToSort')}
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical size={14} />
+        </button>
       )}
 
       {canManage && (
@@ -400,6 +595,21 @@ function PhotoTile({ photo, isCover, canManage, busy, onView, onMakeCover, onMov
             </div>
           </PopOver>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ── Drag ghost — the floating copy under the pointer while dragging ──────────
+
+function PhotoDragGhost({ photo }: { photo: EvidencePhoto }) {
+  const { url } = useMediaUrl(normalizeKey(thumbKey(photo)));
+  return (
+    <div className="rounded-md border border-primary overflow-hidden bg-surface aspect-square shadow-lg cursor-grabbing">
+      {url ? (
+        <img src={url} alt="" className="w-full h-full object-cover" />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center text-subtler"><ImageOff size={18} /></div>
       )}
     </div>
   );
