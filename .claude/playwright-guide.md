@@ -151,9 +151,10 @@ Only if you're specifically testing the login screen. The quick-login panel is
 hidden by default behind an unlabeled button at the bottom-right
 (`getByRole('button').filter({ hasText: /^$/ })`); click it, then a role button
 (`HOLD_ADMIN`, `CO_ADMIN`, `CO_ACCT`, `CO_INV`, `BR_MGR`, `BR_STAFF`,
-`BR_COLL`), then a branch chip (`A1` `A2` `B1` `B2` `ExtX` `DPX`) for the branch
-roles, then submit. The panel drives the `ui_*` set; `BR_COLL` is
-`dev.collector1` and carries its own password.
+`BR_COLL`, `DEAL_PTN`), then a branch chip (`A1` `A2` `B1` `B2` `ExtX` `DPX`)
+for the branch roles, then submit. The panel drives the `ui_*` set; `BR_COLL` is
+`dev.collector1` and carries its own password; `DEAL_PTN` is a one-click
+`ui_branch_manager_dpx` (same account as BR_MGR + DPX).
 
 ## After Login
 
