@@ -7,6 +7,7 @@ import { apiClient, ApiError } from '../../lib/api';
 import { makeDatePickerFormat } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavGuard } from '../../contexts/NavGuardContext';
+import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { useFormSnapshot } from '../../hooks/useFormSnapshot';
 import { ModelName } from '../../components/ModelName';
 import { translateApiError } from '../../lib/apiErrors';
@@ -566,7 +567,10 @@ export function Fin2RatesPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const holdingId = user?.holding_id ?? null;
-  const canManageTerms = ['HOLDING_ADMIN', 'SYSTEM_DEV'].includes(user?.role_code ?? '');
+  // Per-user grants (mig 1163): a granted company admin edits too — read
+  // v_my_permissions, never role_code.
+  const { hasPermission } = useMyPermissions();
+  const canManageTerms = hasPermission('PRICING.FIN2_RATE_MANAGE');
   const navGuard = useNavGuard();
 
   // Table state
