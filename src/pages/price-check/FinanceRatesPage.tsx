@@ -440,25 +440,44 @@ export function FinanceRatesPage() {
     return map;
   }, [familyRows]);
 
-  // Token-AND matching over "brand family" — "apple 15", "iphone 15" and "15"
-  // all hit iPhone 15. The Select's own single-substring filter is bypassed
-  // (filterOptions={false}); we pre-filter here.
+  // Token-AND fuzzy matching over "brand family" — "apple 15", "iphone 15",
+  // "15", and typos like "aple" or "iphne" all hit iPhone 15. Per token:
+  // word-prefix beats substring beats in-order subsequence; a row's score is
+  // the sum, lower first. The Select's own single-substring filter is bypassed
+  // (filterOptions={false}); we pre-filter and pre-rank here.
   const pickOptions = useMemo<SelectItem[]>(() => {
     const tokens = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    const match = (hay: string) => tokens.every(tk => hay.toLowerCase().includes(tk));
 
-    const brandOpts = [...brands.entries()]
-      .filter(([, b]) => tokens.length === 0 || match(b.name))
+    const tokenScore = (hay: string, tk: string): number | null => {
+      if (hay.split(' ').some(w => w.startsWith(tk))) return 0;
+      if (hay.includes(tk)) return 1;
+      let i = 0;
+      for (const ch of hay) { if (ch === tk[i]) i++; if (i === tk.length) return 2; }
+      return null;
+    };
+    const score = (hay: string): number | null => {
+      const h = hay.toLowerCase();
+      let sum = 0;
+      for (const tk of tokens) {
+        const s = tokenScore(h, tk);
+        if (s == null) return null;
+        sum += s;
+      }
+      return sum;
+    };
+    const rank = <T,>(items: T[], hay: (x: T) => string): T[] => {
+      if (tokens.length === 0) return items;
+      return items
+        .map((x, i) => ({ x, i, s: score(hay(x)) }))
+        .filter((e): e is { x: T; i: number; s: number } => e.s != null)
+        .sort((a, b) => a.s - b.s || a.i - b.i)
+        .map(e => e.x);
+    };
+
+    const brandOpts = rank([...brands.entries()], ([, b]) => b.name)
       .map(([id, b]) => ({ value: `b:${id}`, label: b.name }));
 
-    const first = tokens[0] ?? '';
-    const familyOpts = (familyRows ?? [])
-      .filter(r => tokens.length === 0 || match(`${r.brand_name} ${r.family_name}`))
-      .sort((a, b) => {
-        const ap = a.family_name.toLowerCase().startsWith(first) ? 0 : 1;
-        const bp = b.family_name.toLowerCase().startsWith(first) ? 0 : 1;
-        return ap - bp;
-      })
+    const familyOpts = rank(familyRows ?? [], r => `${r.brand_name} ${r.family_name}`)
       .map(r => ({ value: `f:${r.family_id}`, label: `${r.brand_name} ${r.family_name}` }));
 
     return [
