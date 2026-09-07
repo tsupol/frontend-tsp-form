@@ -29,6 +29,8 @@ const ROLES: RoleDef[] = [
   { key: 'BR_STAFF', label: 'BR_STAFF', color: 'success', usernameTemplate: 'ui_branch_staff' },
   // Fixed to DEV BRANCH A1 — no ui_* equivalent, so it carries its own password
   { key: 'BR_COLL', label: 'BR_COLL', color: 'danger', username: 'dev.collector1', password: 'DevCollect!2026' },
+  // One-click deal partner (same account as BR_MGR + DPX chip)
+  { key: 'DEAL_PTN', label: 'DEAL_PTN', color: 'warning', username: 'ui_branch_manager_dpx' },
 ];
 
 const BRANCHES = [
