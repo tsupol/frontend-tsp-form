@@ -922,7 +922,7 @@ export function AssetsPage() {
                         <div className="text-xs text-subtle truncate">
                           {asset.product_display_name ?? `${asset.brand_name} ${asset.family_name} · ${asset.variant_name}`}
                         </div>
-                        <div className="flex items-center gap-2 mt-1 -ml-0.5">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 -ml-0.5">
                           <Badge size="xs" color={getBucketColor(asset.current_bucket)}>
                             {getBucketLabel(asset.current_bucket, t)}
                           </Badge>
