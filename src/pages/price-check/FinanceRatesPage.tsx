@@ -138,7 +138,7 @@ function ModelTable({ model, terms, ratesVisible, t }: {
                       <div className="text-[11px] text-subtler">
                         ×{cell.multiplier}
                         {cell.effective_monthly_pct != null && (
-                          <> · {t('financeRates.pctPerMonth', { pct: cell.effective_monthly_pct })}</>
+                          <> · {t('financeRates.pctPerMonth', { pct: Number(cell.effective_monthly_pct.toFixed(2)) })}</>
                         )}
                       </div>
                     )}
