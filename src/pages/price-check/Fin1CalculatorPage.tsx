@@ -178,8 +178,22 @@ export function Fin1CalculatorPage() {
   const [planLoading, setPlanLoading] = useState(false);
   const planSeq = useRef(0);
 
+  // Cheapest installment reachable at this down-% (the longest active term).
+  // Anything under it is FIN1_MONTHLY_TOO_LOW, so we already know the answer
+  // and don't have to ask. Used to stay quiet while a number is half-typed:
+  // "4", "45", "450" on the way to "4,500" are all below the floor, and the
+  // debounce is shorter than a normal pause between digits — without this the
+  // customer watches a red "lowest possible is X" flash after every keystroke.
+  const monthlyFloor = useMemo(
+    () => (row ? Math.min(...row.cells.map(c => c.installment_amount)) : null),
+    [row],
+  );
+  const belowFloor = monthlyMode && monthlyFloor != null && parseFloat(monthlyStr) < monthlyFloor;
+  const [floorNotice, setFloorNotice] = useState(false);
+
   useEffect(() => {
     if (!monthlyMode || !variant || downPct == null) { setPlan(null); setPlanError(''); return; }
+    if (belowFloor) { setPlan(null); setPlanError(''); setPlanLoading(false); return; }
     const seq = ++planSeq.current;
     setPlanLoading(true);
     const tm = setTimeout(async () => {
@@ -210,7 +224,7 @@ export function Fin1CalculatorPage() {
     }, 300);
     return () => clearTimeout(tm);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [monthlyMode, monthlyStr, downPct, uplift, variant?.variant_id]);
+  }, [monthlyMode, monthlyStr, downPct, uplift, variant?.variant_id, belowFloor]);
 
   const pickVariant = (v: VariantSearchRow) => {
     if (v.variant_id !== variant?.variant_id) {
@@ -228,7 +242,10 @@ export function Fin1CalculatorPage() {
     : '';
 
   // ── Summary numbers (table cell or bank-style plan) ────────────────────────
-  const summary = monthlyMode
+  // While the typed amount is still below the floor we hold the slider-derived
+  // plan on screen rather than blanking the panel — the customer is mid-number,
+  // not looking at an empty result.
+  const summary = monthlyMode && !belowFloor
     ? (plan && {
         down: plan.down_payment,
         months: plan.term_months,
@@ -439,7 +456,12 @@ export function Fin1CalculatorPage() {
                                   mask="number"
                                   decimalScale={0}
                                   value={monthlyStr}
-                                  onChange={(raw) => setMonthlyStr(raw)}
+                                  onChange={(raw) => { setMonthlyStr(raw); setFloorNotice(false); }}
+                                  // A below-floor amount stays silent while it is
+                                  // being typed; on blur the customer has settled
+                                  // on it, so the "lowest possible" guidance is
+                                  // finally worth showing.
+                                  onBlur={() => setFloorNotice(belowFloor)}
                                   placeholder={cell ? fmtCurrency(cell.installment_amount) : ''}
                                   endIcon={monthlyStr
                                     ? <button
@@ -456,10 +478,15 @@ export function Fin1CalculatorPage() {
                               <span className="text-xs text-subtle mt-1">{t('fin1Calc.monthlyTargetHint')}</span>
                             </div>
 
-                            {planError && (
+                            {(planError || (floorNotice && belowFloor && monthlyFloor != null)) && (
                               <div className="alert alert-warning">
                                 <XCircle size={16} />
-                                <span>{planError}</span>
+                                <span>
+                                  {planError || t('fin1Calc.monthlyTooLow', {
+                                    min: fmtCurrency(monthlyFloor ?? 0),
+                                    months: terms[terms.length - 1] ?? 0,
+                                  })}
+                                </span>
                               </div>
                             )}
                           </>
