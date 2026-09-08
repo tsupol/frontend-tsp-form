@@ -17,7 +17,7 @@ import { isSearchable, isBelowSearchMin, SEARCH_MIN_CHARS } from '../../lib/sear
 // nothing that names the financing product. The server strips the rate fields
 // for branch scope anyway; nothing here may recompute them.
 //
-// One fn_fin1_price_table call per (variant, uplift) returns the whole grid
+// One fn_fin1_price_table call per (model, uplift) returns the whole grid
 // (every down % × every active term); the sliders just point at cells — no
 // requests while sliding. The "customer says X per month" mode is the one
 // exception: it asks fn_fin1_plan_by_monthly, which does the bank-style search
@@ -28,14 +28,15 @@ import { isSearchable, isBelowSearchMin, SEARCH_MIN_CHARS } from '../../lib/sear
 // stacked pick-then-negotiate flow instead of two cramped panels.
 // ============================================================================
 
-interface VariantSearchRow {
-  variant_id: number;
-  sku_code: string;
+// Model-level rows (fn_product_search): FIN1 retail price lives on the model —
+// capacity is its own model row, colour variants underneath all share one price
+// (RESPONSE 2026-09-08). Variant search flooded the rail with one row per colour.
+interface ModelSearchRow {
+  model_id: number;
+  model_name: string;
   brand_name: string | null;
   family_name: string | null;
-  model_name: string | null;
-  variant_name: string | null;
-  manufacturer_color?: string | null;
+  is_active: boolean;
 }
 
 interface PriceTableCell {
@@ -84,22 +85,22 @@ interface PlanByMonthly {
   doc_fee_amount: number;
 }
 
-const variantLabel = (v: VariantSearchRow) =>
-  [v.brand_name, v.family_name, v.model_name].filter(Boolean).join(' ');
+// Same two-line shape as the FIN2 price-check rail: family + model, brand below.
+const modelLabel = (m: ModelSearchRow) =>
+  [m.family_name, m.model_name].filter(Boolean).join(' ');
 
-const variantSubLabel = (v: VariantSearchRow) =>
-  [v.variant_name, v.manufacturer_color].filter(Boolean).join(' · ');
+const modelSubLabel = (m: ModelSearchRow) => m.brand_name ?? '';
 
 export function Fin1CalculatorPage() {
   const { t } = useTranslation();
 
   // ── Product selection ──────────────────────────────────────────────────────
   // ?q= seeds the search — the finance-rates page's per-model "คำนวณ" button
-  // jumps here with the model name so the rail opens on its variants.
+  // jumps here with the model name so the rail opens on its capacity models.
   const [searchParams] = useSearchParams();
   const [keyword, setKeyword] = useState(() => searchParams.get('q') ?? '');
   const [debounced, setDebounced] = useState('');
-  const [variant, setVariant] = useState<VariantSearchRow | null>(null);
+  const [model, setModel] = useState<ModelSearchRow | null>(null);
   const [uplift, setUplift] = useState(0);
 
   useEffect(() => {
@@ -111,31 +112,31 @@ export function Fin1CalculatorPage() {
   // The rail stays live after a pick — "what about this one?" mid-negotiation
   // is one click, so the query is not gated on having no selection.
   const { data: searchResults, isFetching: searching } = useQuery({
-    queryKey: ['fin1-calc-variant-search', debounced],
+    queryKey: ['fin1-calc-model-search', debounced],
     queryFn: () =>
-      apiClient.rpc<{ rows: VariantSearchRow[] }>('fn_product_variant_search', {
+      apiClient.rpc<{ rows: ModelSearchRow[] }>('fn_product_search', {
         p_q: debounced,
-        p_only_contractable: true,
+        p_is_contractable: true,
         p_limit: 20,
-      }),
+      }).then(res => ({ rows: (res.rows ?? []).filter(r => r.is_active) })),
     enabled: debounced.length > 0,
     placeholderData: keepPreviousData,
     staleTime: 30 * 1000,
   });
 
-  // ── Price table (one call per variant × uplift) ────────────────────────────
+  // ── Price table (one call per model × uplift) ──────────────────────────────
   const {
     data: table,
     error: tableError,
     isFetching: tableLoading,
   } = useQuery({
-    queryKey: ['fin1-price-table', variant?.variant_id, uplift],
+    queryKey: ['fin1-price-table', model?.model_id, uplift],
     queryFn: () =>
       apiClient.rpc<PriceTable>('fn_fin1_price_table', {
-        p_variant_id: variant!.variant_id,
+        p_model_id: model!.model_id,
         p_uplift: uplift,
       }),
-    enabled: variant != null,
+    enabled: model != null,
     placeholderData: keepPreviousData,
     staleTime: 60 * 1000,
     retry: false,
@@ -192,7 +193,7 @@ export function Fin1CalculatorPage() {
   const [floorNotice, setFloorNotice] = useState(false);
 
   useEffect(() => {
-    if (!monthlyMode || !variant || downPct == null) { setPlan(null); setPlanError(''); return; }
+    if (!monthlyMode || !model || downPct == null) { setPlan(null); setPlanError(''); return; }
     if (belowFloor) { setPlan(null); setPlanError(''); setPlanLoading(false); return; }
     const seq = ++planSeq.current;
     setPlanLoading(true);
@@ -201,7 +202,7 @@ export function Fin1CalculatorPage() {
         const res = await apiClient.rpc<PlanByMonthly>('fn_fin1_plan_by_monthly', {
           p_monthly: parseFloat(monthlyStr),
           p_down_percent: downPct,
-          p_variant_id: variant.variant_id,
+          p_model_id: model.model_id,
           p_uplift: uplift,
         });
         if (seq === planSeq.current) { setPlan(res); setPlanError(''); }
@@ -224,15 +225,15 @@ export function Fin1CalculatorPage() {
     }, 300);
     return () => clearTimeout(tm);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [monthlyMode, monthlyStr, downPct, uplift, variant?.variant_id, belowFloor]);
+  }, [monthlyMode, monthlyStr, downPct, uplift, model?.model_id, belowFloor]);
 
-  const pickVariant = (v: VariantSearchRow) => {
-    if (v.variant_id !== variant?.variant_id) {
+  const pickModel = (m: ModelSearchRow) => {
+    if (m.model_id !== model?.model_id) {
       setUplift(0);
       setMonthlyStr('');
       setPlan(null);
     }
-    setVariant(v);
+    setModel(m);
   };
 
   const tableErrorMsg = tableError
@@ -323,20 +324,20 @@ export function Fin1CalculatorPage() {
                   autoFocus={!isMobile}
                 />
               </div>
-              <DataTable<VariantSearchRow>
+              <DataTable<ModelSearchRow>
                 data={searchRows}
-                getRowProps={r => ({ 'data-state': r.original.variant_id === variant?.variant_id ? 'selected' : undefined })}
+                getRowProps={r => ({ 'data-state': r.original.model_id === model?.model_id ? 'selected' : undefined })}
                 enableKeyboardNav={!isMobile}
                 keyboardActivateMode="manual"
-                onRowActivate={r => pickVariant(r.original)}
+                onRowActivate={r => pickModel(r.original)}
                 renderRow={r => (
                   <button
                     type="button"
                     className="w-full text-left px-4 py-2.5 transition-colors cursor-pointer"
-                    onClick={() => { pickVariant(r.original); if (isMobile) goTo('detail'); }}
+                    onClick={() => { pickModel(r.original); if (isMobile) goTo('detail'); }}
                   >
-                    <div className="min-w-0 text-sm font-medium truncate">{variantLabel(r.original)}</div>
-                    <div className="min-w-0 text-xs text-subtle truncate">{variantSubLabel(r.original)}</div>
+                    <div className="min-w-0 text-sm font-medium truncate">{modelLabel(r.original)}</div>
+                    <div className="min-w-0 text-xs text-subtle truncate">{modelSubLabel(r.original)}</div>
                   </button>
                 )}
                 className={`flex-1 min-h-0 panel-datatable ${searching ? 'opacity-60' : ''} transition-opacity`}
@@ -352,11 +353,11 @@ export function Fin1CalculatorPage() {
 
             {/* ── Right: negotiation panel ── */}
             <PageNavPanel id="detail" className={isMobile ? '' : 'flex-1 min-w-0 flex flex-col'}>
-              {variant ? (
+              {model ? (
                 <>
                   <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2 min-w-0">
-                    <span className="text-sm font-medium truncate">{variantLabel(variant)}</span>
-                    <span className="text-xs text-subtle truncate">{variantSubLabel(variant)}</span>
+                    <span className="text-sm font-medium truncate">{modelLabel(model)}</span>
+                    <span className="text-xs text-subtle truncate">{modelSubLabel(model)}</span>
                   </div>
                   <div className="flex-1 overflow-auto better-scroll px-4 py-3">
                     <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] xl:gap-8 xl:items-start">
