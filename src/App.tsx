@@ -24,7 +24,6 @@ import { ProductsLayout } from './pages/products/ProductsLayout';
 import { CallCenterPage } from './pages/call-center/CallCenterPage';
 import { PricingLayout } from './pages/pricing/PricingLayout';
 import { PricebookPage } from './pages/pricing/PricebookPage';
-import { Fin1RatesPage } from './pages/pricing/Fin1RatesPage';
 import { Fin2RatesPage } from './pages/pricing/Fin2RatesPage';
 import { DiscountPoliciesPage } from './pages/pricing/DiscountPoliciesPage';
 import { DealPartnerRatesPage } from './pages/pricing/DealPartnerRatesPage';
@@ -422,16 +421,8 @@ function App() {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/admin/pricing/fin1-rates"
-        element={
-          <ProtectedRoute>
-            <AdminLayout>
-              <PricingLayout><Fin1RatesPage /></PricingLayout>
-            </AdminLayout>
-          </ProtectedRoute>
-        }
-      />
+      {/* Legacy FIN1 rate cards retired (mig 1172) — เรทผ่อน FIN1 is the FIN1 config now */}
+      <Route path="/admin/pricing/fin1-rates" element={<Navigate to="/admin/pricing/fin1-rate-config" replace />} />
       <Route
         path="/admin/pricing/fin1-rate-config"
         element={

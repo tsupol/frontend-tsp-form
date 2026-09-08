@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { DollarSign, Calculator, SlidersHorizontal, TrendingUp, Percent, Handshake } from 'lucide-react';
+import { DollarSign, SlidersHorizontal, TrendingUp, Percent, Handshake } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -9,7 +9,6 @@ const navItems = [
   { path: '/admin/pricing/pricebook', labelKey: 'nav.pricebook', icon: DollarSign },
   // NOTICE 2026-09-05: holding/company-side only — hidden from branch roles.
   { path: '/admin/pricing/fin1-rate-config', labelKey: 'nav.fin1RateConfig', icon: SlidersHorizontal, holdingCompanyOnly: true },
-  { path: '/admin/pricing/fin1-rates', labelKey: 'nav.fin1Rates', icon: Calculator },
   { path: '/admin/pricing/fin2-rates', labelKey: 'nav.fin2Rates', icon: TrendingUp },
   { path: '/admin/pricing/discount-policies', labelKey: 'nav.discountPolicies', icon: Percent },
   { path: '/admin/pricing/deal-partner-rates', labelKey: 'nav.dealPartnerRates', icon: Handshake },

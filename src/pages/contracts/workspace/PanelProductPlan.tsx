@@ -1067,9 +1067,9 @@ export function PanelProductPlan(_props: Props) {
         </div>
       )}
 
-      {/* USED — no plans available (backend returned 0 quotes for both FIN1+FIN2).
-          Usually means missing fin1_rate_cards for the asset's category, or no
-          used_asset_profit_rates seeded for FIN2 USED. */}
+      {/* USED — no plans available (backend returned 0 quotes). FIN2-only since
+          mig 1172 (legacy FIN1 rate cards retired; FIN1 contract opening returns
+          in phase 3) — usually means no used_asset_profit_rates seeded. */}
       {mode === 'used' && localTargetAssetId && usedQuoteData && dedupedQuotes.length === 0 && (
         <div className="alert alert-warning">
           <AlertTriangle size={16} />

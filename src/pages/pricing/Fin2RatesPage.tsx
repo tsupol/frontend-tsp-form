@@ -68,7 +68,6 @@ interface WorkbenchRow {
   fin2_profit_amount: number | null;
   missing_cost_price: boolean;
   missing_retail_price: boolean;
-  missing_fin1_rate_card: boolean;
   missing_fin2_profit_rate: boolean;
   needs_price_setup: boolean;
 }

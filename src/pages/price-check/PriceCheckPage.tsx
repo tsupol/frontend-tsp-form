@@ -536,18 +536,15 @@ function PricingDetail({ model, quoteData, loading, t }: {
           <div className="p-8 text-center text-subtle">{t('priceCheck.noQuotes')}</div>
         ) : (
           <div className="flex flex-col gap-6">
-            {/* FIN1 rows hidden (NOTICE 2026-09-05): the quote RPC still emits
-                them from the retired pre-09-04 rate cards, so the numbers are
-                not real. Real FIN1 lives on the FIN1 calculator page. */}
-
-            {/* FIN2 — Negotiable */}
+            {/* FIN2 only — the quote RPC stopped emitting FIN1 rows entirely
+                (mig 1172). Real FIN1 lives on the FIN1 calculator page. */}
             {fin2Enabled && fin2Rows.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <Badge size="sm" color="warning">FIN2</Badge>
                   <span className="text-sm font-medium">{t('priceCheck.fin2Desc')}</span>
                 </div>
-                <PricingTable rows={fin2Rows} terms={fin2Terms} type="fin2" t={t} />
+                <PricingTable rows={fin2Rows} terms={fin2Terms} t={t} />
                 <Fin2Calculator fin2Rows={fin2Rows} fin2Terms={fin2Terms} t={t} />
               </div>
             )}
@@ -668,10 +665,10 @@ function Fin2Calculator({ fin2Rows, fin2Terms, t }: {
 
 // ── Pricing Table ────────────────────────────────────────────────────────────
 
-function PricingTable({ rows, terms, type, t }: {
+// FIN2-only since mig 1172 (the quote RPC no longer emits FIN1 rows at all).
+function PricingTable({ rows, terms, t }: {
   rows: PricingRow[];
   terms: number[];
-  type: 'fin1' | 'fin2';
   t: (key: string) => string;
 }) {
   return (
@@ -683,9 +680,7 @@ function PricingTable({ rows, terms, type, t }: {
             <th className="text-right px-4 py-2 font-medium">{t('priceCheck.downPayment')}</th>
             <th className="text-right px-4 py-2 font-medium">{t('priceCheck.installment')}</th>
             <th className="text-right px-4 py-2 font-medium max-sm:hidden">{t('priceCheck.totalAmount')}</th>
-            <th className="text-right px-4 py-2 font-medium max-sm:hidden">
-              {type === 'fin1' ? t('priceCheck.interest') : t('priceCheck.profit')}
-            </th>
+            <th className="text-right px-4 py-2 font-medium max-sm:hidden">{t('priceCheck.profit')}</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-line">
@@ -708,10 +703,7 @@ function PricingTable({ rows, terms, type, t }: {
                   {fmt(row.total_amount)}
                 </td>
                 <td className="text-right px-4 py-2.5 tabular-nums text-subtle max-sm:hidden">
-                  {type === 'fin1'
-                    ? (row.interest_percent_total != null ? `${row.interest_percent_total}%` : '—')
-                    : (row.fin2_profit_amount != null ? fmt(row.fin2_profit_amount) : '—')
-                  }
+                  {row.fin2_profit_amount != null ? fmt(row.fin2_profit_amount) : '—'}
                 </td>
               </tr>
             ));

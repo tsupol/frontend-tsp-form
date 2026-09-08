@@ -86,7 +86,6 @@ interface WorkbenchRow {
   fin2_profit_amount: number | null;
   missing_cost_price: boolean;
   missing_retail_price: boolean;
-  missing_fin1_rate_card: boolean;
   missing_fin2_profit_rate: boolean;
   needs_price_setup: boolean;
 }
@@ -130,9 +129,6 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
   // FIN2 profit state
   const [fin2Profits, setFin2Profits] = useState<Record<number, string>>({});
   const [isSavingFin2, setIsSavingFin2] = useState<number | null>(null);
-
-  // Tab state
-  const [activeTab, setActiveTab] = useState<'fin2' | 'fin1'>('fin2');
 
   // Add term state
   const [newTermMonths, setNewTermMonths] = useState<number | ''>('');
@@ -179,7 +175,6 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
 
     initializedForRef.current = modelId;
     setErrorMessage('');
-    setActiveTab('fin2');
     setNewTermMonths('');
     setNewTermProfit('');
 
@@ -233,26 +228,10 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
   }, [isDirtyRef]);
 
   // Whether the selected model is contractable. FIN2 only applies to contractable
-  // models — non-contractable models hide the FIN2 tab entirely (and the tab bar,
-  // since FIN1 would be the only tab left).
+  // models — non-contractable models get no finance section at all. Legacy FIN1
+  // rate cards retired (mig 1172): the workbench view is FIN2-only now; FIN1
+  // numbers live on the FIN1 engine pages (เรทผ่อน FIN1 / คำนวณค่างวด FIN1).
   const isContractable = workbenchRows.some(r => r.is_contractable);
-
-  // Once we know the model isn't contractable, ensure the active tab isn't FIN2.
-  useEffect(() => {
-    if (!isContractable && activeTab === 'fin2') setActiveTab('fin1');
-  }, [isContractable, activeTab]);
-
-  // FIN1 rows (deduplicated)
-  const fin1Rows = useMemo(() => {
-    const rows = workbenchRows.filter(r => r.finance_model === 'FIN1' && r.term_months !== null);
-    const seen = new Set<string>();
-    return rows.filter(r => {
-      const key = `${r.term_months}-${r.down_percent}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  }, [workbenchRows]);
 
   // FIN2 rows (deduplicated)
   const fin2Rows = useMemo(() => {
@@ -538,26 +517,13 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
               </div>
             </div>
 
-            {/* Tab bar — only shown for contractable models (FIN2 doesn't apply otherwise) */}
+            {/* FIN2 — the only finance model here (legacy FIN1 rate cards retired, mig 1172) */}
             {isContractable && (
               <div className="flex border-b border-line">
-                <button
-                  className={`px-3 py-1.5 text-xs font-medium cursor-pointer transition-colors ${activeTab === 'fin1' ? 'border-b-2 border-primary-fg text-primary-fg' : 'text-subtle hover:text-fg'}`}
-                  onClick={() => setActiveTab('fin1')}
-                >
-                  FIN1
-                </button>
-                <button
-                  className={`px-3 py-1.5 text-xs font-medium cursor-pointer transition-colors ${activeTab === 'fin2' ? 'border-b-2 border-primary-fg text-primary-fg' : 'text-subtle hover:text-fg'}`}
-                  onClick={() => setActiveTab('fin2')}
-                >
-                  FIN2
-                </button>
+                <span className="px-3 py-1.5 text-xs font-medium border-b-2 border-primary-fg text-primary-fg">FIN2</span>
               </div>
             )}
-
-            {/* FIN2 tab — only when contractable */}
-            {isContractable && activeTab === 'fin2' && (
+            {isContractable && (
               <div>
                 {fin2Rows.length === 0 && (
                   <div className="alert alert-warning mb-3">
@@ -658,33 +624,6 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
               </div>
             )}
 
-            {/* FIN1 tab — always shown (default when not contractable) */}
-            {(!isContractable || activeTab === 'fin1') && (
-              <div>
-                {fin1Rows.length > 0 ? (
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b border-line">
-                        <th className="py-1.5 text-left font-medium text-subtle">{t('pricing.termMonths', { months: '' }).replace(' ', '')}</th>
-                        <th className="py-1.5 text-right font-medium text-subtle">{t('pricing.downPercent')}</th>
-                        <th className="py-1.5 text-right font-medium text-subtle">{t('pricing.installment')}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {fin1Rows.map((row, idx) => (
-                        <tr key={idx} className="border-b border-line last:border-b-0">
-                          <td className="py-1.5">{t('pricing.termMonths', { months: row.term_months })}</td>
-                          <td className="py-1.5 text-right tabular-nums">{row.down_percent !== null ? `${row.down_percent}%` : '—'}</td>
-                          <td className="py-1.5 text-right tabular-nums">{formatTHB(row.cal_installment)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <div className="text-xs text-subtle py-3">{t('pricing.noRateCard')}</div>
-                )}
-              </div>
-            )}
           </div>
         </>
       )}

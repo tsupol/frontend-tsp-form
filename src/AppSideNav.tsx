@@ -559,7 +559,6 @@ export const AppSideNav = () => {
         ...(role.startsWith('HOLDING_') || role.startsWith('COMPANY_') || role === 'SYSTEM_DEV' ? [
           { key: 'fin1-rate-config', icon: <SlidersHorizontal size="1rem" />, label: t('nav.fin1RateConfig'), path: '/admin/pricing/fin1-rate-config' },
         ] : []),
-        { key: 'fin1-rates', icon: <Calculator size="1rem" />, label: t('nav.fin1Rates'), path: '/admin/pricing/fin1-rates' },
         { key: 'fin2-rates', icon: <TrendingUp size="1rem" />, label: t('nav.fin2Rates'), path: '/admin/pricing/fin2-rates' },
         { key: 'discount-policies', icon: <Percent size="1rem" />, label: t('nav.discountPolicies'), path: '/admin/pricing/discount-policies' },
         { key: 'deal-partner-rates', icon: <Handshake size="1rem" />, label: t('nav.dealPartnerRates'), path: '/admin/pricing/deal-partner-rates' },
