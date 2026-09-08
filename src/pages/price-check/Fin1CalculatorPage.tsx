@@ -463,16 +463,15 @@ export function Fin1CalculatorPage() {
                                   // finally worth showing.
                                   onBlur={() => setFloorNotice(belowFloor)}
                                   placeholder={cell ? fmtCurrency(cell.installment_amount) : ''}
-                                  endIcon={monthlyStr
-                                    ? <button
-                                        type="button"
-                                        className="bg-transparent border-none p-0 cursor-pointer text-current flex items-center"
-                                        onClick={() => setMonthlyStr('')}
-                                        aria-label={t('common.clear', { defaultValue: 'Clear' })}
-                                      >
-                                        <X size={14} />
-                                      </button>
+                                  // The icon slot is pointer-events:none until
+                                  // onEndIconClick marks it clickable, so the
+                                  // handler has to go here — a <button> nested
+                                  // in the slot never receives the click.
+                                  endIcon={monthlyStr ? <X size={14} /> : undefined}
+                                  onEndIconClick={monthlyStr
+                                    ? () => { setMonthlyStr(''); setFloorNotice(false); }
                                     : undefined}
+                                  reserveIconSlots
                                 />
                               </div>
                               <span className="text-xs text-subtle mt-1">{t('fin1Calc.monthlyTargetHint')}</span>
