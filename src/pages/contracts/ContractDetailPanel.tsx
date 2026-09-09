@@ -20,7 +20,7 @@ import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { ColorSwatch } from '../../components/ColorAutocomplete';
 import { fmtCurrency } from '../../lib/format';
-import { getStateColor, getStateLabel, productName } from './contractUtils';
+import { getStateColor, getStateLabel, productName, formatInstallment } from './contractUtils';
 import { ContractActionButtons } from './ContractActions';
 import { WalletsTab } from './wallet/WalletsTab';
 import { DeviceTab } from './DeviceTab';
@@ -102,6 +102,14 @@ interface ContractDetail {
   insurance_balance: number | null;
   installment_amount: number | null;
   value_month: number | null;
+  // Plan shape (mig 1179). FIN1 plans are routinely non-uniform: the final
+  // installment is lighter. is_uniform_installment=false → show the split.
+  last_installment_amount: number | null;
+  installment_total: number | null;
+  is_uniform_installment: boolean | null;
+  doc_fee_amount: number | null;
+  uplift_amount: number | null;
+  financed_amount: number | null;
   saving_target_amount: number | null;
   snapshot_term_months: number | null;
   snapshot_installment_amount: number | null;
@@ -1051,21 +1059,37 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
           {/* Total to collect = down + (installment × months), from the agreed rate
               snapshot. The view precomputes it as agreed_total_financed; this — not
               agreed_price — is the number the money owner cares about. */}
+          {/* `agreed_total_financed` is still `value_month × installment_amount`
+              (mig 1179 kept the old expression), which over-counts a FIN1 plan
+              whose final installment is lighter — 2,360 × 11 = 25,960 where the
+              contract really collects 25,950. `installment_total` is the same
+              quantity computed correctly by the same view, so prefer it and
+              keep the old column only for rows that predate it. Reported to BE
+              2026-09-09. */}
           <InfoCell
             label={t('contract.totalToCollect')}
-            value={fmtCurrency(contract.agreed_total_financed)}
-            highlight={contract.agreed_total_financed != null && contract.agreed_total_financed > 0}
+            value={fmtCurrency(contract.installment_total ?? contract.agreed_total_financed)}
+            highlight={(contract.installment_total ?? contract.agreed_total_financed ?? 0) > 0}
           />
           {/* Read the live agreed columns, NOT snapshot_* — the snapshot values
               drift (e.g. snapshot_down_amount=0, snapshot_installment≠agreed) and
               show wrong numbers. Per BE (Ohm, 2026-07-06): installment_amount /
               value_month / down_payment are the source of truth here. */}
           <InfoCell label={t('contract.downPayment')} value={fmtCurrency(contract.down_payment)} />
-          <InfoCell label={t('contract.installmentAmount')} value={fmtCurrency(contract.installment_amount)} />
+          {/* A non-uniform plan (FIN1, flat interest) must never be shown as
+              "X × n" — the final installment is lighter and the customer will
+              be told the wrong number. mig 1179 exposes the split. */}
+          <InfoCell
+            label={t('contract.installmentAmount')}
+            value={formatInstallment(contract, t, fmtCurrency)}
+          />
           <InfoCell
             label={t('contract.termMonths')}
             value={contract.value_month ? `${contract.value_month} ${t('contract.months')}` : '—'}
           />
+          {contract.doc_fee_amount != null && contract.doc_fee_amount > 0 && (
+            <InfoCell label={t('fin1Plan.rowDocFee')} value={fmtCurrency(contract.doc_fee_amount)} />
+          )}
           <InfoCell label={t('contract.totalPaid')} value={fmtCurrency(contract.total_paid)} />
           <InfoCell label={t('contract.outstanding')} value={fmtCurrency(contract.outstanding_amount)} highlight={contract.outstanding_amount != null && contract.outstanding_amount > 0} />
           {isFin2 && (

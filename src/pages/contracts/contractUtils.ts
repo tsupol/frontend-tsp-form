@@ -67,3 +67,45 @@ export function productName(value: string | null | undefined): string | null {
   const v = value?.trim();
   return v && v !== '-' ? v : null;
 }
+
+// ── Installment shape ───────────────────────────────────────────────────────
+
+/**
+ * How to render "the monthly installment" for a contract.
+ *
+ * FIN1 plans are routinely NON-UNIFORM: flat interest means the regular
+ * installment is rounded up and the final one settles the lighter remainder
+ * (e.g. 2,360 × 10 + 2,350, not 2,360 × 11). Writing "2,360 × 11" tells the
+ * customer a total that is not what they will pay, so every screen showing an
+ * installment must go through this. FIN2 and every legacy contract come back
+ * with `is_uniform_installment = true` (or a NULL last installment) and render
+ * exactly as before.
+ *
+ * mig 1179 added the three columns to `v_contracts` / `v_contract_detail`.
+ */
+export function formatInstallment(
+  row: {
+    installment_amount: number | null;
+    last_installment_amount?: number | null;
+    is_uniform_installment?: boolean | null;
+    value_month?: number | null;
+  },
+  t: TFunction | ((k: string, o?: Record<string, unknown>) => string),
+  fmt: (n: number | null | undefined) => string,
+): string {
+  const { installment_amount, last_installment_amount, is_uniform_installment, value_month } = row;
+  if (
+    is_uniform_installment === false &&
+    last_installment_amount != null &&
+    installment_amount != null &&
+    value_month != null &&
+    value_month > 1
+  ) {
+    return t('fin1Plan.installmentSplitShort', {
+      amount: fmt(installment_amount),
+      count: value_month - 1,
+      last: fmt(last_installment_amount),
+    }) as string;
+  }
+  return fmt(installment_amount);
+}

@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Package, Lock, AlertTriangle } from 'lucide-react';
 import { fmtCurrency } from '../../../lib/format';
+import { formatInstallment } from '../contractUtils';
 import { useWorkspace } from './WorkspaceContext';
 import { SummaryCard } from './SummaryCard';
 
@@ -58,7 +59,9 @@ export function CardProductPlan({ onEdit, active, shake }: { onEdit?: () => void
               <span>{contract.commercial_model}</span>
               <span>{contract.value_month} {t('contract.months')}</span>
               {contract.down_payment != null && <span>{t('contract.downPayment')} {fmtCurrency(contract.down_payment)}</span>}
-              <span>{t('contract.installmentAmount')} {fmtCurrency(contract.installment_amount!)}</span>
+              {/* Non-uniform (FIN1): the last installment is lighter — say so
+                  rather than implying every month is the same. */}
+              <span>{t('contract.installmentAmount')} {formatInstallment(contract, t, fmtCurrency)}</span>
               {isFinancialLocked && <Lock size={12} className="text-warning-fg" />}
             </div>
           ) : missing.length > 0 && (

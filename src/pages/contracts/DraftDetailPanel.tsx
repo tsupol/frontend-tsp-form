@@ -6,7 +6,7 @@ import { Copy, Check, Star } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
-import { getStateColor, getStateLabel, productName } from './contractUtils';
+import { getStateColor, getStateLabel, productName, formatInstallment } from './contractUtils';
 import { ContractActionButtons } from './ContractActions';
 
 interface ContractDetail {
@@ -37,6 +37,11 @@ interface ContractDetail {
   insurance_deposit: number | null;
   insurance_balance: number | null;
   installment_amount: number | null;
+  value_month: number | null;
+  // Plan shape (mig 1179) — FIN1's final installment is lighter than the rest.
+  last_installment_amount: number | null;
+  installment_total: number | null;
+  is_uniform_installment: boolean | null;
   snapshot_term_months: number | null;
   agreed_total_financed: number | null;
   discount_amount: number | null;
@@ -190,7 +195,7 @@ function DraftOverviewTab({ contract, t }: { contract: ContractDetail; t: Return
             </div>
             <InfoCell label={t('contract.agreedPrice')} value={fmtCurrency(contract.agreed_price)} />
             <InfoCell label={t('contract.downPayment')} value={fmtCurrency(contract.down_payment)} />
-            <InfoCell label={t('contract.installmentAmount')} value={fmtCurrency(contract.installment_amount)} />
+            <InfoCell label={t('contract.installmentAmount')} value={formatInstallment(contract, t, fmtCurrency)} />
             <InfoCell
               label={t('contract.termMonths')}
               value={contract.snapshot_term_months ? `${contract.snapshot_term_months} ${t('contract.months')}` : '—'}

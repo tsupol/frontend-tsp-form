@@ -47,6 +47,17 @@ export interface ContractServerState {
   installment_amount: number | null;
   value_month: number | null;
 
+  // Plan shape (mig 1179). FIN1 installments are routinely non-uniform — the
+  // final one is lighter (flat interest, remainder settles last). NULL
+  // last_installment_amount / is_uniform_installment=true means every
+  // installment is equal (FIN2 and every legacy contract).
+  last_installment_amount: number | null;
+  installment_total: number | null;
+  is_uniform_installment: boolean | null;
+  doc_fee_amount: number | null;
+  uplift_amount: number | null;
+  financed_amount: number | null;
+
   // Snapshot — pre-negotiation baseline (13 cols)
   snapshot_term_months: number | null;
   snapshot_installment_amount: number | null;
