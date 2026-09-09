@@ -24,19 +24,29 @@ adds what is specific to this app.
 - **Window size: default to a 1440x900 viewport** for review shots. Set it over
   CDP (never `browser_resize`, which pins the viewport for the session and can't
   be undone). Chrome's own overhead measured here: **+15px width** (scrollbar),
-  **+95px height**, so ask for 1455x995 to land on 1442x902:
+  **+95px height**, so ask for 1455x995 to land on 1442x902.
+
+  **Reuse the window's current `left`/`top` — never hardcode them.** The user
+  moves this window between monitors, and a hardcoded position drags it back to
+  whichever screen it happened to be on when the snippet was written.
   ```js
   const cdp = await page.context().newCDPSession(page);
-  const { windowId } = await cdp.send('Browser.getWindowForTarget');
-  await cdp.send('Browser.setWindowBounds', { windowId,
-    bounds: { left: 2990, top: 60, width: 1455, height: 995, windowState: 'normal' } });
+  const { windowId, bounds } = await cdp.send('Browser.getWindowForTarget');
+  await cdp.send('Browser.setWindowBounds', {
+    windowId,
+    bounds: { left: bounds.left, top: bounds.top, width: 1455, height: 995, windowState: 'normal' },
+  });
   await page.waitForTimeout(500);
   await cdp.detach();
   ```
-  Other useful sizes on this 2048x1152 screen: 1280x800 (small laptop — the rail
-  before it collapses), 1024x768 (where `max-lg:hidden` columns drop), 1900x1000
-  (wide tables). Below ~1280 the asset rail + detail panel starts to feel
-  squeezed, so don't review two-panel pages there unless that's the point.
+  (If the window is maximised, `setWindowBounds` is ignored until you send
+  `windowState: 'normal'` first — the snippet above already does.)
+
+  Other useful sizes: 1280x800 (small laptop — the rail before it collapses),
+  1024x768 (where `max-lg:hidden` columns drop), 1900x1000 (wide tables). Below
+  ~1280 the asset rail + detail panel starts to feel squeezed, so don't review
+  two-panel pages there unless that's the point. Check `screen.availWidth/Height`
+  before asking for a big size — CDP can't exceed the display the window is on.
 
 - **Do NOT call `page.emulateMedia()`** (the global guide explains why: it pins
   the media query for the session). The context already boots dark.
