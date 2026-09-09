@@ -9,7 +9,7 @@ import { XCircle, AlertTriangle, ImageOff, ExternalLink, CheckCircle, Loader2, C
 import { apiClient, ApiError } from '../lib/api';
 import { wsClient } from '../lib/api/ws';
 import { DateTime } from './DateTime';
-import { fmtCurrency } from '../lib/format';
+import { fmtCurrency, formatDateTime } from '../lib/format';
 import { useAuth } from '../contexts/AuthContext';
 import { MediaLightbox, MediaThumbButton } from './MediaLightbox';
 import { normalizeKey } from '../lib/mediaPath';
@@ -89,6 +89,45 @@ export interface SubmissionRow {
   dup_first_status: SubmissionStatus | null;
   dup_first_submitted_at: string | null;
   dup_cross_customer: boolean | null;
+  // Contract facts carried on the same row (mig 1186) — no per-row v_contract_detail
+  // fetch needed. All are the contract's state AT READ TIME, not at submit time, so
+  // an APPROVED slip's installment number moves on as the contract progresses.
+  // device_external_ref = the funder's own customer code for the bound device.
+  device_external_ref: string | null;
+  contract_activated_at: string | null;
+  paid_installment_count: number | null;
+  total_installments: number | null;
+  // First not-yet-settled installment = the one this slip pays down. Always within
+  // [1, total_installments]; null until the contract has a schedule. Never derive it
+  // from paid_installment_count + 1 — the DB owns the formula.
+  current_installment_no: number | null;
+}
+
+/**
+ * Funder ref · activation date · installment n/total — the three contract facts
+ * a reviewer needs while looking at a slip. Each piece is dropped when its value
+ * is null (a pre-activation down-payment slip has no date and no installment),
+ * and the whole line disappears when nothing is left.
+ */
+export function SubmissionContractInfoLine({ row, className }: { row: SubmissionRow; className?: string }) {
+  const { t, i18n } = useTranslation();
+  const parts: React.ReactNode[] = [];
+  if (row.device_external_ref) {
+    parts.push(t('paymentSubmissions.externalRefShort', { ref: row.device_external_ref }));
+  }
+  if (row.contract_activated_at) {
+    parts.push(t('paymentSubmissions.activatedAtShort', {
+      date: formatDateTime(row.contract_activated_at, i18n.language, false),
+    }));
+  }
+  if (row.current_installment_no != null && row.total_installments != null) {
+    parts.push(t('paymentSubmissions.installmentNoShort', {
+      current: row.current_installment_no,
+      total: row.total_installments,
+    }));
+  }
+  if (parts.length === 0) return null;
+  return <div className={className}>{parts.join(' · ')}</div>;
 }
 
 interface EntityMedia {
@@ -368,6 +407,7 @@ export function SubmissionReviewDrawer({
                   )}
                 </span>
               </DetailRow>
+              <SubmissionContractInfoLine row={row} className="text-xs text-subtle text-right" />
               <DetailRow label={t('paymentSubmissions.customerTel')} value={row.customer_tel ?? '—'} />
               <DetailRow label={t('paymentSubmissions.branch')} value={row.branch_name ?? '—'} />
               <hr className="border-line my-2" />

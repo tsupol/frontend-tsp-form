@@ -10,6 +10,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { wsClient } from '../lib/api/ws';
 import {
   SubmissionReviewDrawer,
+  SubmissionContractInfoLine,
   submissionStatusColor as statusColor,
   type SubmissionRow,
   type SubmissionStatus,
@@ -209,6 +210,9 @@ export function PaymentSubmissionsPage() {
             )}
           </div>
         </div>
+        {/* Line 3 — funder ref · activation date · installment n/total (mig 1186).
+            Renders nothing when the contract isn't active yet. */}
+        <SubmissionContractInfoLine row={row} className="mt-1 text-xs text-subtle truncate" />
       </div>
     );
   };
