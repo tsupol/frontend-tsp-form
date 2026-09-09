@@ -21,6 +21,23 @@ adds what is specific to this app.
 - If a shot looks like it has empty space the browser doesn't, suspect the
   capture, not the layout. Compare `window.innerWidth` against the PNG width
   before touching any CSS.
+- **Window size: default to a 1440x900 viewport** for review shots. Set it over
+  CDP (never `browser_resize`, which pins the viewport for the session and can't
+  be undone). Chrome's own overhead measured here: **+15px width** (scrollbar),
+  **+95px height**, so ask for 1455x995 to land on 1442x902:
+  ```js
+  const cdp = await page.context().newCDPSession(page);
+  const { windowId } = await cdp.send('Browser.getWindowForTarget');
+  await cdp.send('Browser.setWindowBounds', { windowId,
+    bounds: { left: 2990, top: 60, width: 1455, height: 995, windowState: 'normal' } });
+  await page.waitForTimeout(500);
+  await cdp.detach();
+  ```
+  Other useful sizes on this 2048x1152 screen: 1280x800 (small laptop — the rail
+  before it collapses), 1024x768 (where `max-lg:hidden` columns drop), 1900x1000
+  (wide tables). Below ~1280 the asset rail + detail panel starts to feel
+  squeezed, so don't review two-panel pages there unless that's the point.
+
 - **Do NOT call `page.emulateMedia()`** (the global guide explains why: it pins
   the media query for the session). The context already boots dark.
 
