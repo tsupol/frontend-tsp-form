@@ -10,14 +10,26 @@ adds what is specific to this app.
   `.playwright-mcp/`. The folder is gitignored; delete the shots when the
   verification is done. `mkdir -p` it first — the screenshot tool errors with
   ENOENT rather than creating the folder itself.
-- **Outline what you captured.** When you hand over shots, list them — one line
-  per shot: the file, the page/state it shows, and what in it is worth looking
-  at. The user is about to open several PNGs; without the list they have to
-  reverse-engineer why each one exists.
-- Also say what you *checked* that isn't visible in the images — the values you
-  read off the DOM, the case you deliberately picked (a null field, an empty
-  list), anything that failed or looked wrong on the way. A shot proves the
-  layout; the outline is what proves you verified the behaviour.
+- **Annotate every review shot — a bare screenshot is not the deliverable.**
+  A shot of a busy page with no marking makes the user hunt for what changed.
+  Two things, both drawn into the page before capturing:
+  1. **Orange outline rectangles** (`2px solid #f59e0b`, ~6px radius) around
+     every element the change touched — all instances on screen, not just one.
+  2. **A doc-reference caption bottom-left**, naming the `UI_FEEDBACK/` or
+     `UI_SUMMARY/` doc the change implements, on a **light-gray opaque
+     background** (`#d4d4d8`, dark text, regular weight — not bold). Opaque,
+     never semi-transparent — the page shows through and the text stops being
+     readable.
+
+  Inject with `page.addScriptTag` + `page.evaluate`, `position: fixed` and a
+  max z-index so the overlay sits above modals and drawers. Measure the text
+  with a `Range`, not `getBoundingClientRect` on the element — a full-width
+  block gives a box running far past the text it's meant to point at.
+- **Outline what you captured** in your reply. One line per shot: the file, the
+  page/state, and what to look at. Also say what you verified that the image
+  can't show — values read off the DOM, the case you deliberately picked (a
+  null field, an empty list), anything that failed on the way. The shot proves
+  the layout; the outline proves the behaviour.
 - **Take them plain: no `clip`, no `scale`, no size of any kind.** Just
   `page.screenshot({ path })`. The window is whatever size the user has it, and
   that is the size worth seeing.
