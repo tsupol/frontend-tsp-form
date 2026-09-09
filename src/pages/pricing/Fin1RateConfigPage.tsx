@@ -47,7 +47,6 @@ interface Fin1Policy {
   min_down_percent: number;
   max_down_percent: number;
   rounding_unit: number;
-  doc_fee_amount: number;
   uplift_max: number;
   guarantee_days: number;
   guarantee_days_uplift: number;
@@ -461,7 +460,9 @@ const POLICY_FIELDS: Array<{ key: keyof Fin1Policy; suffix?: string; decimalScal
   { key: 'min_down_percent', suffix: '%', decimalScale: 0 },
   { key: 'max_down_percent', suffix: '%', decimalScale: 0 },
   { key: 'rounding_unit', decimalScale: 0 },
-  { key: 'doc_fee_amount', decimalScale: 0 },
+  // Two fees are deliberately absent, both moved onto the deal partner and
+  // both now rejected outright by fn_fin1_policy_set: doc_fee_amount (mig 1173)
+  // and guarantee_return_fee_amount (mig 1192, days after 1191 put it here).
   { key: 'uplift_max', decimalScale: 0 },
   { key: 'guarantee_days', decimalScale: 0 },
   { key: 'guarantee_days_uplift', decimalScale: 0 },
