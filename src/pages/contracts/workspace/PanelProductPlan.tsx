@@ -6,9 +6,11 @@ import { Search, ScanBarcode, XCircle, X, Calculator, Info, CheckCircle, Package
 import { apiClient, ApiError } from '../../../lib/api';
 import { fmtCurrency } from '../../../lib/format';
 import { getConditionLabel, getConditionTextColor, assetSearchOrClause } from '../../inventory/inventoryUtils';
+import { formatInstallment } from '../contractUtils';
 import { useWorkspace } from './WorkspaceContext';
 import type { Quote } from './WorkspaceTypes';
 import { useBarcodeScanner } from '../../../components/BarcodeScanner';
+import { Fin1PlanEditor } from './Fin1PlanEditor';
 import { ColorSwatch } from '../../../components/ColorAutocomplete';
 import { lookupBarcode } from '../../../lib/barcodeLookup';
 import { translateApiError } from '../../../lib/apiErrors';
@@ -642,6 +644,52 @@ export function PanelProductPlan(_props: Props) {
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState('');
 
+  // ── FIN1 rate step (DELIVERY 2026-09-09) ─────────────────────────────
+  // FIN1 no longer has rate cards, so fn_quote_calculate returns nothing for
+  // it (mig 1172) and there is no table row to click. The plan is chosen with
+  // fn_contract_set_fin1_plan instead, which needs the product already on the
+  // contract — so the product is committed first, then the editor opens.
+  // Used assets are out of scope for this engine (FIN1_USED_ASSET_UNSUPPORTED).
+  const fin1Available = fin1Enabled && mode === 'new';
+  const contractIsFin1 = contract?.commercial_model === 'FIN1';
+  const productOnContract =
+    !!localModelId && localModelId === contract?.model_id && localVariantId === contract?.variant_id;
+  const [fin1Open, setFin1Open] = useState(contractIsFin1 && !!contract?.value_month);
+  const [fin1Preparing, setFin1Preparing] = useState(false);
+  const [fin1Error, setFin1Error] = useState('');
+
+  // Commit product + commercial model, then hand over to the plan editor.
+  const handleOpenFin1 = async () => {
+    const contractId = contract?.id ?? wizardData.contractId;
+    if (!contractId || !localModelId || !localVariantId) return;
+    setFin1Preparing(true);
+    setFin1Error('');
+    try {
+      if (contract?.is_used_asset && contract?.target_asset_id) {
+        await apiClient.rpc('fn_contract_clear_target', { p_contract_id: contractId });
+      }
+      if (!productOnContract) {
+        await apiClient.rpc('fn_contract_set_product', {
+          p_contract_id: contractId,
+          p_model_id: localModelId,
+          p_variant_id: localVariantId,
+        });
+      }
+      if (contract?.commercial_model !== 'FIN1') {
+        await apiClient.rpc('fn_contract_set_commercial_model', {
+          p_contract_id: contractId,
+          p_commercial_model: 'FIN1',
+        });
+      }
+      invalidateContract();
+      setFin1Open(true);
+    } catch (err) {
+      setFin1Error(err instanceof ApiError ? translateApiError(err, t) : String(err));
+    } finally {
+      setFin1Preparing(false);
+    }
+  };
+
   const hasChanges = mode === 'used'
     ? localTargetAssetId !== (contract?.target_asset_id ?? null)
       || localQuote?.finance_model !== (contract?.commercial_model ?? undefined)
@@ -1014,6 +1062,58 @@ export function PanelProductPlan(_props: Props) {
         </div>
       )}
 
+      {/* ── FIN1 plan step ──────────────────────────────────────────── */}
+      {/* Its own section, not a quote row: FIN1 is priced by
+          fn_contract_set_fin1_plan, and the product has to be on the contract
+          before that RPC will answer. */}
+      {fin1Available && localVariantId && (
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <Badge size="sm" color="info">FIN1</Badge>
+            <span className="text-sm font-medium">{t('priceCheck.fin1Desc')}</span>
+          </div>
+          {fin1Open && contract?.id && contractIsFin1 && productOnContract ? (
+            <Fin1PlanEditor
+              contractId={contract.id}
+              initialTermMonths={contract.value_month ?? null}
+              initialDownAmount={contract.down_payment ?? null}
+              initialUplift={contract.uplift_amount ?? null}
+              onSaved={() => {
+                invalidateContract();
+                addSnackbar({
+                  message: (
+                    <div className="alert alert-success">
+                      <CheckCircle size={18} />
+                      <div><div className="alert-title">{t('common.saved')}</div></div>
+                    </div>
+                  ),
+                });
+              }}
+            />
+          ) : (
+            <div className="border border-line rounded-lg p-4 flex flex-col gap-3">
+              <span className="text-sm text-subtle">{t('fin1Plan.startHint')}</span>
+              {fin1Error && (
+                <div className="alert alert-danger">
+                  <XCircle size={16} />
+                  <span>{fin1Error}</span>
+                </div>
+              )}
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  color="primary"
+                  onClick={handleOpenFin1}
+                  disabled={fin1Preparing || !contract?.id}
+                >
+                  {fin1Preparing ? t('common.saving') : t('fin1Plan.startButton')}
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Quote tables ────────────────────────────────────────────── */}
       {((mode === 'new' && localVariantId) || (mode === 'used' && localTargetAssetId)) && dedupedQuotes.length > 0 && (
         <div className="flex flex-col gap-5">
@@ -1083,8 +1183,35 @@ export function PanelProductPlan(_props: Props) {
       {saveError && <div className="alert alert-danger"><XCircle size={16} /><span>{saveError}</span></div>}
     </div>
 
-    {/* Footer — selected plan summary doubles as the sticky action bar */}
-    {localQuote ? (
+    {/* Footer — selected plan summary doubles as the sticky action bar.
+        FIN1 writes its plan through its own editor (no local quote to
+        confirm), so its footer just mirrors what is on the contract, with the
+        lighter final installment spelled out when the plan isn't uniform. */}
+    {contractIsFin1 && contract?.value_month != null && contract?.installment_amount != null ? (
+      <div className="shrink-0 border-t border-primary bg-primary-soft px-4 py-3">
+        <div className="text-xs text-primary-fg font-medium mb-2">{t('wizard.selectedPlan')}</div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div>
+            <div className="text-xs text-subtle">{t('wizard.financeModel')}</div>
+            <div className="text-sm font-medium">FIN1</div>
+          </div>
+          <div>
+            <div className="text-xs text-subtle">{t('contract.termMonths')}</div>
+            <div className="text-sm font-medium">{contract.value_month} {t('contract.months')}</div>
+          </div>
+          <div>
+            <div className="text-xs text-subtle">{t('contract.downPayment')}</div>
+            <div className="text-sm font-medium">{fmtCurrency(contract.down_payment)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-subtle">{t('contract.installmentAmount')}</div>
+            <div className="text-sm font-medium text-primary-fg">
+              {formatInstallment(contract, t, fmtCurrency)}
+            </div>
+          </div>
+        </div>
+      </div>
+    ) : localQuote ? (
       <div className="shrink-0 border-t border-primary bg-primary-soft px-4 py-3 flex flex-col gap-3">
         <div>
           <div className="text-xs text-primary-fg font-medium mb-2">{t('wizard.selectedPlan')}</div>

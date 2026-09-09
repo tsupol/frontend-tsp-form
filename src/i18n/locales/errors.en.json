@@ -993,5 +993,21 @@
   "inv.evidence.not_asset_album": "This item is not an asset evidence photo.",
   "media.validation.reorder_scope_mismatch": "The photo list changed — refresh and try again.",
   "media.validation.key_reused": "This file was already attached — upload a fresh one.",
-  "media.validation.invalid_path": "The uploaded file doesn't belong to this device."
+  "media.validation.invalid_path": "The uploaded file doesn't belong to this device.",
+  "sale.validation.wrong_commercial_model": "This action doesn't match the contract's finance model — FIN1 plans are set in the FIN1 step, FIN2 uses the rate table.",
+  "sale.validation.fin1_use_new_engine": "FIN1 plans are set from the model's retail price in the FIN1 step — the old FIN1 rate cards were retired.",
+  "sale.validation.fin1_down_input": "Enter the down payment either as a percentage or as an amount (amounts must land on a multiple of {{rounding_unit}}).",
+  "sale.validation.fin1_down_input_basic": "Enter the down payment either as a percentage or as an amount — not both.",
+  "sale.validation.fin1_used_asset_unsupported": "This FIN1 step covers new devices priced from the model's pricebook only — second-hand devices aren't supported yet.",
+  "sale.validation.model_required": "Pick the product first.",
+  "sale.validation.term_months_required": "Pick the number of installments.",
+  "sale.validation.financial_locked": "Financial terms are locked while approval is pending.",
+  "sale.state.not_editable": "This contract can no longer be edited ({{state}}).",
+  "sale.state.not_editable_basic": "This contract can no longer be edited.",
+  "sale.validation.contract_not_found": "Contract not found.",
+  "contract.validation.fin1_snapshot_required": "Set the FIN1 plan before continuing.",
+  "contract.validation.fin1_plan_out_of_rate": "The plan on this contract no longer matches the rules it was set under — set the plan again.",
+  "contract.validation.fin1_rate_drift": "The rates changed after this plan was set. The contract still matches what was snapshotted, but setting the plan again refreshes it.",
+  "pricing.not_found.variant": "This product is no longer active in the catalog.",
+  "pricing.not_found.model": "This model is no longer active in the catalog."
 }

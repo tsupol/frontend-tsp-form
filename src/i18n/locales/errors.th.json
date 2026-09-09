@@ -993,5 +993,21 @@
   "inv.evidence.not_asset_album": "รายการนี้ไม่ใช่รูปหลักฐานสินทรัพย์",
   "media.validation.reorder_scope_mismatch": "รายการรูปเปลี่ยนไปแล้ว — รีเฟรชแล้วลองใหม่",
   "media.validation.key_reused": "ไฟล์นี้ถูกผูกไปแล้ว — อัปโหลดไฟล์ใหม่",
-  "media.validation.invalid_path": "ไฟล์ที่อัปโหลดไม่ใช่ของเครื่องนี้"
+  "media.validation.invalid_path": "ไฟล์ที่อัปโหลดไม่ใช่ของเครื่องนี้",
+  "sale.validation.wrong_commercial_model": "คำสั่งนี้ไม่ตรงกับโมเดลการค้าของสัญญา — FIN1 ตั้งแผนในขั้นเลือกเรท FIN1 · FIN2 ใช้ตารางเรท",
+  "sale.validation.fin1_use_new_engine": "FIN1 ตั้งแผนจากราคาตั้งของรุ่นในขั้นเลือกเรท FIN1 — ระบบเรทการ์ด FIN1 เดิมถูกถอดแล้ว",
+  "sale.validation.fin1_down_input": "ระบุเงินดาวน์เป็น % หรือเป็นบาทอย่างใดอย่างหนึ่ง (จำนวนเงินต้องลงหลัก {{rounding_unit}})",
+  "sale.validation.fin1_down_input_basic": "ระบุเงินดาวน์เป็น % หรือเป็นบาทอย่างใดอย่างหนึ่ง ไม่ใช่ทั้งสองอย่าง",
+  "sale.validation.fin1_used_asset_unsupported": "ขั้นตอน FIN1 นี้รองรับเฉพาะเครื่องใหม่ตามราคาตั้งของรุ่น — เครื่องมือสองยังไม่รองรับ",
+  "sale.validation.model_required": "เลือกสินค้าก่อน",
+  "sale.validation.term_months_required": "เลือกจำนวนงวด",
+  "sale.validation.financial_locked": "เงื่อนไขการเงินถูกล็อกระหว่างรออนุมัติ",
+  "sale.state.not_editable": "สัญญานี้แก้ไขไม่ได้แล้ว ({{state}})",
+  "sale.state.not_editable_basic": "สัญญานี้แก้ไขไม่ได้แล้ว",
+  "sale.validation.contract_not_found": "ไม่พบสัญญา",
+  "contract.validation.fin1_snapshot_required": "ตั้งแผน FIN1 ก่อนจึงจะไปต่อได้",
+  "contract.validation.fin1_plan_out_of_rate": "แผนบนสัญญาไม่ตรงกับกติกาที่ใช้ตอนตั้งแผนแล้ว — ตั้งแผนใหม่อีกครั้ง",
+  "contract.validation.fin1_rate_drift": "เรทเปลี่ยนหลังตั้งแผน สัญญายังตรงกับที่ snapshot ไว้ ตั้งแผนใหม่จะอัปเดตให้ตรงกับกติกาวันนี้",
+  "pricing.not_found.variant": "สินค้านี้ไม่ได้เปิดใช้งานในแคตตาล็อกแล้ว",
+  "pricing.not_found.model": "รุ่นนี้ไม่ได้เปิดใช้งานในแคตตาล็อกแล้ว"
 }
