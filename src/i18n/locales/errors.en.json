@@ -115,6 +115,8 @@
   "auth.unauthorized": "Please log in to continue",
   "auth.session_expired": "Session expired, please log in again",
   "auth.forbidden": "You do not have permission to perform this action",
+  "auth.permission.not_grantable": "This permission cannot be granted to an individual.",
+  "auth.permission.grant_not_found": "This user has no active grant for that permission.",
   "system.unexpected": "An unexpected error occurred",
   "product.validation.brand_code_required": "Brand code is required",
   "product.validation.brand_code_invalid": "Brand code format is invalid",

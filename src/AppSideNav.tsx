@@ -60,6 +60,7 @@ import {
   Wallet,
   UserX,
   Hourglass,
+  KeySquare,
 } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
 import { getRoleLabel } from './lib/roleLabel';
@@ -598,7 +599,14 @@ export const AppSideNav = () => {
         { key: 'staff-commission', icon: <UserCheck size="1rem" />, label: t('nav.staffCommission'), path: '/admin/company/staff-commission' },
       ],
     },
-    { key: 'users', icon: <Users size="1rem" />, label: t('nav.users'), path: '/admin/users' },
+    {
+      key: 'users', icon: <Users size="1rem" />, label: t('nav.users'), path: '/admin/users',
+      // Grants are handed out BY holding admins, so only they get the overview.
+      children: ['HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
+        { key: 'users-list', icon: <Users size="1rem" />, label: t('nav.users'), path: '/admin/users' },
+        { key: 'permission-grants', icon: <KeySquare size="1rem" />, label: t('nav.permissionGrants'), path: '/admin/users/permission-grants' },
+      ] : undefined,
+    },
     {
       type: 'custom',
       key: 'notifications',

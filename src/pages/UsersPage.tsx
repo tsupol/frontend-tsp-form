@@ -3,12 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { useForm, Controller } from 'react-hook-form';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { DataTable, DataTableColumnHeader, DataTableFooter, Button, Input, Select, PopOver, MenuItem, MenuSeparator, Badge, Modal, Switch, LabeledCheckbox, createSelectColumn, useSnackbarContext, MobileHeader, type ColumnDef, type RowSelectionState, type SortingState } from 'tsp-form';
-import { Plus, MoreHorizontal, Pencil, ShieldCheck, ShieldOff, KeyRound, Trash2, Ban, XCircle, CheckCircle, Eye, EyeOff, Copy, SlidersHorizontal, ArrowRightFromLine, AlertTriangle } from 'lucide-react';
+import { Plus, MoreHorizontal, Pencil, ShieldCheck, ShieldOff, KeyRound, KeySquare, Trash2, Ban, XCircle, CheckCircle, Eye, EyeOff, Copy, SlidersHorizontal, ArrowRightFromLine, AlertTriangle } from 'lucide-react';
 import { apiClient, ApiError } from '../lib/api';
 import { FormErrorMessage } from 'tsp-form';
 import { getRoleLabel } from '../lib/roleLabel';
 import { translateApiError } from '../lib/apiErrors';
 import { SearchInput } from '../components/SearchInput';
+import { useAuth } from '../contexts/AuthContext';
+import { UserPermissionGrantsModal } from './users/UserPermissionGrantsModal';
 
 interface VUser {
   id: number;
@@ -97,7 +99,7 @@ function useBranches(companyId: string | null) {
 }
 
 // Row actions menu
-function RowActions({ user, onEdit, onChangeRole, onPasswordManage, onToggleActive, onDelete }: { user: VUser; onEdit: (user: VUser) => void; onChangeRole: (user: VUser) => void; onPasswordManage: (user: VUser) => void; onToggleActive: (user: VUser) => void; onDelete: (user: VUser) => void }) {
+function RowActions({ user, onEdit, onChangeRole, onPasswordManage, onGrants, onToggleActive, onDelete }: { user: VUser; onEdit: (user: VUser) => void; onChangeRole: (user: VUser) => void; onPasswordManage: (user: VUser) => void; onGrants: ((user: VUser) => void) | null; onToggleActive: (user: VUser) => void; onDelete: (user: VUser) => void }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
 
@@ -134,6 +136,14 @@ function RowActions({ user, onEdit, onChangeRole, onPasswordManage, onToggleActi
           label={t('users.changeRole')}
           onClick={() => { setOpen(false); onChangeRole(user); }}
         />
+        {/* Holding admins only — granting is their call to make (§3). */}
+        {onGrants && (
+          <MenuItem
+            icon={<KeySquare size={14} />}
+            label={t('users.permissionGrants')}
+            onClick={() => { setOpen(false); onGrants(user); }}
+          />
+        )}
         <MenuSeparator />
         <MenuItem
           icon={user.is_active ? <ShieldOff size={14} /> : <ShieldCheck size={14} />}
@@ -1327,8 +1337,14 @@ export function UsersPage() {
   const [deleteUser, setDeleteUser] = useState<VUser | null>(null);
   const [passwordUser, setPasswordUser] = useState<VUser | null>(null);
   const [changeRoleUser, setChangeRoleUser] = useState<VUser | null>(null);
+  const [grantsUser, setGrantsUser] = useState<VUser | null>(null);
   const [bulkAction, setBulkAction] = useState<{ action: 'deactivate' | 'activate'; users: VUser[] } | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
+
+  // Granting is a holding-admin act (§3); company admins are the recipients.
+  // Visibility only — the RPC enforces it regardless of what we render.
+  const { user: currentUser } = useAuth();
+  const canGrant = ['HOLDING_ADMIN', 'SYSTEM_DEV'].includes(currentUser?.role_code ?? '');
 
   const activeFilterCount = [filterRole, filterHolding, filterCompany, filterBranch].filter(Boolean).length + (sorting.length > 0 ? 1 : 0);
 
@@ -1435,7 +1451,7 @@ export function UsersPage() {
     {
       id: 'actions',
       header: () => null,
-      cell: ({ row }) => <RowActions user={row.original} onEdit={setEditUser} onChangeRole={setChangeRoleUser} onPasswordManage={setPasswordUser} onToggleActive={setToggleActiveUser} onDelete={setDeleteUser} />,
+      cell: ({ row }) => <RowActions user={row.original} onEdit={setEditUser} onChangeRole={setChangeRoleUser} onPasswordManage={setPasswordUser} onGrants={canGrant ? setGrantsUser : null} onToggleActive={setToggleActiveUser} onDelete={setDeleteUser} />,
       enableSorting: false,
       className: 'w-10',
     },
@@ -1779,6 +1795,7 @@ export function UsersPage() {
                         onEdit={setEditUser}
                         onChangeRole={setChangeRoleUser}
                         onPasswordManage={setPasswordUser}
+                        onGrants={canGrant ? setGrantsUser : null}
                         onToggleActive={setToggleActiveUser}
                         onDelete={setDeleteUser}
                       />
@@ -1806,6 +1823,7 @@ export function UsersPage() {
       <DeleteUserModal user={deleteUser} open={!!deleteUser} onClose={() => setDeleteUser(null)} />
       <PasswordModal user={passwordUser} open={!!passwordUser} onClose={() => setPasswordUser(null)} />
       <ChangeRoleModal user={changeRoleUser} open={!!changeRoleUser} onClose={() => setChangeRoleUser(null)} />
+      <UserPermissionGrantsModal user={grantsUser} open={!!grantsUser} onClose={() => setGrantsUser(null)} />
       <BulkActionModal
         action={bulkAction?.action ?? 'deactivate'}
         users={bulkAction?.users ?? []}

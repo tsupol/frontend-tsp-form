@@ -525,7 +525,8 @@
     "serviceFee": "Service Fees",
     "serviceFeeByType": "Service Fees by Type",
     "lotIntake": "Goods Received",
-    "lotIntakeByModel": "Goods Received by Model"
+    "lotIntakeByModel": "Goods Received by Model",
+    "permissionGrants": "Permission grants"
   },
   "ownerType": {
     "HOLDING": "Holding",
@@ -1017,7 +1018,8 @@
     "passwordRules": "At least 8 characters, with a letter and a number",
     "passwordMismatch": "Passwords do not match",
     "changeRole": "Change Role",
-    "changeRoleSuccess": "Role updated for {{username}}"
+    "changeRoleSuccess": "Role updated for {{username}}",
+    "permissionGrants": "Permission grants"
   },
   "profile": {
     "changePassword": "Change Password",
@@ -7674,5 +7676,32 @@
       "NEGOTIATED": "Settled by negotiation",
       "OTHER": "Other"
     }
+  },
+  "permissionGrants": {
+    "title": "Permission grants",
+    "navTitle": "Permission grants",
+    "description": "Permissions a holding admin hands to individual company admins. The grant applies inside that person's own company.",
+    "manageFor": "Permission grants",
+    "granted": "Granted",
+    "revoked": "Revoked",
+    "grantedBy": "Granted by",
+    "grantedAt": "Granted",
+    "revokedAt": "Revoked",
+    "fromRole": "From role",
+    "fromRoleHint": "This role already has every grantable permission",
+    "note": "Note",
+    "notePlaceholder": "Why this person needs it (optional)",
+    "permission": "Permission",
+    "user": "User",
+    "showRevoked": "Show revoked",
+    "empty": "No permissions granted yet",
+    "emptyRevoked": "No grants recorded",
+    "grantSuccess": "Granted {{permission}} to {{username}}",
+    "revokeSuccess": "Revoked {{permission}} from {{username}}",
+    "revoke": "Revoke",
+    "history": "History",
+    "reloginHint": "The user sees the change after their next page load or login.",
+    "onlyHoldingAdmin": "Only a holding admin can grant permissions.",
+    "companyScope": "Applies within {{company}}"
   }
 }

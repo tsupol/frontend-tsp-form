@@ -16,6 +16,7 @@ import { HoldingSelectModal } from './components/HoldingSelectModal';
 import { ChatDockProvider } from './contexts/ChatDockContext';
 import { ChatDock } from './components/ChatDock';
 import { UsersPage } from './pages/UsersPage';
+import { PermissionGrantsPage } from './pages/users/PermissionGrantsPage';
 import { BrandsPage } from './pages/products/BrandsPage';
 import { FamiliesPage } from './pages/products/FamiliesPage';
 import { AttributesPage } from './pages/products/AttributesPage';
@@ -350,6 +351,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <UsersPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/users/permission-grants"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <PermissionGrantsPage />
             </AdminLayout>
           </ProtectedRoute>
         }

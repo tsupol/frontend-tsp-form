@@ -115,6 +115,8 @@
   "auth.unauthorized": "กรุณาเข้าสู่ระบบเพื่อดำเนินการต่อ",
   "auth.session_expired": "เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง",
   "auth.forbidden": "คุณไม่มีสิทธิ์ดำเนินการนี้",
+  "auth.permission.not_grantable": "สิทธิ์นี้มอบให้เป็นรายคนไม่ได้",
+  "auth.permission.grant_not_found": "ไม่พบสิทธิ์รายคนที่ยังใช้งานอยู่ของผู้ใช้นี้",
   "system.unexpected": "เกิดข้อผิดพลาดที่ไม่คาดคิด",
   "product.validation.brand_code_required": "กรุณากรอกรหัสแบรนด์",
   "product.validation.brand_code_invalid": "รูปแบบรหัสแบรนด์ไม่ถูกต้อง",

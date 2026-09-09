@@ -523,7 +523,8 @@
     "serviceFee": "รายงานค่าบริการ",
     "serviceFeeByType": "รายงานค่าบริการแบ่งตามประเภท",
     "lotIntake": "รายงานเครื่องเข้า",
-    "lotIntakeByModel": "รายงานเครื่องเข้าตามรุ่น"
+    "lotIntakeByModel": "รายงานเครื่องเข้าตามรุ่น",
+    "permissionGrants": "สิทธิ์พิเศษรายคน"
   },
   "ownerType": {
     "HOLDING": "Holding",
@@ -1015,7 +1016,8 @@
     "passwordRules": "อย่างน้อย 8 ตัวอักษร มีทั้งตัวอักษรและตัวเลข",
     "passwordMismatch": "รหัสผ่านไม่ตรงกัน",
     "changeRole": "เปลี่ยนบทบาท",
-    "changeRoleSuccess": "เปลี่ยนบทบาทสำหรับ {{username}} สำเร็จ"
+    "changeRoleSuccess": "เปลี่ยนบทบาทสำหรับ {{username}} สำเร็จ",
+    "permissionGrants": "สิทธิ์พิเศษ"
   },
   "profile": {
     "changePassword": "เปลี่ยนรหัสผ่าน",
@@ -7664,5 +7666,32 @@
       "NEGOTIATED": "เจรจาตกลงกันได้",
       "OTHER": "อื่น ๆ"
     }
+  },
+  "permissionGrants": {
+    "title": "สิทธิ์พิเศษรายคน",
+    "navTitle": "สิทธิ์พิเศษรายคน",
+    "description": "สิทธิ์ที่ holding admin มอบให้ company admin เป็นรายคน ใช้ได้ในขอบเขต company ของคนนั้น",
+    "manageFor": "สิทธิ์พิเศษ",
+    "granted": "มอบแล้ว",
+    "revoked": "ถอนแล้ว",
+    "grantedBy": "มอบโดย",
+    "grantedAt": "วันที่มอบ",
+    "revokedAt": "วันที่ถอน",
+    "fromRole": "มีตาม role",
+    "fromRoleHint": "role นี้มีสิทธิ์ที่มอบได้ทั้งหมดอยู่แล้ว",
+    "note": "หมายเหตุ",
+    "notePlaceholder": "เหตุผลที่ต้องได้สิทธิ์นี้ (ถ้ามี)",
+    "permission": "สิทธิ์",
+    "user": "ผู้ใช้",
+    "showRevoked": "แสดงที่ถอนแล้ว",
+    "empty": "ยังไม่ได้มอบสิทธิ์",
+    "emptyRevoked": "ไม่มีประวัติการมอบสิทธิ์",
+    "grantSuccess": "มอบ {{permission}} ให้ {{username}} แล้ว",
+    "revokeSuccess": "ถอน {{permission}} จาก {{username}} แล้ว",
+    "revoke": "ถอนสิทธิ์",
+    "history": "ประวัติ",
+    "reloginHint": "ผู้ใช้จะเห็นผลเมื่อโหลดหน้าใหม่หรือ login ใหม่",
+    "onlyHoldingAdmin": "เฉพาะ holding admin เท่านั้นที่มอบสิทธิ์ได้",
+    "companyScope": "ใช้ได้ในขอบเขต {{company}}"
   }
 }
