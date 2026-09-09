@@ -1983,11 +1983,10 @@
       "rounding_unit": "หน่วยปัดเศษ (บาท)",
       "doc_fee_amount": "ค่าทำสัญญา (บาท)",
       "uplift_max": "เพดานราคาปรับขึ้น (บาท)",
-      "guarantee_days": "ประกัน (วัน)",
-      "guarantee_days_uplift": "ประกันเมื่อปรับราคา (วัน)",
+      "branch_min_down_default": "ค่าเริ่มต้นดาวน์ขั้นต่ำของสาขา %",
+      "branch_max_down_default": "ค่าเริ่มต้นดาวน์สูงสุดของสาขา %",
       "settlement_discount_min": "ส่วนลดปิดสัญญา ต่ำสุด %",
-      "settlement_discount_max": "ส่วนลดปิดสัญญา สูงสุด %",
-      "approved_ttl_days": "อายุใบอนุมัติ (วัน)"
+      "settlement_discount_max": "ส่วนลดปิดสัญญา สูงสุด %"
     },
     "downMinTag": "ขั้นต่ำตามนโยบาย",
     "downMaxTag": "สูงสุดตามนโยบาย"
@@ -2207,7 +2206,14 @@
     "guaranteeFeeRange": "ช่วงค่าคืนเครื่องที่อนุญาต",
     "guaranteeFeeAmount": "ค่าคืนเครื่องในระยะประกัน",
     "guaranteeFeeHint": "สาขาจ่ายเพิ่มจากการคืนเงินเต็มจำนวน เมื่อลูกค้าคืนเครื่องภายในระยะประกัน",
-    "guaranteeFeeRangeHint": "ค่าคืนเครื่องต้องอยู่ในช่วง {{min}}–{{max}} บาท"
+    "guaranteeFeeRangeHint": "ค่าคืนเครื่องต้องอยู่ในช่วง {{min}}–{{max}} บาท",
+    "valueRequired": "กรุณาระบุค่า",
+    "guaranteeDaysSection": "ประกันเครื่อง & อายุใบอนุมัติ",
+    "guaranteeDaysHint": "สาขาภายในไม่มีประกันเครื่อง — เงื่อนไขนี้ใช้กับร้าน deal partner",
+    "guaranteeDays": "ประกัน (วัน)",
+    "guaranteeDaysUplift": "ประกันเมื่อปรับราคา (วัน)",
+    "approvedTtlDays": "อายุใบอนุมัติ (วัน)",
+    "daysValue": "{{days}} วัน"
   },
   "branchStock": {
     "retailTab": "ขายปลีก",

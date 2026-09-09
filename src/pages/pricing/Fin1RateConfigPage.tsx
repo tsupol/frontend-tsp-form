@@ -48,12 +48,11 @@ interface Fin1Policy {
   max_down_percent: number;
   rounding_unit: number;
   uplift_max: number;
-  guarantee_days: number;
-  guarantee_days_uplift: number;
+  branch_min_down_default: number;
+  branch_max_down_default: number;
   clawback_days: number;
   clawback_min_paid: number;
   clawback_notice_days: number;
-  approved_ttl_days: number;
   settlement_discount_min: number;
   settlement_discount_max: number;
 }
@@ -460,15 +459,20 @@ const POLICY_FIELDS: Array<{ key: keyof Fin1Policy; suffix?: string; decimalScal
   { key: 'min_down_percent', suffix: '%', decimalScale: 0 },
   { key: 'max_down_percent', suffix: '%', decimalScale: 0 },
   { key: 'rounding_unit', decimalScale: 0 },
-  // Two fees are deliberately absent, both moved onto the deal partner and
-  // both now rejected outright by fn_fin1_policy_set: doc_fee_amount (mig 1173)
-  // and guarantee_return_fee_amount (mig 1192, days after 1191 put it here).
+  // Deliberately absent — moved onto the deal partner, and fn_fin1_policy_set
+  // rejects the keys outright (not silently): doc_fee_amount (mig 1173);
+  // guarantee_days, guarantee_days_uplift, approved_ttl_days and
+  // guarantee_return_fee_amount (mig 1192 — "ไม่ใช่นโยบายของ FIN1 แต่เกิดขึ้นกับ
+  // deal partner"; the view still returns the three day-columns but they are
+  // inert and scheduled for removal).
   { key: 'uplift_max', decimalScale: 0 },
-  { key: 'guarantee_days', decimalScale: 0 },
-  { key: 'guarantee_days_uplift', decimalScale: 0 },
+  // Seeds for the branch down range in finance-models when a branch turns
+  // FIN1 on. Must sit inside the holding min/max above and min ≤ max — the
+  // server enforces both (FIN1_POLICY_KEY {rule}) like every other field here.
+  { key: 'branch_min_down_default', suffix: '%', decimalScale: 0 },
+  { key: 'branch_max_down_default', suffix: '%', decimalScale: 0 },
   { key: 'settlement_discount_min', suffix: '%', decimalScale: 0 },
   { key: 'settlement_discount_max', suffix: '%', decimalScale: 0 },
-  { key: 'approved_ttl_days', decimalScale: 0 },
 ];
 
 function PolicyPanel({ policy, canManage, onSaved }: {

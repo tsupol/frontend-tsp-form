@@ -15,7 +15,7 @@ import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 
 // ============================================================================
-// Deal partner terms — mig 1154/1155 model, extended by mig 1173 and 1191.
+// Deal partner terms — mig 1154/1155 model, extended by migs 1173/1191/1192.
 //
 // The page is named "เงื่อนไข Deal Partner" (owner 09-09) rather than
 // "ค่าคอม …" because it now carries four separate terms of the deal:
@@ -41,11 +41,14 @@ import { ActionDoneView } from '../contracts/ActionDoneView';
 // Internal branches have none — this page only lists DEAL_PARTNER branches.
 //
 // The guarantee return fee goes the other way: if the customer returns the
-// device inside the FIN1 guarantee window (30 days, 60 with an uplift), they
-// get every baht back AND the branch pays this on top. Stored as policy rather
+// device inside the guarantee window (30 days, 60 with an uplift), they get
+// every baht back AND the branch pays this on top. Stored as policy rather
 // than hardcoded. mig 1191 first put it on the FIN1 policy; mig 1192 moved it
-// here days later, so this page is now its only home. Nothing consumes it yet
-// — the return flow is not built.
+// here days later — along with the window itself (guarantee_days /
+// guarantee_days_uplift) and approved_ttl_days — because internal branches
+// have no device guarantee: these are terms of the deal-partner arrangement,
+// not FIN1 policy. Price/plan RPCs answer guarantee_days: null for internal
+// branches and the UI hides the line. The return flow is not built yet.
 //
 // The old scoped rates (fn_deal_partner_rate_upsert / set_active) are
 // deprecated — any p_scope other than HOLDING now answers DEPRECATED_SCOPE.
@@ -65,6 +68,9 @@ interface PolicyRow {
   guarantee_return_fee_min: number;
   guarantee_return_fee_max: number;
   guarantee_return_fee_default: number;
+  guarantee_days: number;
+  guarantee_days_uplift: number;
+  approved_ttl_days: number;
   updated_at: string;
 }
 
@@ -117,12 +123,16 @@ interface PolicyFormData {
   guarantee_return_fee_min: string;
   guarantee_return_fee_max: string;
   guarantee_return_fee_default: string;
+  guarantee_days: string;
+  guarantee_days_uplift: string;
+  approved_ttl_days: string;
 }
 
 const EMPTY_POLICY_FORM: PolicyFormData = {
   total_min: '', total_max: '', branch_rate_default: '', company_rate_default: '',
   doc_fee_min: '', doc_fee_max: '', doc_fee_default: '',
   guarantee_return_fee_min: '', guarantee_return_fee_max: '', guarantee_return_fee_default: '',
+  guarantee_days: '', guarantee_days_uplift: '', approved_ttl_days: '',
 };
 
 function PolicyModal({ open, onClose, policy, onSaved }: {
@@ -162,6 +172,9 @@ function PolicyModal({ open, onClose, policy, onSaved }: {
         guarantee_return_fee_min: String(p.guarantee_return_fee_min),
         guarantee_return_fee_max: String(p.guarantee_return_fee_max),
         guarantee_return_fee_default: String(p.guarantee_return_fee_default),
+        guarantee_days: String(p.guarantee_days),
+        guarantee_days_uplift: String(p.guarantee_days_uplift),
+        approved_ttl_days: String(p.approved_ttl_days),
       } : EMPTY_POLICY_FORM);
       setView('form');
       setResult(null);
@@ -212,6 +225,9 @@ function PolicyModal({ open, onClose, policy, onSaved }: {
           guarantee_return_fee_min: parseFloat(data.guarantee_return_fee_min),
           guarantee_return_fee_max: parseFloat(data.guarantee_return_fee_max),
           guarantee_return_fee_default: parseFloat(data.guarantee_return_fee_default),
+          guarantee_days: parseInt(data.guarantee_days),
+          guarantee_days_uplift: parseInt(data.guarantee_days_uplift),
+          approved_ttl_days: parseInt(data.approved_ttl_days),
         },
       });
       setResult(saved);
@@ -248,6 +264,27 @@ function PolicyModal({ open, onClose, policy, onSaved }: {
             value={field.value}
             onChange={(raw) => field.onChange(raw)}
             suffix="%"
+          />
+        )}
+      />
+      <FormErrorMessage error={errors[name]} />
+    </div>
+  );
+
+  // Whole days — guarantee window / approval TTL.
+  const dayField = (name: keyof PolicyFormData, label: string) => (
+    <div className="flex flex-col">
+      <label className="form-label">{label}</label>
+      <Controller
+        name={name}
+        control={control}
+        rules={{ required: t('dealPartnerRate.valueRequired') }}
+        render={({ field }) => (
+          <MaskedInput
+            mask="number"
+            decimalScale={0}
+            value={field.value}
+            onChange={(raw) => field.onChange(raw)}
           />
         )}
       />
@@ -297,6 +334,9 @@ function PolicyModal({ open, onClose, policy, onSaved }: {
               { label: t('dealPartnerRate.docFeeDefault'), value: fmtBaht(result.doc_fee_default) },
               { label: t('dealPartnerRate.guaranteeFeeRange'), value: `${fmtBaht(result.guarantee_return_fee_min)} – ${fmtBaht(result.guarantee_return_fee_max)}` },
               { label: t('dealPartnerRate.guaranteeFeeDefault'), value: fmtBaht(result.guarantee_return_fee_default) },
+              { label: t('dealPartnerRate.guaranteeDays'), value: t('dealPartnerRate.daysValue', { days: result.guarantee_days }) },
+              { label: t('dealPartnerRate.guaranteeDaysUplift'), value: t('dealPartnerRate.daysValue', { days: result.guarantee_days_uplift }) },
+              { label: t('dealPartnerRate.approvedTtlDays'), value: t('dealPartnerRate.daysValue', { days: result.approved_ttl_days }) },
             ]}
             onClose={forceClose}
           />
@@ -363,6 +403,21 @@ function PolicyModal({ open, onClose, policy, onSaved }: {
                   {t('dealPartnerRate.docFeeRangeHint', { min: vFeeMin, max: vFeeMax })}
                 </p>
               )}
+
+              {/* Guarantee window + approval TTL (mig 1192) — moved here from
+                  the FIN1 policy: internal branches have no device guarantee,
+                  so these are terms of the deal-partner arrangement. */}
+              <div className="border-t border-line pt-4 -mb-1">
+                <div className="text-sm font-medium">{t('dealPartnerRate.guaranteeDaysSection')}</div>
+                <div className="text-xs text-subtle mt-0.5">{t('dealPartnerRate.guaranteeDaysHint')}</div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {dayField('guarantee_days', t('dealPartnerRate.guaranteeDays'))}
+                {dayField('guarantee_days_uplift', t('dealPartnerRate.guaranteeDaysUplift'))}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {dayField('approved_ttl_days', t('dealPartnerRate.approvedTtlDays'))}
+              </div>
 
               {/* Guarantee return fee (mig 1191) — the extra the branch pays a
                   customer who returns the device inside the guarantee window. */}
@@ -897,6 +952,16 @@ export function DealPartnerRatesPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {policyStat(t('dealPartnerRate.docFeeRange'), `${fmtBaht(policy.doc_fee_min)} – ${fmtBaht(policy.doc_fee_max)}`)}
                   {policyStat(t('dealPartnerRate.docFeeDefault'), fmtBaht(policy.doc_fee_default), true)}
+                </div>
+              </div>
+              <div className="border-t border-line pt-3">
+                <div className="text-xs font-medium text-subtle mb-2 flex items-center gap-1">
+                  <ShieldCheck size={12} />{t('dealPartnerRate.guaranteeDaysSection')}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {policyStat(t('dealPartnerRate.guaranteeDays'), t('dealPartnerRate.daysValue', { days: policy.guarantee_days }))}
+                  {policyStat(t('dealPartnerRate.guaranteeDaysUplift'), t('dealPartnerRate.daysValue', { days: policy.guarantee_days_uplift }))}
+                  {policyStat(t('dealPartnerRate.approvedTtlDays'), t('dealPartnerRate.daysValue', { days: policy.approved_ttl_days }))}
                 </div>
               </div>
               <div className="border-t border-line pt-3">

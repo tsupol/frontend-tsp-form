@@ -1987,11 +1987,10 @@
       "rounding_unit": "Rounding unit (฿)",
       "doc_fee_amount": "Doc fee (฿)",
       "uplift_max": "Max price uplift (฿)",
-      "guarantee_days": "Guarantee (days)",
-      "guarantee_days_uplift": "Guarantee w/ uplift (days)",
+      "branch_min_down_default": "Branch down min default %",
+      "branch_max_down_default": "Branch down max default %",
       "settlement_discount_min": "Early-settlement discount min %",
-      "settlement_discount_max": "Early-settlement discount max %",
-      "approved_ttl_days": "Approval TTL (days)"
+      "settlement_discount_max": "Early-settlement discount max %"
     },
     "downMinTag": "Policy minimum",
     "downMaxTag": "Policy maximum"
@@ -2211,7 +2210,14 @@
     "guaranteeFeeRange": "Allowed fee",
     "guaranteeFeeAmount": "Guarantee return fee",
     "guaranteeFeeHint": "Paid by the branch on top of the full refund when a device is returned within the guarantee window",
-    "guaranteeFeeRangeHint": "Fee must be within {{min}}–{{max}} THB"
+    "guaranteeFeeRangeHint": "Fee must be within {{min}}–{{max}} THB",
+    "valueRequired": "Value is required",
+    "guaranteeDaysSection": "Guarantee window & approval TTL",
+    "guaranteeDaysHint": "Internal branches have no device guarantee — these terms apply to deal partners",
+    "guaranteeDays": "Guarantee (days)",
+    "guaranteeDaysUplift": "Guarantee w/ uplift (days)",
+    "approvedTtlDays": "Approval TTL (days)",
+    "daysValue": "{{days}} days"
   },
   "branchStock": {
     "retailTab": "Retail",
