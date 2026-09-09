@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, DataTable, Badge, Select, Button, Switch, PopOver, Tooltip, Modal, NumberSpinner, MaskedInput, useSnackbarContext } from 'tsp-form';
+import { PageNav, PageNavPanel, MobileHeader, DataTable, Badge, Select, Button, Switch, PopOver, Tooltip, Modal, NumberSpinner, MaskedInput, CollapsiblePanel, useSnackbarContext } from 'tsp-form';
 import { ArrowRightFromLine, ArrowLeft, SlidersHorizontal, AlertTriangle, CheckCircle, XCircle, Loader2, Plus, X } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -10,25 +10,53 @@ import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { useFormSnapshot } from '../../hooks/useFormSnapshot';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { ModelName } from '../../components/ModelName';
+import { DateTime } from '../../components/DateTime';
 import { translateApiError } from '../../lib/apiErrors';
 import { SearchInput } from '../../components/SearchInput';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-interface PricebookRow {
+// v_model_price_profile (mig 1183) — one row per model: retail price + the
+// movable bounds (first-hand uplift, used price range, used uplift). NULL
+// bounds (`bounds_set=false`) mean the holding default 0..uplift_max applies.
+interface ProfileRow {
   model_id: number;
   model_code: string;
   model_name: string;
-  category_code: string;
-  category_name: string;
-  retail_price: number | null;
+  brand_name: string;
+  family_name: string;
+  is_contractable: boolean;
+  is_sellable: boolean;
   cost_price: number | null;
-  needs_price_setup: boolean;
-  missing_cost_price: boolean;
+  retail_price: number | null;
+  retail_effective_from: string | null;
+  uplift_min: number | null;
+  uplift_max: number | null;
+  used_retail_min: number | null;
+  used_retail_max: number | null;
+  used_uplift_min: number | null;
+  used_uplift_max: number | null;
+  bounds_set: boolean;
+  used_set: boolean;
   missing_retail_price: boolean;
-  finance_model: string;
-  term_months: number | null;
-  fin2_profit_amount: number | null;
+  missing_cost_price: boolean;
+  variant_override_count: number;
+}
+
+// v_price_rates_lookup RETAIL_PRICE rows — each row is the full profile
+// (price + bounds) for one effective period; is_active marks the open row.
+interface RetailHistoryRow {
+  price_rate_id: number;
+  value: number;
+  effective_from: string;
+  effective_to: string | null;
+  is_active: boolean;
+  uplift_min: number | null;
+  uplift_max: number | null;
+  used_retail_min: number | null;
+  used_retail_max: number | null;
+  used_uplift_min: number | null;
+  used_uplift_max: number | null;
 }
 
 interface ModelRow {
@@ -103,18 +131,66 @@ const calcMargin = (retail: number | null, cost: number | null): string => {
   return `${margin.toFixed(1)}%`;
 };
 
+const fmtRange = (min: number | null | undefined, max: number | null | undefined): string | null =>
+  min == null || max == null ? null : `${formatTHB(min)}–${formatTHB(max)}`;
+
+// ── Min/max bound pair inputs ────────────────────────────────────────────────
+// Server rules (shown back verbatim from params.rule when violated): min/max
+// travel as a pair, 0 ≤ min ≤ max, uplift in steps of 100. Clearing both
+// clears the bound (holding default applies again).
+
+function BoundsPairInputs({ label, minValue, maxValue, onMinChange, onMaxChange, disabled, t }: {
+  label: string;
+  minValue: string;
+  maxValue: string;
+  onMinChange: (v: string) => void;
+  onMaxChange: (v: string) => void;
+  disabled: boolean;
+  t: (key: string, opts?: Record<string, unknown>) => string;
+}) {
+  return (
+    <div className="flex flex-col">
+      <label className="form-label text-xs">{label}</label>
+      <div className="flex items-center gap-2">
+        <MaskedInput
+          className="w-full"
+          mask="number"
+          decimalScale={0}
+          value={minValue}
+          onChange={(raw) => onMinChange(raw)}
+          placeholder={t('pricing.min')}
+          size="sm"
+          disabled={disabled}
+        />
+        <span className="text-subtle text-xs shrink-0">–</span>
+        <MaskedInput
+          className="w-full"
+          mask="number"
+          decimalScale={0}
+          value={maxValue}
+          onChange={(raw) => onMaxChange(raw)}
+          placeholder={t('pricing.max')}
+          size="sm"
+          disabled={disabled}
+        />
+      </div>
+    </div>
+  );
+}
+
 // ── Editor Panel ─────────────────────────────────────────────────────────────
 // Always mounted — accepts modelId which can be null (shows placeholder).
 // Handles model switches internally without remounting.
 
-function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, isDirtyRef, canManageTerms }: {
+function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, isDirtyRef, canManage, policyUpliftMax }: {
   modelId: number | null;
   modelCode: string;
   familyName: string;
   baseModelName: string;
   suffix: string;
   isDirtyRef?: React.MutableRefObject<boolean>;
-  canManageTerms: boolean;
+  canManage: boolean;
+  policyUpliftMax: number | null;
 }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -122,6 +198,14 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
 
   const [retailPrice, setRetailPrice] = useState('');
   const [costPrice, setCostPrice] = useState('');
+  // Bounds (catalog v2, mig 1181): first-hand uplift, used price, used uplift —
+  // all min/max string pairs, '' = not set (holding default applies).
+  const [upliftMin, setUpliftMin] = useState('');
+  const [upliftMax, setUpliftMax] = useState('');
+  const [usedRetailMin, setUsedRetailMin] = useState('');
+  const [usedRetailMax, setUsedRetailMax] = useState('');
+  const [usedUpliftMin, setUsedUpliftMin] = useState('');
+  const [usedUpliftMax, setUsedUpliftMax] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [errorKey, setErrorKey] = useState(0);
@@ -140,13 +224,49 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
   const initializedForRef = useRef<number | null>(null);
 
   // Dirty tracking via snapshot
-  const snapshot = useFormSnapshot({ retailPrice, costPrice, fin2Profits });
+  const snapshot = useFormSnapshot({
+    retailPrice, costPrice, fin2Profits,
+    upliftMin, upliftMax, usedRetailMin, usedRetailMax, usedUpliftMin, usedUpliftMax,
+  });
 
-  // Fetch workbench for selected model
+  // Price profile — the editable truth for retail price + bounds (mig 1183)
+  const { data: profileRows = [], isLoading: profileLoading } = useQuery({
+    queryKey: ['model-price-profile', modelId],
+    queryFn: () => apiClient.get<ProfileRow[]>(`/v_model_price_profile?model_id=eq.${modelId}`),
+    enabled: !!modelId,
+    staleTime: 30 * 1000,
+  });
+  const profile = profileRows[0]?.model_id === modelId ? profileRows[0] : null;
+
+  // Fetch workbench for selected model (FIN2 per-term profit — unchanged path)
   const { data: workbenchRows = [], isLoading } = useQuery({
     queryKey: ['price-editor-workbench', modelId],
     queryFn: () => apiClient.get<WorkbenchRow[]>(
       `/v_pricing_user_workbench?model_id=eq.${modelId}&order=finance_model,variant_id,term_months`
+    ),
+    enabled: !!modelId,
+    staleTime: 30 * 1000,
+  });
+
+  // What the branch calculator will actually resolve for this model — the
+  // uplift buttons (uplift_options) and whether they come from model bounds or
+  // the holding default. Skipped while no retail price (the RPC errors with
+  // FIN1_NO_RETAIL_PRICE) or the model isn't contractable.
+  const { data: resolveInfo } = useQuery({
+    queryKey: ['fin1-price-table', modelId, 0],
+    queryFn: () => apiClient.rpc<{ uplift_options?: number[]; uplift_source?: 'model' | 'policy'; guarantee_days?: number }>(
+      'fn_fin1_price_table', { p_model_id: modelId, p_uplift: 0 },
+    ),
+    enabled: !!modelId && !!profile && !profile.missing_retail_price && profile.is_contractable,
+    staleTime: 60 * 1000,
+    retry: false,
+  });
+
+  // Retail-price history — one row per effective period, bounds included
+  const { data: historyRows = [] } = useQuery({
+    queryKey: ['price-rate-history', modelId],
+    queryFn: () => apiClient.get<RetailHistoryRow[]>(
+      `/v_price_rates_lookup?model_id=eq.${modelId}&rate_type=eq.RETAIL_PRICE&order=effective_from.desc&limit=20`
     ),
     enabled: !!modelId,
     staleTime: 30 * 1000,
@@ -159,13 +279,16 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
         initializedForRef.current = null;
         setRetailPrice('');
         setCostPrice('');
+        setUpliftMin(''); setUpliftMax('');
+        setUsedRetailMin(''); setUsedRetailMax('');
+        setUsedUpliftMin(''); setUsedUpliftMax('');
         setFin2Profits({});
         setErrorMessage('');
       }
       return;
     }
     if (initializedForRef.current === modelId) return;
-    if (isLoading || workbenchRows.length === 0) {
+    if (isLoading || profileLoading || !profile) {
       // Model changed but data not ready yet — clear ref so we init when data arrives
       if (initializedForRef.current !== null && initializedForRef.current !== modelId) {
         initializedForRef.current = null;
@@ -178,11 +301,15 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
     setNewTermMonths('');
     setNewTermProfit('');
 
-    const first = workbenchRows[0];
-    const initRetail = first?.retail_price !== null ? String(first.retail_price) : '';
-    const initCost = first?.cost_price !== null ? String(first.cost_price) : '';
-    setRetailPrice(initRetail);
-    setCostPrice(initCost);
+    const str = (v: number | null) => (v != null ? String(v) : '');
+    setRetailPrice(str(profile.retail_price));
+    setCostPrice(str(profile.cost_price));
+    setUpliftMin(str(profile.uplift_min));
+    setUpliftMax(str(profile.uplift_max));
+    setUsedRetailMin(str(profile.used_retail_min));
+    setUsedRetailMax(str(profile.used_retail_max));
+    setUsedUpliftMin(str(profile.used_uplift_min));
+    setUsedUpliftMax(str(profile.used_uplift_max));
 
     const profits: Record<number, string> = {};
     for (const row of workbenchRows) {
@@ -192,7 +319,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
     }
     setFin2Profits(profits);
     snapshot.resetNext();
-  }, [modelId, workbenchRows, isLoading]);
+  }, [modelId, workbenchRows, isLoading, profile, profileLoading]);
 
   // Sync FIN2 profits when workbench data refreshes (e.g. after adding a term)
   useEffect(() => {
@@ -231,7 +358,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
   // models — non-contractable models get no finance section at all. Legacy FIN1
   // rate cards retired (mig 1172): the workbench view is FIN2-only now; FIN1
   // numbers live on the FIN1 engine pages (เรทผ่อน FIN1 / คำนวณค่างวด FIN1).
-  const isContractable = workbenchRows.some(r => r.is_contractable);
+  const isContractable = profile?.is_contractable ?? workbenchRows.some(r => r.is_contractable);
 
   // FIN2 rows (deduplicated)
   const fin2Rows = useMemo(() => {
@@ -247,7 +374,15 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
 
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: ['price-editor-workbench', modelId] });
-    queryClient.invalidateQueries({ queryKey: ['pricebook-prices'] });
+    queryClient.invalidateQueries({ queryKey: ['model-price-profile', modelId] });
+    queryClient.invalidateQueries({ queryKey: ['price-rate-history', modelId] });
+    queryClient.invalidateQueries({ queryKey: ['pricebook-profiles'] });
+    // FIN1 consumers of the retail price + bounds
+    queryClient.invalidateQueries({ queryKey: ['fin1-price-table'] });
+    queryClient.invalidateQueries({ queryKey: ['fin1-rate-sheet'] });
+    queryClient.invalidateQueries({ queryKey: ['fin1-rate-sheet-model'] });
+    queryClient.invalidateQueries({ queryKey: ['fin1-sheet-families'] });
+    queryClient.invalidateQueries({ queryKey: ['model-price-bounds'] });
   };
 
   const showSuccess = () => {
@@ -273,28 +408,54 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
     setErrorKey(k => k + 1);
   };
 
-  const handleSavePricebook = async () => {
-    if (!modelId) return;
+  const numOrNull = (s: string): number | null => (s.trim() ? parseFloat(s) : null);
+
+  // Patch of profile keys that differ from the server row. Min/max travel as a
+  // pair whenever either side changed — fn_model_price_set requires pairs, and
+  // JSON null clears the bound (server validates the pairing rules).
+  const profilePatch = useMemo(() => {
+    const patch: Record<string, number | null> = {};
+    if (!profile) return patch;
+    const retailVal = numOrNull(retailPrice);
+    if (retailVal !== null && retailVal !== profile.retail_price) patch.retail_price = retailVal;
+    const pairs: Array<[string, string, number | null, string, string, number | null]> = [
+      ['uplift_min', upliftMin, profile.uplift_min, 'uplift_max', upliftMax, profile.uplift_max],
+      ['used_retail_min', usedRetailMin, profile.used_retail_min, 'used_retail_max', usedRetailMax, profile.used_retail_max],
+      ['used_uplift_min', usedUpliftMin, profile.used_uplift_min, 'used_uplift_max', usedUpliftMax, profile.used_uplift_max],
+    ];
+    for (const [minKey, minStr, minCur, maxKey, maxStr, maxCur] of pairs) {
+      const minVal = numOrNull(minStr);
+      const maxVal = numOrNull(maxStr);
+      if (minVal !== minCur || maxVal !== maxCur) {
+        patch[minKey] = minVal;
+        patch[maxKey] = maxVal;
+      }
+    }
+    return patch;
+  }, [profile, retailPrice, upliftMin, upliftMax, usedRetailMin, usedRetailMax, usedUpliftMin, usedUpliftMax]);
+
+  const costVal = numOrNull(costPrice);
+  const costChanged = costVal !== null && costVal !== (profile?.cost_price ?? null);
+  const profileDirty = Object.keys(profilePatch).length > 0 || costChanged;
+
+  const handleSaveProfile = async () => {
+    if (!modelId || !profileDirty) return;
     setIsSaving(true);
     setErrorMessage('');
     const start = Date.now();
     try {
       const promises: Promise<unknown>[] = [];
-      const retailVal = retailPrice.trim() ? parseFloat(retailPrice) : null;
-      const costVal = costPrice.trim() ? parseFloat(costPrice) : null;
-      if (retailVal !== null) {
-        promises.push(apiClient.rpc('price_rate_upsert', {
-          p_program_code: 'PRICEBOOK', p_rate_type: 'RETAIL_PRICE',
-          p_model_id: modelId, p_value: retailVal,
+      if (Object.keys(profilePatch).length > 0) {
+        promises.push(apiClient.rpc('fn_model_price_set', {
+          p_model_id: modelId, p_patch: profilePatch,
         }));
       }
-      if (costVal !== null) {
+      if (costChanged) {
         promises.push(apiClient.rpc('price_rate_upsert', {
           p_program_code: 'PRICEBOOK', p_rate_type: 'COST_PRICE',
           p_model_id: modelId, p_value: costVal,
         }));
       }
-      if (promises.length === 0) return;
       await Promise.all(promises);
       snapshot.reset();
       showSuccess();
@@ -422,12 +583,12 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
     }
   };
 
-  const busy = isLoading || isSaving;
+  const busy = isLoading || profileLoading || isSaving;
 
   return (
     <div className="flex flex-col relative">
       {/* Loading overlay — preserves old content underneath */}
-      {isLoading && modelId && (
+      {(isLoading || profileLoading) && modelId && (
         <div className="absolute inset-0 bg-bg/60 z-10 flex items-center justify-center rounded-lg">
           <Loader2 size={20} className="animate-spin text-subtle" />
         </div>
@@ -464,58 +625,167 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
               </div>
             )}
 
-            {/* Pricebook Rates */}
+            {/* Price profile — retail price + bounds (catalog v2, mig 1181/1183) */}
             <div>
               <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-3">{t('pricing.pricebookSection')}</h3>
-              <div className="space-y-3">
-                <div className="flex flex-col">
-                  <label className="form-label text-xs" htmlFor="ed-retail">{t('pricing.retailPrice')}</label>
-                  <MaskedInput
-                    id="ed-retail"
-                    mask="number"
-                    decimalScale={2}
-                    value={retailPrice}
-                    onChange={(raw) => setRetailPrice(raw)}
-                    size="sm"
-                    disabled={busy}
-                  />
-                </div>
-                <div className="flex flex-col">
-                  <label className="form-label text-xs" htmlFor="ed-cost">{t('pricing.costPrice')}</label>
-                  <MaskedInput
-                    id="ed-cost"
-                    mask="number"
-                    decimalScale={2}
-                    value={costPrice}
-                    onChange={(raw) => setCostPrice(raw)}
-                    size="sm"
-                    disabled={busy}
-                  />
-                </div>
-                {retailPrice && costPrice && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-subtle">{t('pricing.margin')}</span>
-                    <span className="font-medium tabular-nums">
-                      {(() => {
-                        const r = parseFloat(retailPrice);
-                        const c = parseFloat(costPrice);
-                        if (!r || !c || r === 0) return '—';
-                        return `${(((r - c) / r) * 100).toFixed(1)}%`;
-                      })()}
-                    </span>
+              {canManage ? (
+                <div className="space-y-3">
+                  <div className="flex flex-col">
+                    <label className="form-label text-xs" htmlFor="ed-retail">{t('pricing.retailPrice')}</label>
+                    <MaskedInput
+                      id="ed-retail"
+                      mask="number"
+                      decimalScale={0}
+                      value={retailPrice}
+                      onChange={(raw) => setRetailPrice(raw)}
+                      size="sm"
+                      disabled={busy}
+                    />
                   </div>
-                )}
-                <Button
-                  color="primary"
-                  size="sm"
-                  className="w-full"
-                  disabled={busy || (!retailPrice.trim() && !costPrice.trim())}
-                  onClick={handleSavePricebook}
-                >
-                  {isSaving ? t('pricing.saving') : t('pricing.savePrice')}
-                </Button>
-              </div>
+                  <div className="flex flex-col">
+                    <label className="form-label text-xs" htmlFor="ed-cost">{t('pricing.costPrice')}</label>
+                    <MaskedInput
+                      id="ed-cost"
+                      mask="number"
+                      decimalScale={2}
+                      value={costPrice}
+                      onChange={(raw) => setCostPrice(raw)}
+                      size="sm"
+                      disabled={busy}
+                    />
+                  </div>
+                  {retailPrice && costPrice && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-subtle">{t('pricing.margin')}</span>
+                      <span className="font-medium tabular-nums">
+                        {calcMargin(parseFloat(retailPrice) || null, parseFloat(costPrice) || null)}
+                      </span>
+                    </div>
+                  )}
+                  {isContractable && (
+                    <>
+                      <BoundsPairInputs
+                        label={t('pricing.upliftBounds')}
+                        minValue={upliftMin} maxValue={upliftMax}
+                        onMinChange={setUpliftMin} onMaxChange={setUpliftMax}
+                        disabled={busy} t={t}
+                      />
+                      {profile && !profile.bounds_set && !upliftMin.trim() && !upliftMax.trim() && (
+                        <div className="text-xs text-subtle -mt-2">
+                          {policyUpliftMax != null
+                            ? t('pricing.boundsNotSet', { range: `0–${formatTHB(policyUpliftMax)}` })
+                            : t('pricing.boundsNotSetNoRange')}
+                        </div>
+                      )}
+                      <BoundsPairInputs
+                        label={t('pricing.usedPriceRange')}
+                        minValue={usedRetailMin} maxValue={usedRetailMax}
+                        onMinChange={setUsedRetailMin} onMaxChange={setUsedRetailMax}
+                        disabled={busy} t={t}
+                      />
+                      <BoundsPairInputs
+                        label={t('pricing.usedUpliftRange')}
+                        minValue={usedUpliftMin} maxValue={usedUpliftMax}
+                        onMinChange={setUsedUpliftMin} onMaxChange={setUsedUpliftMax}
+                        disabled={busy} t={t}
+                      />
+                    </>
+                  )}
+                  <Button
+                    color="primary"
+                    size="sm"
+                    className="w-full"
+                    disabled={busy || !profileDirty}
+                    onClick={handleSaveProfile}
+                  >
+                    {isSaving ? t('pricing.saving') : t('pricing.savePrice')}
+                  </Button>
+                </div>
+              ) : (
+                // Read-only profile — no PRICING.PRICEBOOK_MANAGE
+                <div className="space-y-1.5 text-sm">
+                  {[
+                    { label: t('pricing.retailPrice'), value: formatTHB(profile?.retail_price ?? null) },
+                    { label: t('pricing.costPrice'), value: formatTHB(profile?.cost_price ?? null) },
+                    { label: t('pricing.margin'), value: calcMargin(profile?.retail_price ?? null, profile?.cost_price ?? null) },
+                    ...(isContractable ? [
+                      {
+                        label: t('pricing.upliftBounds'),
+                        value: profile?.bounds_set
+                          ? fmtRange(profile.uplift_min, profile.uplift_max) ?? '—'
+                          : (policyUpliftMax != null
+                            ? t('pricing.boundsNotSet', { range: `0–${formatTHB(policyUpliftMax)}` })
+                            : t('pricing.boundsNotSetNoRange')),
+                      },
+                      ...(profile?.used_set ? [
+                        { label: t('pricing.usedPriceRange'), value: fmtRange(profile.used_retail_min, profile.used_retail_max) ?? '—' },
+                        { label: t('pricing.usedUpliftRange'), value: fmtRange(profile.used_uplift_min, profile.used_uplift_max) ?? '—' },
+                      ] : []),
+                    ] : []),
+                  ].map((row, i) => (
+                    <div key={i} className="flex items-center justify-between gap-3">
+                      <span className="text-subtle text-xs">{row.label}</span>
+                      <span className="tabular-nums text-right">{row.value}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* What the branch calculator resolves for this model */}
+              {resolveInfo?.uplift_options && resolveInfo.uplift_options.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-line text-xs">
+                  <span className="text-subtle">{t('pricing.branchUpliftButtons')}</span>{' '}
+                  <span className="tabular-nums font-medium">
+                    {resolveInfo.uplift_options.map(u => formatTHB(u)).join(' / ')}
+                  </span>
+                  {resolveInfo.uplift_source && (
+                    <span className="text-subtler"> · {t(`pricing.upliftSource_${resolveInfo.uplift_source}`)}</span>
+                  )}
+                </div>
+              )}
+
+              {(profile?.variant_override_count ?? 0) > 0 && (
+                <div className="mt-2 text-xs text-subtle">
+                  {t('pricing.variantOverrides', { n: profile!.variant_override_count })}
+                </div>
+              )}
+
+              {profile?.retail_effective_from && (
+                <div className="mt-2 text-[11px] text-subtler">
+                  {t('pricing.effectiveFrom')}: <DateTime value={profile.retail_effective_from} showTime />
+                </div>
+              )}
             </div>
+
+            {/* Retail price history — one row per effective period */}
+            {historyRows.length > 0 && (
+              <CollapsiblePanel title={t('pricing.history')} defaultOpen={false}>
+                <div className="flex flex-col">
+                  {historyRows.map((r) => (
+                    <div key={r.price_rate_id} className="py-2 border-b border-line last:border-b-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-medium tabular-nums">{formatTHB(r.value)}</span>
+                        {r.is_active && <Badge size="xs" color="success">{t('pricing.historyCurrent')}</Badge>}
+                      </div>
+                      {(r.uplift_min != null || r.used_retail_min != null) && (
+                        <div className="text-xs text-subtle tabular-nums">
+                          {r.uplift_min != null && <>+{fmtRange(r.uplift_min, r.uplift_max)}</>}
+                          {r.used_retail_min != null && (
+                            <> · {t('pricing.usedShort')} {fmtRange(r.used_retail_min, r.used_retail_max)}
+                              {r.used_uplift_min != null && <> (+{fmtRange(r.used_uplift_min, r.used_uplift_max)})</>}
+                            </>
+                          )}
+                        </div>
+                      )}
+                      <div className="text-[11px] text-subtler">
+                        <DateTime value={r.effective_from} showTime />
+                        {r.effective_to && <> → <DateTime value={r.effective_to} showTime /></>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CollapsiblePanel>
+            )}
 
             {/* FIN2 — the only finance model here (legacy FIN1 rate cards retired, mig 1172) */}
             {isContractable && (
@@ -529,7 +799,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                   <div className="alert alert-warning mb-3">
                     <AlertTriangle size={14} />
                     <div className="alert-description text-xs">
-                      {canManageTerms
+                      {canManage
                         ? t('pricing.fin2EmptyAdmin')
                         : t('pricing.fin2EmptyStaff')}
                     </div>
@@ -563,7 +833,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                               {isSavingFin2 === term ? t('pricing.saving') : t('common.save')}
                             </Button>
                           </div>
-                          {canManageTerms && (
+                          {canManage && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -580,7 +850,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                   })}
                 </div>
                 {/* Add term — HOLDING_ADMIN only */}
-                {canManageTerms && (
+                {canManage && (
                   <div className="mt-3 pt-3 border-t border-line space-y-2">
                     <div className="flex gap-2">
                       <div className="flex flex-col shrink-0">
@@ -640,7 +910,7 @@ export function PricebookPage() {
   // Per-user grants (mig 1163): a granted company admin edits too — read
   // v_my_permissions, never role_code.
   const { hasPermission } = useMyPermissions();
-  const canManageTerms = hasPermission('PRICING.PRICEBOOK_MANAGE');
+  const canManage = hasPermission('PRICING.PRICEBOOK_MANAGE');
   const navGuard = useNavGuard();
 
   // Table state
@@ -783,78 +1053,44 @@ export function PricebookPage() {
   }, [searchData]);
   const totalCount = searchData?.total ?? 0;
 
-  // Fetch pricing status for current page's models
+  // Price profiles for the current page's models — one row per model with
+  // retail/cost, the movable bounds, and the missing-price flags (mig 1183).
   const modelIds = useMemo(() => models.map(m => m.id), [models]);
-  const { data: pricingRows = [] } = useQuery({
-    queryKey: ['pricebook-prices', modelIds],
+  const { data: profileRows = [] } = useQuery({
+    queryKey: ['pricebook-profiles', modelIds],
     queryFn: async () => {
       if (modelIds.length === 0) return [];
-      const idsFilter = `model_id=in.(${modelIds.join(',')})`;
-      return apiClient.get<PricebookRow[]>(
-        `/v_pricing_user_workbench?${idsFilter}&order=model_code`
+      return apiClient.get<ProfileRow[]>(
+        `/v_model_price_profile?model_id=in.(${modelIds.join(',')})&order=model_code`
       );
     },
     enabled: modelIds.length > 0,
     staleTime: 30 * 1000,
   });
 
-  // Aggregate pricing per model
-  const pricingMap = useMemo(() => {
-    const map = new Map<number, {
-      retail_price: number | null;
-      cost_price: number | null;
-      needs_price_setup: boolean;
-      missing_retail: boolean;
-      missing_cost: boolean;
-      category_code: string;
-      fin2_terms: { term_months: number; profit: number | null }[];
-    }>();
-    for (const row of pricingRows) {
-      const existing = map.get(row.model_id);
-      if (!existing) {
-        map.set(row.model_id, {
-          retail_price: row.retail_price,
-          cost_price: row.cost_price,
-          needs_price_setup: row.needs_price_setup,
-          missing_retail: row.missing_retail_price,
-          missing_cost: row.missing_cost_price,
-          category_code: row.category_code,
-          fin2_terms: [],
-        });
-      } else {
-        if (row.retail_price !== null && existing.retail_price === null) {
-          existing.retail_price = row.retail_price;
-        }
-        if (row.cost_price !== null && existing.cost_price === null) {
-          existing.cost_price = row.cost_price;
-        }
-        if (row.needs_price_setup) {
-          existing.needs_price_setup = true;
-        }
-      }
-      // Collect FIN2 terms (deduplicated by term_months)
-      if (row.finance_model === 'FIN2' && row.term_months !== null) {
-        const entry = map.get(row.model_id)!;
-        if (!entry.fin2_terms.some(t => t.term_months === row.term_months)) {
-          entry.fin2_terms.push({ term_months: row.term_months, profit: row.fin2_profit_amount });
-        }
-      }
-    }
-    // Sort FIN2 terms by term_months
-    for (const entry of map.values()) {
-      entry.fin2_terms.sort((a, b) => a.term_months - b.term_months);
-    }
+  const profileMap = useMemo(() => {
+    const map = new Map<number, ProfileRow>();
+    for (const row of profileRows) map.set(row.model_id, row);
     return map;
-  }, [pricingRows]);
+  }, [profileRows]);
+
+  // Holding default uplift cap — shown when a model has no bounds of its own
+  const { data: policyRows } = useQuery({
+    queryKey: ['fin1-policy'],
+    queryFn: () => apiClient.get<{ uplift_max: number }[]>('/v_fin1_policy'),
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+  const policyUpliftMax = policyRows?.[0]?.uplift_max ?? null;
 
   // Filter by needs_setup client-side
   const displayModels = useMemo(() => {
     if (!filterNeedsSetup) return models;
     return models.filter(m => {
-      const pricing = pricingMap.get(m.id);
-      return pricing?.needs_price_setup !== false;
+      const p = profileMap.get(m.id);
+      return !p || p.missing_retail_price || p.missing_cost_price;
     });
-  }, [models, filterNeedsSetup, pricingMap]);
+  }, [models, filterNeedsSetup, profileMap]);
 
   // Selected model object (for passing info to editor)
   const selectedModel = selectedModelId ? models.find(m => m.id === selectedModelId) ?? null : null;
@@ -1074,11 +1310,10 @@ export function PricebookPage() {
                     onRowActivate={(row) => handleRowSelect(row.original.id)}
                     renderRow={(row) => {
                       const model = row.original;
-                      const pricing = pricingMap.get(model.id);
-                      const rp = pricing?.retail_price ?? null;
-                      const cp = pricing?.cost_price ?? null;
-                      const needsSetup = pricing?.needs_price_setup ?? true;
-                      const fin2Terms = pricing?.fin2_terms ?? [];
+                      const p = profileMap.get(model.id);
+                      const rp = p?.retail_price ?? null;
+                      const cp = p?.cost_price ?? null;
+                      const needsSetup = p ? (p.missing_retail_price || p.missing_cost_price) : true;
 
                       return (
                         <div className="flex items-center gap-3 px-3 py-2.5">
@@ -1092,6 +1327,11 @@ export function PricebookPage() {
                               ) : (
                                 <Tooltip content={t('pricing.allPriced')}>
                                   <Badge size="xs" color="success" startIcon={<CheckCircle />} />
+                                </Tooltip>
+                              )}
+                              {(p?.variant_override_count ?? 0) > 0 && (
+                                <Tooltip content={t('pricing.variantOverrides', { n: p!.variant_override_count })}>
+                                  <Badge size="xs" color="info">{p!.variant_override_count}</Badge>
                                 </Tooltip>
                               )}
                             </div>
@@ -1112,28 +1352,24 @@ export function PricebookPage() {
                             <div className="text-[10px] text-subtle">{t('pricing.costPrice')}</div>
                           </div>
 
-                          <div className="shrink-0 w-14 xl:w-18 text-right hidden lg:block">
-                            <div className="text-sm tabular-nums text-subtle">
-                              {calcMargin(rp, cp)}
-                            </div>
-                            <div className="text-[10px] text-subtle">{t('pricing.margin')}</div>
-                          </div>
-
-                          {fin2Terms.length > 0 && (
-                            <div className="shrink-0 w-16 xl:w-24 text-right hidden lg:block">
-                              <div className="flex flex-col gap-0.5 items-end">
-                                {fin2Terms.map(ft => {
-                                  const hasProfit = ft.profit !== null;
-                                  return (
-                                    <div key={ft.term_months} className="flex items-center gap-1">
-                                      <span className={`text-[11px] tabular-nums ${hasProfit ? '' : 'text-subtle'}`}>
-                                        {hasProfit ? formatTHB(ft.profit) : '—'}
-                                      </span>
-                                      <span className={`text-[10px] tabular-nums px-1.5 py-0.5 rounded ${hasProfit ? 'bg-success-soft text-success' : 'bg-warning-soft text-warning-fg'}`}>{ft.term_months}m</span>
-                                    </div>
-                                  );
-                                })}
+                          {/* Uplift bounds — model's own, or muted holding default */}
+                          {p?.is_contractable && (
+                            <div className="shrink-0 w-20 xl:w-28 text-right hidden lg:block">
+                              <div className="text-sm tabular-nums">
+                                {p.bounds_set ? (
+                                  fmtRange(p.uplift_min, p.uplift_max)
+                                ) : (
+                                  <span className="text-subtle">
+                                    {policyUpliftMax != null ? `0–${formatTHB(policyUpliftMax)}*` : '—'}
+                                  </span>
+                                )}
                               </div>
+                              <div className="text-[10px] text-subtle">{t('pricing.upliftShort')}</div>
+                              {p.used_set && (
+                                <div className="text-[10px] text-subtle tabular-nums truncate">
+                                  {t('pricing.usedShort')} {fmtRange(p.used_retail_min, p.used_retail_max)}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
@@ -1167,7 +1403,8 @@ export function PricebookPage() {
                       baseModelName={selectedModel?.base_model_name ?? ''}
                       suffix={''}
                       isDirtyRef={editorDirtyRef}
-                      canManageTerms={canManageTerms}
+                      canManage={canManage}
+                      policyUpliftMax={policyUpliftMax}
                     />
                   </div>
                 </PageNavPanel>

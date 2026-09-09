@@ -100,6 +100,29 @@ interface RetailSetResult {
   sheet?: unknown;
 }
 
+// v_model_price_profile subset — the per-model uplift bounds (catalog v2,
+// mig 1181). NULL bounds (`bounds_set=false`) = holding default 0..uplift_max.
+interface ModelBounds {
+  model_id: number;
+  uplift_min: number | null;
+  uplift_max: number | null;
+  bounds_set: boolean;
+}
+
+// Mirrors fin._fin1_resolve_price (mig 1181): the uplift buttons are 0 (always
+// allowed) then 1,000-steps from the model's min to max. fn_fin1_rate_sheet
+// doesn't return uplift_options per model yet (BE follow-up pending) — until
+// it does, derive them from the profile bounds; the holding default cap
+// applies when the model has no bounds of its own.
+function upliftOptionsFor(bounds: ModelBounds | undefined, policyMax: number): number[] {
+  const hasOwn = bounds?.bounds_set && bounds.uplift_min != null && bounds.uplift_max != null;
+  const min = hasOwn ? bounds!.uplift_min! : 0;
+  const max = hasOwn ? bounds!.uplift_max! : policyMax;
+  const opts = [0];
+  for (let u = min > 0 ? min : 1000; u <= max; u += 1000) opts.push(u);
+  return opts;
+}
+
 // ── Rate table for one model ─────────────────────────────────────────────────
 
 function ModelTable({ model, terms, ratesVisible, t }: {
@@ -156,12 +179,12 @@ function ModelTable({ model, terms, ratesVisible, t }: {
 
 // ── One model card (uplift override + actions) ───────────────────────────────
 
-function ModelRateCard({ model, familyLabel, terms, ratesVisible, upliftMax, canEdit, onEdit, t }: {
+function ModelRateCard({ model, familyLabel, terms, ratesVisible, upliftOptions, canEdit, onEdit, t }: {
   model: SheetModel;
   familyLabel: string; // "Apple iPhone 15" — seeds the calculator jump
   terms: number[];
   ratesVisible: boolean;
-  upliftMax: number;
+  upliftOptions: number[]; // per-model (catalog v2) — from the model's own bounds when set
   canEdit: boolean;
   onEdit: (m: SheetModel) => void;
   t: (key: string, opts?: Record<string, unknown>) => string;
@@ -172,11 +195,6 @@ function ModelRateCard({ model, familyLabel, terms, ratesVisible, upliftMax, can
   // the uplift applied (base price + uplift, longer guarantee). View-only —
   // it never touches the stored retail price.
   const [uplift, setUplift] = useState(0);
-  const upliftOptions = useMemo(() => {
-    const opts = [0];
-    for (let u = 1000; u <= upliftMax; u += 1000) opts.push(u);
-    return opts;
-  }, [upliftMax]);
 
   const { data: upliftSheet, isFetching, error } = useQuery({
     queryKey: ['fin1-rate-sheet-model', model.model_id, uplift],
@@ -534,6 +552,26 @@ export function FinanceRatesPage() {
 
   const terms = sheetData?.sheet.terms ?? [];
 
+  // Per-model uplift bounds for every model on the sheet (catalog v2) — one
+  // query per sheet, drives the "+ราคา" button options per model.
+  const sheetModelIds = useMemo(
+    () => (sheetData?.families ?? []).flatMap(f => f.models.map(m => m.model_id)).sort((a, b) => a - b),
+    [sheetData],
+  );
+  const { data: boundsRows } = useQuery({
+    queryKey: ['model-price-bounds', sheetModelIds],
+    queryFn: () => apiClient.get<ModelBounds[]>(
+      `/v_model_price_profile?model_id=in.(${sheetModelIds.join(',')})&select=model_id,uplift_min,uplift_max,bounds_set`
+    ),
+    enabled: sheetModelIds.length > 0,
+    staleTime: 60_000,
+  });
+  const boundsByModel = useMemo(() => {
+    const map = new Map<number, ModelBounds>();
+    for (const b of boundsRows ?? []) map.set(b.model_id, b);
+    return map;
+  }, [boundsRows]);
+
   const onSaved = () => {
     // fn_fin1_retail_set returns the model's new sheet, but invalidating keeps
     // every consumer (family counts, calculator price table) consistent too.
@@ -621,7 +659,7 @@ export function FinanceRatesPage() {
                           familyLabel={`${fam.brand_name} ${fam.family_name}`}
                           terms={terms}
                           ratesVisible={sheetData.rates_visible}
-                          upliftMax={sheetData.uplift_max ?? 0}
+                          upliftOptions={upliftOptionsFor(boundsByModel.get(model.model_id), sheetData.uplift_max ?? 0)}
                           canEdit={canEdit}
                           onEdit={setEditModel}
                           t={t}

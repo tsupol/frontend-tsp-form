@@ -1916,7 +1916,22 @@
     "removeTerm": "Remove",
     "termAdded": "Term added",
     "termRemoved": "Term removed",
-    "enterMonths": "Months"
+    "enterMonths": "Months",
+    "upliftBounds": "Uplift range (+price)",
+    "usedPriceRange": "Used price range",
+    "usedUpliftRange": "Used uplift range",
+    "min": "Min",
+    "max": "Max",
+    "boundsNotSet": "Not set — holding default {{range}} applies",
+    "boundsNotSetNoRange": "Not set — holding default applies",
+    "branchUpliftButtons": "Uplift buttons branches see:",
+    "upliftSource_model": "model bounds",
+    "upliftSource_policy": "holding default",
+    "history": "Price history",
+    "historyCurrent": "Current",
+    "upliftShort": "+Price",
+    "usedShort": "Used",
+    "variantOverrides": "{{n}} variant(s) priced separately (bounds follow the model)"
   },
   "assetEvidence": {
     "title": "Evidence Photos",

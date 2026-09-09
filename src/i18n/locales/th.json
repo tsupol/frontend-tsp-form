@@ -1912,7 +1912,22 @@
     "removeTerm": "ลบ",
     "termAdded": "เพิ่มเงื่อนไขสำเร็จ",
     "termRemoved": "ลบเงื่อนไขสำเร็จ",
-    "enterMonths": "เดือน"
+    "enterMonths": "เดือน",
+    "upliftBounds": "กรอบราคาเพิ่ม (+ราคา)",
+    "usedPriceRange": "ช่วงราคามือสอง",
+    "usedUpliftRange": "กรอบราคาเพิ่มมือสอง",
+    "min": "ต่ำสุด",
+    "max": "สูงสุด",
+    "boundsNotSet": "ยังไม่ตั้ง — ใช้ค่ากลาง {{range}}",
+    "boundsNotSetNoRange": "ยังไม่ตั้ง — ใช้ค่ากลางของ holding",
+    "branchUpliftButtons": "ปุ่มราคาเพิ่มที่สาขาเห็น:",
+    "upliftSource_model": "กรอบของรุ่น",
+    "upliftSource_policy": "ค่ากลาง holding",
+    "history": "ประวัติราคา",
+    "historyCurrent": "ปัจจุบัน",
+    "upliftShort": "+ราคา",
+    "usedShort": "มือสอง",
+    "variantOverrides": "มี {{n}} variant ตั้งราคาแยก (กรอบใช้ของรุ่น)"
   },
   "assetEvidence": {
     "title": "รูปหลักประกัน",
