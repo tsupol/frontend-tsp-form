@@ -22,7 +22,7 @@
 // ============================================================================
 
 import { useTranslation } from 'react-i18next';
-import { Tooltip } from 'tsp-form';
+import { Badge, Tooltip } from 'tsp-form';
 import {
   ShieldOff, PauseCircle, Loader2, ShieldAlert, WifiOff, CheckCircle2,
   Image as ImageIcon, Lock, AlertTriangle, Eye, ArrowRight, Clock,
@@ -53,12 +53,16 @@ const ALERT_CLASS: Record<Tone, string> = {
   neutral: 'alert alert-info',
 };
 
-const PILL_CLASS: Record<Tone, string> = {
-  info: 'bg-info-soft border-info-border text-info-fg',
-  warning: 'bg-warning-soft border-warning-border text-warning-fg',
-  danger: 'bg-danger-soft border-danger-border text-danger-fg',
-  success: 'bg-success-soft border-success-border text-success-fg',
-  neutral: 'bg-surface border-line text-subtle',
+// The list badge is a tsp-form <Badge> so it matches the bucket/owner badges it
+// sits beside; tone maps straight onto Badge's colors (`neutral` = `default`).
+// Don't hand-roll a pill here — a custom one shipped visibly taller than its
+// neighbours (text-xs + py-0.5 against badge-xs's 1rem / 0.625rem).
+const BADGE_COLOR: Record<Tone, 'info' | 'warning' | 'danger' | 'success' | 'default'> = {
+  info: 'info',
+  warning: 'warning',
+  danger: 'danger',
+  success: 'success',
+  neutral: 'default',
 };
 
 function styleOf(code: MdmStoryStatusCode) {
@@ -177,10 +181,14 @@ export function MdmStoryBadge({ story, showCustomerSees = true }: {
   const s = styleOf(story.status_code);
   const Icon = s.icon;
   const pill = (
-    <span className={`rounded-md border px-2 py-0.5 text-xs inline-flex items-center gap-1 ${PILL_CLASS[s.tone]}`}>
-      <Icon size={12} className={`shrink-0 ${s.spin ? 'animate-spin' : ''}`} />
-      <span className="truncate">{story.status_th}</span>
-    </span>
+    <Badge
+      size="xs"
+      color={BADGE_COLOR[s.tone]}
+      truncate
+      startIcon={<Icon className={s.spin ? 'animate-spin' : undefined} />}
+    >
+      {story.status_th}
+    </Badge>
   );
   return (
     <div className="min-w-0">
