@@ -106,8 +106,13 @@ export function OverflowTabs<T extends string>({
 
   const activeInOverflow = overflow.includes(activeTab);
 
+  // `overflow-clip` on the strip: the measurement rail below is absolute, but
+  // its full un-truncated width still counts toward this box's scrollWidth.
+  // Inside PageNav that propagates up and gives the whole two-panel layout a
+  // horizontal scrollbar (measured: rail 782px vs strip 445px). `clip` rather
+  // than `hidden` so no scroll container is created for the sticky bits.
   return (
-    <div className="flex-none relative border-b border-line">
+    <div className="flex-none relative border-b border-line overflow-clip">
       {/* Off-screen measurement rail — renders all tabs to learn their widths. */}
       <div ref={measureRef} className="absolute opacity-0 pointer-events-none flex" aria-hidden style={{ top: -9999, left: 0 }}>
         {tabs.map((tab) => (
