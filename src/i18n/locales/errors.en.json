@@ -958,6 +958,8 @@
   "sale.partner.rate_out_of_range_basic": "Total commission is outside the holding's allowed range.",
   "sale.partner.doc_fee_out_of_range": "Contract fee ฿{{doc_fee_amount}} is outside the allowed range ฿{{doc_fee_min}}–฿{{doc_fee_max}}.",
   "sale.partner.doc_fee_out_of_range_basic": "Contract fee is outside the holding's allowed range.",
+  "sale.partner.guarantee_fee_out_of_range": "Guarantee return fee ฿{{guarantee_return_fee_amount}} is outside the allowed range ฿{{guarantee_return_fee_min}}–฿{{guarantee_return_fee_max}}.",
+  "sale.partner.guarantee_fee_out_of_range_basic": "Guarantee return fee is outside the holding's allowed range.",
   "sale.partner.not_deal_partner": "This branch is not a deal partner.",
   "sale.partner.return_branch_invalid": "The return branch must be an active internal branch in the same holding.",
   "sale.partner.config_not_found": "No commission config exists for this branch.",

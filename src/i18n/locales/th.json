@@ -2198,7 +2198,16 @@
     "docFeeRangeHint": "ค่าทำสัญญาต้องอยู่ในช่วง {{min}}–{{max}} บาท",
     "docFeeRequired": "กรุณาระบุค่าทำสัญญา",
     "docFeeDefaultOutOfRange": "ค่า default ต้องอยู่ในช่วงค่าทำสัญญาที่กำหนด",
-    "internalNoDocFee": "สาขาภายในไม่มีค่าทำสัญญา"
+    "internalNoDocFee": "สาขาภายในไม่มีค่าทำสัญญา",
+    "amountRequired": "กรุณาระบุจำนวนเงิน",
+    "guaranteeFeeSection": "ค่าคืนเครื่องในระยะประกัน",
+    "guaranteeFeeMin": "ค่าคืนเครื่องขั้นต่ำ",
+    "guaranteeFeeMax": "ค่าคืนเครื่องสูงสุด",
+    "guaranteeFeeDefault": "ค่าคืนเครื่อง default",
+    "guaranteeFeeRange": "ช่วงค่าคืนเครื่องที่อนุญาต",
+    "guaranteeFeeAmount": "ค่าคืนเครื่องในระยะประกัน",
+    "guaranteeFeeHint": "สาขาจ่ายเพิ่มจากการคืนเงินเต็มจำนวน เมื่อลูกค้าคืนเครื่องภายในระยะประกัน",
+    "guaranteeFeeRangeHint": "ค่าคืนเครื่องต้องอยู่ในช่วง {{min}}–{{max}} บาท"
   },
   "branchStock": {
     "retailTab": "ขายปลีก",

@@ -958,6 +958,8 @@
   "sale.partner.rate_out_of_range_basic": "ค่าคอมรวมอยู่นอกช่วงที่ holding กำหนด",
   "sale.partner.doc_fee_out_of_range": "ค่าทำสัญญา {{doc_fee_amount}} บาท อยู่นอกช่วงที่กำหนด {{doc_fee_min}}–{{doc_fee_max}} บาท",
   "sale.partner.doc_fee_out_of_range_basic": "ค่าทำสัญญาอยู่นอกช่วงที่ holding กำหนด",
+  "sale.partner.guarantee_fee_out_of_range": "ค่าคืนเครื่องในระยะประกัน {{guarantee_return_fee_amount}} บาท อยู่นอกช่วงที่กำหนด {{guarantee_return_fee_min}}–{{guarantee_return_fee_max}} บาท",
+  "sale.partner.guarantee_fee_out_of_range_basic": "ค่าคืนเครื่องในระยะประกันอยู่นอกช่วงที่ holding กำหนด",
   "sale.partner.not_deal_partner": "สาขานี้ไม่ใช่ deal partner",
   "sale.partner.return_branch_invalid": "สาขารับเครื่องคืนต้องเป็นสาขาภายในที่เปิดใช้งานใน holding เดียวกัน",
   "sale.partner.config_not_found": "ไม่พบ config ค่าคอมของสาขานี้",

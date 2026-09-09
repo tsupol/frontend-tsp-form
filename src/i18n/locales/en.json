@@ -2202,7 +2202,16 @@
     "docFeeRangeHint": "Fee must be within {{min}}–{{max}} THB",
     "docFeeRequired": "Contract fee is required",
     "docFeeDefaultOutOfRange": "Default must be within the allowed fee range",
-    "internalNoDocFee": "Internal branches have no contract fee"
+    "internalNoDocFee": "Internal branches have no contract fee",
+    "amountRequired": "Amount is required",
+    "guaranteeFeeSection": "Guarantee return fee",
+    "guaranteeFeeMin": "Fee min",
+    "guaranteeFeeMax": "Fee max",
+    "guaranteeFeeDefault": "Fee default",
+    "guaranteeFeeRange": "Allowed fee",
+    "guaranteeFeeAmount": "Guarantee return fee",
+    "guaranteeFeeHint": "Paid by the branch on top of the full refund when a device is returned within the guarantee window",
+    "guaranteeFeeRangeHint": "Fee must be within {{min}}–{{max}} THB"
   },
   "branchStock": {
     "retailTab": "Retail",
