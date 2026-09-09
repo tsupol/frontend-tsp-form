@@ -8,7 +8,13 @@ adds what is specific to this app.
 
 - **Write to `screenshots/<date>_<topic>/`**, never a bare filename and never
   `.playwright-mcp/`. The folder is gitignored; delete the shots when the
-  verification is done.
+  verification is done. `mkdir -p` it first — the screenshot tool errors with
+  ENOENT rather than creating the folder itself.
+- **Don't narrate the capture.** No running commentary on navigating, resizing,
+  clicking, or "now taking shot 2 of 3" — the shots are the deliverable, the
+  steps are not. When it's done, say what the shots show and where they are, in
+  a couple of lines. Report the process only where it carries information the
+  user needs: something rendered wrong, or a step failed and changed the result.
 - **Take them plain: no `clip`, no `scale`, no size of any kind.** Just
   `page.screenshot({ path })`. The window is whatever size the user has it, and
   that is the size worth seeing.
