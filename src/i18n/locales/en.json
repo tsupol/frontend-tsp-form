@@ -1929,7 +1929,7 @@
     "upliftSource_policy": "holding default",
     "history": "Price history",
     "historyCurrent": "Current",
-    "upliftShort": "+Price",
+    "upliftShort": "Uplift range",
     "usedShort": "Used",
     "variantOverrides": "{{n}} variant(s) priced separately (bounds follow the model)"
   },
