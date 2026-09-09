@@ -972,6 +972,8 @@
   "pricing.fin1.multiplier_order": "นอกช่วงที่ตั้งได้ {{allowed_min}}–{{allowed_max}} — ค่างวดต้องลดลงและดอกรวมต้องเพิ่มเมื่องวดยาวขึ้น",
   "pricing.fin1.policy_key": "ค่านโยบายไม่ผ่านเงื่อนไข — ต้องเป็น {{rule}}",
   "pricing.fin1.policy_key_basic": "ไม่รู้จัก key ของนโยบาย หรือค่าไม่ผ่านเงื่อนไข",
+  "pricing.fin1.branch_config": "ช่วงดาวน์ของสาขาต้องอยู่ในกรอบ holding {{holding_min}}–{{holding_max}}% และ ขั้นต่ำ ≤ สูงสุด",
+  "pricing.fin1.branch_config_basic": "ค่า config ของสาขาอยู่นอกกรอบที่ holding กำหนด",
   "pricing.fin1.no_retail_price": "สินค้านี้ยังไม่มีราคาตั้งในระบบ — แจ้ง holding ให้กรอกตารางราคาก่อน",
   "pricing.fin1.uplift": "ราคาปรับขึ้นต้องอยู่ระหว่าง 0 ถึงเพดานที่ตั้งไว้",
   "pricing.fin1.monthly_too_low": "ค่างวดที่ขอต่ำกว่าค่างวดของงวดยาวสุด — เพิ่มเงินดาวน์",

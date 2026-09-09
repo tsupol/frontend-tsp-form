@@ -972,6 +972,8 @@
   "pricing.fin1.multiplier_order": "Out of the allowed range {{allowed_min}}–{{allowed_max}} — installments must decrease and total interest increase as the term grows.",
   "pricing.fin1.policy_key": "Policy value rejected — must satisfy: {{rule}}",
   "pricing.fin1.policy_key_basic": "Unknown policy key or invalid value.",
+  "pricing.fin1.branch_config": "Branch down payment must sit inside the holding band {{holding_min}}–{{holding_max}}%, with min ≤ max.",
+  "pricing.fin1.branch_config_basic": "Branch settings are outside the holding's allowed band.",
   "pricing.fin1.no_retail_price": "This product has no retail price set yet — ask the holding to fill in the pricebook.",
   "pricing.fin1.uplift": "The price uplift must be between 0 and the configured maximum.",
   "pricing.fin1.monthly_too_low": "The requested monthly amount is below the longest term's installment — raise the down payment.",

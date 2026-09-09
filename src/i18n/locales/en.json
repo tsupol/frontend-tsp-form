@@ -5663,7 +5663,17 @@
     "desc_FIN2": "Fixed profit",
     "desc_PRICEBOOK": "Retail / cash",
     "alwaysOn": "Always on",
-    "saved": "Finance model updated"
+    "saved": "Finance model updated",
+    "downRange": "Down payment range",
+    "downRangeHint": "Branch range for FIN1, inside the holding band {{min}}–{{max}}%",
+    "downMin": "Min down %",
+    "downMax": "Max down %",
+    "downSaved": "Down payment range updated",
+    "downEdit": "Edit range",
+    "downOutOfBand": "Must be within the holding band {{min}}–{{max}}%",
+    "downMaxBelowMin": "Max must not be below min",
+    "downResetDefault": "Holding default",
+    "downLoading": "Loading range…"
   },
   "lessors": {
     "title": "Lessors",

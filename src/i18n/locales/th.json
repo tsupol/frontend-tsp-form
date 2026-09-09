@@ -5657,7 +5657,17 @@
     "desc_FIN2": "กำไรคงที่",
     "desc_PRICEBOOK": "ขายปลีก / เงินสด",
     "alwaysOn": "เปิดเสมอ",
-    "saved": "อัปเดตรูปแบบการเงินแล้ว"
+    "saved": "อัปเดตรูปแบบการเงินแล้ว",
+    "downRange": "ช่วงเงินดาวน์",
+    "downRangeHint": "ช่วงดาวน์ของสาขาสำหรับ FIN1 ภายในกรอบ holding {{min}}–{{max}}%",
+    "downMin": "ดาวน์ขั้นต่ำ %",
+    "downMax": "ดาวน์สูงสุด %",
+    "downSaved": "อัปเดตช่วงเงินดาวน์แล้ว",
+    "downEdit": "แก้ไขช่วง",
+    "downOutOfBand": "ต้องอยู่ในกรอบ holding {{min}}–{{max}}%",
+    "downMaxBelowMin": "ค่าสูงสุดต้องไม่น้อยกว่าค่าต่ำสุด",
+    "downResetDefault": "ค่า default ของ holding",
+    "downLoading": "กำลังโหลดช่วงดาวน์…"
   },
   "lessors": {
     "title": "ผู้ให้เช่า",
