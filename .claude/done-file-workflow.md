@@ -73,6 +73,8 @@ finding (a mig landed without a NOTICE, an RPC drifted), state *what* and
 - Multiple parallel agents: one test log per work order, each agent appends to
   its own topic's log. Outbox drafts use final filenames so collisions are
   visible immediately.
-- Deploy: if a deploy step belongs before responding (bundle must match the
-  DONE), it runs first on the same trigger. Command TBD — ask Ton once, then
-  record it here.
+- Deploy: `just deploy` (builds, ships dist/ over ssh; nginx serves it at
+  once — no restart). Verify after: the live index at https://nnfui.czynet.dev
+  must reference the freshly built main-*.js hash. Run it when Ton says
+  "deploy"; when DONE files claim behavior DB will check on POP, deploy
+  before or together with "ส่ง BE" so the bundle matches the claims.
