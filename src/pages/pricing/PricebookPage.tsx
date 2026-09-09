@@ -1342,7 +1342,7 @@ export function PricebookPage() {
                             <div className={`text-sm tabular-nums ${rp === null ? 'text-subtle' : ''}`}>
                               {formatTHB(rp)}
                             </div>
-                            <div className="text-[10px] text-subtle">{t('pricing.retailPrice')}</div>
+                            <div className="text-[10px] text-subtle">{t('pricing.retailPriceShort')}</div>
                           </div>
 
                           <div className="shrink-0 w-16 xl:w-24 text-right hidden sm:block">

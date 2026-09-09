@@ -1874,7 +1874,7 @@
   },
   "pricing": {
     "title": "ตารางราคา",
-    "retailPrice": "ราคาขายปลีก",
+    "retailPrice": "ราคาขายปลีก มือหนึ่ง",
     "costPrice": "ราคาทุน",
     "margin": "กำไร",
     "needsSetup": "ต้องตั้งค่า",
@@ -1927,7 +1927,8 @@
     "historyCurrent": "ปัจจุบัน",
     "upliftShort": "กรอบ +ราคา",
     "usedShort": "มือสอง",
-    "variantOverrides": "มี {{n}} variant ตั้งราคาแยก (กรอบใช้ของรุ่น)"
+    "variantOverrides": "มี {{n}} variant ตั้งราคาแยก (กรอบใช้ของรุ่น)",
+    "retailPriceShort": "ราคาขายปลีก"
   },
   "assetEvidence": {
     "title": "รูปหลักประกัน",

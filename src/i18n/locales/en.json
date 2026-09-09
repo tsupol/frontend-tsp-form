@@ -1878,7 +1878,7 @@
   },
   "pricing": {
     "title": "Pricebook",
-    "retailPrice": "Retail Price",
+    "retailPrice": "Retail Price (1st-hand)",
     "costPrice": "Cost Price",
     "margin": "Margin",
     "needsSetup": "Needs Setup",
@@ -1931,7 +1931,8 @@
     "historyCurrent": "Current",
     "upliftShort": "Uplift range",
     "usedShort": "Used",
-    "variantOverrides": "{{n}} variant(s) priced separately (bounds follow the model)"
+    "variantOverrides": "{{n}} variant(s) priced separately (bounds follow the model)",
+    "retailPriceShort": "Retail"
   },
   "assetEvidence": {
     "title": "Evidence Photos",
