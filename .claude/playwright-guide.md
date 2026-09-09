@@ -10,11 +10,14 @@ adds what is specific to this app.
   `.playwright-mcp/`. The folder is gitignored; delete the shots when the
   verification is done. `mkdir -p` it first — the screenshot tool errors with
   ENOENT rather than creating the folder itself.
-- **Don't narrate the capture.** No running commentary on navigating, resizing,
-  clicking, or "now taking shot 2 of 3" — the shots are the deliverable, the
-  steps are not. When it's done, say what the shots show and where they are, in
-  a couple of lines. Report the process only where it carries information the
-  user needs: something rendered wrong, or a step failed and changed the result.
+- **Outline what you captured.** When you hand over shots, list them — one line
+  per shot: the file, the page/state it shows, and what in it is worth looking
+  at. The user is about to open several PNGs; without the list they have to
+  reverse-engineer why each one exists.
+- Also say what you *checked* that isn't visible in the images — the values you
+  read off the DOM, the case you deliberately picked (a null field, an empty
+  list), anything that failed or looked wrong on the way. A shot proves the
+  layout; the outline is what proves you verified the behaviour.
 - **Take them plain: no `clip`, no `scale`, no size of any kind.** Just
   `page.screenshot({ path })`. The window is whatever size the user has it, and
   that is the size worth seeing.
