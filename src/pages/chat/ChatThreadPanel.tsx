@@ -741,9 +741,10 @@ export function ChatThreadPanel({
   const title = inboxRow?.customer_name ?? t('chat.title');
 
   // Multi-branch users (company / holding, no branch_id) see chats from every
-  // สาขา — surface which branch this thread belongs to. Branch users see one
-  // branch only, so the label is redundant and hidden.
-  const showBranch = !user?.branch_id;
+  // สาขา — surface which branch this thread belongs to. For branch users the
+  // label is redundant on their own branch, but a pooled collector (mig 1185)
+  // also opens threads from the pool's other branches — label those.
+  const showBranch = !user?.branch_id || (inboxRow != null && inboxRow.branch_id !== user.branch_id);
 
   return (
     <div className="flex-1 min-h-0 flex flex-col h-full relative">

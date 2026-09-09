@@ -287,8 +287,10 @@ export function ChatPage() {
 
   // Multi-branch users (company / holding) have no branch_id — they see chats
   // across every สาขา in scope, so tag each row with its branch. A branch user
-  // only ever sees their own branch, so the badge would be noise; hide it.
-  const showBranch = !user?.branch_id;
+  // mostly sees their own branch (badge = noise), but a pooled collector
+  // (mig 1185) also gets rooms from the other branches the pool covers — tag
+  // those rows so a cross-branch room is recognisable in the mixed list.
+  const ownBranchId = user?.branch_id ?? null;
 
   return (
     <PageNav
@@ -469,7 +471,7 @@ export function ChatPage() {
                         row={row}
                         selected={selectedContractId === row.contract_id}
                         onSelect={() => selectThread(row.contract_id, isMobile ? goTo : undefined)}
-                        showBranch={showBranch}
+                        showBranch={ownBranchId === null || row.branch_id !== ownBranchId}
                         lang={i18n.language}
                         t={t}
                       />

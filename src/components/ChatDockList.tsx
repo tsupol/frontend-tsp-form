@@ -29,9 +29,10 @@ interface Props {
 export function ChatDockList({ selectedContractId, onSelect }: Props) {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
-  // Branch label only means something to multi-branch users; branch staff see
-  // one branch, so it is noise there.
-  const showBranch = !user?.branch_id;
+  // Branch label only means something to multi-branch users — plus pooled
+  // collectors (mig 1185), whose inbox mixes in rooms from the other branches
+  // their pool covers; those cross-branch rows get the label too.
+  const ownBranchId = user?.branch_id ?? null;
 
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: ['chat-dock-inbox'],
@@ -77,7 +78,7 @@ export function ChatDockList({ selectedContractId, onSelect }: Props) {
               row={row}
               selected={selectedContractId === row.contract_id}
               onSelect={() => onSelect(row.contract_id)}
-              showBranch={showBranch}
+              showBranch={ownBranchId === null || row.branch_id !== ownBranchId}
               lang={i18n.language}
               t={t}
               compact
