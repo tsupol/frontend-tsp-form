@@ -1352,9 +1352,12 @@ export function PricebookPage() {
                             <div className="text-[10px] text-subtle">{t('pricing.costPrice')}</div>
                           </div>
 
-                          {/* Uplift bounds — model's own, or muted holding default */}
+                          {/* Uplift bounds — model's own, or muted holding default.
+                              Wider than the price columns: a bounds-rich row
+                              stacks three lines (range, label, used range) and
+                              the used line needs ~9 digit-pairs to breathe. */}
                           {p?.is_contractable && (
-                            <div className="shrink-0 w-20 xl:w-28 text-right hidden lg:block">
+                            <div className="shrink-0 w-28 xl:w-36 text-right hidden lg:block">
                               <div className="text-sm tabular-nums">
                                 {p.bounds_set ? (
                                   fmtRange(p.uplift_min, p.uplift_max)
@@ -1366,7 +1369,7 @@ export function PricebookPage() {
                               </div>
                               <div className="text-[10px] text-subtle">{t('pricing.upliftShort')}</div>
                               {p.used_set && (
-                                <div className="text-[10px] text-subtle tabular-nums truncate">
+                                <div className="text-[11px] text-subtle tabular-nums truncate">
                                   {t('pricing.usedShort')} {fmtRange(p.used_retail_min, p.used_retail_max)}
                                 </div>
                               )}
