@@ -930,9 +930,9 @@ export function AssetsPage() {
                         <div className="flex items-baseline gap-1.5 min-w-0">
                           <span className="font-medium text-xs truncate">{codeDisplay(asset.asset_code_display, asset.asset_code)}</span>
                           {asset.external_ref && (
-                            <span className="text-[10px] font-mono text-subtle bg-surface px-1 py-0.5 rounded border border-line shrink-0">
+                            <Badge size="xs" variant="outline" className="font-mono shrink-0">
                               EXT {asset.external_ref}
-                            </span>
+                            </Badge>
                           )}
                           <span className={`text-[10px] shrink-0 ${getConditionTextColor(asset.condition_grade)}`}>
                             {getConditionLabel(asset.condition_grade, t)}
