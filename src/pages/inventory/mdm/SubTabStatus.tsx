@@ -17,7 +17,8 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { type AssetMdmStatus } from './mdmApi';
 import { RelativeDateTime } from './RelativeDateTime';
 import { RecentIntentsPanel } from './RecentIntentsPanel';
-import { MdmActivityCard } from './MdmActivityCard';
+import { MdmStoryBox } from './MdmStoryBox';
+import { useMdmStory } from './useMdmStory';
 import { DeviceProfilesApps } from './DeviceProfilesApps';
 
 export function SubTabStatus({
@@ -30,6 +31,7 @@ export function SubTabStatus({
   const { t } = useTranslation();
   const { user } = useAuth();
   const actorId = user?.user_id ?? null;
+  const { data: story } = useMdmStory(status.asset_id);
 
   const battery = status.battery_level != null ? Math.round(status.battery_level * 100) : null;
   const capPct = status.capacity_gb && status.available_capacity_gb != null
@@ -38,8 +40,9 @@ export function SubTabStatus({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* "What's happening now" — the first thing a staffer on a call needs. */}
-      <MdmActivityCard status={status} />
+      {/* "What's happening now" — the first thing a staffer on a call needs.
+          Every line is composed by the DB (§3.0); we only print it. */}
+      {story && <MdmStoryBox story={story} onGoToEnroll={onNotEnrolled} />}
 
       {/* Device info glance (§3.1). has_basic_info === false → nothing to show
           yet; the pull buttons live in the accordion below. */}

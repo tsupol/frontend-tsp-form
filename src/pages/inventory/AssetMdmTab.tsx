@@ -65,7 +65,8 @@ export function AssetMdmTab({ assetId, onRefresh }: { assetId: number; onRefresh
       predicate: (q) => {
         const k = q.queryKey;
         return Array.isArray(k) && typeof k[0] === 'string'
-          && (k[0].startsWith('mdm-') || k[0].startsWith('branch-mdm') || k[0] === 'asset-mdm-status');
+          && (k[0].startsWith('mdm-') || k[0].startsWith('branch-mdm')
+            || k[0] === 'asset-mdm-status' || k[0] === 'asset-mdm-story');
       },
     });
   };

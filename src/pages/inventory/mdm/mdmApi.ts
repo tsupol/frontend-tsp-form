@@ -252,6 +252,65 @@ export function fetchMdmStatus(assetId: number): Promise<AssetMdmStatus | null> 
     .then((r) => r[0] ?? null);
 }
 
+// ── The story row: v_asset_mdm_story (§3.0, nnf-mdm migs 281–283) ───────────
+//
+// The whole "what is happening to this device" box, pre-composed by the DB:
+// six fields, each a `*_code` (pick an icon/colour) paired with a `*_th`
+// (the sentence to print). The FE must NEVER translate a code into words or
+// re-derive the state — changing the wording is a DB change, in one place.
+//
+// It reads a report table with one row per device, so fetching it for a whole
+// branch list costs ~2ms; no need to lazy-load it per device.
+
+export type MdmStoryStatusCode =
+  | 'NOT_IN_MDM' | 'PAUSED' | 'CHANGING' | 'SILENT'
+  | 'HARD' | 'MEDIUM' | 'WALLPAPER' | 'NORMAL';
+
+export interface AssetMdmStory {
+  asset_id: number;
+  holding_id: number | null;
+  company_id: number | null;
+  branch_id: number | null;
+  /** null = never entered MDM. */
+  binding_id: number | null;
+
+  status_code: MdmStoryStatusCode;
+  status_th: string;
+
+  /** 0 normal · 1 dunning image · 2 +app lock 1 · 3 +app lock 2. */
+  customer_sees_level: number;
+  customer_sees_th: string;
+
+  reason_code: 'OVERDUE' | 'SLIP_UNDER_REVIEW' | 'STAFF_HOLD' | 'PROMISE_ACTIVE' | 'NONE';
+  /** Empty string = no reason to show; hide the line rather than print blank. */
+  reason_th: string;
+
+  next_code: 'WILL_ESCALATE' | 'RELEASE_ON_PAYMENT' | 'HOLD_UNTIL' | 'NONE';
+  next_date: string | null;
+  next_th: string;
+
+  confidence_code: 'CONFIRMED' | 'COMMANDED' | 'UNKNOWN';
+  as_of_at: string | null;
+  as_of_th: string;
+
+  action_code: 'CALL_CUSTOMER' | 'RESEND' | 'NONE';
+  action_th: string;
+
+  /** Debug only — when the report row was last written. */
+  status_updated_at: string | null;
+}
+
+export function fetchMdmStory(assetId: number): Promise<AssetMdmStory | null> {
+  return apiClient
+    .get<AssetMdmStory[]>(`/v_asset_mdm_story?asset_id=eq.${assetId}`)
+    .then((r) => r[0] ?? null);
+}
+
+/** Every device in one branch — for the asset list's badge + line (§5). */
+export function fetchBranchMdmStories(branchId: number): Promise<AssetMdmStory[]> {
+  return apiClient.get<AssetMdmStory[]>(`/v_asset_mdm_story?branch_id=eq.${branchId}`);
+}
+
 // ── Queue / history: v_asset_mdm_recent_intents (§4) ────────────────────────
 
 export type MdmIntentDisplayStatus = 'DONE' | 'IN_PROGRESS' | 'FAILED' | 'CANCELED';

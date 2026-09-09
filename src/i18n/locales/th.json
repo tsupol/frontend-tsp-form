@@ -3125,6 +3125,12 @@
         "notReadyTitle": "ยังไม่ควรส่งมอบ",
         "appleShort": "กุญแจ Apple",
         "orgShort": "กุญแจองค์กร"
+      },
+      "story": {
+        "customerSees": "ลูกค้าเห็น",
+        "reason": "เพราะ",
+        "next": "ถัดไป",
+        "goToEnroll": "ไปหน้านำเครื่องเข้าระบบ"
       }
     },
     "icloud_appleOnly": "iCloud ใช้ได้เฉพาะเครื่อง Apple เท่านั้น",

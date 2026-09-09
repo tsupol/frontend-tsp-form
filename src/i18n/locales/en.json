@@ -3129,6 +3129,12 @@
         "notReadyTitle": "Not safe to hand over yet",
         "appleShort": "Apple key",
         "orgShort": "Company key"
+      },
+      "story": {
+        "customerSees": "Customer sees",
+        "reason": "Because",
+        "next": "Next",
+        "goToEnroll": "Go to enrollment"
       }
     },
     "icloud_appleOnly": "iCloud applies to Apple devices only.",

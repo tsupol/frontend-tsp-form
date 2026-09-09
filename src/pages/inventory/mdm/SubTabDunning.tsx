@@ -25,6 +25,8 @@ import {
 import { useMdmCommand } from './useMdmCommand';
 import { MDM_NO_CACHE } from './useMdmStatus';
 import { MdmActivityLine } from './MdmActivityCard';
+import { MdmStoryLines } from './MdmStoryBox';
+import { useMdmStory } from './useMdmStory';
 import { MdmErrorAlert, CommandAckNote } from './MdmSharedBits';
 
 export function SubTabDunning({
@@ -40,6 +42,7 @@ export function SubTabDunning({
 }) {
   const { t } = useTranslation();
   const [confirm, setConfirm] = useState<null | 'enforce' | 'release'>(null);
+  const { data: story } = useMdmStory(status.asset_id);
 
   const cmd = useMdmCommand({ onAck, onNotEnrolled });
 
@@ -85,6 +88,10 @@ export function SubTabDunning({
     <div className="flex flex-col gap-4">
       {/* Current state — so staff don't re-press what's already in effect. */}
       <MdmActivityLine status={status} />
+
+      {/* What the system is already going to do on its own (§6) — pressing a
+          button is often unnecessary once you can see this. */}
+      {story && <MdmStoryLines story={story} />}
 
       <p className="text-sm text-subtle">{t('asset.mdm.dunning.intro')}</p>
 

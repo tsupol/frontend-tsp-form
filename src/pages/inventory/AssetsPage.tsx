@@ -16,6 +16,8 @@ import { buildBillActionToast, type StandardBillResponse } from '../../lib/billA
 import { useAuth } from '../../contexts/AuthContext';
 import { AssignIcloudModal, ReleaseIcloudModal, IcloudPasswordRow } from '../contracts/IcloudModals';
 import { ActionDoneView } from '../contracts/ActionDoneView';
+import { MdmStoryBadge } from './mdm/MdmStoryBox';
+import type { AssetMdmStory } from './mdm/mdmApi';
 import { AssetScreenTimeSection } from '../../components/AssetScreenTimeSection';
 import { AssetContractTimeline } from '../../components/AssetContractTimeline';
 import { getStateColor } from '../contracts/contractUtils';
@@ -559,6 +561,23 @@ export function AssetsPage() {
   const list = listData?.data ?? [];
   const totalCount = listData?.totalCount ?? 0;
 
+  // MDM story badges for the rows on screen (IMPLEMENT §5). Fetched for the
+  // visible page rather than a whole branch, because this list is not always
+  // branch-scoped — the filter is optional. It reads a prepared report table,
+  // so one request covers the page; rows without a story simply show nothing.
+  const visibleAssetIds = list.map(a => a.asset_id);
+  const { data: stories = [] } = useQuery({
+    queryKey: ['asset-mdm-story-list', visibleAssetIds],
+    queryFn: () => apiClient.get<AssetMdmStory[]>(
+      `/v_asset_mdm_story?asset_id=in.(${visibleAssetIds.join(',')})`,
+    ),
+    enabled: visibleAssetIds.length > 0,
+    // Same no-cache rule as the rest of MDM: the row moves without the user.
+    staleTime: 0,
+    refetchOnMount: 'always',
+  });
+  const storyByAsset = new Map(stories.map(s => [s.asset_id, s]));
+
   // Pill counts via the dedicated branch-stock views (backend-defined scope).
   // v_branch_sellable_stock filters is_sellable=true AND is_contractable=false
   // internally; v_branch_contractable_stock filters is_contractable=true AND
@@ -928,6 +947,17 @@ export function AssetsPage() {
                           </Badge>
                           <OwnerBadge ownerType={asset.owner_type as OwnerType | null} ownerName={asset.owner_name} size="xs" />
                         </div>
+                        {/* MDM story (§5) — only for devices actually under MDM;
+                            "not in MDM" on every stock item would be noise. */}
+                        {(() => {
+                          const story = storyByAsset.get(asset.asset_id);
+                          if (!story || story.status_code === 'NOT_IN_MDM') return null;
+                          return (
+                            <div className="mt-1">
+                              <MdmStoryBadge story={story} />
+                            </div>
+                          );
+                        })()}
                       </div>
                       <div className="text-right shrink-0">
                         <div className="text-sm font-medium tabular-nums">{fmtCurrency(asset.current_cost_basis)}</div>
