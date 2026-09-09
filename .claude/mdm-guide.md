@@ -22,7 +22,10 @@ src/pages/inventory/
     useMdmStatus.ts               ← the ONE shared v_asset_mdm_status query + MDM_NO_CACHE config
     mdmApi.ts                     ← ALL types + RPC wrappers + parseMdmError. One file, one import.
     useMdmCommand.ts              ← the async fire→ack→error contract every action button uses
-    MdmActivityCard.tsx           ← §3.0 "what's happening now" box (full) + MdmActivityLine (compact)
+    MdmStoryBox.tsx               ← §3.0 "what's happening now" box, printed from v_asset_mdm_story
+                                    (+ MdmStoryLines for sub-tab 3, MdmStoryBadge for list rows)
+    useMdmStory.ts                ← that view's query; polls fast while status_code === CHANGING
+    MdmActivityCard.tsx           ← now ONLY MdmActivityLine (enforcement level + ●●○ ladder)
     DeviceProfilesApps.tsx        ← the sub-tab-2 accordion: IMEI/SIM + profiles (collapsible,
                                     each with count+staleness+Pull, poll-until-observed_at-moves).
                                     The APPS section used to be here too — it moved to sub-tab 5.
@@ -68,29 +71,36 @@ behalf (ours). Showing both together is the point: it's how the operator picks t
    ladder table's "0 = light" row is the theoretical dunning ladder, not what a handed-over device
    shows. Don't render level 0 as a dunning rung.
 
-4. **"How it unlocks" comes ONLY from `release_condition_code`** — never composed from
+4. **The §3.0 box PRINTS `v_asset_mdm_story`; it never composes.** (2026-09-09, nnf-mdm migs
+   281–283.) Six `*_code` / `*_th` pairs: the code picks an icon/colour and decides whether to
+   poll, the `*_th` IS the sentence to show. NEVER translate a code into words, and never
+   re-derive the state from `v_asset_mdm_status` — changing the wording is a DB change in one
+   place. Empty `*_th` = the line doesn't apply → hide the row, don't print a bare label.
+   `v_asset_mdm_status` is still the source for BUTTONS and the `may_*` flags.
+
+5. **"How it unlocks" comes ONLY from `release_condition_code`** — never composed from
    `enforcement_origin_code` (they contradicted on real hardware). `null` ≠ unrestricted → hide the
    line. Values: CUSTOMER_PAYS / STAFF_MUST_RELEASE / AUTOMATION_WILL_REVERT / null.
 
-5. **null is a real answer — hide the line, never render "0 days".** The why/next columns
+6. **null is a real answer — hide the line, never render "0 days".** The why/next columns
    (`overdue_days_effective`, `next_level`, `days_until_next_level`, …) are null when the device
    isn't under a live contract (stock, repair, closed). Same for `phone_number`/`carrier_network`
    (no active SIM → "No active SIM", not blank) and `nnf_app_installed`/`app_whitelist_active`
    (`null` = never pulled, ≠ `false` = pulled-and-absent — different messages).
 
-6. **Sub-tab visibility from per-device `may_*` flags, NOT role_code.** `may_dunning`, `may_wallpaper`,
+7. **Sub-tab visibility from per-device `may_*` flags, NOT role_code.** `may_dunning`, `may_wallpaper`,
    `may_app_control`, `may_lost_mode`/`may_location`, `may_pause`, `may_profile` — these are
    permission AND territory (a device in another branch returns all-false → no dead-end 403s).
    `AssetMdmTab.visibleSubTabs()` owns this. Don't gate on role.
 
-7. **Error codes arrive in BOTH casings — keep both in the catalogue.** `parseMdmError` prefers
+8. **Error codes arrive in BOTH casings — keep both in the catalogue.** `parseMdmError` prefers
    `messageKey`, which the BE sends **lowercase** (`mdm.state.gate_already_open`), while a raw
    type-B code arrives UPPER. The i18n lookup is by exact key, so an entry filed only in upper case
    silently never matches and the user gets the BE's raw English. Add every new MDM code to
    `errors.{en,th}.json` in both cases, and compare codes with `.toUpperCase()` in FE branching.
    (This bit three pre-existing codes as well as the 2026-08-13 app-removal set.)
 
-8. **Alerts use tsp-form `.alert`** (`alert alert-{info|success|warning|danger}` + `.alert-title` /
+9. **Alerts use tsp-form `.alert`** (`alert alert-{info|success|warning|danger}` + `.alert-title` /
    `.alert-description`), not hand-rolled tone boxes. Radios use tsp-form `RadioGroup`/`RadioCircle`.
    The user flagged both during review — match the component library.
 
