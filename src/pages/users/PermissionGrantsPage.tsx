@@ -85,18 +85,22 @@ export function PermissionGrantsPage() {
     {
       accessorKey: 'permission_code',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('permissionGrants.permission')} />,
+      // The DB descriptions are long sentences. Without a hard cap the cell
+      // stretches to their full width — `truncate` needs a bounded box to clip
+      // against — which widens the table and pushes the revoke button off-screen.
       cell: ({ row }) => (
-        <div className="min-w-0">
+        <div className="min-w-0 max-w-[18rem]">
           <div className="text-sm font-mono truncate">{row.original.permission_code}</div>
           <div className="text-xs text-subtle truncate max-lg:hidden">{row.original.description}</div>
         </div>
       ),
+      className: 'max-w-[18rem]',
     },
     {
       accessorKey: 'granted_by_username',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('permissionGrants.grantedBy')} />,
       cell: ({ row }) => <span className="text-sm text-subtle">{row.original.granted_by_username ?? '—'}</span>,
-      className: 'w-40 max-md:hidden',
+      className: 'w-32 max-md:hidden',
     },
     {
       accessorKey: 'granted_at',
@@ -106,7 +110,7 @@ export function PermissionGrantsPage() {
           <DateTime value={row.original.granted_at} showTime={false} />
         </span>
       ),
-      className: 'w-32 max-md:hidden',
+      className: 'w-28 max-md:hidden',
     },
     {
       id: 'status',
@@ -132,7 +136,7 @@ export function PermissionGrantsPage() {
         </Button>
       ) : null,
       enableSorting: false,
-      className: 'w-28',
+      className: 'w-28 whitespace-nowrap',
     },
   ];
 
