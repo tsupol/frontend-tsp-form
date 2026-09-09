@@ -400,7 +400,7 @@
     "fin2Rates": "อัตรา FIN2",
     "discountPolicies": "นโยบายส่วนลด",
     "discountApprovals": "อนุมัติส่วนลด",
-    "dealPartnerRates": "ค่าคอมพาร์ทเนอร์",
+    "dealPartnerRates": "เงื่อนไข Deal Partner",
     "inventory": "คลังสินค้า",
     "stock": "ภาพรวมสต็อก",
     "lots": "Lot",
@@ -2139,7 +2139,7 @@
     "filterAllBranches": "ทุกสาขา"
   },
   "dealPartnerRate": {
-    "title": "ค่าคอม Deal Partner",
+    "title": "เงื่อนไข Deal Partner",
     "policyTitle": "นโยบายของ holding",
     "defaultsHint": "ร้าน deal partner ที่เปิดใหม่จะได้ค่า default นี้อัตโนมัติ",
     "totalRange": "ช่วงยอดรวมที่อนุญาต",
@@ -2168,7 +2168,19 @@
     "rateRequired": "กรุณาระบุค่าคอม",
     "editConfig": "แก้ไขค่าคอม",
     "configSaved": "บันทึกค่าคอมแล้ว",
-    "empty": "ยังไม่มีร้าน deal partner"
+    "empty": "ยังไม่มีร้าน deal partner",
+    "commissionSection": "ค่าคอม",
+    "docFeeSection": "ค่าทำสัญญา",
+    "docFeeMin": "ค่าทำสัญญาขั้นต่ำ",
+    "docFeeMax": "ค่าทำสัญญาสูงสุด",
+    "docFeeDefault": "ค่าทำสัญญา default",
+    "docFeeRange": "ช่วงค่าทำสัญญาที่อนุญาต",
+    "docFeeAmount": "ค่าทำสัญญา",
+    "docFeeHint": "ร้านเก็บจากลูกค้าวันทำสัญญา แล้วนำส่ง company",
+    "docFeeRangeHint": "ค่าทำสัญญาต้องอยู่ในช่วง {{min}}–{{max}} บาท",
+    "docFeeRequired": "กรุณาระบุค่าทำสัญญา",
+    "docFeeDefaultOutOfRange": "ค่า default ต้องอยู่ในช่วงค่าทำสัญญาที่กำหนด",
+    "internalNoDocFee": "สาขาภายในไม่มีค่าทำสัญญา"
   },
   "branchStock": {
     "retailTab": "ขายปลีก",

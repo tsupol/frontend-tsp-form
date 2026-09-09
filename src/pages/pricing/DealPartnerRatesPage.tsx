@@ -7,7 +7,7 @@ import {
   Button, Select, Modal, Badge, TextArea, MaskedInput, FormErrorMessage,
   type ColumnDef, type SortingState,
 } from 'tsp-form';
-import { ArrowRightFromLine, Pencil, Undo2 } from 'lucide-react';
+import { ArrowRightFromLine, Pencil, Undo2, ChevronsRight, Receipt } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { translateApiError } from '../../lib/apiErrors';
@@ -15,17 +15,27 @@ import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 
 // ============================================================================
-// Deal partner commission — mig 1154/1155 model.
+// Deal partner terms — mig 1154/1155 model, extended by mig 1173.
+//
+// The page is named "เงื่อนไข Deal Partner" (owner 09-09) rather than
+// "ค่าคอม …" because it now carries three separate terms of the deal:
+// commission, contract fee (ค่าทำสัญญา), and the return branch.
 //
 // Two levels, nothing in between:
 //   1. Holding policy (v_deal_partner_policy, 1 row): allowed range for the
 //      TOTAL commission (branch % + company %) plus the defaults a brand-new
 //      DEAL_PARTNER branch is seeded with (trigger-side, no FE involvement).
-//      Edited via fn_deal_partner_policy_set {p_patch}.
+//      mig 1173 adds the same shape for the contract fee — doc_fee_min/max/
+//      default, in whole baht. Edited via fn_deal_partner_policy_set {p_patch}.
 //   2. Per-branch config (v_deal_partner_branch_configs, 1 row per partner
 //      branch): branch % + company %, whose sum must stay inside the policy
-//      range. company % > 0 derives risk_party = COMPANY — display-only fact,
+//      range, plus that shop's own doc_fee_amount inside the policy fee range.
+//      company % > 0 derives risk_party = COMPANY — display-only fact,
 //      never a separate input. Edited via fn_deal_partner_branch_config_set.
+//
+// The contract fee is the shop's, not the customer's discount: the shop
+// collects it on signing day and remits it to the company (bill line, phase 3).
+// Internal branches have none — this page only lists DEAL_PARTNER branches.
 //
 // The old scoped rates (fn_deal_partner_rate_upsert / set_active) are
 // deprecated — any p_scope other than HOLDING now answers DEPRECATED_SCOPE.
@@ -39,6 +49,9 @@ interface PolicyRow {
   branch_rate_default: number;
   company_rate_default: number;
   total_default: number;
+  doc_fee_min: number;
+  doc_fee_max: number;
+  doc_fee_default: number;
   updated_at: string;
 }
 
@@ -53,6 +66,12 @@ interface BranchConfigRow {
   risk_party: 'BRANCH' | 'COMPANY';
   total_min: number;
   total_max: number;
+  // Fee bounds ride along on the branch row, so the modal doesn't have to wait
+  // for the policy query to know what range to validate against.
+  doc_fee_amount: number;
+  doc_fee_min: number;
+  doc_fee_max: number;
+  doc_fee_default: number;
   return_to_branch_id: number | null;
   return_to_branch_name: string | null;
   is_active: boolean;
@@ -66,6 +85,7 @@ interface BranchLookup {
 }
 
 const fmtPct = (n: number) => `${Number(n)}%`;
+const fmtBaht = (n: number) => `฿${Number(n).toLocaleString('en-US')}`;
 
 // ── Policy modal ─────────────────────────────────────────────────────────────
 
@@ -74,7 +94,15 @@ interface PolicyFormData {
   total_max: string;
   branch_rate_default: string;
   company_rate_default: string;
+  doc_fee_min: string;
+  doc_fee_max: string;
+  doc_fee_default: string;
 }
+
+const EMPTY_POLICY_FORM: PolicyFormData = {
+  total_min: '', total_max: '', branch_rate_default: '', company_rate_default: '',
+  doc_fee_min: '', doc_fee_max: '', doc_fee_default: '',
+};
 
 function PolicyModal({ open, onClose, policy, onSaved }: {
   open: boolean;
@@ -90,7 +118,7 @@ function PolicyModal({ open, onClose, policy, onSaved }: {
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
 
   const { handleSubmit, control, formState: { errors, isDirty }, reset, watch } = useForm<PolicyFormData>({
-    defaultValues: { total_min: '', total_max: '', branch_rate_default: '', company_rate_default: '' },
+    defaultValues: EMPTY_POLICY_FORM,
   });
 
   // Seed only when the modal opens (or the holding changes) — NOT on every
@@ -107,7 +135,10 @@ function PolicyModal({ open, onClose, policy, onSaved }: {
         total_max: String(p.total_max),
         branch_rate_default: String(p.branch_rate_default),
         company_rate_default: String(p.company_rate_default),
-      } : { total_min: '', total_max: '', branch_rate_default: '', company_rate_default: '' });
+        doc_fee_min: String(p.doc_fee_min),
+        doc_fee_max: String(p.doc_fee_max),
+        doc_fee_default: String(p.doc_fee_default),
+      } : EMPTY_POLICY_FORM);
       setView('form');
       setResult(null);
       setErrorMessage('');
@@ -123,6 +154,16 @@ function PolicyModal({ open, onClose, policy, onSaved }: {
   const rangeInvalid = allFilled && vMax < vMin;
   const totalInvalid = allFilled && !rangeInvalid && (defaultTotal! < vMin || defaultTotal! > vMax);
 
+  // Contract fee mirrors the commission shape: a min/max band plus the default
+  // a new shop is seeded with, which must itself sit inside that band. Same two
+  // failure modes, checked separately so the message points at the right pair.
+  const vFeeMin = parseFloat(watch('doc_fee_min'));
+  const vFeeMax = parseFloat(watch('doc_fee_max'));
+  const vFeeDef = parseFloat(watch('doc_fee_default'));
+  const feeFilled = [vFeeMin, vFeeMax, vFeeDef].every(n => !Number.isNaN(n));
+  const feeRangeInvalid = feeFilled && vFeeMax < vFeeMin;
+  const feeDefaultInvalid = feeFilled && !feeRangeInvalid && (vFeeDef < vFeeMin || vFeeDef > vFeeMax);
+
   const onSubmit = async (data: PolicyFormData) => {
     setIsSaving(true);
     setErrorMessage('');
@@ -133,6 +174,9 @@ function PolicyModal({ open, onClose, policy, onSaved }: {
           total_max: parseFloat(data.total_max),
           branch_rate_default: parseFloat(data.branch_rate_default),
           company_rate_default: parseFloat(data.company_rate_default),
+          doc_fee_min: parseFloat(data.doc_fee_min),
+          doc_fee_max: parseFloat(data.doc_fee_max),
+          doc_fee_default: parseFloat(data.doc_fee_default),
         },
       });
       setResult(saved);
@@ -176,6 +220,27 @@ function PolicyModal({ open, onClose, policy, onSaved }: {
     </div>
   );
 
+  // Whole baht — the fee is a flat charge, never a fraction of one.
+  const bahtField = (name: keyof PolicyFormData, label: string) => (
+    <div className="flex flex-col">
+      <label className="form-label">{label}</label>
+      <Controller
+        name={name}
+        control={control}
+        rules={{ required: t('dealPartnerRate.docFeeRequired') }}
+        render={({ field }) => (
+          <MaskedInput
+            mask="number"
+            decimalScale={0}
+            value={field.value}
+            onChange={(raw) => field.onChange(raw)}
+          />
+        )}
+      />
+      <FormErrorMessage error={errors[name]} />
+    </div>
+  );
+
   return (
     <>
     <Modal open={open} onClose={handleClose} maxWidth="26rem" width="100%">
@@ -193,6 +258,8 @@ function PolicyModal({ open, onClose, policy, onSaved }: {
               { label: t('dealPartnerRate.branchDefault'), value: fmtPct(result.branch_rate_default) },
               { label: t('dealPartnerRate.companyDefault'), value: fmtPct(result.company_rate_default) },
               { label: t('dealPartnerRate.totalDefault'), value: fmtPct(result.branch_rate_default + result.company_rate_default), emphasis: true },
+              { label: t('dealPartnerRate.docFeeRange'), value: `${fmtBaht(result.doc_fee_min)} – ${fmtBaht(result.doc_fee_max)}` },
+              { label: t('dealPartnerRate.docFeeDefault'), value: fmtBaht(result.doc_fee_default) },
             ]}
             onClose={forceClose}
           />
@@ -237,12 +304,34 @@ function PolicyModal({ open, onClose, policy, onSaved }: {
                   {t('dealPartnerRate.rangeHint', { min: vMin, max: vMax })}
                 </p>
               )}
+
+              {/* Contract fee (mig 1173) — a separate term of the deal, so it
+                  gets its own labelled block rather than more loose fields. */}
+              <div className="border-t border-line pt-4 -mb-1">
+                <div className="text-sm font-medium">{t('dealPartnerRate.docFeeSection')}</div>
+                <div className="text-xs text-subtle mt-0.5">{t('dealPartnerRate.docFeeHint')}</div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {bahtField('doc_fee_min', t('dealPartnerRate.docFeeMin'))}
+                {bahtField('doc_fee_max', t('dealPartnerRate.docFeeMax'))}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {bahtField('doc_fee_default', t('dealPartnerRate.docFeeDefault'))}
+              </div>
+              {feeRangeInvalid && (
+                <p className="text-xs text-danger-fg -mt-3">{t('dealPartnerRate.maxBelowMin')}</p>
+              )}
+              {feeDefaultInvalid && (
+                <p className="text-xs text-danger-fg -mt-3">
+                  {t('dealPartnerRate.docFeeRangeHint', { min: vFeeMin, max: vFeeMax })}
+                </p>
+              )}
             </div>
           </div>
           <ModalErrorBand message={errorMessage} onDismiss={() => setErrorMessage('')} />
           <div className="modal-footer">
             <Button variant="outline" onClick={handleClose} type="button">{t('common.cancel')}</Button>
-            <Button color="primary" type="submit" disabled={isSaving || rangeInvalid || totalInvalid}>
+            <Button color="primary" type="submit" disabled={isSaving || rangeInvalid || totalInvalid || feeRangeInvalid || feeDefaultInvalid}>
               {isSaving ? t('pricing.saving') : t('common.save')}
             </Button>
           </div>
@@ -267,9 +356,15 @@ function PolicyModal({ open, onClose, policy, onSaved }: {
 interface ConfigFormData {
   branch_rate_percent: string;
   company_rate_percent: string;
+  doc_fee_amount: string;
   return_to_branch_id: string;
   note: string;
 }
+
+const EMPTY_CONFIG_FORM: ConfigFormData = {
+  branch_rate_percent: '', company_rate_percent: '', doc_fee_amount: '',
+  return_to_branch_id: '', note: '',
+};
 
 function BranchConfigModal({ open, onClose, config, internalBranches, onSaved }: {
   open: boolean;
@@ -286,7 +381,7 @@ function BranchConfigModal({ open, onClose, config, internalBranches, onSaved }:
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
 
   const { handleSubmit, control, formState: { errors, isDirty }, reset, watch, setValue } = useForm<ConfigFormData>({
-    defaultValues: { branch_rate_percent: '', company_rate_percent: '', return_to_branch_id: '', note: '' },
+    defaultValues: EMPTY_CONFIG_FORM,
   });
 
   useEffect(() => {
@@ -294,9 +389,10 @@ function BranchConfigModal({ open, onClose, config, internalBranches, onSaved }:
       reset(config ? {
         branch_rate_percent: String(config.branch_rate_percent),
         company_rate_percent: String(config.company_rate_percent),
+        doc_fee_amount: String(config.doc_fee_amount),
         return_to_branch_id: config.return_to_branch_id ? String(config.return_to_branch_id) : '',
         note: config.note ?? '',
-      } : { branch_rate_percent: '', company_rate_percent: '', return_to_branch_id: '', note: '' });
+      } : EMPTY_CONFIG_FORM);
       setView('form');
       setResult(null);
       setErrorMessage('');
@@ -310,6 +406,10 @@ function BranchConfigModal({ open, onClose, config, internalBranches, onSaved }:
   const outOfRange = config != null && total !== null && (total < config.total_min || total > config.total_max);
   const riskParty: 'BRANCH' | 'COMPANY' = bothFilled && vCo > 0 ? 'COMPANY' : 'BRANCH';
 
+  const vFee = parseFloat(watch('doc_fee_amount'));
+  const feeOutOfRange = config != null && !Number.isNaN(vFee)
+    && (vFee < config.doc_fee_min || vFee > config.doc_fee_max);
+
   const onSubmit = async (data: ConfigFormData) => {
     if (!config) return;
     setIsSaving(true);
@@ -320,6 +420,7 @@ function BranchConfigModal({ open, onClose, config, internalBranches, onSaved }:
         p_branch_id: config.branch_id,
         p_branch_rate_percent: parseFloat(data.branch_rate_percent),
         p_company_rate_percent: parseFloat(data.company_rate_percent),
+        p_doc_fee_amount: parseFloat(data.doc_fee_amount),
         p_return_to_branch_id: retId,
         // NULL params mean "keep current" on the BE, so clearing the Select
         // needs the explicit flag.
@@ -371,6 +472,7 @@ function BranchConfigModal({ open, onClose, config, internalBranches, onSaved }:
               { label: t('dealPartnerRate.companyRate'), value: fmtPct(result.company_rate_percent) },
               { label: t('dealPartnerRate.totalRate'), value: fmtPct(result.total_rate_percent), emphasis: true },
               { label: t('dealPartnerRate.riskParty'), value: riskLabel(result.risk_party) },
+              { label: t('dealPartnerRate.docFeeAmount'), value: fmtBaht(result.doc_fee_amount) },
               { label: t('dealPartnerRate.returnBranch'), value: result.return_to_branch_name ?? '—' },
             ]}
             onClose={forceClose}
@@ -437,6 +539,33 @@ function BranchConfigModal({ open, onClose, config, internalBranches, onSaved }:
                 </p>
               )}
 
+              {/* This shop's contract fee, inside the holding band (mig 1173). */}
+              <div className="flex flex-col">
+                <label className="form-label">{t('dealPartnerRate.docFeeAmount')}</label>
+                <Controller
+                  name="doc_fee_amount"
+                  control={control}
+                  rules={{ required: t('dealPartnerRate.docFeeRequired') }}
+                  render={({ field }) => (
+                    <MaskedInput
+                      mask="number"
+                      decimalScale={0}
+                      value={field.value}
+                      onChange={(raw) => field.onChange(raw)}
+                      error={feeOutOfRange}
+                      endIcon={config ? <ChevronsRight size={14} /> : undefined}
+                      onEndIconClick={config ? () => setValue('doc_fee_amount', String(config.doc_fee_default), { shouldDirty: true }) : undefined}
+                    />
+                  )}
+                />
+                <FormErrorMessage error={errors.doc_fee_amount} />
+                <p className={`text-xs mt-1 ${feeOutOfRange ? 'text-danger-fg' : 'text-subtle'}`}>
+                  {config
+                    ? t('dealPartnerRate.docFeeRangeHint', { min: config.doc_fee_min, max: config.doc_fee_max })
+                    : t('dealPartnerRate.docFeeHint')}
+                </p>
+              </div>
+
               <div className="flex flex-col">
                 <label className="form-label">{t('dealPartnerRate.returnBranch')}</label>
                 <Select
@@ -466,7 +595,7 @@ function BranchConfigModal({ open, onClose, config, internalBranches, onSaved }:
           <ModalErrorBand message={errorMessage} onDismiss={() => setErrorMessage('')} />
           <div className="modal-footer">
             <Button variant="outline" onClick={handleClose} type="button">{t('common.cancel')}</Button>
-            <Button color="primary" type="submit" disabled={isSaving || outOfRange}>
+            <Button color="primary" type="submit" disabled={isSaving || outOfRange || feeOutOfRange}>
               {isSaving ? t('pricing.saving') : t('common.save')}
             </Button>
           </div>
@@ -569,6 +698,12 @@ export function DealPartnerRatesPage() {
       className: 'w-24',
     },
     {
+      accessorKey: 'doc_fee_amount',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.docFeeAmount')} />,
+      cell: ({ row }) => <span className="text-sm tabular-nums">{fmtBaht(row.original.doc_fee_amount)}</span>,
+      className: 'w-28 max-md:hidden',
+    },
+    {
       accessorKey: 'risk_party',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.riskParty')} />,
       cell: ({ row }) => riskBadge(row.original.risk_party),
@@ -644,11 +779,25 @@ export function DealPartnerRatesPage() {
             )}
           </div>
           {policy ? (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {policyStat(t('dealPartnerRate.totalRange'), `${fmtPct(policy.total_min)} – ${fmtPct(policy.total_max)}`)}
-              {policyStat(t('dealPartnerRate.branchDefault'), fmtPct(policy.branch_rate_default))}
-              {policyStat(t('dealPartnerRate.companyDefault'), fmtPct(policy.company_rate_default))}
-              {policyStat(t('dealPartnerRate.totalDefault'), fmtPct(policy.total_default), true)}
+            <div className="flex flex-col gap-3">
+              <div>
+                <div className="text-xs font-medium text-subtle mb-2">{t('dealPartnerRate.commissionSection')}</div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {policyStat(t('dealPartnerRate.totalRange'), `${fmtPct(policy.total_min)} – ${fmtPct(policy.total_max)}`)}
+                  {policyStat(t('dealPartnerRate.branchDefault'), fmtPct(policy.branch_rate_default))}
+                  {policyStat(t('dealPartnerRate.companyDefault'), fmtPct(policy.company_rate_default))}
+                  {policyStat(t('dealPartnerRate.totalDefault'), fmtPct(policy.total_default), true)}
+                </div>
+              </div>
+              <div className="border-t border-line pt-3">
+                <div className="text-xs font-medium text-subtle mb-2 flex items-center gap-1">
+                  <Receipt size={12} />{t('dealPartnerRate.docFeeSection')}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {policyStat(t('dealPartnerRate.docFeeRange'), `${fmtBaht(policy.doc_fee_min)} – ${fmtBaht(policy.doc_fee_max)}`)}
+                  {policyStat(t('dealPartnerRate.docFeeDefault'), fmtBaht(policy.doc_fee_default), true)}
+                </div>
+              </div>
             </div>
           ) : (
             <div className="text-sm text-subtle">—</div>
@@ -699,6 +848,10 @@ export function DealPartnerRatesPage() {
                         {t('dealPartnerRate.companyRate')} {fmtPct(row.company_rate_percent)}
                       </span>
                       <span className="tabular-nums font-medium">{fmtPct(row.total_rate_percent)}</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-xs text-subtle mt-1">
+                      <Receipt size={12} />
+                      <span>{t('dealPartnerRate.docFeeAmount')} {fmtBaht(row.doc_fee_amount)}</span>
                     </div>
                     {row.return_to_branch_name && (
                       <div className="flex items-center gap-1 text-xs text-subtle mt-1">

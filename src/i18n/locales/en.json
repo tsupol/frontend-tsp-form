@@ -402,7 +402,7 @@
     "fin2Rates": "FIN2 Rates",
     "discountPolicies": "Discount Policies",
     "discountApprovals": "Discount Approvals",
-    "dealPartnerRates": "Partner Commission",
+    "dealPartnerRates": "Deal Partner Terms",
     "inventory": "Inventory",
     "stock": "Stock Dashboard",
     "lots": "Lots",
@@ -2143,7 +2143,7 @@
     "filterAllBranches": "All Branches"
   },
   "dealPartnerRate": {
-    "title": "Deal Partner Commission",
+    "title": "Deal Partner Terms",
     "policyTitle": "Holding policy",
     "defaultsHint": "Defaults are applied automatically to new deal partner branches",
     "totalRange": "Allowed total",
@@ -2172,7 +2172,19 @@
     "rateRequired": "Commission rate is required",
     "editConfig": "Edit commission",
     "configSaved": "Commission saved",
-    "empty": "No deal partner branches"
+    "empty": "No deal partner branches",
+    "commissionSection": "Commission",
+    "docFeeSection": "Contract fee",
+    "docFeeMin": "Fee min",
+    "docFeeMax": "Fee max",
+    "docFeeDefault": "Fee default",
+    "docFeeRange": "Allowed fee",
+    "docFeeAmount": "Contract fee",
+    "docFeeHint": "Collected from the customer on signing day, then remitted to the company",
+    "docFeeRangeHint": "Fee must be within {{min}}–{{max}} THB",
+    "docFeeRequired": "Contract fee is required",
+    "docFeeDefaultOutOfRange": "Default must be within the allowed fee range",
+    "internalNoDocFee": "Internal branches have no contract fee"
   },
   "branchStock": {
     "retailTab": "Retail",
