@@ -17,6 +17,7 @@ import { ChatDockProvider } from './contexts/ChatDockContext';
 import { ChatDock } from './components/ChatDock';
 import { UsersPage } from './pages/UsersPage';
 import { PermissionGrantsPage } from './pages/users/PermissionGrantsPage';
+import { UsersLayout } from './pages/users/UsersLayout';
 import { BrandsPage } from './pages/products/BrandsPage';
 import { FamiliesPage } from './pages/products/FamiliesPage';
 import { AttributesPage } from './pages/products/AttributesPage';
@@ -350,7 +351,7 @@ function App() {
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <UsersPage />
+              <UsersLayout><UsersPage /></UsersLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
@@ -360,7 +361,7 @@ function App() {
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <PermissionGrantsPage />
+              <UsersLayout><PermissionGrantsPage /></UsersLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
