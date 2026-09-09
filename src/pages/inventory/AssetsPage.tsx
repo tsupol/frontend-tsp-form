@@ -941,23 +941,23 @@ export function AssetsPage() {
                         <div className="text-xs text-subtle truncate">
                           {asset.product_display_name ?? `${asset.brand_name} ${asset.family_name} · ${asset.variant_name}`}
                         </div>
+                        {/* One chip line: bucket, owner, and the MDM state all
+                            wrap together instead of each claiming its own row.
+                            The MDM pill is omitted for devices not under MDM —
+                            it would otherwise appear on every stock item. */}
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 -ml-0.5">
                           <Badge size="xs" color={getBucketColor(asset.current_bucket)}>
                             {getBucketLabel(asset.current_bucket, t)}
                           </Badge>
                           <OwnerBadge ownerType={asset.owner_type as OwnerType | null} ownerName={asset.owner_name} size="xs" />
+                          {(() => {
+                            const story = storyByAsset.get(asset.asset_id);
+                            if (!story || story.status_code === 'NOT_IN_MDM') return null;
+                            // Pill only here: the customer-facing line would just
+                            // restate it, and the full story is one click away.
+                            return <MdmStoryBadge story={story} showCustomerSees={false} />;
+                          })()}
                         </div>
-                        {/* MDM story (§5) — only for devices actually under MDM;
-                            "not in MDM" on every stock item would be noise. */}
-                        {(() => {
-                          const story = storyByAsset.get(asset.asset_id);
-                          if (!story || story.status_code === 'NOT_IN_MDM') return null;
-                          return (
-                            <div className="mt-1">
-                              <MdmStoryBadge story={story} />
-                            </div>
-                          );
-                        })()}
                       </div>
                       <div className="text-right shrink-0">
                         <div className="text-sm font-medium tabular-nums">{fmtCurrency(asset.current_cost_basis)}</div>
