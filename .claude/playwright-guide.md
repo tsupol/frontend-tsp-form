@@ -4,9 +4,25 @@
 mode, screenshots, batching and the common gotchas live there. This file only
 adds what is specific to this app.
 
-Two reminders that bite here: start with
-`await page.emulateMedia({ colorScheme: 'dark' })`, and write screenshots to
-`screenshots/` (gitignored), never a bare filename.
+## Screenshots — the rule
+
+- **Write to `screenshots/<date>_<topic>/`**, never a bare filename and never
+  `.playwright-mcp/`. The folder is gitignored; delete the shots when the
+  verification is done.
+- **Take them plain: no `clip`, no `scale`, no size of any kind.** Just
+  `page.screenshot({ path })`. The window is whatever size the user has it, and
+  that is the size worth seeing.
+- **Never pass `scale: 'css'` expecting CSS pixels — this server ignores it.**
+  Measured 2026-09-09: a 1144x1660 viewport with `clip` at exactly that size
+  still produced a 1430x2074 PNG (x1.25 = the DPR). The extra is padding, and it
+  reads as dead space on the right that is NOT in the app. A plain shot of a
+  1312x820 viewport gives a clean 1640x1025 (x1.25) with correct aspect — that
+  is fine, it's just a hi-DPI capture of the real viewport.
+- If a shot looks like it has empty space the browser doesn't, suspect the
+  capture, not the layout. Compare `window.innerWidth` against the PNG width
+  before touching any CSS.
+- **Do NOT call `page.emulateMedia()`** (the global guide explains why: it pins
+  the media query for the session). The context already boots dark.
 
 Project-specific viewport traps — all three have tempted a `browser_resize`, and
 none of them are a viewport problem:
