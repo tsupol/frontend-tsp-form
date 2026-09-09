@@ -28,6 +28,10 @@ propose first, get a yes, then file.
    `D:\dev\nnf\UI_FEEDBACK\`, commit, push. A stale draft is held back with a
    one-line reason; the rest still ship. Then delete the shipped drafts, their
    test logs, and the review screenshots — all scaffolding.
+6. **Hand Ton the paste block.** End the ส่ง-BE report with a copy-paste-ready
+   block — one `UI_FEEDBACK/<filename>.md` path per line for every doc just
+   shipped, nothing else in the block — so Ton can paste it straight into the
+   chat with DB to say "read these".
 
 If work predates its test log (an old page needing a retroactive DONE), run a
 real verification round-trip *now* and write that — never recall or assume a
