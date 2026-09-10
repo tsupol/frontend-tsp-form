@@ -292,6 +292,11 @@ export function BarcodesPage() {
                 onKeyDown={onSearchKey}
                 placeholder={t('barcodes.search')}
                 size="sm"
+                // Not <SearchInput>: this box commits on Enter, not on a
+                // debounce — the shared box would start searching mid-typing.
+                // No permanent icon, so reserve the slots or the hint appearing
+                // on keystroke 1 remounts the input and focus dies.
+                reserveIconSlots
                 // Hint takes the slot while the keyword is too short to commit;
                 // the clear-X returns as soon as it's long enough to search.
                 // Same trade the shared SearchInput makes — at 1-2 chars there's

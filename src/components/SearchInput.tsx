@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { forwardRef, useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Input } from 'tsp-form';
 import { Search } from 'lucide-react';
@@ -21,22 +21,7 @@ import { isSearchableLoose, isBelowSearchMinLoose, searchMinFor } from '../lib/s
  * matches nearly every row), not to save time; BE measured 2 and 3 as equally
  * cheap. Same UI either way, so staff learn one rule.
  */
-export function SearchInput({
-  value,
-  onChange,
-  onDebouncedChange,
-  placeholder,
-  delay = 300,
-  size = 'sm',
-  startIcon,
-  endIcon,
-  onEndIconClick,
-  minChars,
-  className = '',
-  disabled,
-  autoFocus,
-  'aria-label': ariaLabel,
-}: {
+export const SearchInput = forwardRef<HTMLInputElement, {
   value: string;
   onChange: (next: string) => void;
   /** Fires with the trimmed keyword when searchable, '' when too short or empty. */
@@ -58,7 +43,22 @@ export function SearchInput({
   disabled?: boolean;
   autoFocus?: boolean;
   'aria-label'?: string;
-}) {
+}>(function SearchInput({
+  value,
+  onChange,
+  onDebouncedChange,
+  placeholder,
+  delay = 300,
+  size = 'sm',
+  startIcon,
+  endIcon,
+  onEndIconClick,
+  minChars,
+  className = '',
+  disabled,
+  autoFocus,
+  'aria-label': ariaLabel,
+}, ref) {
   const { t } = useTranslation();
 
   useEffect(() => {
@@ -72,6 +72,9 @@ export function SearchInput({
 
   return (
     <Input
+      // Forwarded so a host can put the cursor back in the box — e.g. after
+      // the barcode-scanner modal closes, or on "reset selection".
+      ref={ref}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder ?? t('common.search')}
@@ -100,4 +103,4 @@ export function SearchInput({
       className={`search-min-hint ${className}`.trim()}
     />
   );
-}
+});

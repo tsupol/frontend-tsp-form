@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Input, Select, Badge, Button, MaskedInput, useSnackbarContext } from 'tsp-form';
-import { Search, ScanBarcode, XCircle, X, Calculator, Info, CheckCircle, Package, BookOpen, AlertTriangle, Wand2 } from 'lucide-react';
+import { ScanBarcode, XCircle, X, Calculator, Info, CheckCircle, Package, BookOpen, AlertTriangle, Wand2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { fmtCurrency } from '../../../lib/format';
 import { getConditionLabel, getConditionTextColor, assetSearchOrClause } from '../../inventory/inventoryUtils';
@@ -14,10 +14,8 @@ import { Fin1PlanEditor } from './Fin1PlanEditor';
 import { ColorSwatch } from '../../../components/ColorAutocomplete';
 import { lookupBarcode } from '../../../lib/barcodeLookup';
 import { translateApiError } from '../../../lib/apiErrors';
-import {
-  SEARCH_MIN_CHARS,
-  isSearchable, isBelowSearchMin, isSearchableLoose, isBelowSearchMinLoose,
-} from '../../../lib/searchKeyword';
+import { SearchInput } from '../../../components/SearchInput';
+import { isSearchable } from '../../../lib/searchKeyword';
 
 /** Hard cap on installment term, mirroring the backend guard (mig 1030). */
 const TERM_MONTHS_MAX = 60;
@@ -147,7 +145,6 @@ export function PanelProductPlan(_props: Props) {
   // ── NEW product state ───────────────────────────────────────────────
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const [selectedModel, setSelectedModel] = useState<SearchModel | null>(null);
@@ -162,7 +159,6 @@ export function PanelProductPlan(_props: Props) {
   // ── In-stock asset search state (covers both NEW and USED selection paths) ──
   const [assetSearch, setAssetSearch] = useState('');
   const [debouncedAssetSearch, setDebouncedAssetSearch] = useState('');
-  const assetSearchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const assetSearchRef = useRef<HTMLInputElement>(null);
   const [selectedAsset, setSelectedAsset] = useState<StockAsset | null>(null);
   const [localTargetAssetId, setLocalTargetAssetId] = useState<number | null>(contract?.target_asset_id ?? null);
@@ -170,33 +166,12 @@ export function PanelProductPlan(_props: Props) {
   // Determine if something is selected (either mode)
   const hasSelection = mode === 'new' ? !!localModelId : !!localTargetAssetId;
 
-  // ── NEW: search debounce ────────────────────────────────────────────
-
-  // Floor is 2, not 3: staff search by generation number ("16", "17"), and
+  // Debounce + the 2-char floor for both boxes live in SearchInput. Floor is
+  // 2, not 3: staff search by generation number ("16", "17"), and
   // fn_product_search scores a standalone family token at 95 precisely so that
-  // works. A single character is still dropped — it matches most of the
-  // catalog, so it's a scan, not a search.
-  const handleSearchInput = (value: string) => {
-    setSearch(value);
-    clearTimeout(searchTimer.current);
-    const next = isSearchable(value) ? value.trim() : '';
-    searchTimer.current = setTimeout(() => setDebouncedSearch(next), 300);
-  };
-
+  // works. A single character matches most of the catalog / stock, so
+  // SearchInput reports '' for it — same as an empty box.
   const shouldSearch = isSearchable(debouncedSearch);
-
-  // ── USED: search debounce ───────────────────────────────────────────
-
-  // A single character matches nearly every row of the OR below, so it browses
-  // the branch's stock rather than filtering it — dropped to '' before the
-  // debounce, which is the same thing an empty box does. Two is enough: a
-  // fragment of a serial or IMEI is a real narrowing.
-  const handleAssetSearchInput = (value: string) => {
-    setAssetSearch(value);
-    clearTimeout(assetSearchTimer.current);
-    const next = isSearchableLoose(value) ? value.trim() : '';
-    assetSearchTimer.current = setTimeout(() => setDebouncedAssetSearch(next), 300);
-  };
 
   const shouldAssetSearch = true; // always show — list all when empty, filter when typing
 
@@ -932,20 +907,13 @@ export function PanelProductPlan(_props: Props) {
             <>
               <div className="flex gap-2">
                 <div className="flex-1 min-w-0">
-                  {/* Not <SearchInput>: this box takes a ref so the scanner can
-                      refocus it. Hint rides inside the field the same way. */}
-                  <Input
+                  <SearchInput
                     ref={assetSearchRef}
                     value={assetSearch}
-                    onChange={(e) => handleAssetSearchInput(e.target.value)}
+                    onChange={setAssetSearch}
+                    onDebouncedChange={setDebouncedAssetSearch}
                     placeholder={t('wizard.searchAssetPlaceholder')}
-                    startIcon={<Search size={16} />}
-                    endIcon={isBelowSearchMinLoose(assetSearch)
-                      ? <span className="text-[11px] whitespace-nowrap">
-                          {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
-                        </span>
-                      : undefined}
-                    className="w-full search-min-hint"
+                    className="w-full"
                     size="sm"
                   />
                 </div>
@@ -1009,20 +977,17 @@ export function PanelProductPlan(_props: Props) {
                   aria-label={t('barcodeScanner.title', { defaultValue: 'Scan barcode' })}
                 />
                 <div className="input-group-divider" />
-                <Input
+                <SearchInput
                   ref={searchRef}
                   value={search}
-                  onChange={(e) => handleSearchInput(e.target.value)}
+                  onChange={setSearch}
+                  onDebouncedChange={setDebouncedSearch}
                   placeholder={t('wizard.searchProductPlaceholder')}
+                  // The scan button carries the affordance; a magnifier too
+                  // would double up inside the same input-group.
+                  startIcon={null}
+                  className="w-full"
                   size="sm"
-                  // Hint rides inside the field, right-aligned, so the result
-                  // list below can't shift as the user types.
-                  endIcon={isBelowSearchMin(search)
-                    ? <span className="text-[11px] whitespace-nowrap">
-                        {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
-                      </span>
-                    : undefined}
-                  className="w-full search-min-hint"
                 />
               </div>
               <div className="border border-line rounded-lg overflow-hidden h-48 data-table-content better-scroll">

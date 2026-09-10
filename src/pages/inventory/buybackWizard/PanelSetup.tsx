@@ -10,7 +10,7 @@ import type { BuybackDraft } from './types';
 import { useBarcodeScanner } from '../../../components/BarcodeScanner';
 import { lookupBarcode } from '../../../lib/barcodeLookup';
 import { translateApiError } from '../../../lib/apiErrors';
-import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../../lib/searchKeyword';
+import { SearchInput } from '../../../components/SearchInput';
 
 interface ProductSearchVariant { variant_id: number; sku_code: string; name: string; is_active: boolean }
 interface ProductSearchModel {
@@ -336,15 +336,9 @@ function ProductPickerModal({
     }
   }, [open]);
 
-  // Floor is 2 so "16"/"17" reach fn_product_search, which matches model
-  // generations by design. A single character still doesn't fire — it matches
-  // most of the catalog. An empty box browses.
-  useEffect(() => {
-    const next = isSearchable(keyword) ? keyword.trim() : '';
-    const tm = setTimeout(() => setDebounced(next), 300);
-    return () => clearTimeout(tm);
-  }, [keyword]);
-
+  // Debounce + 2-char floor live in SearchInput; below the floor it reports
+  // '' and an empty box browses. Floor is 2 so "16"/"17" reach
+  // fn_product_search, which matches model generations by design.
   const { data: results, isFetching } = useQuery({
     queryKey: ['buyback-product-search', debounced],
     queryFn: () => apiClient.rpc<ProductSearchResponse>('fn_product_search', {
@@ -402,18 +396,16 @@ function ProductPickerModal({
               aria-label={t('barcodeScanner.title', { defaultValue: 'Scan barcode' })}
             />
             <div className="input-group-divider" />
-            <Input
+            <SearchInput
               value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
+              onChange={setKeyword}
+              onDebouncedChange={setDebounced}
               placeholder={t('buybackWizard.searchPlaceholder', { defaultValue: 'Search model (e.g. iPhone 16)' })}
-              // Hint rides inside the field, right-aligned, so the model list
-              // below can't shift as the user types.
-              endIcon={isBelowSearchMin(keyword)
-                ? <span className="text-[11px] whitespace-nowrap">
-                    {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
-                  </span>
-                : undefined}
-              className="w-full search-min-hint"
+              // The scan button carries the affordance; a magnifier too would
+              // double up inside the same input-group.
+              startIcon={null}
+              size="md"
+              className="w-full"
               autoFocus
             />
           </div>

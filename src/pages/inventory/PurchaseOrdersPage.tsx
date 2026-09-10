@@ -23,7 +23,6 @@ import { lookupBarcode } from '../../lib/barcodeLookup';
 import { OwnerBadge } from '../../components/OwnerBadge';
 import type { OwnerType } from '../../lib/ownerTypes';
 import { translateApiError } from '../../lib/apiErrors';
-import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 import { SearchInput } from '../../components/SearchInput';
 
 // ============================================================================
@@ -1518,15 +1517,9 @@ function ProductPickerModal({
     }
   }, [open]);
 
-  // Floor is 2 so "16"/"17" reach fn_product_variant_search, which surfaces
-  // them via its ILIKE word_match tier. A single character still doesn't fire —
-  // it matches most of the catalog. An empty box browses.
-  useEffect(() => {
-    const next = isSearchable(keyword) ? keyword.trim() : '';
-    const tm = setTimeout(() => setDebounced(next), 300);
-    return () => clearTimeout(tm);
-  }, [keyword]);
-
+  // Debounce + 2-char floor live in SearchInput; below the floor it reports
+  // '' and an empty box browses. Floor is 2 so "16"/"17" reach
+  // fn_product_variant_search via its ILIKE word_match tier.
   const { data: results, isFetching } = useQuery({
     queryKey: ['po-variant-search', debounced],
     queryFn: () =>
@@ -1559,18 +1552,16 @@ function ProductPickerModal({
               aria-label={t('barcodeScanner.title', { defaultValue: 'Scan barcode' })}
             />
             <div className="input-group-divider" />
-            <Input
+            <SearchInput
               value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
+              onChange={setKeyword}
+              onDebouncedChange={setDebounced}
               placeholder={t('po.searchPlaceholder')}
-              // Hint rides inside the field, right-aligned, so the result list
-              // below can't shift as the user types.
-              endIcon={isBelowSearchMin(keyword)
-                ? <span className="text-[11px] whitespace-nowrap">
-                    {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
-                  </span>
-                : undefined}
-              className="w-full search-min-hint"
+              // The scan button carries the affordance; a magnifier too would
+              // double up inside the same input-group.
+              startIcon={null}
+              size="md"
+              className="w-full"
               autoFocus
             />
           </div>

@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, Input, NumberSpinner, DataTable, PopOver, LabeledCheckbox, useSnackbarContext } from 'tsp-form';
+import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, NumberSpinner, DataTable, PopOver, LabeledCheckbox, useSnackbarContext } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine, PackagePlus, CheckCircle, XCircle, Plus, Trash2, ScanBarcode, ExternalLink, SlidersHorizontal, AlertTriangle } from 'lucide-react';
 import { useBarcodeScanner } from '../../components/BarcodeScanner';
 import { CurrencyInput } from '../../components/CurrencyInput';
@@ -15,7 +15,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { fmtNum, codeDisplay } from './inventoryUtils';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { translateApiError } from '../../lib/apiErrors';
-import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 import { SearchInput } from '../../components/SearchInput';
 
 // ============================================================================
@@ -1571,16 +1570,9 @@ function VariantPickerInline({
   const [debounced, setDebounced] = useState('');
   const { open: openScanner, scannerEl } = useBarcodeScanner({ onScan: setKeyword });
 
-  // Floor is 2 so "16"/"17" reach fn_product_variant_search, which surfaces
-  // them via its ILIKE word_match tier. A single character still doesn't fire —
-  // it matches most of the catalog, and the wrong SKU on a receipt is costly.
-  // An empty box browses.
-  useEffect(() => {
-    const next = isSearchable(keyword) ? keyword.trim() : '';
-    const tm = setTimeout(() => setDebounced(next), 300);
-    return () => clearTimeout(tm);
-  }, [keyword]);
-
+  // Debounce + 2-char floor live in SearchInput; below the floor it reports
+  // '' and an empty box browses. Floor is 2 so "16"/"17" reach
+  // fn_product_variant_search via its ILIKE word_match tier.
   const { data: results, isFetching } = useQuery({
     queryKey: ['variant-search-receipt', debounced],
     queryFn: () =>
@@ -1603,18 +1595,16 @@ function VariantPickerInline({
           aria-label={t('barcodeScanner.title', { defaultValue: 'Scan barcode' })}
         />
         <div className="input-group-divider" />
-        <Input
+        <SearchInput
           value={keyword}
-          onChange={(e) => setKeyword(e.target.value)}
+          onChange={setKeyword}
+          onDebouncedChange={setDebounced}
           placeholder={t('receiving.searchProduct')}
-          // Hint rides inside the field, right-aligned, so the result list
-          // below can't shift as the user types.
-          endIcon={isBelowSearchMin(keyword)
-            ? <span className="text-[11px] whitespace-nowrap">
-                {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
-              </span>
-            : undefined}
-          className="w-full search-min-hint"
+          // The scan button carries the affordance; a magnifier too would
+          // double up inside the same input-group.
+          startIcon={null}
+          size="md"
+          className="w-full"
           autoFocus
         />
       </div>
