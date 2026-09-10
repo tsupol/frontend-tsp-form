@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 import type { ReactNode } from 'react';
 import { authService } from '../lib/auth';
 import { apiClient, setAuthErrorHandler, setTokenRefresher } from '../lib/api';
-import type { UserInfo } from '../lib/auth';
+import type { BranchType, UserInfo } from '../lib/auth';
 
 interface LoginResult {
   needsHoldingSelect: boolean;
@@ -17,6 +17,10 @@ interface Capability {
 interface CapabilitiesResponse {
   role_code: string;
   capabilities: Capability[];
+  // mig 1193
+  branch_id?: number | null;
+  branch_type?: BranchType | null;
+  db_role?: string | null;
 }
 
 interface AuthContextType {
@@ -25,6 +29,8 @@ interface AuthContextType {
   isLoading: boolean;
   needsHoldingSelect: boolean;
   capabilities: Set<string>;
+  /** Branch is a deal-partner shop → render the shop menu set (NOTICE 1193). */
+  isDealPartner: boolean;
   can: (code: string) => boolean;
   login: (username: string, password: string) => Promise<LoginResult>;
   logout: () => Promise<void>;
@@ -44,6 +50,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const res = await apiClient.rpc<CapabilitiesResponse>('my_capabilities');
       setCapabilities(new Set(res.capabilities.map(c => c.code)));
+      // Sessions from before mig 1193 have no stored branch_type until their
+      // next refresh — my_capabilities returns it too, so backfill from here.
+      if (res.branch_type !== undefined || res.db_role !== undefined) {
+        authService.storeBranchContext({ branch_type: res.branch_type, db_role: res.db_role });
+        setUser(prev => prev
+          ? { ...prev, branch_type: res.branch_type ?? null, db_role: res.db_role ?? null }
+          : prev
+        );
+      }
     } catch (err) {
       console.error('[Auth] Failed to fetch capabilities:', err);
       setCapabilities(new Set());
@@ -153,8 +168,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
           }
 
-          // Resolve org names from v_branches
-          if (userInfo.branch_id) {
+          // Resolve org names from v_branches — fallback only; login/refresh
+          // persist them since mig 1193, and shop users can't read v_branches
+          // once the nnf_partner role lands.
+          if (userInfo.branch_id && !userInfo.branch_name) {
             try {
               const branches = await apiClient.get<{ name: string; company_name: string }[]>(
                 `/v_branches?id=eq.${userInfo.branch_id}&limit=1`
@@ -257,8 +274,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const switchHolding = useCallback(async (holdingId: number) => {
     const result = await authService.switchHolding(holdingId);
-    // Use holding_id from server response as single source of truth
-    setUser(prev => prev ? { ...prev, holding_id: result.holding_id } : prev);
+    // Use holding_id from server response as single source of truth; the org
+    // block (branch_type/db_role/names) was persisted by authService.
+    setUser(prev => prev
+      ? {
+          ...prev,
+          holding_id: result.holding_id,
+          branch_type: authService.getBranchType(),
+          db_role: authService.getDbRole(),
+          branch_name: authService.getStoredBranchName() ?? prev.branch_name,
+          company_name: authService.getStoredCompanyName() ?? prev.company_name,
+        }
+      : prev);
     setNeedsHoldingSelect(false);
     scheduleRefresh();
     await fetchCapabilities();
@@ -272,6 +299,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         needsHoldingSelect,
         capabilities,
+        isDealPartner: user?.branch_type === 'DEAL_PARTNER',
         can,
         login,
         logout,

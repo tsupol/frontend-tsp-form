@@ -196,6 +196,15 @@ function RealtimeBridge() {
   return null;
 }
 
+// /admin lands on the dashboard — except for deal-partner shops, whose menu
+// set has no dashboard yet (NOTICE 1193: the shop home page comes with its
+// read model later). Until then they land on their own contract list.
+function DashboardOrShopHome() {
+  const { isDealPartner } = useAuth();
+  if (isDealPartner) return <Navigate to="/admin/contracts/search" replace />;
+  return <DashboardPage />;
+}
+
 function App() {
   const { t } = useTranslation();
   const { isLoading, needsHoldingSelect, isAuthenticated } = useAuth();
@@ -231,7 +240,7 @@ function App() {
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <DashboardPage />
+              <DashboardOrShopHome />
             </AdminLayout>
           </ProtectedRoute>
         }

@@ -1,5 +1,20 @@
 import { apiClient } from './api';
 
+// mig 1193: login/refresh/switch_holding/my_capabilities return the branch's
+// type so the UI can pick the menu set (DEAL_PARTNER → shop menu). Null when
+// the user has no branch (holding/company admins, SYSTEM_DEV before switch).
+export type BranchType = 'INTERNAL' | 'EXTERNAL' | 'DEAL_PARTNER';
+
+// Subset of the mig-1193 block shared by login / refresh / switch_holding /
+// my_capabilities responses. Persisted so a page reload keeps the menu set
+// without re-reading v_branches (which the shop DB role won't be able to see).
+export interface BranchContext {
+  branch_type?: BranchType | null;
+  db_role?: string | null;
+  branch_name?: string | null;
+  company_name?: string | null;
+}
+
 export interface UserProfile {
   user_id: number;
   username: string;
@@ -35,6 +50,8 @@ export interface UserInfo {
   branch_id: number | null;
   branch_name: string | null;
   company_name: string | null;
+  branch_type: BranchType | null;
+  db_role: string | null;
   firstname: string | null;
   lastname: string | null;
   nickname: string | null;
@@ -54,6 +71,8 @@ export interface LoginResponse {
   role_code: string;
   branch_name: string | null;
   company_name: string | null;
+  branch_type: BranchType | null;
+  db_role: string | null;
   access_token: string;
   token_type: string;
   expires_at: string;
@@ -67,7 +86,7 @@ export interface HoldingOption {
   name: string;
 }
 
-export interface SwitchHoldingResponse {
+export interface SwitchHoldingResponse extends BranchContext {
   user_id: number;
   holding_id: number;
   role_code: string;
@@ -84,7 +103,9 @@ export interface RefreshRequest {
   p_user_agent?: string;
 }
 
-export interface RefreshResponse {
+// mig 1193: refresh returns the same org block as login (branch_type,
+// db_role, branch_name, company_name) — no extra view call needed after it.
+export interface RefreshResponse extends BranchContext {
   user_id: number;
   access_token: string;
   token_type: string;
@@ -109,6 +130,7 @@ export const authService = {
     }, false);
 
     this.storeTokens(result);
+    this.storeBranchContext(result);
     return result;
   },
 
@@ -124,6 +146,7 @@ export const authService = {
     }, false);
 
     this.storeTokens(result);
+    this.storeBranchContext(result);
     return result;
   },
 
@@ -148,6 +171,8 @@ export const authService = {
   /** Convert me_profile_get response to UserInfo for auth context */
   profileToUserInfo(res: MeProfileResponse): UserInfo {
     const p = res.profile;
+    // Org block comes from the last login/refresh/switch_holding response
+    // (persisted below), NOT from views — the shop DB role can't read them.
     return {
       user_id: p.user_id,
       username: p.username,
@@ -155,8 +180,10 @@ export const authService = {
       holding_id: p.holding_id,
       company_id: p.company_id,
       branch_id: p.branch_id,
-      branch_name: null,
-      company_name: null,
+      branch_name: this.getStoredBranchName(),
+      company_name: this.getStoredCompanyName(),
+      branch_type: this.getBranchType(),
+      db_role: this.getDbRole(),
       firstname: p.firstname,
       lastname: p.lastname,
       nickname: p.nickname,
@@ -172,6 +199,39 @@ export const authService = {
     localStorage.setItem('user_id', String(response.user_id));
   },
 
+  /**
+   * Persist the mig-1193 org block. Fields set to undefined are left as-is
+   * (caller didn't receive them); null clears the stored value.
+   */
+  storeBranchContext(ctx: BranchContext): void {
+    const put = (key: string, value: string | null | undefined) => {
+      if (value === undefined) return;
+      if (value === null) localStorage.removeItem(key);
+      else localStorage.setItem(key, value);
+    };
+    put('branch_type', ctx.branch_type);
+    put('db_role', ctx.db_role);
+    put('branch_name', ctx.branch_name);
+    put('company_name', ctx.company_name);
+  },
+
+  getBranchType(): BranchType | null {
+    const v = localStorage.getItem('branch_type');
+    return v === 'INTERNAL' || v === 'EXTERNAL' || v === 'DEAL_PARTNER' ? v : null;
+  },
+
+  getDbRole(): string | null {
+    return localStorage.getItem('db_role');
+  },
+
+  getStoredBranchName(): string | null {
+    return localStorage.getItem('branch_name');
+  },
+
+  getStoredCompanyName(): string | null {
+    return localStorage.getItem('company_name');
+  },
+
   clearTokens(): void {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
@@ -179,6 +239,10 @@ export const authService = {
     localStorage.removeItem('refresh_expires_at');
     localStorage.removeItem('user_id');
     localStorage.removeItem('selected_holding_id');
+    localStorage.removeItem('branch_type');
+    localStorage.removeItem('db_role');
+    localStorage.removeItem('branch_name');
+    localStorage.removeItem('company_name');
   },
 
   getAccessToken(): string | null {
@@ -266,6 +330,7 @@ export const authService = {
     localStorage.setItem('access_token', result.access_token);
     localStorage.setItem('expires_at', result.expires_at);
     localStorage.setItem('selected_holding_id', String(result.holding_id));
+    this.storeBranchContext(result);
 
     return result;
   },

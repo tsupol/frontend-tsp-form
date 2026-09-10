@@ -63,6 +63,7 @@ import {
   KeySquare,
 } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
+import { filterSideNavForShop } from './lib/shopMenu';
 import { getRoleLabel } from './lib/roleLabel';
 import { useTheme } from './contexts/ThemeContext';
 import { useNavGuard } from './contexts/NavGuardContext';
@@ -196,7 +197,7 @@ export const AppSideNav = () => {
   const location = useLocation();
   const { t } = useTranslation();
   const navGuard = useNavGuard();
-  const { user, can } = useAuth();
+  const { user, can, isDealPartner } = useAuth();
   const role = user?.role_code ?? '';
   const { showFin1, showFin2 } = useMyCommercialModels();
   const canApprove = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
@@ -626,6 +627,10 @@ export const AppSideNav = () => {
     }] : []),
   ];
 
+  // Deal-partner shops get the narrow shop menu set (NOTICE 1193) — the
+  // whitelist lives in src/lib/shopMenu.ts, shared with the section layouts.
+  const visibleItems = isDealPartner ? filterSideNavForShop(menuItems) : menuItems;
+
   const handleSelect = (_key: string, path?: string) => {
     if (path) navGuard ? navGuard.guardedNavigate(path) : navigate(path);
   };
@@ -677,7 +682,7 @@ export const AppSideNav = () => {
           <div className="flex flex-col w-full h-full min-h-0 pointer-events-auto">
             <div className="side-menu-content better-scroll">
               <SideMenuItems
-                items={menuItems}
+                items={visibleItems}
                 activePath={location.pathname}
                 collapsed={menuCollapsed}
                 isMobile={isMobile}

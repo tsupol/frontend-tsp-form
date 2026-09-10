@@ -4,12 +4,15 @@ import { useTranslation } from 'react-i18next';
 import { Badge } from 'tsp-form';
 import { Search, PiggyBank, FilePlus, Link2, FileEdit, CreditCard, Archive, Repeat2, PauseCircle } from 'lucide-react';
 import { useNavCounts } from '../../hooks/useNavCounts';
+import { useAuth } from '../../contexts/AuthContext';
+import { shopMenuAllows } from '../../lib/shopMenu';
 
 export function ContractsLayout({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
+  const { isDealPartner } = useAuth();
   const { savingContractsCount, draftContractsCount, pendingPairingCount, pendingPaymentCount, depositOverdueCount, pausedContractsCount } = useNavCounts();
 
-  const navItems = [
+  const allItems = [
     { path: '/admin/contracts/search', labelKey: 'nav.contractSearch', icon: Search, count: 0 },
     { path: '/admin/contracts/saving', labelKey: 'nav.savingContracts', icon: PiggyBank, count: savingContractsCount },
     { path: '/admin/contracts/draft', labelKey: 'nav.draftContracts', icon: FileEdit, count: draftContractsCount },
@@ -20,6 +23,8 @@ export function ContractsLayout({ children }: { children: ReactNode }) {
     { path: '/admin/contracts/paused', labelKey: 'nav.pausedContracts', icon: PauseCircle, count: pausedContractsCount },
     { path: '/admin/contracts/new', labelKey: 'nav.newContract', icon: FilePlus, count: 0, accent: true },
   ];
+  // Deal-partner shops: only the shop menu set (dual-nav rule — mirrors AppSideNav).
+  const navItems = isDealPartner ? allItems.filter(i => shopMenuAllows(i.path)) : allItems;
 
   return (
     <div className="flex h-dvh overflow-hidden">

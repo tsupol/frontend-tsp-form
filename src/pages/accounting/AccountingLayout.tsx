@@ -10,6 +10,7 @@ import {
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavCounts } from '../../hooks/useNavCounts';
+import { filterSubNavForShop } from '../../lib/shopMenu';
 
 type NavItem =
   | { type: 'link'; path: string; labelKey: string; icon: typeof CalendarCheck; badge?: number }
@@ -19,7 +20,7 @@ export function AccountingLayout({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
   const navGuard = useNavGuard();
-  const { user } = useAuth();
+  const { user, isDealPartner } = useAuth();
   const canSeeAudit = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(user?.role_code ?? '');
   // ETL daily reports — REPORT.DAILY.READ audience: BM + company office roles
   // (admin / accountant / inventory) + holding + sysdev.
@@ -35,7 +36,7 @@ export function AccountingLayout({ children }: { children: ReactNode }) {
   ].includes(user?.role_code ?? '');
   const { unclosedCount } = useNavCounts();
 
-  const navItems: NavItem[] = useMemo(() => [
+  const allItems: NavItem[] = useMemo(() => [
     { type: 'group', labelKey: 'nav.groupDaily' },
     { type: 'link', path: '/admin/accounting/bills', labelKey: 'nav.bills', icon: Receipt },
     { type: 'link', path: '/admin/accounting/payment-list', labelKey: 'nav.paymentList', icon: ArrowUpRight },
@@ -71,6 +72,10 @@ export function AccountingLayout({ children }: { children: ReactNode }) {
       { type: 'link' as const, path: '/admin/accounting/audit-flags', labelKey: 'nav.auditFlags', icon: ShieldAlert },
     ] : []),
   ], [canSeeAudit, canSeeReports, canSeeFinancier, unclosedCount]);
+
+  // Deal-partner shops: bills only — no day close, remit, or holding reports
+  // (dual-nav rule — mirrors AppSideNav, where this fan-out collapses to บิล).
+  const navItems = isDealPartner ? filterSubNavForShop(allItems) : allItems;
 
   return (
     <div className="flex h-dvh overflow-hidden">

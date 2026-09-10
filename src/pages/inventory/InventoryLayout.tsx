@@ -2,13 +2,15 @@ import type { ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { BarChart3, Box, Boxes, ClipboardList, PackagePlus, ArrowLeftRight, Wrench, RotateCcw, HandCoins, ShoppingCart, Barcode, Receipt, UserCog } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { filterSubNavForShop } from '../../lib/shopMenu';
 
 type NavItem =
   | { type: 'link'; path: string; labelKey: string; icon: typeof BarChart3; iconClassName?: string }
   | { type: 'highlight'; path: string; labelKey: string; icon: typeof BarChart3 }
   | { type: 'group'; labelKey: string };
 
-const navItems: NavItem[] = [
+const allItems: NavItem[] = [
   { type: 'group', labelKey: 'nav.groupStock' },
   { type: 'link', path: '/admin/inventory/stock', labelKey: 'nav.stock', icon: BarChart3 },
   { type: 'link', path: '/admin/inventory/lots', labelKey: 'nav.lots', icon: Boxes },
@@ -32,6 +34,10 @@ const navItems: NavItem[] = [
 export function InventoryLayout({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const location = useLocation();
+  const { isDealPartner } = useAuth();
+
+  // Deal-partner shops: own devices/stock only (dual-nav rule — mirrors AppSideNav).
+  const navItems = isDealPartner ? filterSubNavForShop(allItems) : allItems;
 
   // Longest-prefix match so /admin/inventory/buyback/new activates the
   // new-buyback item, not the buyback list item.

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { MapPin, Building2, Landmark, CalendarDays, ShieldBan, Cloud, KeyRound, UserCheck, PenLine, Stamp, Wallet, Boxes, Wrench, Smartphone } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { filterSubNavForShop } from '../../lib/shopMenu';
 
 const ADMIN_ROLES = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'];
 
@@ -15,11 +16,11 @@ export function CompanyLayout({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
   const navGuard = useNavGuard();
-  const { user } = useAuth();
+  const { user, isDealPartner } = useAuth();
   const role = user?.role_code ?? '';
   const isAdmin = ADMIN_ROLES.includes(role);
 
-  const navItems: NavItem[] = useMemo(() => [
+  const allItems: NavItem[] = useMemo(() => [
     { type: 'group', labelKey: 'nav.groupOrganization' },
     ...(isAdmin ? [{ type: 'link' as const, path: '/admin/company/branches', labelKey: 'nav.branches', icon: MapPin }] : []),
     { type: 'link', path: '/admin/company/pin', labelKey: 'nav.branchPin', icon: KeyRound },
@@ -40,6 +41,9 @@ export function CompanyLayout({ children }: { children: ReactNode }) {
     { type: 'group', labelKey: 'nav.groupStaff' },
     { type: 'link', path: '/admin/company/staff-commission', labelKey: 'nav.staffCommission', icon: UserCheck },
   ], [isAdmin]);
+
+  // Deal-partner shops: PIN / signers / ABM OTP only (dual-nav rule — mirrors AppSideNav).
+  const navItems = isDealPartner ? filterSubNavForShop(allItems) : allItems;
 
   return (
     <div className="flex h-dvh overflow-hidden">
