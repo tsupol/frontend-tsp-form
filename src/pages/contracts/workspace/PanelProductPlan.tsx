@@ -8,6 +8,7 @@ import { fmtCurrency } from '../../../lib/format';
 import { getConditionLabel, getConditionTextColor, assetSearchOrClause } from '../../inventory/inventoryUtils';
 import { formatInstallment } from '../contractUtils';
 import { useWorkspace } from './WorkspaceContext';
+import { useAuth } from '../../../contexts/AuthContext';
 import type { Quote } from './WorkspaceTypes';
 import { useBarcodeScanner } from '../../../components/BarcodeScanner';
 import { Fin1PlanEditor } from './Fin1PlanEditor';
@@ -130,6 +131,11 @@ interface Props {
 export function PanelProductPlan(_props: Props) {
   const { t } = useTranslation();
   const { data: wizardData, contract, invalidateContract } = useWorkspace();
+  // Deal-partner shops must point the contract at a real registered device —
+  // the catalog "promised but not in stock" path is internal-only (design
+  // v3.1 §1; owner 09-10). The approval freeze on the BE side will hold the
+  // chosen device; here we keep the picking stock-only.
+  const { isDealPartner } = useAuth();
 
   // ── Mode: new vs used (drives the submit RPC path) ──────────────────
   const initialMode: SelectionMode = contract?.is_used_asset ? 'used' : 'new';
@@ -893,13 +899,15 @@ export function PanelProductPlan(_props: Props) {
               <Package size={18} />
               <span className="font-medium text-sm">{t('wizard.tabInStock')}</span>
             </button>
-            <button
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-colors cursor-pointer ${sourceTab === 'catalog' ? 'border-primary bg-primary-soft text-primary-fg' : 'border-line hover:border-fg/30 bg-transparent text-fg'}`}
-              onClick={() => handleSwitchTab('catalog')}
-            >
-              <BookOpen size={18} />
-              <span className="font-medium text-sm">{t('wizard.tabCatalog')}</span>
-            </button>
+            {!isDealPartner && (
+              <button
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-colors cursor-pointer ${sourceTab === 'catalog' ? 'border-primary bg-primary-soft text-primary-fg' : 'border-line hover:border-fg/30 bg-transparent text-fg'}`}
+                onClick={() => handleSwitchTab('catalog')}
+              >
+                <BookOpen size={18} />
+                <span className="font-medium text-sm">{t('wizard.tabCatalog')}</span>
+              </button>
+            )}
           </div>
 
           {/* In-stock search */}

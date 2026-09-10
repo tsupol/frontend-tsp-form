@@ -354,7 +354,8 @@
     "CREDIT_WALLET": "Credit Wallet",
     "INSURANCE_WALLET": "Insurance Wallet",
     "HOLDING_BUDGET": "Company budget",
-    "INTERNAL": "Internal"
+    "INTERNAL": "Internal",
+    "PARTNER_COLLECT": "Collected at store"
   },
   "auth": {
     "login": "Login",
@@ -5417,6 +5418,7 @@
     "method_TRANSFER": "Bank Transfer",
     "method_SAVING_WALLET": "Saving Wallet",
     "method_INSURANCE_WALLET": "Insurance Wallet",
+    "method_PARTNER_COLLECT": "Collected at store",
     "paymentSlip": "Payment Slip",
     "paymentSlipDesc": "Upload payment slip photos (optional)",
     "uploadSlip": "Tap to upload payment slip",

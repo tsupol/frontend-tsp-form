@@ -177,7 +177,7 @@ export interface BillOpenResult {
   }>;
 }
 
-export type PaymentMethod = 'CASH' | 'TRANSFER' | 'SAVING_WALLET';
+export type PaymentMethod = 'CASH' | 'TRANSFER' | 'SAVING_WALLET' | 'PARTNER_COLLECT';
 
 export interface PaymentLine {
   method: PaymentMethod;

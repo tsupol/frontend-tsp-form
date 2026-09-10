@@ -181,6 +181,8 @@
   "CORE.VALIDATION.LEAF_BUILD_FAILED": "Upload failed. Please try again.",
   "MEDIA.NOT_FOUND.ENTITY_MEDIA_NOT_FOUND": "This account has no payment QR to remove.",
   "SALE.VALIDATION.TRANSFER_ACCOUNT_REQUIRED": "Select which account received the transfer.",
+  "SALE.VALIDATION.PARTNER_METHOD_REQUIRED": "Deal-partner bills can only be paid with \"Collected at store\".",
+  "SALE.VALIDATION.PARTNER_METHOD_NOT_ALLOWED": "\"Collected at store\" is only available at deal-partner branches.",
   "SALE.VALIDATION.TRANSFER_ACCOUNT_NOT_A_CHANNEL_DEFAULT": "That account isn't one of the branch's channel accounts.",
   "sale.validation.invalid_charge_type": "Unknown charge type.",
   "SALE.VALIDATION.INVALID_CHARGE_TYPE": "Unknown charge type.",

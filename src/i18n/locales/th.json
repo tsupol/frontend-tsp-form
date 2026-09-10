@@ -352,7 +352,8 @@
     "CREDIT_WALLET": "กระเป๋าเครดิต",
     "INSURANCE_WALLET": "กระเป๋าประกัน",
     "HOLDING_BUDGET": "งบบริษัท",
-    "INTERNAL": "ภายใน"
+    "INTERNAL": "ภายใน",
+    "PARTNER_COLLECT": "หน้าร้าน"
   },
   "auth": {
     "login": "เข้าสู่ระบบ",
@@ -5411,6 +5412,7 @@
     "method_TRANSFER": "เงินโอน",
     "method_SAVING_WALLET": "กระเป๋าออม",
     "method_INSURANCE_WALLET": "กระเป๋าประกัน",
+    "method_PARTNER_COLLECT": "หน้าร้าน",
     "paymentSlip": "สลิปชำระเงิน",
     "paymentSlipDesc": "อัปโหลดภาพสลิปชำระเงิน (ไม่บังคับ)",
     "uploadSlip": "แตะเพื่ออัปโหลดสลิป",

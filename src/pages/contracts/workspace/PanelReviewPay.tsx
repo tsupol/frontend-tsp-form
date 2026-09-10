@@ -19,6 +19,7 @@ import { BillReceipt, type BillDetail } from './BillReceipt';
 import { BillCart, type DraftCartLine } from './BillCart';
 import { signContractOpenParties } from './signContractOpenParties';
 import { translateApiError } from '../../../lib/apiErrors';
+import { useAuth } from '../../../contexts/AuthContext';
 
 /* ─────────────────────────────────────────────────────────────────────────────
    ⚠️  ONE-GO ACTIVATION — DO NOT FIRE BILL/ACTIVATE RPCs ON MOUNT.
@@ -50,6 +51,7 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { data, updateData, contract, invalidateContract, setOpenModal } = useWorkspace();
+  const { isDealPartner } = useAuth();
 
   const savingBalance = contract?.saving_balance ?? 0;
 
@@ -100,16 +102,27 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
   const isNoCharge = totalAmount <= 0;
 
   // ── Payment rows ─────────────────────────────────────────────────────
+  // NOTICE 1196: bills of a DEAL_PARTNER branch accept only PARTNER_COLLECT
+  // ("หน้าร้าน" — the money stays with the shop and is netted in the payout
+  // round), and no other branch may use it. The server enforces both; here we
+  // just offer the right option. TEMP: selected by code because
+  // v_ref_payment_methods does not expose held_by yet (filed with BE) —
+  // switch to filtering held_by === 'BRANCH' once the view carries it.
   const paymentMethodOptions = useMemo(() => {
+    if (isDealPartner) {
+      return [{ value: 'PARTNER_COLLECT', label: t('paymentMethod.PARTNER_COLLECT') }];
+    }
     const opts = BASE_PAYMENT_METHOD_VALUES.map(v => ({ value: v as string, label: t(`paymentMethod.${v}`) }));
     if (savingBalance > 0) {
       opts.push({ value: 'SAVING_WALLET', label: `${t('workspace.savingWallet')} (${fmtCurrency(savingBalance)})` });
     }
     return opts;
-  }, [savingBalance, t]);
+  }, [savingBalance, t, isDealPartner]);
 
   const [payments, setPayments] = useState<PaymentLine[]>(() => {
-    const defaultMethod: PaymentMethod = savingBalance > 0 && savingBalance >= totalAmount ? 'SAVING_WALLET' : 'CASH';
+    const defaultMethod: PaymentMethod = isDealPartner
+      ? 'PARTNER_COLLECT'
+      : savingBalance > 0 && savingBalance >= totalAmount ? 'SAVING_WALLET' : 'CASH';
     return [{ method: defaultMethod, amount: totalAmount, bank_account_id: null }];
   });
   // Auto-sync the single default payment row's amount to the cart total
@@ -516,7 +529,7 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
               onClick={() => {
                 const remaining = totalAmount - totalPayment;
                 userEditedPayments.current = true;
-                setPayments(prev => [...prev, { method: 'CASH', amount: remaining > 0 ? remaining : 0, bank_account_id: null }]);
+                setPayments(prev => [...prev, { method: isDealPartner ? 'PARTNER_COLLECT' : 'CASH', amount: remaining > 0 ? remaining : 0, bank_account_id: null }]);
               }}
               startIcon={<Plus size={14} />}
             >
