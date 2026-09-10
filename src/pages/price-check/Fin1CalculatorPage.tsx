@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { Button, DataTable, Input, MaskedInput, MobileHeader, PageNav, PageNavPanel, Slider } from 'tsp-form';
+import { DataTable, Input, MaskedInput, MobileHeader, PageNav, PageNavPanel, Slider } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine, Calculator, Search, ShieldCheck, X, XCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
@@ -84,6 +84,11 @@ interface PlanByMonthly {
   requested_monthly: number;
   doc_fee_amount: number;
 }
+
+/** Uplift granularity the backend accepts (owner 2026-09-10; verified live:
+ *  p_uplift 500 passes, 250 rejects — `uplift_options` is only a suggestion
+ *  list, the real rule is 0..uplift_max in steps of 500). */
+const UPLIFT_STEP = 500;
 
 // Same two-line shape as the FIN2 price-check rail: family + model, brand below.
 const modelLabel = (m: ModelSearchRow) =>
@@ -373,19 +378,27 @@ export function Fin1CalculatorPage() {
                           <>
                             {/* ── Price + uplift ─────────────────────────── */}
                             <div className="flex flex-col gap-2">
-                              <label className="form-label mb-0">{t('fin1Calc.priceUplift')}</label>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                {(table.uplift_options ?? [0]).map(u => (
-                                  <Button
-                                    key={u}
-                                    size="sm"
-                                    variant={u === uplift ? 'primary' : 'outline'}
-                                    onClick={() => setUplift(u)}
-                                  >
-                                    {u === 0 ? t('fin1Calc.upliftNone') : `+${fmtCurrency(u)}`}
-                                  </Button>
-                                ))}
-                              </div>
+                              <label className="form-label mb-0">
+                                {uplift > 0
+                                  ? t('fin1Calc.upliftLabel', { amount: fmtCurrency(uplift) })
+                                  : t('fin1Calc.priceUplift')}
+                              </label>
+                              {table.policy.uplift_max > 0 && (
+                                <div className="flex flex-col gap-1">
+                                  <Slider
+                                    value={uplift}
+                                    onChange={(v) => setUplift(Math.min(table.policy.uplift_max,
+                                      Math.max(0, Math.round(v / UPLIFT_STEP) * UPLIFT_STEP)))}
+                                    min={0}
+                                    max={table.policy.uplift_max}
+                                    step={UPLIFT_STEP}
+                                  />
+                                  <div className="flex justify-between text-[11px] text-subtler tabular-nums">
+                                    <span>+0</span>
+                                    <span>+{fmtCurrency(table.policy.uplift_max)}</span>
+                                  </div>
+                                </div>
+                              )}
                               <div className="text-sm tabular-nums">
                                 {uplift > 0 && table.base_price != null ? (
                                   <>

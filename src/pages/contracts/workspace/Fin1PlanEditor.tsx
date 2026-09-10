@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, MaskedInput, Slider } from 'tsp-form';
 import { Check, ShieldCheck, XCircle, AlertTriangle, Loader2 } from 'lucide-react';
@@ -98,6 +98,11 @@ export interface Fin1PlanResponse {
 /** Which box the user typed the down payment into — only one is sent. */
 type DownMode = 'percent' | 'amount';
 
+/** Uplift granularity the backend accepts (owner 2026-09-10; verified live:
+ *  p_uplift 500 passes, 250 rejects — `uplift_options` is only a suggestion
+ *  list, the real rule is 0..uplift_max in steps of 500). */
+const UPLIFT_STEP = 500;
+
 interface Props {
   contractId: number;
   /** Plan already on the contract (server truth) — seeds the controls on open. */
@@ -191,7 +196,9 @@ export function Fin1PlanEditor({
         setPreview(res);
         setPreviewError('');
         setTermMonths(res.term_months);
-        setDownPercent(res.down_percent);
+        // Integer: the % slider steps by 1 and its label shows the chosen
+        // whole percent — never seed it with the resolved decimal (25.02).
+        setDownPercent(Math.round(res.down_percent));
         setDownAmountStr(String(res.down_amount));
       } catch (err) {
         // The out-of-range probe is expected to fail — the error carries the
@@ -237,7 +244,7 @@ export function Fin1PlanEditor({
         // switching % ↔ baht never shows a stale number. Never overwrite the
         // box the user is typing in.
         if (downMode === 'percent') setDownAmountStr(String(res.down_amount));
-        else setDownPercent(res.down_percent);
+        else setDownPercent(Math.round(res.down_percent));
       } catch (err) {
         if (seq !== previewSeq.current) return;
         setPreview(null);
@@ -270,11 +277,7 @@ export function Fin1PlanEditor({
     setSaveError('');
   };
 
-  const upliftOptions = useMemo(() => {
-    const opts = policy?.uplift_options ?? preview?.policy?.uplift_options ?? [0];
-    // 0 is always offered (§3: "0 = ไม่เพิ่ม ได้เสมอ").
-    return opts.includes(0) ? opts : [0, ...opts];
-  }, [policy, preview]);
+  const upliftMax = policy?.uplift_max ?? preview?.policy?.uplift_max ?? 0;
 
   const terms = policy?.terms ?? [];
   const shown = saved ?? preview;
@@ -303,19 +306,26 @@ export function Fin1PlanEditor({
     <div className="flex flex-col gap-5">
       {/* ── Price + uplift ─────────────────────────────────────────── */}
       <div className="flex flex-col gap-2">
-        <label className="form-label mb-0">{t('fin1Plan.priceUplift')}</label>
-        <div className="flex items-center gap-2 flex-wrap">
-          {upliftOptions.map(u => (
-            <Button
-              key={u}
-              size="sm"
-              variant={u === uplift ? 'primary' : 'outline'}
-              onClick={() => setUplift(u)}
-            >
-              {u === 0 ? t('fin1Plan.upliftNone') : `+${fmtCurrency(u)}`}
-            </Button>
-          ))}
-        </div>
+        <label className="form-label mb-0">
+          {uplift > 0
+            ? t('fin1Plan.upliftLabel', { amount: fmtCurrency(uplift) })
+            : t('fin1Plan.priceUplift')}
+        </label>
+        {upliftMax > 0 && (
+          <div className="flex flex-col gap-1">
+            <Slider
+              value={uplift}
+              onChange={(v) => setUplift(Math.min(upliftMax, Math.max(0, Math.round(v / UPLIFT_STEP) * UPLIFT_STEP)))}
+              min={0}
+              max={upliftMax}
+              step={UPLIFT_STEP}
+            />
+            <div className="flex justify-between text-[11px] text-subtler tabular-nums">
+              <span>+0</span>
+              <span>+{fmtCurrency(upliftMax)}</span>
+            </div>
+          </div>
+        )}
         {shown && (
           <div className="text-sm tabular-nums">
             {shown.uplift_amount > 0 ? (
@@ -346,7 +356,10 @@ export function Fin1PlanEditor({
             <label className="form-label mb-0">
               {downPercent != null && preview
                 ? t('fin1Plan.downLabel', {
-                    pct: preview.down_percent,
+                    // % mode shows the whole percent the user chose (like the
+                    // FIN1 calculator page); the resolved decimal only appears
+                    // in baht mode, where it IS the answer to what was typed.
+                    pct: downMode === 'percent' ? Math.round(downPercent) : preview.down_percent,
                     amount: fmtCurrency(preview.down_amount),
                   })
                 : t('fin1Plan.downPayment')}
@@ -494,7 +507,9 @@ function PlanSummary({ plan, t }: { plan: Fin1PlanResponse; t: TFn }) {
       </div>
       <div className="border-t border-line">
         {[
-          { label: t('fin1Plan.rowDown'), value: `${fmtCurrency(plan.down_amount)} (${plan.down_percent}%)` },
+          // Amount only, like the FIN1 calculator's summary — the resolved
+          // percent is decimal (25.02) and the owner asked for no decimals.
+          { label: t('fin1Plan.rowDown'), value: fmtCurrency(plan.down_amount) },
           { label: t('fin1Plan.rowFinanced'), value: fmtCurrency(plan.financed_amount) },
           { label: t('fin1Plan.rowMonths'), value: t('fin1Plan.months', { count: plan.term_months }) },
           { label: t('fin1Plan.rowInstallmentTotal'), value: fmtCurrency(plan.total_effective) },
