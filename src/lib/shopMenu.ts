@@ -51,16 +51,19 @@ export function shopMenuAllows(path: string): boolean {
 
 // Section-layout sub-nav filter. Layout nav arrays mix links ({ path, ... })
 // and group headers (no path); a group header survives only if at least one
-// link after it survives.
-export function filterSubNavForShop<T extends { path?: string }>(items: T[]): T[] {
+// link after it survives. T is unconstrained so union item types (link |
+// group) infer as-is — a `{ path?: string }` constraint makes some call
+// sites widen the result to the constraint type.
+export function filterSubNavForShop<T>(items: T[]): T[] {
   const kept: T[] = [];
   let pendingGroup: T | null = null;
   for (const item of items) {
-    if (item.path === undefined) {
+    const path = (item as { path?: string }).path;
+    if (path === undefined) {
       pendingGroup = item;
       continue;
     }
-    if (shopMenuAllows(item.path)) {
+    if (shopMenuAllows(path)) {
       if (pendingGroup) {
         kept.push(pendingGroup);
         pendingGroup = null;
