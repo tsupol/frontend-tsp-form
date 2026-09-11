@@ -72,6 +72,10 @@ export function useChatRealtimeSnackbars() {
   // both invalidate `['chat-inbox']`, which refetches this too. It previously
   // polled at 60s alongside ChatPage's inbox and the nav badge — three timers on
   // one view, three query keys, so React Query deduped none of them.
+  // Deal-partner shops have no chat feature at all (menu cut, v_branch_chat_list
+  // not in the nnf_partner whitelist → permanent 403) — don't poll a dead view.
+  const isPartnerShop = user?.branch_type === 'DEAL_PARTNER';
+
   const { data } = useQuery({
     queryKey: ['chat-inbox', 'global'],
     queryFn: () =>
@@ -79,7 +83,7 @@ export function useChatRealtimeSnackbars() {
         '/v_branch_chat_list?order=last_message_at.desc.nullslast'
         + `&select=contract_id,customer_name,last_message_text&limit=${ROSTER_LIMIT}`,
       ),
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && !isPartnerShop,
     staleTime: 30_000,
   });
 

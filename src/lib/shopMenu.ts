@@ -15,10 +15,13 @@ import type { SideMenuItemData } from 'tsp-form';
 // This is the single source of truth. AppSideNav filters through
 // filterSideNavForShop; section layouts (Contracts/Inventory/Company/
 // Accounting) filter through filterSubNavForShop — dual-nav rule.
+// Cuts of 2026-09-11 (owner, partner-role NOTICE §2.4): savings, the two
+// stock pages (only "สินทรัพย์" remains), and the users page are out — their
+// endpoints (v_saving_contracts, v_users, user_*, …) are not in the
+// nnf_partner whitelist and 403 at the DB.
 export const SHOP_ALLOWED_PATHS = new Set<string>([
   // Contracts — the FIN1 wizard + the shop's own contract lists
   '/admin/contracts/search',
-  '/admin/contracts/saving',
   '/admin/contracts/draft',
   '/admin/contracts/pending-payment',
   '/admin/contracts/pending-pairing',
@@ -28,10 +31,8 @@ export const SHOP_ALLOWED_PATHS = new Set<string>([
   // Bills (own branch) — "บิลของร้าน" per NOTICE 1193 §3. The accounting
   // fan-out collapses to this single page for shops.
   '/admin/accounting/bills',
-  // Shop devices: register / photos / correct variant / own stock
-  '/admin/inventory/stock',
+  // Shop devices: register / photos / correct variant
   '/admin/inventory/assets',
-  '/admin/inventory/branch-stock',
   // Price check (read-only rate/price tables; children already follow the
   // branch's commercial_models)
   '/admin/price-check/fin1',
@@ -41,8 +42,6 @@ export const SHOP_ALLOWED_PATHS = new Set<string>([
   '/admin/company/pin',
   '/admin/company/signers',
   '/admin/company/abm-otp',
-  // Own staff accounts
-  '/admin/users',
 ]);
 
 export function shopMenuAllows(path: string): boolean {

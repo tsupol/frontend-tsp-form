@@ -78,6 +78,9 @@ export function useNavCounts() {
       );
       return totalCount;
     },
+    // Deal-partner shops have no collections menu and the view is outside the
+    // nnf_partner whitelist (permanent 403) — don't poll a dead view.
+    enabled: user?.branch_type !== 'DEAL_PARTNER',
     refetchInterval: FALLBACK_POLL_MS,
     refetchOnWindowFocus: true,
     retry: false,

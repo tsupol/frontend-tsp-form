@@ -1,4 +1,5 @@
 import { config } from '../config/config';
+import { rewritePartnerViewPath } from './partnerViews';
 
 const API_BASE_URL = config.apiUrl;
 
@@ -231,11 +232,15 @@ export class ApiClient {
   }
 
   private makeNonV2Error(data: unknown, endpoint: string, status: number): ApiError {
-    console.error(`[API] Non-v2 error from ${endpoint} (HTTP ${status}). Expected {ok, error}. Got:`, data);
-
-    // PostgREST returns 401 + code "42501" for permission denied — treat as 403, not auth error
+    // PostgREST returns 401 + code "42501" for permission denied — treat as 403, not auth error.
+    // For nnf_partner (deal-partner shop) sessions this is the expected shape for anything
+    // outside the whitelist, so it isn't logged as an error.
     const pgCode = typeof data === 'object' && data !== null && 'code' in data ? (data as { code: string }).code : '';
     const isPermissionDenied = pgCode === '42501';
+
+    if (!isPermissionDenied) {
+      console.error(`[API] Non-v2 error from ${endpoint} (HTTP ${status}). Expected {ok, error}. Got:`, data);
+    }
 
     const auth = status === 401 && !isPermissionDenied;
 
@@ -253,6 +258,9 @@ export class ApiClient {
     return new ApiError({
       code: errorCode,
       message: errorMessage,
+      // Lets the standard catch-block pattern render a translated "no
+      // permission" line instead of the raw "Permission denied: /v_x" string.
+      messageKey: isPermissionDenied ? 'auth.forbidden' : undefined,
       isAuthError: auth,
       httpStatus: isPermissionDenied ? 403 : status,
     });
@@ -270,7 +278,10 @@ export class ApiClient {
   ): Promise<{ response: Response; data: unknown }> {
     const doFetch = async () => {
       const base = API_BASE_URL.replace(/\/+$/, '');
-      const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+      let path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+      // DEAL_PARTNER sessions read the v_partner_* view set — one rewrite
+      // point for every view call in the app (NOTICE 2026-09-11).
+      path = rewritePartnerViewPath(path);
       const url = `${base}${path}`;
       const headers = { ...this.getHeaders(includeAuth), ...options.headers as Record<string, string> };
       const response = await fetch(url, { ...options, headers });

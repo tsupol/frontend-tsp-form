@@ -74,9 +74,39 @@ export function DraftContractsPage() {
     return branches.map(b => ({ value: String(b.id), label: b.name }));
   }, [branches]);
 
+  // Deal-partner shops can't read v_saving_contracts (not in the nnf_partner
+  // whitelist — it belongs to the savings menu the owner cut 09-11). Their
+  // drafts come from v_contracts instead (rewritten to v_partner_contracts by
+  // the api client), which carries every column this list renders except
+  // age_days — computed here from created_at.
+  const isPartner = user?.branch_type === 'DEAL_PARTNER';
+
   const { data: listData, isFetching } = useQuery({
-    queryKey: ['draft-contracts', debouncedSearch, filterBranchId, pageIndex, pageSize],
-    queryFn: () => {
+    queryKey: ['draft-contracts', isPartner, debouncedSearch, filterBranchId, pageIndex, pageSize],
+    queryFn: async () => {
+      if (isPartner) {
+        const cols = 'id,code,code_display,state,commercial_model,branch_id,branch_name,customer_id,customer_name,draft_note,model_name,variant_name,product_display_name,created_at';
+        let url = `/v_contracts?state=eq.DRAFT&order=created_at.desc&select=${cols}`;
+        if (debouncedSearch) {
+          url += `&or=(code.ilike.*${debouncedSearch}*,customer_name.ilike.*${debouncedSearch}*)`;
+        }
+        const res = await apiClient.getPaginated<Partial<DraftContract> & { created_at: string }>(url, { page: pageIndex + 1, pageSize });
+        const now = Date.now();
+        return {
+          totalCount: res.totalCount,
+          data: res.data.map(r => ({
+            last_note: null,
+            model_id: null,
+            variant_id: null,
+            commission_owner_id: null,
+            owner_name: null,
+            created_by: null,
+            created_by_name: null,
+            ...r,
+            age_days: Math.floor((now - new Date(r.created_at).getTime()) / 86_400_000),
+          }) as DraftContract),
+        };
+      }
       let url = '/v_saving_contracts?state=eq.DRAFT&order=created_at.desc';
       if (filterBranchId) url += `&branch_id=eq.${filterBranchId}`;
       if (debouncedSearch) {
