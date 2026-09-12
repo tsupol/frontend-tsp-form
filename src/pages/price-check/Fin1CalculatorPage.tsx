@@ -378,11 +378,14 @@ export function Fin1CalculatorPage() {
                           <>
                             {/* ── Price + uplift ─────────────────────────── */}
                             <div className="flex flex-col gap-2">
-                              <label className="form-label mb-0">
-                                {uplift > 0
-                                  ? t('fin1Calc.upliftLabel', { amount: fmtCurrency(uplift) })
-                                  : t('fin1Calc.priceUplift')}
-                              </label>
+                              <div className="flex items-baseline gap-2">
+                                <span className="form-label mb-0">{t('fin1Calc.priceUplift')}</span>
+                                {uplift > 0 && (
+                                  <span className="text-2xl font-semibold tabular-nums leading-none">
+                                    +{fmtCurrency(uplift)}
+                                  </span>
+                                )}
+                              </div>
                               {table.policy.uplift_max > 0 && (
                                 <div className="flex flex-col gap-1">
                                   <Slider
@@ -399,18 +402,16 @@ export function Fin1CalculatorPage() {
                                   </div>
                                 </div>
                               )}
-                              <div className="text-sm tabular-nums">
-                                {uplift > 0 && table.base_price != null ? (
-                                  <>
-                                    <span className="text-subtle">{fmtCurrency(table.base_price)} + {fmtCurrency(uplift)} = </span>
-                                    <span className="font-semibold">{fmtCurrency(table.price)}</span>
-                                  </>
-                                ) : (
-                                  <span className="font-semibold">{fmtCurrency(table.price)}</span>
+                              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 tabular-nums">
+                                {uplift > 0 && table.base_price != null && (
+                                  <span className="text-sm text-subtle">
+                                    {fmtCurrency(table.base_price)} + {fmtCurrency(uplift)} =
+                                  </span>
                                 )}
-                                <span className="text-subtle"> {t('fin1Calc.baht')}</span>
+                                <span className="text-3xl font-semibold leading-none">{fmtCurrency(table.price)}</span>
+                                <span className="text-sm text-subtle">{t('fin1Calc.baht')}</span>
                                 {table.guarantee_days != null && (
-                                  <span className="inline-flex items-center gap-1 ml-3 text-xs text-success">
+                                  <span className="inline-flex items-center gap-1 text-xs text-success-fg">
                                     <ShieldCheck size={13} />
                                     {t('fin1Calc.guaranteeDays', { days: table.guarantee_days })}
                                   </span>
@@ -421,9 +422,15 @@ export function Fin1CalculatorPage() {
                             {/* ── Down % ─────────────────────────────────── */}
                             {downPct != null && row && (
                               <div className="flex flex-col gap-1">
-                                <label className="form-label mb-0">
-                                  {t('fin1Calc.downLabel', { pct: downPct, amount: fmtCurrency(row.down_amount) })}
-                                </label>
+                                <div className="flex flex-wrap items-baseline gap-x-2">
+                                  <span className="form-label mb-0">{t('fin1Calc.downTitle')}</span>
+                                  <span className="text-2xl font-semibold tabular-nums leading-none">
+                                    {fmtCurrency(row.down_amount)}
+                                  </span>
+                                  <span className="text-sm text-subtle tabular-nums">
+                                    {t('fin1Calc.baht')} · {downPct}%
+                                  </span>
+                                </div>
                                 <Slider
                                   value={downPct}
                                   onChange={(v) => setDownPct(Math.round(v))}
@@ -438,11 +445,15 @@ export function Fin1CalculatorPage() {
                             {/* ── Months ─────────────────────────────────── */}
                             {termMonths != null && terms.length > 0 && (
                               <div className={`flex flex-col gap-1 ${monthlyMode ? 'opacity-50' : ''}`}>
-                                <label className="form-label mb-0">
-                                  {monthlyMode && plan
-                                    ? t('fin1Calc.monthsFromMonthly', { count: plan.term_months })
-                                    : t('fin1Calc.monthsLabel', { count: termMonths })}
-                                </label>
+                                <div className="flex flex-wrap items-baseline gap-x-2">
+                                  <span className="form-label mb-0">
+                                    {monthlyMode && plan ? t('fin1Calc.termFromMonthly') : t('fin1Calc.termTitle')}
+                                  </span>
+                                  <span className="text-2xl font-semibold tabular-nums leading-none">
+                                    {monthlyMode && plan ? plan.term_months : termMonths}
+                                  </span>
+                                  <span className="text-sm text-subtle">{t('fin1Calc.monthsUnit')}</span>
+                                </div>
                                 <Slider
                                   value={terms.indexOf(termMonths)}
                                   onChange={(v) => {
@@ -465,10 +476,12 @@ export function Fin1CalculatorPage() {
                             {/* ── Customer's target monthly ──────────────── */}
                             <div className="flex flex-col">
                               <label className="form-label">{t('fin1Calc.monthlyTarget')}</label>
-                              <div className="w-44">
+                              <div className="w-56">
                                 <MaskedInput
                                   mask="number"
                                   decimalScale={0}
+                                  size="lg"
+                                  className="w-full text-2xl font-semibold tabular-nums"
                                   value={monthlyStr}
                                   onChange={(raw) => { setMonthlyStr(raw); setFloorNotice(false); }}
                                   // A below-floor amount stays silent while it is
@@ -516,14 +529,14 @@ export function Fin1CalculatorPage() {
                           <div className={`rounded-md border border-line overflow-hidden ${(tableLoading || planLoading) ? 'opacity-60' : ''} transition-opacity`}>
                             <div className="px-4 py-3 bg-surface flex flex-col gap-1">
                               <div className="text-sm text-subtle">{t('fin1Calc.summaryTitle')}</div>
-                              <div className="text-xl xl:text-2xl font-semibold tabular-nums">
+                              <div className="text-2xl xl:text-3xl font-semibold tabular-nums">
                                 {t('fin1Calc.summaryMonthly', {
                                   amount: fmtCurrency(summary.monthly),
                                   count: summary.last !== summary.monthly ? summary.months - 1 : summary.months,
                                 })}
                               </div>
                               {summary.last !== summary.monthly && (
-                                <div className="text-sm xl:text-base tabular-nums">
+                                <div className="text-base xl:text-lg tabular-nums">
                                   {t('fin1Calc.summaryLast', { amount: fmtCurrency(summary.last) })}
                                 </div>
                               )}
@@ -536,13 +549,16 @@ export function Fin1CalculatorPage() {
                             <div className="border-t border-line">
                               {[
                                 { label: t('fin1Calc.rowDown'), value: fmtCurrency(summary.down) },
-                                { label: t('fin1Calc.rowMonths'), value: t('fin1Calc.months', { count: summary.months }) },
+                                { label: t('fin1Calc.rowMonths'), value: String(summary.months), suffix: t('fin1Calc.monthsUnit') },
                                 { label: t('fin1Calc.rowTotal'), value: fmtCurrency(summary.total) },
-                                { label: t('fin1Calc.rowDocFee'), value: t('fin1Calc.docFeeValue', { amount: fmtCurrency(summary.docFee) }) },
+                                { label: t('fin1Calc.rowDocFee'), value: fmtCurrency(summary.docFee), suffix: t('fin1Calc.docFeeWhen') },
                               ].map((r, i) => (
-                                <div key={i} className="flex items-center justify-between px-4 py-2 border-b border-line last:border-b-0">
+                                <div key={i} className="flex items-baseline justify-between gap-2 px-4 py-2 border-b border-line last:border-b-0">
                                   <span className="text-sm text-subtle">{r.label}</span>
-                                  <span className="text-sm tabular-nums font-medium">{r.value}</span>
+                                  <span className="flex items-baseline gap-1.5 min-w-0">
+                                    {r.suffix && <span className="text-xs text-subtle truncate">{r.suffix}</span>}
+                                    <span className="text-xl font-semibold tabular-nums leading-none">{r.value}</span>
+                                  </span>
                                 </div>
                               ))}
                             </div>
