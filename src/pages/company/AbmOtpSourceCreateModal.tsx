@@ -20,6 +20,7 @@ import { Modal, Button, Input, Select } from 'tsp-form';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, KeyRound, CheckCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { useAbmServers } from './abmServers';
 import { translateApiError } from '../../lib/apiErrors';
 import { CopyButton } from '../../components/CopyButton';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
@@ -41,6 +42,10 @@ export function AbmOtpSourceCreateModal({ open, companyId, onClose, onCreated }:
   const [email, setEmail] = useState('');
   const [label, setLabel] = useState('');
   const [branchId, setBranchId] = useState<string>('');
+  // Which ABM organisation this email signs into. Mandatory since mig 297 —
+  // sending null now fails with OTP_SOURCE_TENANT_REQUIRED, which is exactly
+  // what this form used to do.
+  const [tenantId, setTenantId] = useState<string>('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<AbmOtpSourceCreated | null>(null);
@@ -53,9 +58,19 @@ export function AbmOtpSourceCreateModal({ open, companyId, onClose, onCreated }:
     enabled: open,
   });
 
+  const { data: abmServers = [], isLoading: serversLoading } = useAbmServers(open);
+
+  // Preselect the holding's default org. Runs when the list lands rather than
+  // on open, since the fetch usually resolves after the modal is already up.
+  useEffect(() => {
+    if (!open || tenantId !== '' || abmServers.length === 0) return;
+    const preset = abmServers.find(s2 => s2.is_default) ?? abmServers[0];
+    setTenantId(String(preset.abm_tenant_id));
+  }, [open, abmServers, tenantId]);
+
   useEffect(() => {
     if (open) {
-      setView('form'); setEmail(''); setLabel(''); setBranchId('');
+      setView('form'); setEmail(''); setLabel(''); setBranchId(''); setTenantId('');
       setBusy(false); setError(''); setResult(null); setConfirmClose(false);
     }
   }, [open]);
@@ -84,7 +99,7 @@ export function AbmOtpSourceCreateModal({ open, companyId, onClose, onCreated }:
         p_company_id: companyId,
         p_login_email: email.trim(),
         p_label: label.trim() || null,
-        p_abm_tenant_id: null,
+        p_abm_tenant_id: Number(tenantId),
         p_branch_id: branchId ? Number(branchId) : null,
       });
       setResult(res);
@@ -104,7 +119,13 @@ export function AbmOtpSourceCreateModal({ open, companyId, onClose, onCreated }:
   };
 
   const branchOptions = branches.map(b => ({ value: String(b.id), label: b.name }));
-  const canSubmit = !busy && email.trim().length > 0 && companyId != null;
+  const tenantOptions = abmServers.map(s2 => ({
+    value: String(s2.abm_tenant_id),
+    label: s2.display_name,
+  }));
+  // No org chosen = a guaranteed 400, so the button stays shut rather than
+  // teaching the user what OTP_SOURCE_TENANT_REQUIRED means.
+  const canSubmit = !busy && email.trim().length > 0 && companyId != null && tenantId !== '';
 
   return (
     <>
@@ -151,6 +172,29 @@ export function AbmOtpSourceCreateModal({ open, companyId, onClose, onCreated }:
                   />
                   {/* Scope is decided purely by whether a branch is chosen. */}
                   <p className="text-xs text-subtle mt-1">{t('abmOtp.create.branchHint')}</p>
+                </div>
+                {/* Mandatory. The org decides where the DEP profile is pushed —
+                    bind the wrong one and Apple answers NOT_ACCESSIBLE for
+                    every device this email ever scans. */}
+                <div className="flex flex-col">
+                  <label className="form-label">{t('abmOtp.create.abmOrg')} *</label>
+                  {serversLoading ? (
+                    <p className="text-xs text-subtle">{t('common.loading')}</p>
+                  ) : tenantOptions.length === 0 ? (
+                    <div className="alert alert-warning">
+                      <AlertTriangle size={16} className="shrink-0" />
+                      <span className="min-w-0">{t('abmOtp.create.noAbmOrgs')}</span>
+                    </div>
+                  ) : (
+                    <Select
+                      options={tenantOptions}
+                      value={tenantId || null}
+                      onChange={(v) => setTenantId((v as string) ?? '')}
+                      placeholder={t('abmOtp.create.abmOrgPlaceholder')}
+                      showChevron
+                    />
+                  )}
+                  <p className="text-xs text-subtle mt-1">{t('abmOtp.create.abmOrgHint')}</p>
                 </div>
               </div>
             </div>

@@ -13,9 +13,14 @@ export interface AbmOtpSource {
   owner_scope: AbmOtpScope;
   login_email: string;
   label: string | null;
-  /** Reference only — which ABM tenant this account belongs to. Nullable. */
+  /** Which ABM org this account signs into. Null = unbound: the account cannot
+   *  enroll anything and never appears in the enroll picker (mig 296-297). */
   abm_tenant_id: number | null;
   abm_tenant_name: string | null;
+  /** Default FOR ITS SCOPE — one per company and one per branch, not one per
+   *  company overall. A branch default outranks the company one for that
+   *  branch's staff (mig 289). */
+  is_default: boolean;
   is_active: boolean;
   created_at: string;
   revoked_at: string | null;

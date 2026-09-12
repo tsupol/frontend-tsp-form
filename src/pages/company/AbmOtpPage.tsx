@@ -24,13 +24,16 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, Select, Switch, MobileHeader } from 'tsp-form';
 import {
   ArrowRightFromLine, RefreshCw, Plus, Mail, AlertTriangle, Inbox, Smartphone,
+  Building2, Star,
 } from 'lucide-react';
-import { apiClient } from '../../lib/api';
+import { apiClient, ApiError } from '../../lib/api';
+import { translateApiError } from '../../lib/apiErrors';
 import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
 import { CopyButton } from '../../components/CopyButton';
 import { AbmOtpSourceCreateModal } from './AbmOtpSourceCreateModal';
 import { AbmOtpSetupModal } from './AbmOtpSetupModal';
+import { AbmOtpTenantModal } from './AbmOtpTenantModal';
 import type { AbmOtpSource, AbmOtpMessage } from './abmOtpTypes';
 
 type Tab = 'view' | 'manage';
@@ -57,6 +60,7 @@ export function AbmOtpPage() {
   const [tab, setTab] = useState<Tab>('view');
   const [createOpen, setCreateOpen] = useState(false);
   const [setupSource, setSetupSource] = useState<AbmOtpSource | null>(null);
+  const [tenantSource, setTenantSource] = useState<AbmOtpSource | null>(null);
   // Empty = every account, the project's clearable-filter convention.
   const [filterEmail, setFilterEmail] = useState<string>('');
 
@@ -202,6 +206,7 @@ export function AbmOtpPage() {
                 onChanged={refresh}
                 mayRevealKey={mayRevealKey}
                 onOpenSetup={setSetupSource}
+                onOpenTenant={setTenantSource}
               />
             )}
         </div>
@@ -212,6 +217,13 @@ export function AbmOtpPage() {
         companyId={companyId}
         onClose={() => setCreateOpen(false)}
         onCreated={refresh}
+      />
+
+      <AbmOtpTenantModal
+        open={tenantSource !== null}
+        source={tenantSource}
+        onClose={() => setTenantSource(null)}
+        onSaved={refresh}
       />
 
       <AbmOtpSetupModal
@@ -320,13 +332,14 @@ function OtpList({ rows, loading, filtered, onClearFilter }: {
 
 // ── Tab: Manage ──────────────────────────────────────────────────────────────
 
-function SourceList({ rows, loading, onChanged, mayRevealKey, onOpenSetup }: {
+function SourceList({ rows, loading, onChanged, mayRevealKey, onOpenSetup, onOpenTenant }: {
   rows: AbmOtpSource[];
   loading: boolean;
   onChanged: () => void;
   /** COMPANY_ADMIN and above only — see MAY_REVEAL_KEY. */
   mayRevealKey: boolean;
   onOpenSetup: (row: AbmOtpSource) => void;
+  onOpenTenant: (row: AbmOtpSource) => void;
 }) {
   const { t } = useTranslation();
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -343,6 +356,26 @@ function SourceList({ rows, loading, onChanged, mayRevealKey, onOpenSetup }: {
       onChanged();
     } catch {
       setError(t('abmOtp.toggleFailed'));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  // The default is per SCOPE, not per company: a branch account being default
+  // only outranks the company default for that branch's own staff. Flipping one
+  // on silently clears whichever row held it before (replaced_source_id), so the
+  // list must be refetched rather than patched.
+  const setDefault = async (row: AbmOtpSource) => {
+    setBusyId(row.id);
+    setError('');
+    try {
+      await apiClient.rpc('fn_abm_otp_source_set_default', {
+        p_source_id: row.id,
+        p_is_default: !row.is_default,
+      });
+      onChanged();
+    } catch (err) {
+      setError(err instanceof ApiError ? translateApiError(err, t) : t('abmOtp.default.failed'));
     } finally {
       setBusyId(null);
     }
@@ -374,8 +407,24 @@ function SourceList({ rows, loading, onChanged, mayRevealKey, onOpenSetup }: {
                     : t('abmOtp.scopeCompany')}
                 </Badge>
                 {!row.is_active && <Badge size="xs" color="danger">{t('abmOtp.inactive')}</Badge>}
+                {row.is_default && (
+                  <Badge size="xs" color="success">{t('abmOtp.default.badge')}</Badge>
+                )}
               </div>
               {row.label && <span className="text-xs text-subtle">{row.label}</span>}
+
+              {/* Which ABM organisation this email signs into. An account with
+                  none cannot enroll anything — it is invisible to the enroll
+                  picker — so an unbound row is an error state, not a blank. */}
+              {row.abm_tenant_name ? (
+                <span className="text-xs text-subtler inline-flex items-center gap-1">
+                  <Building2 size={12} className="shrink-0" />{row.abm_tenant_name}
+                </span>
+              ) : (
+                <span className="text-xs text-danger-fg inline-flex items-center gap-1">
+                  <AlertTriangle size={13} className="shrink-0" />{t('abmOtp.tenant.unbound')}
+                </span>
+              )}
 
               {/* No message ever received = the phone-side Shortcut isn't
                   working. Surfacing it here is the only way anyone learns
@@ -391,11 +440,40 @@ function SourceList({ rows, loading, onChanged, mayRevealKey, onOpenSetup }: {
                 </span>
               )}
             </div>
-            <div className="shrink-0 pt-0.5 flex items-center gap-2">
+            <div className="shrink-0 pt-0.5 flex items-center gap-2 flex-wrap justify-end">
               {/* Opens the key + the phone recipe. Rotate lives inside that
                   modal rather than as a second row button — it's destructive
                   and should be reached only after seeing which account and
                   which key you're about to kill. */}
+              {/* Default-for-scope. The BE refuses a row that is unbound or
+                  switched off, so the button says why before it is pressed
+                  rather than surfacing OTP_SOURCE_DEFAULT_NEEDS_* after. */}
+              <Button
+                size="sm"
+                variant={row.is_default ? 'solid' : 'outline'}
+                color={row.is_default ? 'success' : undefined}
+                startIcon={<Star size={14} />}
+                disabled={busyId === row.id || row.abm_tenant_id == null || !row.is_active}
+                title={
+                  row.abm_tenant_id == null
+                    ? t('abmOtp.default.needsTenant')
+                    : !row.is_active
+                      ? t('abmOtp.default.needsActive')
+                      : undefined
+                }
+                onClick={() => setDefault(row)}
+              >
+                {row.is_default ? t('abmOtp.default.unset') : t('abmOtp.default.set')}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                startIcon={<Building2 size={14} />}
+                disabled={busyId === row.id}
+                onClick={() => onOpenTenant(row)}
+              >
+                {t('abmOtp.tenant.changeButton')}
+              </Button>
               {mayRevealKey && (
                 <Button
                   size="sm"
