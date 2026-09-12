@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button, Input, FormErrorMessage } from 'tsp-form';
 import { Eye, EyeOff, AlertTriangle, CheckCircle } from 'lucide-react';
@@ -17,7 +17,6 @@ interface LoginFormData {
 
 
 export function LoginPage() {
-  const navigate = useNavigate();
   const { t } = useTranslation();
   const { login } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -83,7 +82,12 @@ export function LoginPage() {
     try {
       const result = await login(data.username, data.password);
       if (!result.needsHoldingSelect) {
-        navigate('/admin');
+        // Hard navigation, not navigate(): boot the app fresh so no state from
+        // a previous session in this tab can survive into the new one. Mirrors
+        // what /dev-login already does. Skips the finally-block setIsPending
+        // in practice — the page is being torn down.
+        window.location.replace('/admin');
+        return;
       }
       // If holding selection is needed, the modal in App handles it
     } catch (err) {

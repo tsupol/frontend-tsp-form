@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 import type { ReactNode } from 'react';
 import { authService } from '../lib/auth';
 import { apiClient, setAuthErrorHandler, setTokenRefresher } from '../lib/api';
+import { queryClient } from '../lib/queryClient';
 import type { BranchType, UserInfo } from '../lib/auth';
 
 interface LoginResult {
@@ -274,6 +275,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const switchHolding = useCallback(async (holdingId: number) => {
     const result = await authService.switchHolding(holdingId);
+    // Switching holding changes the whole data scope, so every cached query is
+    // now wrong. Unlike login/logout this stays in-app (no reload to wipe the
+    // heap), so drop the cache by hand; mounted pages refetch.
+    queryClient.clear();
     // Use holding_id from server response as single source of truth; the org
     // block (branch_type/db_role/names) was persisted by authService.
     setUser(prev => prev

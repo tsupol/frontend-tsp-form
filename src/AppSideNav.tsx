@@ -92,7 +92,11 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
   const handleLogout = async () => {
     setOpen(false);
     await logout();
-    navigate('/login');
+    // Hard navigation, not navigate(): logout must nuke everything. A SPA
+    // transition keeps the JS heap — React Query cache, component state,
+    // timers — so the next user logging in would see the previous user's
+    // data until each query went stale. Reloading drops all of it.
+    window.location.replace('/login');
   };
 
   const displayName = user?.nickname || user?.firstname || user?.username || 'User';

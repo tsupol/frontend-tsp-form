@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Button, Switch } from 'tsp-form';
 import { XCircle } from 'lucide-react';
 import { authService } from '../../lib/auth';
@@ -24,7 +23,6 @@ function truncate(str: string | null, len: number) {
 }
 
 export function DevTokensPage() {
-  const navigate = useNavigate();
   const { logout } = useAuth();
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [refreshError, setRefreshError] = useState<string | null>(null);
@@ -83,7 +81,7 @@ export function DevTokensPage() {
             const expiredDuration = Date.now() - expiredSinceRef.current;
             if (expiredDuration >= EXPIRED_GRACE_PERIOD_MS) {
               await logout();
-              navigate('/login');
+              window.location.replace('/login');
             }
           } finally {
             refreshingRef.current = false;
@@ -93,7 +91,7 @@ export function DevTokensPage() {
           const expiredDuration = Date.now() - expiredSinceRef.current;
           if (expiredDuration >= EXPIRED_GRACE_PERIOD_MS) {
             await logout();
-            navigate('/login');
+            window.location.replace('/login');
           }
         }
       } else if (!isExpired) {
@@ -104,7 +102,7 @@ export function DevTokensPage() {
     update();
     const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
-  }, [autoRefresh, logout, navigate]);
+  }, [autoRefresh, logout]);
 
   const handleManualRefresh = async () => {
     setRefreshStatus('Refreshing...');

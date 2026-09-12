@@ -126,16 +126,14 @@ await page.addInitScript((t) => {
   localStorage.setItem('refresh_token', t.refresh_token);
   localStorage.setItem('expires_at', t.expires_at);
   localStorage.setItem('refresh_expires_at', t.refresh_expires_at);
-  localStorage.setItem('user_id', String(t.out_user_id));
   if (t.holding_id != null) localStorage.setItem('selected_holding_id', String(t.holding_id));
 }, d);
 
 await page.goto('https://localhost:5173/admin');
 ```
 
-All five keys matter — miss `refresh_expires_at` and `validateAndRefresh`
-treats the refresh token as expired and clears the session immediately. The
-user-id field in the login response is `out_user_id`, not `user_id`.
+All four keys matter — miss `refresh_expires_at` and `validateAndRefresh`
+treats the refresh token as expired and clears the session immediately.
 
 </details>
 

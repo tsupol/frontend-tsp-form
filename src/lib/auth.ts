@@ -196,7 +196,6 @@ export const authService = {
     localStorage.setItem('refresh_token', response.refresh_token);
     localStorage.setItem('expires_at', response.expires_at);
     localStorage.setItem('refresh_expires_at', response.refresh_expires_at);
-    localStorage.setItem('user_id', String(response.user_id));
   },
 
   /**
@@ -237,12 +236,38 @@ export const authService = {
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('expires_at');
     localStorage.removeItem('refresh_expires_at');
-    localStorage.removeItem('user_id');
     localStorage.removeItem('selected_holding_id');
     localStorage.removeItem('branch_type');
     localStorage.removeItem('db_role');
     localStorage.removeItem('branch_name');
     localStorage.removeItem('company_name');
+    this.clearUserScopedState();
+  },
+
+  /**
+   * Drop per-user app state that would otherwise survive into the next
+   * session. Tokens live in memory and die with the reload that follows a
+   * logout, but localStorage/sessionStorage do not — without this, one user's
+   * print queue, branch scope or open chat carries over to whoever logs in
+   * next. Anything keyed to a specific user's data belongs in these lists.
+   */
+  clearUserScopedState(): void {
+    const localKeys = [
+      'asset-print-queue-v1',   // AssetsPage print queue
+      'chatDock',               // ChatDockContext: open contract + position
+      'priceCheck_recent',      // PriceCheckPage recents
+    ];
+    const sessionKeys = [
+      'accounting.reconcile.branchScope',
+      'accounting.reconcile.dateRange',
+      'accounting.reconcile.branchStripCollapsed',
+    ];
+    for (const k of localKeys) {
+      try { localStorage.removeItem(k); } catch { /* ignore */ }
+    }
+    for (const k of sessionKeys) {
+      try { sessionStorage.removeItem(k); } catch { /* ignore */ }
+    }
   },
 
   getAccessToken(): string | null {
