@@ -150,10 +150,21 @@ export function PartnerReviewPoolsPage() {
           <div key="panels" className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
             {/* Left — pool list */}
             <PageNavPanel id="list" className={isMobile ? '' : 'w-1/2 xl:w-5/12 border-r border-line flex flex-col'}>
-              {/* Kind tabs */}
-              <div className="flex-none flex border-b border-line px-2">
+              {/* Kind tabs — create sits at the right end of the same row */}
+              <div className="flex-none flex items-center border-b border-line px-2">
                 <TabButton active={kind === 'CREDIT'} onClick={() => setKind('CREDIT')} label={t('partnerPools.kindCredit')} />
                 <TabButton active={kind === 'PAYOUT'} onClick={() => setKind('PAYOUT')} label={t('partnerPools.kindPayout')} />
+                {canManage && (
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    className="ml-auto my-1.5"
+                    startIcon={<Plus size={16} />}
+                    onClick={() => setCreateOpen(true)}
+                  >
+                    {t('partnerPools.createPool')}
+                  </Button>
+                )}
               </div>
 
               {/* Blocked-shops warning — the whole point of this screen */}
@@ -185,33 +196,17 @@ export function PartnerReviewPoolsPage() {
                 </div>
               )}
 
-              {(isHoldingAdmin || canManage) && (
-                <div className="flex-none p-2 border-b border-line flex items-center gap-2">
-                  {isHoldingAdmin ? (
-                    <div className="flex-1 min-w-0">
-                      <Select
-                        options={companies.map(c => ({ label: c.name, value: String(c.id) }))}
-                        value={companyFilter || null}
-                        onChange={(v) => setCompanyFilter((v as string) ?? '')}
-                        placeholder={t('partnerPools.allCompanies')}
-                        size="sm"
-                        showChevron
-                        clearable
-                      />
-                    </div>
-                  ) : (
-                    <div className="flex-1" />
-                  )}
-                  {canManage && (
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      startIcon={<Plus size={16} />}
-                      onClick={() => setCreateOpen(true)}
-                    >
-                      {t('partnerPools.createPool')}
-                    </Button>
-                  )}
+              {isHoldingAdmin && (
+                <div className="flex-none p-2 border-b border-line">
+                  <Select
+                    options={companies.map(c => ({ label: c.name, value: String(c.id) }))}
+                    value={companyFilter || null}
+                    onChange={(v) => setCompanyFilter((v as string) ?? '')}
+                    placeholder={t('partnerPools.allCompanies')}
+                    size="sm"
+                    showChevron
+                    clearable
+                  />
                 </div>
               )}
 
