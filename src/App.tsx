@@ -87,6 +87,7 @@ import { OverdueAgingReportPage } from './pages/collections/OverdueAgingReportPa
 import { BlacklistPage } from './pages/company/BlacklistPage';
 import { ICloudPoolPage } from './pages/company/ICloudPoolPage';
 import { AbmOtpPage } from './pages/company/AbmOtpPage';
+import { PartnerReviewPoolsPage } from './pages/company/PartnerReviewPoolsPage';
 import { BranchPinPage } from './pages/company/BranchPinPage';
 import { BranchFinanceModelsPage } from './pages/company/BranchFinanceModelsPage';
 import { OwnerConfigPage } from './pages/company/OwnerConfigPage';
@@ -1152,6 +1153,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <CompanyLayout><AbmOtpPage /></CompanyLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/company/partner-reviewers/:poolId?"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <CompanyLayout><PartnerReviewPoolsPage /></CompanyLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

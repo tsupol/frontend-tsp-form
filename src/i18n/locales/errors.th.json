@@ -1015,5 +1015,19 @@
   "contract.validation.fin1_plan_out_of_rate": "แผนบนสัญญาไม่ตรงกับกติกาที่ใช้ตอนตั้งแผนแล้ว — ตั้งแผนใหม่อีกครั้ง",
   "contract.validation.fin1_rate_drift": "เรทเปลี่ยนหลังตั้งแผน สัญญายังตรงกับที่ snapshot ไว้ ตั้งแผนใหม่จะอัปเดตให้ตรงกับกติกาวันนี้",
   "pricing.not_found.variant": "สินค้านี้ไม่ได้เปิดใช้งานในแคตตาล็อกแล้ว",
-  "pricing.not_found.model": "รุ่นนี้ไม่ได้เปิดใช้งานในแคตตาล็อกแล้ว"
+  "pricing.not_found.model": "รุ่นนี้ไม่ได้เปิดใช้งานในแคตตาล็อกแล้ว",
+  "partner.validation.pool_name_required": "กรุณาระบุชื่อ pool",
+  "partner.validation.pool_name_taken": "ชื่อ pool นี้ถูกใช้แล้วในบริษัทและชนิดเดียวกัน",
+  "partner.validation.pool_kind_invalid": "ชนิด pool ไม่ถูกต้อง",
+  "partner.validation.pool_kind_mismatch": "ชนิด pool เปลี่ยนไม่ได้ — สร้าง pool ใหม่แทน",
+  "partner.validation.pool_company_mismatch": "สาขากับ pool อยู่คนละบริษัท",
+  "partner.validation.member_company_mismatch": "ผู้ตรวจต้องเป็นคนของบริษัทเดียวกับ pool หรือระดับ holding",
+  "partner.validation.member_branch_role": "พนักงานระดับสาขาเป็นผู้ตรวจไม่ได้ — ต้องเป็นระดับบริษัทหรือ holding",
+  "partner.validation.member_missing_permission": "ผู้ใช้นี้ไม่มีสิทธิ์ {{permission}} — ให้สิทธิ์รายคน หรือเปลี่ยน role เป็น ฝ่ายสินเชื่อ (COMPANY_CREDIT) / บัญชี (COMPANY_ACCOUNTANT)",
+  "partner.validation.member_inactive": "ผู้ใช้นี้ถูกปิดใช้งาน",
+  "partner.validation.not_deal_partner_branch": "เพิ่มได้เฉพาะสาขาร้าน deal partner",
+  "partner.validation.no_review_pool": "สาขาร้านนี้ยังไม่ถูกผูกกับ pool ผู้ตรวจ",
+  "partner.state.pool_inactive": "pool นี้ถูกปิดใช้งานแล้ว",
+  "partner.not_found.pool": "ไม่พบ pool — โหลดรายการใหม่",
+  "partner.not_found.pool_member": "ผู้ใช้นี้ไม่ได้อยู่ใน pool — โหลดรายการใหม่"
 }

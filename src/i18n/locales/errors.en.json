@@ -1015,5 +1015,19 @@
   "contract.validation.fin1_plan_out_of_rate": "The plan on this contract no longer matches the rules it was set under — set the plan again.",
   "contract.validation.fin1_rate_drift": "The rates changed after this plan was set. The contract still matches what was snapshotted, but setting the plan again refreshes it.",
   "pricing.not_found.variant": "This product is no longer active in the catalog.",
-  "pricing.not_found.model": "This model is no longer active in the catalog."
+  "pricing.not_found.model": "This model is no longer active in the catalog.",
+  "partner.validation.pool_name_required": "Enter a pool name.",
+  "partner.validation.pool_name_taken": "A pool with this name already exists for this company and type.",
+  "partner.validation.pool_kind_invalid": "Invalid pool type.",
+  "partner.validation.pool_kind_mismatch": "A pool's type cannot be changed — create a new pool instead.",
+  "partner.validation.pool_company_mismatch": "The branch and the pool belong to different companies.",
+  "partner.validation.member_company_mismatch": "Reviewers must belong to the pool's company or be holding-level.",
+  "partner.validation.member_branch_role": "Branch-level staff cannot be reviewers — only company or holding-level users.",
+  "partner.validation.member_missing_permission": "This user doesn't have the {{permission}} permission. Grant it individually or change their role to COMPANY_CREDIT / COMPANY_ACCOUNTANT.",
+  "partner.validation.member_inactive": "This user account is deactivated.",
+  "partner.validation.not_deal_partner_branch": "Only deal-partner shop branches can be added to a reviewer pool.",
+  "partner.validation.no_review_pool": "This shop branch has no reviewer pool yet.",
+  "partner.state.pool_inactive": "This pool is deactivated.",
+  "partner.not_found.pool": "Pool not found — refresh the list.",
+  "partner.not_found.pool_member": "This user is not a member of the pool — refresh the list."
 }

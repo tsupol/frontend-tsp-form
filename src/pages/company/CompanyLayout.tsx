@@ -1,7 +1,7 @@
 import { useMemo, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { MapPin, Building2, Landmark, CalendarDays, ShieldBan, Cloud, KeyRound, UserCheck, PenLine, Stamp, Wallet, Boxes, Wrench, Smartphone } from 'lucide-react';
+import { MapPin, Building2, Landmark, CalendarDays, ShieldBan, Cloud, KeyRound, UserCheck, PenLine, Stamp, Wallet, Boxes, Wrench, Smartphone, ShieldCheck } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { filterSubNavForShop } from '../../lib/shopMenu';
@@ -26,6 +26,10 @@ export function CompanyLayout({ children }: { children: ReactNode }) {
     { type: 'link', path: '/admin/company/pin', labelKey: 'nav.branchPin', icon: KeyRound },
     ...(isAdmin ? [{ type: 'link' as const, path: '/admin/company/lessors', labelKey: 'nav.lessors', icon: Stamp }] : []),
     { type: 'link', path: '/admin/company/signers', labelKey: 'nav.branchSigners', icon: PenLine },
+    // Partner reviewer pools (NOTICE 1208) — admins manage; accountant/credit read-only.
+    ...(isAdmin || ['COMPANY_ACCOUNTANT', 'COMPANY_CREDIT'].includes(role)
+      ? [{ type: 'link' as const, path: '/admin/company/partner-reviewers', labelKey: 'nav.partnerReviewers', icon: ShieldCheck }]
+      : []),
     { type: 'group', labelKey: 'nav.groupFinance' },
     { type: 'link', path: '/admin/company/bank-accounts', labelKey: 'nav.bankAccounts', icon: Landmark },
     ...(isAdmin ? [{ type: 'link' as const, path: '/admin/company/finance-models', labelKey: 'nav.financeModels', icon: Wallet }] : []),
@@ -40,7 +44,7 @@ export function CompanyLayout({ children }: { children: ReactNode }) {
     { type: 'link', path: '/admin/company/abm-otp', labelKey: 'nav.abmOtp', icon: Smartphone },
     { type: 'group', labelKey: 'nav.groupStaff' },
     { type: 'link', path: '/admin/company/staff-commission', labelKey: 'nav.staffCommission', icon: UserCheck },
-  ], [isAdmin]);
+  ], [isAdmin, role]);
 
   // Deal-partner shops: PIN / signers / ABM OTP only (dual-nav rule — mirrors AppSideNav).
   const navItems = isDealPartner ? filterSubNavForShop(allItems) : allItems;

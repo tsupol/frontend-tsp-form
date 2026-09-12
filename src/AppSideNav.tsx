@@ -579,6 +579,11 @@ export const AppSideNav = () => {
           { key: 'lessors', icon: <Stamp size="1rem" />, label: t('nav.lessors'), path: '/admin/company/lessors' },
         ] : []),
         { key: 'signers', icon: <PenLine size="1rem" />, label: t('nav.branchSigners'), path: '/admin/company/signers' },
+        // Partner reviewer pools (NOTICE 1208): manage = COMPANY_ADMIN/HOLDING_ADMIN;
+        // COMPANY_ACCOUNTANT/COMPANY_CREDIT get the page read-only.
+        ...(['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV', 'COMPANY_ACCOUNTANT', 'COMPANY_CREDIT'].includes(role) ? [
+          { key: 'partner-reviewers', icon: <ShieldCheck size="1rem" />, label: t('nav.partnerReviewers'), path: '/admin/company/partner-reviewers' },
+        ] : []),
         { type: 'group', key: 'grp-finance', label: t('nav.groupFinance') },
         { key: 'bank-accounts', icon: <Landmark size="1rem" />, label: t('nav.bankAccounts'), path: '/admin/company/bank-accounts' },
         ...(['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
