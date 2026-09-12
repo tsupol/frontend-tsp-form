@@ -172,6 +172,14 @@ export interface EnrollChecklistProps {
   errorMessage?: string | null;
   /** Rendered inside step 3, under the serial (tab-1 puts its zoom button here). */
   serialSlot?: ReactNode;
+  /** Rendered directly ABOVE the send button — the "which ABM account did you
+   *  scan with?" picker. It sits here rather than at the top of the page
+   *  because the answer is only knowable at the moment of sending, and the
+   *  person answering is looking at this button. */
+  prepareSlot?: ReactNode;
+  /** Blocks the send button while the account is unknown (still loading, or the
+   *  branch has none). Separate from `preparing`, which means in-flight. */
+  prepareDisabled?: boolean;
   /** Steps 6 and 7 — <EnrollReadinessSteps>, wired to the host's RPC. */
   children?: ReactNode;
   /** Hide the key banner (a host that shows the same information elsewhere). */
@@ -184,7 +192,8 @@ export interface EnrollChecklistProps {
 
 export function EnrollChecklist({
   view, onPrepare, preparing = false, errorMessage,
-  serialSlot, children, hideKeyBanner = false, showRawBlockedReason = false,
+  serialSlot, prepareSlot, prepareDisabled = false,
+  children, hideKeyBanner = false, showRawBlockedReason = false,
 }: EnrollChecklistProps) {
   const { t } = useTranslation();
 
@@ -281,6 +290,7 @@ export function EnrollChecklist({
 
                 {isSendStep && showPrepareButton && (
                   <div className="flex flex-col gap-1.5">
+                    {prepareSlot}
                     <div>
                       <Button
                         color="primary"
@@ -289,7 +299,7 @@ export function EnrollChecklist({
                           ? <RotateCcw size={15} />
                           : <Send size={15} />}
                         onClick={onPrepare}
-                        disabled={preparing}
+                        disabled={preparing || prepareDisabled}
                       >
                         {isRetry
                           ? t('asset.mdm.button.retry')

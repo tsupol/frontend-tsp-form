@@ -7215,7 +7215,11 @@
       "ingestUrlLabel": "Send-to URL",
       "phoneSetupHint": "Enter both on the phone that receives the SMS, following the phone setup guide.",
       "tokenSaved": "I've saved the key",
-      "emailHasActiveKey": "This email already has an account with a working key. Replacing it is a key change, which only a company administrator can do — ask them to use \"Change key\". To add a different ABM account, use a different email."
+      "emailHasActiveKey": "This email already has an account with a working key. Replacing it is a key change, which only a company administrator can do — ask them to use \"Change key\". To add a different ABM account, use a different email.",
+      "abmOrg": "ABM organisation",
+      "abmOrgPlaceholder": "Select an ABM organisation",
+      "abmOrgHint": "Devices scanned with this email enrol into this organisation.",
+      "noAbmOrgs": "No ABM organisation is available to this holding. Contact an administrator."
     },
     "setup": {
       "openButton": "Phone setup",
@@ -7238,6 +7242,26 @@
       "rotateConfirmSubmit": "Change key",
       "rotatedTitle": "New key issued",
       "rotatedBody": "Enter the key below on the phone now — the old one no longer works."
+    },
+    "tenant": {
+      "title": "Change ABM organisation",
+      "changeButton": "Change ABM org",
+      "currentOrg": "Current organisation",
+      "notBoundYet": "Not linked to an ABM organisation yet",
+      "unbound": "No ABM organisation linked",
+      "hint": "Moving this account changes where its devices enrol. Its default setting is kept.",
+      "submit": "Move account",
+      "doneTitle": "ABM organisation updated",
+      "movedFrom": "Moved from",
+      "nowIn": "Now in"
+    },
+    "default": {
+      "badge": "Default",
+      "set": "Set as default",
+      "unset": "Remove default",
+      "needsTenant": "Link an ABM organisation first",
+      "needsActive": "The account is switched off",
+      "failed": "Could not change the default account."
     }
   },
   "nnfMdm": {
@@ -7850,5 +7874,12 @@
     "confirmPlan": "Confirm plan",
     "savedTitle": "FIN1 plan saved to the contract",
     "changePlan": "Change plan"
+  },
+  "mdmEnrollAccount": {
+    "pickerLabel": "Which account did you scan this device with?",
+    "pickerPlaceholder": "Select an ABM account",
+    "pickerHint": "Pick the email used to sign in to Apple Configurator when this device was scanned.",
+    "singleLine": "Account:",
+    "noneForBranch": "This branch has no ABM account yet — contact an administrator."
   }
 }

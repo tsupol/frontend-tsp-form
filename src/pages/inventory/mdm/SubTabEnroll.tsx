@@ -37,9 +37,11 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from 'tsp-form';
 import { ShieldCheck, RefreshCw, PackageCheck, PackageOpen, Search } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
-import { apiClient, ApiError } from '../../../lib/api';
+import { ApiError } from '../../../lib/api';
 import { DateTime } from '../../../components/DateTime';
-import { applyLightLock, parseMdmError, type AssetMdmStatus } from './mdmApi';
+import { applyLightLock, prepareAsset, parseMdmError, type AssetMdmStatus } from './mdmApi';
+import { useEnrollAccounts, defaultAccountId } from './enrollAccounts';
+import { EnrollAccountPicker } from './shared/EnrollAccountPicker';
 import { translateApiError } from '../../../lib/apiErrors';
 import { EnrollChecklist } from './shared/EnrollChecklist';
 import { EnrollReadinessSteps, isLockedBadge } from './shared/EnrollReadinessSteps';
@@ -83,10 +85,21 @@ export function SubTabEnroll({
   // before sending the enrollment, so it renders BIG and letter-spaced.
   const [serialZoomOpen, setSerialZoomOpen] = useState(false);
 
+  // Which ABM account the branch scanned this device with. The DB will guess if
+  // we do not say, and with two live ABM orgs a guess is wrong for a whole
+  // branch at a time — so the send button stays shut until this is known.
+  const accounts = useEnrollAccounts();
+  const accountRows = accounts.data ?? [];
+  const [sourceId, setSourceId] = useState<number | null>(null);
+  const effectiveSourceId = sourceId ?? defaultAccountId(accountRows);
+
   const view = fromAssetStatus(status);
 
   const prepare = useMutation({
-    mutationFn: () => apiClient.rpc<PrepareResponse>('fn_mdm_prepare_asset', { p_asset_id: status.asset_id }),
+    mutationFn: () => {
+      if (effectiveSourceId == null) throw new Error('no-abm-account');
+      return prepareAsset(status.asset_id, effectiveSourceId) as Promise<PrepareResponse>;
+    },
     onSuccess: () => {
       setErrorMsg(null);
       queryClient.invalidateQueries({ queryKey: ['asset-mdm-status', status.asset_id] });
@@ -154,6 +167,15 @@ export function SubTabEnroll({
         view={view}
         onPrepare={() => prepare.mutate()}
         preparing={prepare.isPending}
+        prepareSlot={(
+          <EnrollAccountPicker
+            accounts={accountRows}
+            loading={accounts.isLoading}
+            value={effectiveSourceId}
+            onChange={setSourceId}
+          />
+        )}
+        prepareDisabled={accounts.isLoading || effectiveSourceId == null}
         errorMessage={errorMsg}
         hideKeyBanner
         showRawBlockedReason

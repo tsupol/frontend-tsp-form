@@ -42,7 +42,7 @@
 //    in MDM, render "—" not an error. sim_info is what the DEVICE reported, not
 //    the contract's tel — the difference is the useful part when chasing a customer.
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
@@ -61,6 +61,8 @@ import {
   type MdmDeviceListRow, type MdmDeviceListBadge, type ApplyTemplateResult,
 } from '../inventory/mdm/mdmApi';
 import { parseMdmError } from '../inventory/mdm/mdmApi';
+import { useEnrollAccounts, defaultAccountId } from '../inventory/mdm/enrollAccounts';
+import { EnrollAccountPicker } from '../inventory/mdm/shared/EnrollAccountPicker';
 import { ActivationLockRevealModal } from './ActivationLockRevealModal';
 import { MDM_SEARCH_MIN_CHARS, isSearchable } from '../../lib/searchKeyword';
 import { SearchInput } from '../../components/SearchInput';
@@ -368,7 +370,11 @@ function DeviceRow({
   );
 }
 
-// ── Enroll confirm dialog (safest RPC; just a "scanned into ABM?" reminder) ────
+// ── Enroll confirm dialog ─────────────────────────────────────────────────────
+// It already asks "did you scan this into ABM?", so the follow-up — "with WHICH
+// email?" — belongs in the same breath. That answer picks the ABM org the DEP
+// profile is pushed to; without it the DB guesses, and with two live orgs the
+// guess is wrong for a whole branch at a time.
 
 function EnrollDialog({
   row, onClose, onDone, onError,
@@ -381,11 +387,20 @@ function EnrollDialog({
   const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
 
+  const accounts = useEnrollAccounts(!!row);
+  const accountRows = accounts.data ?? [];
+  const [sourceId, setSourceId] = useState<number | null>(null);
+  const effectiveSourceId = sourceId ?? defaultAccountId(accountRows);
+
+  // A different device may belong to a different branch, so the choice must not
+  // survive the dialog closing.
+  useEffect(() => { if (!row) setSourceId(null); }, [row]);
+
   const confirm = async () => {
-    if (!row) return;
+    if (!row || effectiveSourceId == null) return;
     setBusy(true);
     try {
-      await prepareAsset(row.asset_id);
+      await prepareAsset(row.asset_id, effectiveSourceId);
       onDone(t('mdmDevices.enrollQueued'));
       onClose();
     } catch (err) {
@@ -404,10 +419,23 @@ function EnrollDialog({
           <span className="font-medium">{row?.asset_code_display}</span>
           {row?.serial_number && <span className="font-mono text-subtle"> · {row.serial_number}</span>}
         </p>
+        <div className="mt-3">
+          <EnrollAccountPicker
+            accounts={accountRows}
+            loading={accounts.isLoading}
+            value={effectiveSourceId}
+            onChange={setSourceId}
+          />
+        </div>
       </div>
       <div className="modal-footer">
         <Button variant="ghost" onClick={onClose} disabled={busy}>{t('common.cancel')}</Button>
-        <Button color="primary" onClick={confirm} disabled={busy} startIcon={<Send size={15} />}>
+        <Button
+          color="primary"
+          onClick={confirm}
+          disabled={busy || accounts.isLoading || effectiveSourceId == null}
+          startIcon={<Send size={15} />}
+        >
           {t('mdmDevices.enrollConfirmButton')}
         </Button>
       </div>

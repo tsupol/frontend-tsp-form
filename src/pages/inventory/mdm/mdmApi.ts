@@ -561,8 +561,18 @@ export function searchMdmDevices(keyword: string, limit = 20): Promise<MdmDevice
 }
 
 // enroll button — no p_actor_id, no preview; RPC dedupes + self-enforces.
-export function prepareAsset(assetId: number): Promise<PrepareAssetResult> {
-  return apiClient.rpc<PrepareAssetResult>('fn_mdm_prepare_asset', { p_asset_id: assetId });
+//
+// ⚠️ p_source_id is the ABM account the branch scanned this device with, and it
+// decides which ABM org the DEP profile is pushed to. Omitting it makes the DB
+// GUESS the org (holding default / Apple mirror) and log MDM.PREPARE.NO_ACCOUNT;
+// a wrong guess means Apple answers NOT_ACCESSIBLE and the device never enrolls.
+// Since there are two live orgs (RICH, TRW) the guess is wrong for a whole
+// branch at a time — so always pass it. `p_abm_tenant_id` is retired (mig 298).
+export function prepareAsset(assetId: number, sourceId: number): Promise<PrepareAssetResult> {
+  return apiClient.rpc<PrepareAssetResult>('fn_mdm_prepare_asset', {
+    p_asset_id: assetId,
+    p_source_id: sourceId,
+  });
 }
 export interface PrepareAssetResult {
   request_id: number;
@@ -1383,12 +1393,16 @@ export interface EnrollLinkCreated {
 /** Commit can still answer `already_active` when p_replace was dropped (§1.2b). */
 export type EnrollLinkCreateResult = EnrollLinkCreated | EnrollLinkAlreadyActive;
 
+// p_source_id must ride BOTH preview and commit (mig 298) — the link is bound
+// to the ABM account chosen here, and the remote token page reuses that binding
+// on every retry, so getting it wrong here cannot be corrected later.
 export function enrollLinkPreview(
-  assetId: number, actorId: number, replace = false,
+  assetId: number, actorId: number, sourceId: number, replace = false,
 ): Promise<EnrollLinkCreatePreview> {
   return apiClient.rpc<EnrollLinkCreatePreview>('fn_mdm_enroll_link_create', {
     p_asset_id: assetId,
     p_actor_id: actorId,
+    p_source_id: sourceId,
     p_preview: true,
     p_replace: replace,
   });
@@ -1402,12 +1416,13 @@ export function enrollLinkPreview(
  * means the flag went missing, not that anything is wrong with the request.
  */
 export function enrollLinkCreate(p: {
-  assetId: number; actorId: number; challengeId: number;
+  assetId: number; actorId: number; sourceId: number; challengeId: number;
   confirmCode: string; issuedTo: string; replace?: boolean;
 }): Promise<EnrollLinkCreateResult> {
   return apiClient.rpc<EnrollLinkCreateResult>('fn_mdm_enroll_link_create', {
     p_asset_id: p.assetId,
     p_actor_id: p.actorId,
+    p_source_id: p.sourceId,
     p_preview: false,
     p_challenge_id: p.challengeId,
     p_confirm_code: p.confirmCode,

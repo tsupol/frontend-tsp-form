@@ -42,6 +42,8 @@ import {
   isAlreadyActive, parseMdmError,
   type AssetMdmStatus, type MdmChallenge,
 } from './mdmApi';
+import { useEnrollAccounts, defaultAccountId } from './enrollAccounts';
+import { EnrollAccountPicker } from './shared/EnrollAccountPicker';
 import { useTicker, secondsUntil, splitDuration } from './shared/useTicker';
 
 // On the dev box the app is served from localhost, and a QR pointing at
@@ -159,6 +161,15 @@ export function EnrollDelegationPanel({
   const [confirmRevoke, setConfirmRevoke] = useState(false);
   const [revokeReason, setRevokeReason] = useState('');
 
+  // The ABM account this link will be bound to. It rides BOTH preview and
+  // commit (mig 298), and the remote token page reuses the binding on every
+  // retry — so the choice must be made before the preview, and cannot be
+  // corrected afterwards without re-issuing the link.
+  const accounts = useEnrollAccounts(status.may_enroll_delegate);
+  const accountRows = accounts.data ?? [];
+  const [sourceId, setSourceId] = useState<number | null>(null);
+  const effectiveSourceId = sourceId ?? defaultAccountId(accountRows);
+
   // §1 — the flag hides the whole strip. Not a disabled button: a delegate-less
   // role should not be shown a door it cannot open.
   if (!status.may_enroll_delegate) return null;
@@ -176,7 +187,8 @@ export function EnrollDelegationPanel({
     setReplaceMode(replace);
     setBusy(true);
     try {
-      const res = await enrollLinkPreview(status.asset_id, actorId, replace);
+      if (effectiveSourceId == null) { setPanelError(t('mdmEnrollAccount.noneForBranch')); return; }
+      const res = await enrollLinkPreview(status.asset_id, actorId, effectiveSourceId, replace);
       // The race-guard branch: someone issued a link while this page was stale.
       // Not an error — close up and let the status block (which the refresh
       // repaints) show the live link.
@@ -198,9 +210,11 @@ export function EnrollDelegationPanel({
     setBusy(true);
     setDialogError(null);
     try {
+      if (effectiveSourceId == null) { setDialogError(t('mdmEnrollAccount.noneForBranch')); return; }
       const res = await enrollLinkCreate({
         assetId: status.asset_id,
         actorId,
+        sourceId: effectiveSourceId,
         challengeId: challenge.challenge_id,
         confirmCode,
         issuedTo: issuedTo.trim(),
@@ -297,11 +311,27 @@ export function EnrollDelegationPanel({
             </div>
           </div>
 
+          {/* Re-issue mints a NEW link with a NEW binding, so the account is
+              choosable here too — not just on first issue. */}
+          <EnrollAccountPicker
+            accounts={accountRows}
+            loading={accounts.isLoading}
+            value={effectiveSourceId}
+            onChange={setSourceId}
+            size="sm"
+          />
+
           <div className="flex items-center gap-2 flex-wrap">
             <Button variant="outline" size="sm" startIcon={<Eye size={14} />} onClick={doReveal} disabled={busy}>
               {t('enrollLink.showLink')}
             </Button>
-            <Button variant="outline" size="sm" startIcon={<RefreshCw size={14} />} onClick={() => openDialog(true)} disabled={busy}>
+            <Button
+              variant="outline"
+              size="sm"
+              startIcon={<RefreshCw size={14} />}
+              onClick={() => openDialog(true)}
+              disabled={busy || accounts.isLoading || effectiveSourceId == null}
+            >
               {t('enrollLink.reissue')}
             </Button>
             <Button variant="outline" size="sm" startIcon={<Ban size={14} className="text-danger-fg" />} onClick={() => setConfirmRevoke(true)} disabled={busy}>
@@ -312,13 +342,20 @@ export function EnrollDelegationPanel({
       ) : (
         <>
           <p className="text-xs text-subtle">{t('enrollLink.desc')}</p>
+          <EnrollAccountPicker
+            accounts={accountRows}
+            loading={accounts.isLoading}
+            value={effectiveSourceId}
+            onChange={setSourceId}
+            size="sm"
+          />
           <div>
             <Button
               variant="outline"
               size="sm"
               startIcon={<Link2 size={15} />}
               onClick={() => openDialog(false)}
-              disabled={busy}
+              disabled={busy || accounts.isLoading || effectiveSourceId == null}
             >
               {t('enrollLink.issueButton')}
             </Button>
