@@ -980,3 +980,17 @@ input[type="number"
 @media (prefers-reduced-motion: reduce) {
     .enroll-reveal { animation: none; }
 }
+
+/* เช็คราคา FIN1 — the customer reads the target-installment amount off the
+   screen with the staff, so the figure they type is set in the same large type
+   as the calculated numbers around it (owner 2026-09-12: ตัวเลขสำคัญตัวใหญ่).
+   The rule has to target the inner <input>: tsp-form's Input puts `className`
+   on `.input-wrapper` whenever an icon slot is present, and `.form-control`
+   sets its own font-size, so a utility class on the component never reaches
+   the text. */
+.fin1-amount-input .form-control {
+    font-size: 1.5rem;
+    line-height: 2rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}

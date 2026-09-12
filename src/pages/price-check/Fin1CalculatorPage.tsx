@@ -481,7 +481,7 @@ export function Fin1CalculatorPage() {
                                   mask="number"
                                   decimalScale={0}
                                   size="lg"
-                                  className="w-full text-2xl font-semibold tabular-nums"
+                                  className="w-full fin1-amount-input"
                                   value={monthlyStr}
                                   onChange={(raw) => { setMonthlyStr(raw); setFloorNotice(false); }}
                                   // A below-floor amount stays silent while it is
@@ -556,8 +556,8 @@ export function Fin1CalculatorPage() {
                                 <div key={i} className="flex items-baseline justify-between gap-2 px-4 py-2 border-b border-line last:border-b-0">
                                   <span className="text-sm text-subtle">{r.label}</span>
                                   <span className="flex items-baseline gap-1.5 min-w-0">
-                                    {r.suffix && <span className="text-xs text-subtle truncate">{r.suffix}</span>}
                                     <span className="text-xl font-semibold tabular-nums leading-none">{r.value}</span>
+                                    {r.suffix && <span className="text-xs text-subtle truncate">{r.suffix}</span>}
                                   </span>
                                 </div>
                               ))}
