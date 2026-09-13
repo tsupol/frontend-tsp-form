@@ -21,7 +21,7 @@ import { signContractOpenParties } from './signContractOpenParties';
 import { translateApiError } from '../../../lib/apiErrors';
 import { useAuth } from '../../../contexts/AuthContext';
 import { buildSavingSeededPayments, savingApplied, unusedSaving } from '../savingAutoFill';
-import { SavingAppliedDialog, SavingUnusedWarning } from '../SavingAppliedNotice';
+import { SavingRowNote, SavingUnusedWarning, SavingUnusedConfirmDialog } from '../SavingAppliedNotice';
 
 /* ─────────────────────────────────────────────────────────────────────────────
    ⚠️  ONE-GO ACTIVATION — DO NOT FIRE BILL/ACTIVATE RPCs ON MOUNT.
@@ -153,16 +153,9 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalAmount, savingAutoFillOn, savingBalance]);
 
-  // Announce the saving balance once, when the panel first has something to
-  // apply it to. Staff kept missing it entirely — the dialog is the request.
-  const [savingDialogOpen, setSavingDialogOpen] = useState(false);
-  const savingDialogShown = useRef(false);
-  useEffect(() => {
-    if (savingDialogShown.current) return;
-    if (!savingAutoFillOn || savingUsable <= 0) return;
-    savingDialogShown.current = true;
-    setSavingDialogOpen(true);
-  }, [savingAutoFillOn, savingUsable]);
+  // Confirm gate when the rows leave saving unspent. No announce-on-entry
+  // dialog: the decision belongs at the one moment it stops being reversible.
+  const [savingConfirmOpen, setSavingConfirmOpen] = useState(false);
 
   // Single override-aware receiving account for this (own) branch. Used to
   // label the printed receipt's TRANSFER lines; the picker auto-selects it.
@@ -170,6 +163,12 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
 
   const totalPayment = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
   const isBalanced = totalAmount > 0 && Math.abs(totalPayment - totalAmount) < 0.01;
+
+  // How much of the usable saving the current rows actually spend.
+  const savingUsed = savingAutoFillOn
+    ? payments.filter(p => p.method === 'SAVING_WALLET').reduce((sum, p) => sum + (p.amount || 0), 0)
+    : 0;
+  const savingLeftUnused = savingAutoFillOn ? unusedSaving(payments, savingBalance, totalAmount) : 0;
 
   const updatePayment = (idx: number, updates: Partial<PaymentLine>) => {
     userEditedPayments.current = true;
@@ -296,11 +295,15 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
   const onConfirmClick = () => {
     if (!canConfirm) return;
     if (isNoCharge) { setConfirmNoCharge(true); return; }
+    // Opening while part (or all) of the saving balance goes unspent is the
+    // mistake this whole feature exists to catch — confirm it explicitly.
+    if (savingLeftUnused > 0.01) { setSavingConfirmOpen(true); return; }
     void runOpenSequence();
   };
 
   const runOpenSequence = async () => {
     setConfirmNoCharge(false);
+    setSavingConfirmOpen(false);
     if (!canConfirm || !data.contractId) return;
     setLoading(true);
     setError('');
@@ -498,7 +501,14 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
           <label className="form-label">{t('wizard.paymentMethods')}</label>
           <div className="flex flex-col gap-3">
             {payments.map((payment, idx) => (
-              <div key={idx} className="border border-line rounded-lg p-3 flex flex-col gap-3">
+              <div
+                key={idx}
+                className={`border rounded-lg p-3 flex flex-col gap-3 ${
+                  payment.method === 'SAVING_WALLET'
+                    ? 'border-info-border bg-info-soft'
+                    : 'border-line'
+                }`}
+              >
                 <div className="flex gap-3 items-end">
                   <div className="flex flex-col" style={{ width: '10rem' }}>
                     <label className="form-label text-xs">{t('wizard.method')}</label>
@@ -541,6 +551,9 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
                     />
                   )}
                 </div>
+                {payment.method === 'SAVING_WALLET' && (
+                  <SavingRowNote used={payment.amount || 0} available={savingUsable} />
+                )}
                 {payment.method === 'TRANSFER' && (
                   <div className="flex flex-col">
                     <label className="form-label text-xs">{t('wizard.bankAccount')}</label>
@@ -576,7 +589,7 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
 
           {/* Saving wallet left on the table — the "removed it / didn't use it
               all" alert the owner asked for. Never blocks Confirm. */}
-          <SavingUnusedWarning unused={savingAutoFillOn ? unusedSaving(payments, savingBalance, totalAmount) : 0} />
+          <SavingUnusedWarning unused={savingLeftUnused} />
         </div>
         )}
 
@@ -666,13 +679,13 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
         </div>
       </div>
 
-      {/* Saving balance announce — fires once when the panel opens on a
-          contract that has savings to spend. Always mounted. */}
-      <SavingAppliedDialog
-        open={savingDialogOpen}
-        onClose={() => setSavingDialogOpen(false)}
-        savingBalance={savingBalance}
-        applied={savingUsable}
+      {/* Saving left unspent — confirm gate at Confirm. Always mounted. */}
+      <SavingUnusedConfirmDialog
+        open={savingConfirmOpen}
+        onClose={() => setSavingConfirmOpen(false)}
+        onConfirm={() => void runOpenSequence()}
+        used={savingUsed}
+        available={savingUsable}
       />
 
       {/* Task #4 — 2-step confirm before opening a no-charge contract. Always

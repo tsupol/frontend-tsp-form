@@ -49,7 +49,7 @@ import { useContractInvalidate } from './useContractInvalidate';
 import { useCompanyFeatures } from '../../hooks/useCompanyFeatures';
 import { translateApiError } from '../../lib/apiErrors';
 import { buildSavingSeededPayments, savingApplied, unusedSaving } from './savingAutoFill';
-import { SavingAppliedDialog, SavingUnusedWarning } from './SavingAppliedNotice';
+import { SavingRowNote, SavingUnusedWarning, SavingUnusedConfirmDialog } from './SavingAppliedNotice';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -2568,19 +2568,25 @@ function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
   // Saving wallet is auto-spent here too (see savingAutoFill.ts) — this modal
   // is the resume path for a contract already at PENDING_PAYMENT.
   const savingUsable = savingApplied(savingBalance, totalAmount);
-  const [savingDialogOpen, setSavingDialogOpen] = useState(false);
+  // Confirm gate when the rows leave saving unspent (no announce-on-entry).
+  const [savingConfirmOpen, setSavingConfirmOpen] = useState(false);
 
   // Reset when opened
   useEffect(() => {
     if (open && totalAmount > 0) {
       setPayments(buildSavingSeededPayments(savingBalance, totalAmount) as PaymentLine[]);
       setError('');
-      setSavingDialogOpen(savingApplied(savingBalance, totalAmount) > 0);
+      setSavingConfirmOpen(false);
     }
   }, [open, totalAmount, savingBalance]);
 
   const totalPayment = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
   const isBalanced = totalAmount > 0 && Math.abs(totalPayment - totalAmount) < 0.01;
+
+  const savingUsed = payments
+    .filter(p => p.method === 'SAVING_WALLET')
+    .reduce((sum, p) => sum + (p.amount || 0), 0);
+  const savingLeftUnused = unusedSaving(payments, savingBalance, totalAmount);
 
   const updatePayment = (idx: number, updates: Partial<PaymentLine>) => {
     setPayments(prev => prev.map((p, i) => {
@@ -2593,8 +2599,16 @@ function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
     }));
   };
 
+  // Gate: paying while saving goes unspent needs an explicit yes.
+  const onConfirmClick = () => {
+    if (!isBalanced || !bill) return;
+    if (savingLeftUnused > 0.01) { setSavingConfirmOpen(true); return; }
+    void handleConfirm();
+  };
+
   const handleConfirm = async () => {
     if (!isBalanced || !bill) return;
+    setSavingConfirmOpen(false);
     setLoading(true);
     setError('');
     try {
@@ -2652,7 +2666,14 @@ function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
             <div className="flex flex-col gap-3">
               <label className="form-label">{t('wizard.paymentMethods')}</label>
               {payments.map((payment, idx) => (
-                <div key={idx} className="border border-line rounded-lg p-3 flex flex-col gap-3">
+                <div
+                  key={idx}
+                  className={`border rounded-lg p-3 flex flex-col gap-3 ${
+                    payment.method === 'SAVING_WALLET'
+                      ? 'border-info-border bg-info-soft'
+                      : 'border-line'
+                  }`}
+                >
                   <div className="flex gap-3 items-end">
                     <div className="flex flex-col" style={{ width: '10rem' }}>
                       <label className="form-label text-xs">{t('wizard.method')}</label>
@@ -2692,6 +2713,9 @@ function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
                       />
                     )}
                   </div>
+                  {payment.method === 'SAVING_WALLET' && (
+                    <SavingRowNote used={payment.amount || 0} available={savingUsable} />
+                  )}
                   {payment.method === 'TRANSFER' && (
                     <div className="flex flex-col">
                       <label className="form-label text-xs">{t('wizard.bankAccount')}</label>
@@ -2721,8 +2745,8 @@ function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
               </span>
             </div>
 
-            {/* Saving wallet left unspent — warn, never block. */}
-            <SavingUnusedWarning unused={unusedSaving(payments, savingBalance, totalAmount)} />
+            {/* Saving wallet left unspent — live band; the gate is at Confirm. */}
+            <SavingUnusedWarning unused={savingLeftUnused} />
           </div>
         )}
       </div>
@@ -2730,7 +2754,7 @@ function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
         <Button onClick={onClose}>{t('common.cancel')}</Button>
         <Button
           color="primary"
-          onClick={handleConfirm}
+          onClick={onConfirmClick}
           disabled={loading || !isBalanced}
           startIcon={loading ? <Loader2 size={16} className="animate-spin" /> : undefined}
         >
@@ -2738,12 +2762,13 @@ function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
         </Button>
       </div>
 
-      {/* Saving balance announce — always mounted, `open` controls it. */}
-      <SavingAppliedDialog
-        open={savingDialogOpen}
-        onClose={() => setSavingDialogOpen(false)}
-        savingBalance={savingBalance}
-        applied={savingUsable}
+      {/* Saving left unspent — confirm gate. Always mounted. */}
+      <SavingUnusedConfirmDialog
+        open={savingConfirmOpen}
+        onClose={() => setSavingConfirmOpen(false)}
+        onConfirm={() => void handleConfirm()}
+        used={savingUsed}
+        available={savingUsable}
       />
     </Modal>
   );

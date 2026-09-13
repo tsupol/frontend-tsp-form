@@ -5512,12 +5512,14 @@
     "coLesseeSkippedMsg": "Co-lessee was skipped. You can add one later.",
     "photoUploaded": "Photo uploaded successfully",
     "updateCustomer": "Update Customer",
-    "savingAppliedTitle": "This contract has saved money",
-    "savingAppliedBalance": "Saving balance: {{amount}} ฿",
-    "savingAppliedBody": "{{amount}} ฿ has been filled in as a Saving Wallet payment for you. Adjust it if that is not what you want.",
-    "savingAppliedLeftover": "{{amount}} ฿ will remain in the saving wallet after this bill.",
     "savingUnusedTitle": "Saving money left unused",
-    "savingUnusedBody": "{{amount}} ฿ of the saving balance is not being used on this bill. Are you sure?"
+    "savingUnusedBody": "{{amount}} ฿ of the saving balance is not being used on this bill. Are you sure?",
+    "savingRowUsage": "Using {{used}} of {{available}} ฿ saving",
+    "savingConfirmTitle": "Saving money not fully used",
+    "savingConfirmNoneTitle": "None of the {{amount}} ฿ saving is being used",
+    "savingConfirmPartialTitle": "Using only {{used}} of {{available}} ฿ saving",
+    "savingConfirmBody": "{{amount}} ฿ will stay in the saving wallet instead of paying this bill. Open the contract anyway?",
+    "savingConfirmCta": "Open anyway"
   },
   "wallet": {
     "allDisabled": "No wallets enabled for this company",
