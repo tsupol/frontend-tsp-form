@@ -2086,7 +2086,8 @@
     "currentPrice": "Current price",
     "newPrice": "New retail price",
     "note": "Note (optional)",
-    "priceSaved": "Retail price saved"
+    "priceSaved": "Retail price saved",
+    "upliftOutOfRange": "Above this model's limit (+{{max}}) — preview only"
   },
   "fin1Calc": {
     "product": "Product",
@@ -2114,7 +2115,16 @@
     "rowDocFee": "Contract fee",
     "docFeeWhen": "on signing day",
     "railHint": "Search for a product to start",
-    "pickHint": "Pick a product to see the installment plan"
+    "pickHint": "Pick a product to see the installment plan",
+    "conditionTitle": "Condition",
+    "conditionNew": "New",
+    "conditionUsed": "Used",
+    "usedPriceLabel": "Used device price",
+    "usedPriceHint": "Between {{min}} and {{max}}",
+    "downByPercent": "%",
+    "downByAmount": "Baht",
+    "downBelowMin": "Minimum down payment for this price is {{min}} ({{pct}}%).",
+    "monthlyDisabledHint": "Not available with an exact-baht down payment — switch back to % to search by installment."
   },
   "fin2": {
     "title": "FIN2 Profit Rates",

@@ -2082,7 +2082,8 @@
     "currentPrice": "ราคาปัจจุบัน",
     "newPrice": "ราคาขายปลีกใหม่",
     "note": "หมายเหตุ (ไม่บังคับ)",
-    "priceSaved": "บันทึกราคาแล้ว"
+    "priceSaved": "บันทึกราคาแล้ว",
+    "upliftOutOfRange": "เกินเพดานของรุ่นนี้ (+{{max}}) — ดูเป็นตัวอย่างเท่านั้น"
   },
   "fin1Calc": {
     "product": "สินค้า",
@@ -2110,7 +2111,16 @@
     "rowDocFee": "ค่าทำสัญญา",
     "docFeeWhen": "จ่ายวันทำสัญญา",
     "railHint": "ค้นหาสินค้าเพื่อเริ่มคำนวณ",
-    "pickHint": "เลือกสินค้าเพื่อดูแผนผ่อนชำระ"
+    "pickHint": "เลือกสินค้าเพื่อดูแผนผ่อนชำระ",
+    "conditionTitle": "สภาพเครื่อง",
+    "conditionNew": "มือ 1",
+    "conditionUsed": "มือสอง",
+    "usedPriceLabel": "ราคาเครื่องมือสอง",
+    "usedPriceHint": "ระหว่าง {{min}} ถึง {{max}}",
+    "downByPercent": "%",
+    "downByAmount": "บาท",
+    "downBelowMin": "เงินดาวน์ขั้นต่ำของราคานี้คือ {{min}} ({{pct}}%)",
+    "monthlyDisabledHint": "ใช้ไม่ได้เมื่อกรอกเงินดาวน์เป็นบาท — สลับกลับเป็น % เพื่อค้นหาจากค่างวด"
   },
   "fin2": {
     "title": "อัตรากำไร FIN2",

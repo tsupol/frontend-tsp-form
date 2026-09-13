@@ -71,6 +71,17 @@ interface SheetModel {
   uplift_amount?: number;
   price?: number;
   guarantee_days?: number;
+  // Per-model uplift bounds, shipped by fn_fin1_rate_sheet itself (mig 1189).
+  // `uplift_options` is 0 then uplift_min..uplift_max in 1,000 steps — the
+  // exact set the server accepts, so the chips can never offer a rejected
+  // value the way the old FE-derived list did.
+  uplift_min?: number;
+  uplift_max?: number;
+  uplift_source?: string;
+  uplift_options?: number[];
+  /** Sheet-level p_uplift is outside THIS model's bounds — the numbers below
+   *  are a what-if the server computed anyway, so they are shown dimmed. */
+  uplift_out_of_range?: boolean;
 }
 
 interface SheetFamily {
@@ -90,7 +101,10 @@ interface RateSheet {
   };
   rates_visible: boolean;
   models_without_price: number;
+  /** Holding-wide ceiling. Never bound a per-model control with it. */
   uplift_max?: number;
+  uplift_max_in_scope?: number;
+  models_uplift_out_of_range?: number;
   families: SheetFamily[];
 }
 
@@ -98,29 +112,6 @@ interface RetailSetResult {
   model_id?: number;
   retail_price?: number;
   sheet?: unknown;
-}
-
-// v_model_price_profile subset — the per-model uplift bounds (catalog v2,
-// mig 1181). NULL bounds (`bounds_set=false`) = holding default 0..uplift_max.
-interface ModelBounds {
-  model_id: number;
-  uplift_min: number | null;
-  uplift_max: number | null;
-  bounds_set: boolean;
-}
-
-// Mirrors fin._fin1_resolve_price (mig 1181): the uplift buttons are 0 (always
-// allowed) then 1,000-steps from the model's min to max. fn_fin1_rate_sheet
-// doesn't return uplift_options per model yet (BE follow-up pending) — until
-// it does, derive them from the profile bounds; the holding default cap
-// applies when the model has no bounds of its own.
-function upliftOptionsFor(bounds: ModelBounds | undefined, policyMax: number): number[] {
-  const hasOwn = bounds?.bounds_set && bounds.uplift_min != null && bounds.uplift_max != null;
-  const min = hasOwn ? bounds!.uplift_min! : 0;
-  const max = hasOwn ? bounds!.uplift_max! : policyMax;
-  const opts = [0];
-  for (let u = min > 0 ? min : 1000; u <= max; u += 1000) opts.push(u);
-  return opts;
 }
 
 // ── Rate table for one model ─────────────────────────────────────────────────
@@ -179,17 +170,20 @@ function ModelTable({ model, terms, ratesVisible, t }: {
 
 // ── One model card (uplift override + actions) ───────────────────────────────
 
-function ModelRateCard({ model, familyLabel, terms, ratesVisible, upliftOptions, canEdit, onEdit, t }: {
+function ModelRateCard({ model, familyLabel, terms, ratesVisible, canEdit, onEdit, t }: {
   model: SheetModel;
   familyLabel: string; // "Apple iPhone 15" — seeds the calculator jump
   terms: number[];
   ratesVisible: boolean;
-  upliftOptions: number[]; // per-model (catalog v2) — from the model's own bounds when set
   canEdit: boolean;
   onEdit: (m: SheetModel) => void;
   t: (key: string, opts?: Record<string, unknown>) => string;
 }) {
   const navigate = useNavigate();
+
+  // Straight from the rate sheet — the server's own allowed set, so a chip can
+  // never offer an uplift this model would reject.
+  const upliftOptions = model.uplift_options ?? [0];
 
   // "+ราคา" is a per-model what-if: re-ask the server for this one model with
   // the uplift applied (base price + uplift, longer guarantee). View-only —
@@ -210,6 +204,10 @@ function ModelRateCard({ model, familyLabel, terms, ratesVisible, upliftOptions,
 
   const shown = uplift > 0 ? (upliftSheet?.families?.[0]?.models?.[0] ?? model) : model;
   const upliftError = uplift > 0 && error ? translateApiError(error, t) : '';
+
+  // The sheet-level uplift sits outside this model's bounds: the server still
+  // computed the numbers, but they are a what-if this model can't be sold at.
+  const outOfRange = model.uplift_out_of_range === true;
 
   return (
     <div className={`border border-line rounded-lg overflow-hidden ${isFetching ? 'opacity-60' : ''} transition-opacity`}>
@@ -235,6 +233,11 @@ function ModelRateCard({ model, familyLabel, terms, ratesVisible, upliftOptions,
             )}
             {model.price_varies && (
               <Badge size="sm" color="warning">{t('financeRates.priceVaries')}</Badge>
+            )}
+            {outOfRange && (
+              <Badge size="sm" color="warning">
+                {t('financeRates.upliftOutOfRange', { max: fmtCurrency(model.uplift_max ?? 0) })}
+              </Badge>
             )}
           </div>
         </div>
@@ -282,7 +285,9 @@ function ModelRateCard({ model, familyLabel, terms, ratesVisible, upliftOptions,
           <span>{upliftError}</span>
         </div>
       )}
-      <ModelTable model={shown} terms={terms} ratesVisible={ratesVisible} t={t} />
+      <div className={outOfRange ? 'opacity-50' : ''}>
+        <ModelTable model={shown} terms={terms} ratesVisible={ratesVisible} t={t} />
+      </div>
     </div>
   );
 }
@@ -552,26 +557,6 @@ export function FinanceRatesPage() {
 
   const terms = sheetData?.sheet.terms ?? [];
 
-  // Per-model uplift bounds for every model on the sheet (catalog v2) — one
-  // query per sheet, drives the "+ราคา" button options per model.
-  const sheetModelIds = useMemo(
-    () => (sheetData?.families ?? []).flatMap(f => f.models.map(m => m.model_id)).sort((a, b) => a - b),
-    [sheetData],
-  );
-  const { data: boundsRows } = useQuery({
-    queryKey: ['model-price-bounds', sheetModelIds],
-    queryFn: () => apiClient.get<ModelBounds[]>(
-      `/v_model_price_profile?model_id=in.(${sheetModelIds.join(',')})&select=model_id,uplift_min,uplift_max,bounds_set`
-    ),
-    enabled: sheetModelIds.length > 0,
-    staleTime: 60_000,
-  });
-  const boundsByModel = useMemo(() => {
-    const map = new Map<number, ModelBounds>();
-    for (const b of boundsRows ?? []) map.set(b.model_id, b);
-    return map;
-  }, [boundsRows]);
-
   const onSaved = () => {
     // fn_fin1_retail_set returns the model's new sheet, but invalidating keeps
     // every consumer (family counts, calculator price table) consistent too.
@@ -659,7 +644,6 @@ export function FinanceRatesPage() {
                           familyLabel={`${fam.brand_name} ${fam.family_name}`}
                           terms={terms}
                           ratesVisible={sheetData.rates_visible}
-                          upliftOptions={upliftOptionsFor(boundsByModel.get(model.model_id), sheetData.uplift_max ?? 0)}
                           canEdit={canEdit}
                           onEdit={setEditModel}
                           t={t}

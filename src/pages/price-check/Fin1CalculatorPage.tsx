@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { DataTable, Input, MaskedInput, MobileHeader, PageNav, PageNavPanel, Slider } from 'tsp-form';
+import { Button, DataTable, Input, MaskedInput, MobileHeader, PageNav, PageNavPanel, Slider } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine, Calculator, Search, ShieldCheck, X, XCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
@@ -57,16 +57,48 @@ interface PriceTable {
   price: number;
   base_price?: number;
   uplift_amount?: number;
+  guarantee_days?: number | null;
+  /** 'catalog' (p_model_id) or 'manual' (p_price — the มือสอง path). */
+  source?: string;
+  // ── The MODEL's own uplift bounds (mig 1181/1189). These — not
+  // policy.uplift_max, which is the holding-wide ceiling — are what the server
+  // validates p_uplift against. Absent in manual-price mode.
+  uplift_min?: number;
+  uplift_max?: number;
+  uplift_source?: string;
   uplift_options?: number[];
-  guarantee_days?: number;
+  // Used-device (มือสอง) bounds. retail min/max are null when the model has no
+  // used pricing; the uplift pair falls back to the holding default, so
+  // "does this model have a used price?" must test the RETAIL pair.
+  used_retail_min?: number | null;
+  used_retail_max?: number | null;
+  used_uplift_min?: number | null;
+  used_uplift_max?: number | null;
   policy: {
     min_down_percent: number;
     max_down_percent: number;
     doc_fee_amount: number;
+    rounding_unit?: number;
+    /** HOLDING-wide ceiling — never bound the slider with this. */
     uplift_max: number;
+    guarantee_days?: number | null;
+    guarantee_days_uplift?: number | null;
   };
   terms: Array<{ term_months: number }>;
   rows: PriceTableRow[];
+}
+
+/** One row of fn_fin1_quote_all — a quote, or the below-minimum-down error. */
+interface QuoteRow {
+  term_months?: number;
+  installment_amount?: number;
+  last_installment_amount?: number;
+  total_effective?: number;
+  down_payment?: number;
+  down_percent?: number;
+  error_code?: string;
+  min_down_percent?: number;
+  min_down_amount?: number;
 }
 
 interface PlanByMonthly {
@@ -85,10 +117,33 @@ interface PlanByMonthly {
   doc_fee_amount: number;
 }
 
-/** Uplift granularity the backend accepts (owner 2026-09-10; verified live:
- *  p_uplift 500 passes, 250 rejects — `uplift_options` is only a suggestion
- *  list, the real rule is 0..uplift_max in steps of 500). */
+/** Slider granularity for the uplift.
+ *
+ *  The backend rule is: p_uplift must be 0, OR inside the MODEL's own
+ *  uplift_min..uplift_max, and a multiple of 100 (`round(v/100)*100`).
+ *  500 is a comfortable slider step that satisfies the multiples-of-100 rule —
+ *  it is not itself the granularity the server enforces. (Earlier comment here
+ *  claimed "steps of 500"; 250 fails only because it isn't a multiple of 100.)
+ *
+ *  `uplift_options` (0, then min..max by 1,000) is the suggestion list the
+ *  finance-rates chips use — a subset of what the slider can reach. */
 const UPLIFT_STEP = 500;
+
+/** Which condition the customer is being quoted on. */
+type Condition = 'new' | 'used';
+
+/** Which box the down payment was entered in — only one is sent. */
+type DownMode = 'percent' | 'amount';
+
+/** Snap a slider value onto the server's allowed set: 0, or min..max.
+ *  With a non-zero min there is a dead zone below it — land on whichever end
+ *  of that gap is nearer so the handle never rests on a rejected value. */
+function snapUplift(v: number, min: number, max: number): number {
+  const stepped = Math.round(v / UPLIFT_STEP) * UPLIFT_STEP;
+  const clamped = Math.min(max, Math.max(0, stepped));
+  if (min <= 0 || clamped >= min) return clamped;
+  return clamped >= min / 2 ? min : 0;
+}
 
 // Same two-line shape as the FIN2 price-check rail: family + model, brand below.
 const modelLabel = (m: ModelSearchRow) =>
@@ -107,6 +162,19 @@ export function Fin1CalculatorPage() {
   const [debounced, setDebounced] = useState('');
   const [model, setModel] = useState<ModelSearchRow | null>(null);
   const [uplift, setUplift] = useState(0);
+
+  // ── มือ 1 / มือสอง ─────────────────────────────────────────────────────────
+  // Used mode keeps the same model selection — only the price source changes:
+  // instead of the catalog retail price it asks the manual-price overload with
+  // whatever the staff types inside the model's used range.
+  const [condition, setCondition] = useState<Condition>('new');
+  const [usedPriceStr, setUsedPriceStr] = useState('');
+  const [usedPriceDebounced, setUsedPriceDebounced] = useState('');
+
+  useEffect(() => {
+    const tm = setTimeout(() => setUsedPriceDebounced(usedPriceStr), 300);
+    return () => clearTimeout(tm);
+  }, [usedPriceStr]);
 
   useEffect(() => {
     const next = isSearchable(keyword) ? keyword.trim() : '';
@@ -129,45 +197,91 @@ export function Fin1CalculatorPage() {
     staleTime: 30 * 1000,
   });
 
-  // ── Price table (one call per model × uplift) ──────────────────────────────
+  // ── Catalog probe: the model's own bounds ──────────────────────────────────
+  // Always at uplift 0, so it is one cached call per model and it is the SAME
+  // query the new-condition table uses when uplift is 0. It answers two things
+  // the used path can't ask for itself: the model's new/used uplift bounds, and
+  // whether the model has a used price at all (used_retail_min/max non-null).
+  const { data: bounds } = useQuery({
+    queryKey: ['fin1-price-table', model?.model_id, 0],
+    queryFn: () =>
+      apiClient.rpc<PriceTable>('fn_fin1_price_table', { p_model_id: model!.model_id, p_uplift: 0 }),
+    enabled: model != null,
+    staleTime: 60 * 1000,
+    retry: false,
+  });
+
+  const hasUsed = bounds?.used_retail_min != null && bounds?.used_retail_max != null;
+  const usedMode = condition === 'used' && hasUsed;
+
+  // Uplift bounds follow the selected condition (work order #2 — the owner's
+  // "slider and maximum don't match" bug was this reading policy.uplift_max).
+  const upliftMin = usedMode ? (bounds?.used_uplift_min ?? 0) : (bounds?.uplift_min ?? 0);
+  const upliftMax = usedMode ? (bounds?.used_uplift_max ?? 0) : (bounds?.uplift_max ?? 0);
+
+  // Clamp the typed used price into the model's range; seeded with the max.
+  const usedPriceRaw = usedPriceDebounced === '' ? null : parseFloat(usedPriceDebounced);
+  const usedPrice = usedMode && usedPriceRaw != null && usedPriceRaw > 0
+    ? Math.min(bounds!.used_retail_max!, Math.max(bounds!.used_retail_min!, usedPriceRaw))
+    : null;
+
+  /** Price the table/quotes are actually computed from, in either condition. */
+  const effectivePrice = usedMode
+    ? (usedPrice != null ? usedPrice + uplift : null)
+    : (bounds?.base_price != null ? bounds.base_price + uplift : null);
+
+  // ── Price table (one call per model × uplift, or per manual price) ─────────
   const {
-    data: table,
+    data: rawTable,
     error: tableError,
     isFetching: tableLoading,
   } = useQuery({
-    queryKey: ['fin1-price-table', model?.model_id, uplift],
+    queryKey: usedMode
+      ? ['fin1-price-table-manual', usedPrice != null ? usedPrice + uplift : null]
+      : ['fin1-price-table', model?.model_id, uplift],
     queryFn: () =>
-      apiClient.rpc<PriceTable>('fn_fin1_price_table', {
-        p_model_id: model!.model_id,
-        p_uplift: uplift,
-      }),
-    enabled: model != null,
+      apiClient.rpc<PriceTable>('fn_fin1_price_table', usedMode
+        ? { p_price: usedPrice! + uplift }
+        : { p_model_id: model!.model_id, p_uplift: uplift }),
+    enabled: usedMode ? usedPrice != null : model != null,
     placeholderData: keepPreviousData,
     staleTime: 60 * 1000,
     retry: false,
   });
 
+  // In manual-price mode the response's `guarantee_days` is the uplift-0
+  // baseline (the server has no model to read the uplifted figure from), so
+  // derive it from policy instead. Null on either side hides the line.
+  const table = useMemo<PriceTable | undefined>(() => {
+    if (!rawTable) return rawTable;
+    if (!usedMode) return rawTable;
+    const g = uplift > 0
+      ? rawTable.policy.guarantee_days_uplift
+      : rawTable.policy.guarantee_days;
+    return { ...rawTable, guarantee_days: g ?? null };
+  }, [rawTable, usedMode, uplift]);
+
   // ── Selection state (sliders point at table cells) ─────────────────────────
   const [downPct, setDownPct] = useState<number | null>(null);
   const [termMonths, setTermMonths] = useState<number | null>(null);
   const [monthlyStr, setMonthlyStr] = useState('');
-  const monthlyMode = monthlyStr !== '' && parseFloat(monthlyStr) > 0;
+  const [downMode, setDownMode] = useState<DownMode>('percent');
+  const [downAmountStr, setDownAmountStr] = useState('');
+  const [downAmountDebounced, setDownAmountDebounced] = useState('');
+  const [downNotice, setDownNotice] = useState(false);
+  const amountMode = downMode === 'amount';
+  // The backend's monthly search only accepts a % down, so exact-baht down and
+  // "customer says X per month" are mutually exclusive.
+  const monthlyMode = !amountMode && monthlyStr !== '' && parseFloat(monthlyStr) > 0;
 
-  const terms = useMemo(() => (table?.terms ?? []).map(x => x.term_months), [table]);
-
-  // Snap selection into the current table (first load, or after a rate change
-  // removed a term). The chosen term survives a down-% change (§3.6).
   useEffect(() => {
-    if (!table) return;
-    setDownPct(p => {
-      if (p != null && p >= table.policy.min_down_percent && p <= table.policy.max_down_percent) return p;
-      return table.policy.min_down_percent;
-    });
-    setTermMonths(tm => {
-      if (tm != null && terms.includes(tm)) return tm;
-      return terms.length ? terms[terms.length - 1] : null;
-    });
-  }, [table, terms]);
+    const tm = setTimeout(() => setDownAmountDebounced(downAmountStr), 300);
+    return () => clearTimeout(tm);
+  }, [downAmountStr]);
+
+  // Terms come from the price table in % mode; in baht mode only the terms
+  // fn_fin1_quote_all actually returned a quote for are selectable.
+  const tableTerms = useMemo(() => (table?.terms ?? []).map(x => x.term_months), [table]);
 
   const row = useMemo(
     () => table?.rows.find(r => r.down_percent === downPct) ?? null,
@@ -177,6 +291,61 @@ export function Fin1CalculatorPage() {
     () => row?.cells.find(c => c.term_months === termMonths) ?? null,
     [row, termMonths],
   );
+
+  // ── Down in exact baht (work order #3) ────────────────────────────────────
+  // The price table is a grid of whole down-PERCENTS, so an arbitrary baht
+  // amount has no cell to point at. fn_fin1_quote_all answers the same
+  // question the other way round: one row per active term at this exact down.
+  const downAmountNum = downAmountDebounced === '' ? null : parseFloat(downAmountDebounced);
+  const { data: quoteAll, isFetching: quotesLoading } = useQuery({
+    queryKey: ['fin1-quote-all', effectivePrice, downAmountNum],
+    queryFn: () =>
+      apiClient.rpc<{ quotes: QuoteRow[] }>('fn_fin1_quote_all', {
+        p_price: effectivePrice!,
+        p_down: downAmountNum!,
+      }),
+    enabled: amountMode && effectivePrice != null && downAmountNum != null && downAmountNum > 0,
+    placeholderData: keepPreviousData,
+    staleTime: 60 * 1000,
+    retry: false,
+  });
+
+  // A row is a quote or a "below the minimum down for this price" error; the
+  // minimum is the same for every term, so the first error row carries it.
+  const quotes = useMemo(
+    () => (quoteAll?.quotes ?? []).filter((q): q is QuoteRow & { term_months: number } =>
+      q.error_code == null && q.term_months != null),
+    [quoteAll],
+  );
+  const downBelowMin = useMemo(() => {
+    if (!amountMode || !quoteAll) return null;
+    const bad = quoteAll.quotes.find(q => q.error_code === 'PRICING.VALIDATION.FIN1_DOWN_BELOW_MIN');
+    return bad && quotes.length === 0 ? bad : null;
+  }, [amountMode, quoteAll, quotes]);
+
+  const quoteTerms = useMemo(() => quotes.map(q => q.term_months), [quotes]);
+  const terms = amountMode && quoteTerms.length > 0 ? quoteTerms : tableTerms;
+  const quote = useMemo(
+    () => quotes.find(q => q.term_months === termMonths) ?? null,
+    [quotes, termMonths],
+  );
+
+  // Snap selection into whatever list is current (first load, a rate change
+  // that removed a term, or switching down mode). The chosen term survives a
+  // down-% change (§3.6).
+  useEffect(() => {
+    if (!table) return;
+    setDownPct(p => {
+      if (p != null && p >= table.policy.min_down_percent && p <= table.policy.max_down_percent) return p;
+      return table.policy.min_down_percent;
+    });
+  }, [table]);
+
+  useEffect(() => {
+    if (terms.length === 0) return;
+    setTermMonths(tm => (tm != null && terms.includes(tm) ? tm : terms[terms.length - 1]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [terms.join(',')]);
 
   // ── "Customer says X/month" mode ───────────────────────────────────────────
   const [plan, setPlan] = useState<PlanByMonthly | null>(null);
@@ -207,8 +376,12 @@ export function Fin1CalculatorPage() {
         const res = await apiClient.rpc<PlanByMonthly>('fn_fin1_plan_by_monthly', {
           p_monthly: parseFloat(monthlyStr),
           p_down_percent: downPct,
-          p_model_id: model.model_id,
-          p_uplift: uplift,
+          // Used mode has no catalog price to start from — send the manual
+          // price directly (p_uplift is ignored when p_price is set, so the
+          // uplift is already folded into effectivePrice).
+          ...(usedMode
+            ? { p_price: effectivePrice }
+            : { p_model_id: model.model_id, p_uplift: uplift }),
         });
         if (seq === planSeq.current) { setPlan(res); setPlanError(''); }
       } catch (err) {
@@ -230,16 +403,41 @@ export function Fin1CalculatorPage() {
     }, 300);
     return () => clearTimeout(tm);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [monthlyMode, monthlyStr, downPct, uplift, model?.model_id, belowFloor]);
+  }, [monthlyMode, monthlyStr, downPct, uplift, model?.model_id, belowFloor, usedMode, effectivePrice]);
 
   const pickModel = (m: ModelSearchRow) => {
     if (m.model_id !== model?.model_id) {
       setUplift(0);
       setMonthlyStr('');
       setPlan(null);
+      setCondition('new');
+      setUsedPriceStr('');
+      setUsedPriceDebounced('');
+      setDownMode('percent');
+      setDownAmountStr('');
+      setDownNotice(false);
     }
     setModel(m);
   };
+
+  // Switching condition resets the uplift — the two conditions have different
+  // bounds, so the old number is not necessarily still allowed.
+  const pickCondition = (c: Condition) => {
+    if (c === condition) return;
+    setCondition(c);
+    setUplift(0);
+    setPlan(null);
+    if (c === 'used' && usedPriceStr === '' && bounds?.used_retail_max != null) {
+      // Seed with the top of the range — the staff negotiates downward.
+      setUsedPriceStr(String(bounds.used_retail_max));
+      setUsedPriceDebounced(String(bounds.used_retail_max));
+    }
+  };
+
+  // A used price outside the model's band is clamped for the query; tell the
+  // staff which number is actually being used rather than silently disagreeing.
+  const usedPriceClamped = usedMode && usedPriceRaw != null && usedPrice != null
+    && usedPriceRaw !== usedPrice;
 
   const tableErrorMsg = tableError
     ? (tableError instanceof ApiError && tableError.code === 'PRICING.VALIDATION.FIN1_NO_RETAIL_PRICE'
@@ -247,11 +445,23 @@ export function Fin1CalculatorPage() {
       : translateApiError(tableError, t))
     : '';
 
-  // ── Summary numbers (table cell or bank-style plan) ────────────────────────
+  // ── Summary numbers (quote row, table cell, or bank-style plan) ───────────
   // While the typed amount is still below the floor we hold the slider-derived
   // plan on screen rather than blanking the panel — the customer is mid-number,
   // not looking at an empty result.
-  const summary = monthlyMode && !belowFloor
+  const summary = amountMode
+    ? (quote && table && {
+        down: quote.down_payment ?? downAmountNum ?? 0,
+        months: quote.term_months,
+        monthly: quote.installment_amount ?? 0,
+        last: quote.last_installment_amount ?? 0,
+        total: quote.total_effective ?? 0,
+        // fn_fin1_quote_all doesn't carry the contract fee — it is a policy
+        // figure, identical to the one the price table already returned.
+        docFee: table.policy.doc_fee_amount,
+        exact: true,
+      })
+    : monthlyMode && !belowFloor
     ? (plan && {
         down: plan.down_payment,
         months: plan.term_months,
@@ -374,6 +584,52 @@ export function Fin1CalculatorPage() {
                           </div>
                         )}
 
+                        {/* ── มือ 1 / มือสอง ─────────────────────────────── */}
+                        {hasUsed && (
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="form-label mb-0">{t('fin1Calc.conditionTitle')}</span>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                size="sm"
+                                variant={condition === 'new' ? 'primary' : 'outline'}
+                                onClick={() => pickCondition('new')}
+                              >
+                                {t('fin1Calc.conditionNew')}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant={condition === 'used' ? 'primary' : 'outline'}
+                                onClick={() => pickCondition('used')}
+                              >
+                                {t('fin1Calc.conditionUsed')}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* ── Used-device price (replaces the catalog price) ── */}
+                        {usedMode && bounds && (
+                          <div className="flex flex-col">
+                            <label className="form-label">{t('fin1Calc.usedPriceLabel')}</label>
+                            <div className="w-56">
+                              <MaskedInput
+                                mask="number"
+                                decimalScale={0}
+                                size="lg"
+                                className="w-full fin1-amount-input"
+                                value={usedPriceStr}
+                                onChange={(raw) => setUsedPriceStr(raw)}
+                              />
+                            </div>
+                            <span className={`text-xs mt-1 tabular-nums ${usedPriceClamped ? 'text-warning-fg' : 'text-subtle'}`}>
+                              {t('fin1Calc.usedPriceHint', {
+                                min: fmtCurrency(bounds.used_retail_min),
+                                max: fmtCurrency(bounds.used_retail_max),
+                              })}
+                            </span>
+                          </div>
+                        )}
+
                         {table && (
                           <>
                             {/* ── Price + uplift ─────────────────────────── */}
@@ -386,26 +642,28 @@ export function Fin1CalculatorPage() {
                                   </span>
                                 )}
                               </div>
-                              {table.policy.uplift_max > 0 && (
+                              {/* The MODEL's own bound for the selected condition —
+                                  policy.uplift_max is the holding ceiling and would
+                                  offer values the server rejects (work order #2). */}
+                              {upliftMax > 0 && (
                                 <div className="flex flex-col gap-1">
                                   <Slider
                                     value={uplift}
-                                    onChange={(v) => setUplift(Math.min(table.policy.uplift_max,
-                                      Math.max(0, Math.round(v / UPLIFT_STEP) * UPLIFT_STEP)))}
+                                    onChange={(v) => setUplift(snapUplift(v, upliftMin, upliftMax))}
                                     min={0}
-                                    max={table.policy.uplift_max}
+                                    max={upliftMax}
                                     step={UPLIFT_STEP}
                                   />
                                   <div className="flex justify-between text-[11px] text-subtler tabular-nums">
                                     <span>+0</span>
-                                    <span>+{fmtCurrency(table.policy.uplift_max)}</span>
+                                    <span>+{fmtCurrency(upliftMax)}</span>
                                   </div>
                                 </div>
                               )}
                               <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 tabular-nums">
                                 {uplift > 0 && table.base_price != null && (
                                   <span className="text-sm text-subtle">
-                                    {fmtCurrency(table.base_price)} + {fmtCurrency(uplift)} =
+                                    {fmtCurrency(usedMode ? usedPrice : table.base_price)} + {fmtCurrency(uplift)} =
                                   </span>
                                 )}
                                 <span className="text-3xl font-semibold leading-none">{fmtCurrency(table.price)}</span>
@@ -419,18 +677,78 @@ export function Fin1CalculatorPage() {
                               </div>
                             </div>
 
-                            {/* ── Down % ─────────────────────────────────── */}
-                            {downPct != null && row && (
-                              <div className="flex flex-col gap-1">
+                            {/* ── Down: % slider or exact baht ───────────── */}
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center justify-between gap-2 flex-wrap">
                                 <div className="flex flex-wrap items-baseline gap-x-2">
                                   <span className="form-label mb-0">{t('fin1Calc.downTitle')}</span>
-                                  <span className="text-2xl font-semibold tabular-nums leading-none">
-                                    {fmtCurrency(row.down_amount)}
-                                  </span>
-                                  <span className="text-sm text-subtle tabular-nums">
-                                    {t('fin1Calc.baht')} · {downPct}%
-                                  </span>
+                                  {amountMode ? (
+                                    quote?.down_payment != null && (
+                                      <>
+                                        <span className="text-2xl font-semibold tabular-nums leading-none">
+                                          {fmtCurrency(quote.down_payment)}
+                                        </span>
+                                        <span className="text-sm text-subtle tabular-nums">
+                                          {t('fin1Calc.baht')}
+                                          {quote.down_percent != null && ` · ${quote.down_percent}%`}
+                                        </span>
+                                      </>
+                                    )
+                                  ) : row && downPct != null && (
+                                    <>
+                                      <span className="text-2xl font-semibold tabular-nums leading-none">
+                                        {fmtCurrency(row.down_amount)}
+                                      </span>
+                                      <span className="text-sm text-subtle tabular-nums">
+                                        {t('fin1Calc.baht')} · {downPct}%
+                                      </span>
+                                    </>
+                                  )}
                                 </div>
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    size="sm"
+                                    variant={!amountMode ? 'primary' : 'outline'}
+                                    onClick={() => { setDownMode('percent'); setDownNotice(false); }}
+                                  >
+                                    {t('fin1Calc.downByPercent')}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant={amountMode ? 'primary' : 'outline'}
+                                    onClick={() => {
+                                      setDownMode('amount');
+                                      setMonthlyStr('');
+                                      setPlan(null);
+                                      // Seed the box from whatever the % slider
+                                      // was resting on, so the numbers don't jump.
+                                      if (downAmountStr === '' && row) {
+                                        setDownAmountStr(String(row.down_amount));
+                                        setDownAmountDebounced(String(row.down_amount));
+                                      }
+                                    }}
+                                  >
+                                    {t('fin1Calc.downByAmount')}
+                                  </Button>
+                                </div>
+                              </div>
+
+                              {amountMode ? (
+                                <div className="w-56">
+                                  <MaskedInput
+                                    mask="number"
+                                    decimalScale={0}
+                                    size="lg"
+                                    className="w-full fin1-amount-input"
+                                    value={downAmountStr}
+                                    onChange={(raw) => { setDownAmountStr(raw); setDownNotice(false); }}
+                                    // Same rule as the monthly box: a half-typed
+                                    // amount is always below the minimum, so the
+                                    // guidance waits for blur.
+                                    onBlur={() => setDownNotice(true)}
+                                  />
+                                </div>
+                              ) : downPct != null && row ? (
                                 <Slider
                                   value={downPct}
                                   onChange={(v) => setDownPct(Math.round(v))}
@@ -439,8 +757,17 @@ export function Fin1CalculatorPage() {
                                   step={1}
                                   showMinMax
                                 />
-                              </div>
-                            )}
+                              ) : null}
+
+                              {amountMode && downNotice && downBelowMin && (
+                                <span className="text-xs text-warning-fg tabular-nums">
+                                  {t('fin1Calc.downBelowMin', {
+                                    min: fmtCurrency(downBelowMin.min_down_amount ?? 0),
+                                    pct: downBelowMin.min_down_percent ?? 0,
+                                  })}
+                                </span>
+                              )}
+                            </div>
 
                             {/* ── Months ─────────────────────────────────── */}
                             {termMonths != null && terms.length > 0 && (
@@ -474,13 +801,16 @@ export function Fin1CalculatorPage() {
                             )}
 
                             {/* ── Customer's target monthly ──────────────── */}
-                            <div className="flex flex-col">
+                            {/* Off in baht-down mode: fn_fin1_plan_by_monthly's
+                                search only takes a down PERCENT. */}
+                            <div className={`flex flex-col ${amountMode ? 'opacity-50' : ''}`}>
                               <label className="form-label">{t('fin1Calc.monthlyTarget')}</label>
                               <div className="w-56">
                                 <MaskedInput
                                   mask="number"
                                   decimalScale={0}
                                   size="lg"
+                                  disabled={amountMode}
                                   className="w-full fin1-amount-input"
                                   value={monthlyStr}
                                   onChange={(raw) => { setMonthlyStr(raw); setFloorNotice(false); }}
@@ -501,7 +831,9 @@ export function Fin1CalculatorPage() {
                                   reserveIconSlots
                                 />
                               </div>
-                              <span className="text-xs text-subtle mt-1">{t('fin1Calc.monthlyTargetHint')}</span>
+                              <span className="text-xs text-subtle mt-1">
+                                {amountMode ? t('fin1Calc.monthlyDisabledHint') : t('fin1Calc.monthlyTargetHint')}
+                              </span>
                             </div>
 
                             {(planError || (floorNotice && belowFloor && monthlyFloor != null)) && (
@@ -526,7 +858,7 @@ export function Fin1CalculatorPage() {
                       {/* ── Summary ────────────────────────────────────── */}
                       {summary && (
                         <div className="mt-4 xl:mt-0 xl:sticky xl:top-0">
-                          <div className={`rounded-md border border-line overflow-hidden ${(tableLoading || planLoading) ? 'opacity-60' : ''} transition-opacity`}>
+                          <div className={`rounded-md border border-line overflow-hidden ${(tableLoading || planLoading || quotesLoading) ? 'opacity-60' : ''} transition-opacity`}>
                             <div className="px-4 py-3 bg-surface flex flex-col gap-1">
                               <div className="text-sm text-subtle">{t('fin1Calc.summaryTitle')}</div>
                               <div className="text-2xl xl:text-3xl font-semibold tabular-nums">
