@@ -64,6 +64,18 @@ view names are the shared contract — those are fine. If BE needs to act on a
 finding (a mig landed without a NOTICE, an RPC drifted), state *what* and
 *why it matters to FE* — never *how* to fix it (per the UI_FEEDBACK rule).
 
+## Subagent briefs
+
+The orchestrating session — the one that read the work order — creates the test
+log itself, before spawning any agents; log creation is never delegated. Every
+brief for an agent doing work-order work then includes this paragraph verbatim:
+
+> Append every test run to `outbox/testlog_<topic>.md` as it happens: user
+> account, entities touched, values changed, reset yes/no, result. Append-only —
+> never reorder or rewrite earlier entries. Your final report is not a test
+> log; verification evidence that only lives in the report gets re-run from
+> scratch at DONE time.
+
 ## Ground rules
 
 - **Ton does not edit drafts** — corrections come through chat; the draft is
