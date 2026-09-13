@@ -22,6 +22,7 @@ import { translateApiError } from '../../../lib/apiErrors';
 import { useAuth } from '../../../contexts/AuthContext';
 import { buildSavingSeededPayments, savingApplied, unusedSaving } from '../savingAutoFill';
 import { SavingRowNote, SavingUnusedWarning, SavingUnusedConfirmDialog } from '../SavingAppliedNotice';
+import { ConfirmDialog } from '../../../components/ConfirmDialog';
 
 /* ─────────────────────────────────────────────────────────────────────────────
    ⚠️  ONE-GO ACTIVATION — DO NOT FIRE BILL/ACTIVATE RPCs ON MOUNT.
@@ -156,6 +157,9 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
   // Confirm gate when the rows leave saving unspent. No announce-on-entry
   // dialog: the decision belongs at the one moment it stops being reversible.
   const [savingConfirmOpen, setSavingConfirmOpen] = useState(false);
+  // Removing a payment row wipes an amount the user typed, with no undo —
+  // confirm it, whatever the method.
+  const [removePaymentIdx, setRemovePaymentIdx] = useState<number | null>(null);
 
   // Single override-aware receiving account for this (own) branch. Used to
   // label the printed receipt's TRANSFER lines; the picker auto-selects it.
@@ -544,10 +548,7 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
                       size="sm"
                       className="shrink-0"
                       startIcon={<Trash2 size={14} />}
-                      onClick={() => {
-                        userEditedPayments.current = true;
-                        setPayments(prev => prev.filter((_, i) => i !== idx));
-                      }}
+                      onClick={() => setRemovePaymentIdx(idx)}
                     />
                   )}
                 </div>
@@ -678,6 +679,27 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
           </Button>
         </div>
       </div>
+
+      {/* Removing a payment row — always mounted, `open` controls it. */}
+      <ConfirmDialog
+        open={removePaymentIdx !== null}
+        onClose={() => setRemovePaymentIdx(null)}
+        onConfirm={() => {
+          userEditedPayments.current = true;
+          setPayments(prev => prev.filter((_, i) => i !== removePaymentIdx));
+          setRemovePaymentIdx(null);
+        }}
+        title={t('wizard.removePaymentTitle')}
+        message={t('wizard.removePaymentBody', {
+          method: removePaymentIdx !== null && payments[removePaymentIdx]
+            ? t(`paymentMethod.${payments[removePaymentIdx].method}`)
+            : '',
+          amount: fmtCurrency(
+            removePaymentIdx !== null ? payments[removePaymentIdx]?.amount ?? 0 : 0,
+          ),
+        })}
+        confirmLabel={t('common.remove')}
+      />
 
       {/* Saving left unspent — confirm gate at Confirm. Always mounted. */}
       <SavingUnusedConfirmDialog

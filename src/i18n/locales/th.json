@@ -5513,7 +5513,9 @@
     "savingConfirmNoneTitle": "ไม่ได้ใช้เงินออมเลย (มีอยู่ {{amount}} ฿)",
     "savingConfirmPartialTitle": "ใช้เงินออมแค่ {{used}} จาก {{available}} ฿",
     "savingConfirmBody": "เงินออม {{amount}} ฿ จะคงอยู่ในกระเป๋าออม ไม่ถูกนำมาชำระบิลนี้ ยืนยันเปิดสัญญาหรือไม่?",
-    "savingConfirmCta": "ยืนยันเปิดสัญญา"
+    "savingConfirmCta": "ยืนยันเปิดสัญญา",
+    "removePaymentTitle": "ลบรายการชำระนี้?",
+    "removePaymentBody": "ลบรายการชำระ{{method}} จำนวน {{amount}} ฿ ออกจากบิลนี้?"
   },
   "wallet": {
     "allDisabled": "บริษัทนี้ไม่ได้เปิดใช้กระเป๋าเงิน",

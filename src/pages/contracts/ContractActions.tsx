@@ -50,6 +50,7 @@ import { useCompanyFeatures } from '../../hooks/useCompanyFeatures';
 import { translateApiError } from '../../lib/apiErrors';
 import { buildSavingSeededPayments, savingApplied, unusedSaving } from './savingAutoFill';
 import { SavingRowNote, SavingUnusedWarning, SavingUnusedConfirmDialog } from './SavingAppliedNotice';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -2570,6 +2571,8 @@ function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
   const savingUsable = savingApplied(savingBalance, totalAmount);
   // Confirm gate when the rows leave saving unspent (no announce-on-entry).
   const [savingConfirmOpen, setSavingConfirmOpen] = useState(false);
+  // Removing a payment row wipes a typed amount with no undo — confirm it.
+  const [removePaymentIdx, setRemovePaymentIdx] = useState<number | null>(null);
 
   // Reset when opened
   useEffect(() => {
@@ -2577,6 +2580,7 @@ function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
       setPayments(buildSavingSeededPayments(savingBalance, totalAmount) as PaymentLine[]);
       setError('');
       setSavingConfirmOpen(false);
+      setRemovePaymentIdx(null);
     }
   }, [open, totalAmount, savingBalance]);
 
@@ -2709,7 +2713,7 @@ function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
                         size="sm"
                         className="shrink-0"
                         startIcon={<Trash2 size={14} />}
-                        onClick={() => setPayments(prev => prev.filter((_, i) => i !== idx))}
+                        onClick={() => setRemovePaymentIdx(idx)}
                       />
                     )}
                   </div>
@@ -2761,6 +2765,26 @@ function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
           {loading ? t('common.loading') : t('wizard.confirmPayment')}
         </Button>
       </div>
+
+      {/* Removing a payment row — always mounted, `open` controls it. */}
+      <ConfirmDialog
+        open={removePaymentIdx !== null}
+        onClose={() => setRemovePaymentIdx(null)}
+        onConfirm={() => {
+          setPayments(prev => prev.filter((_, i) => i !== removePaymentIdx));
+          setRemovePaymentIdx(null);
+        }}
+        title={t('wizard.removePaymentTitle')}
+        message={t('wizard.removePaymentBody', {
+          method: removePaymentIdx !== null && payments[removePaymentIdx]
+            ? t(`paymentMethod.${payments[removePaymentIdx].method}`)
+            : '',
+          amount: fmtCurrency(
+            removePaymentIdx !== null ? payments[removePaymentIdx]?.amount ?? 0 : 0,
+          ),
+        })}
+        confirmLabel={t('common.remove')}
+      />
 
       {/* Saving left unspent — confirm gate. Always mounted. */}
       <SavingUnusedConfirmDialog

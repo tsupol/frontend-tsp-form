@@ -5519,7 +5519,9 @@
     "savingConfirmNoneTitle": "None of the {{amount}} ฿ saving is being used",
     "savingConfirmPartialTitle": "Using only {{used}} of {{available}} ฿ saving",
     "savingConfirmBody": "{{amount}} ฿ will stay in the saving wallet instead of paying this bill. Open the contract anyway?",
-    "savingConfirmCta": "Open anyway"
+    "savingConfirmCta": "Open anyway",
+    "removePaymentTitle": "Remove this payment?",
+    "removePaymentBody": "Remove the {{method}} payment of {{amount}} ฿ from this bill?"
   },
   "wallet": {
     "allDisabled": "No wallets enabled for this company",
