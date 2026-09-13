@@ -8,7 +8,7 @@ import {
 import { ArrowRightFromLine, CheckCircle, Plus, XCircle } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
-import { useMyPermissions } from '../../hooks/useMyPermissions';
+import { useMyPriceCapabilities } from '../../hooks/useMyPriceCapabilities';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { fmtCurrency } from '../../lib/format';
@@ -565,10 +565,11 @@ function PolicyPanel({ policy, canManage, onSaved }: {
 export function Fin1RateConfigPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  // v_my_permissions, not my_capabilities: since mig 1163 this right is a
-  // per-user grant for company admins, and my_capabilities is role-only.
-  const { hasPermission } = useMyPermissions();
-  const canManage = hasPermission('PRICING.FIN1_RATE_MANAGE');
+  // v_my_price_capabilities.fin1_rates, not a permission code: this page saves
+  // holding-wide FIN1 multipliers and policy, and the DB decides who may from
+  // role + per-user grant together (NOTICE 2026-09-13, mig 1214–1216).
+  const { capabilities } = useMyPriceCapabilities();
+  const canManage = capabilities.fin1_rates;
 
   const [samplePrice, setSamplePrice] = useState('');
   // Staff think in down % of the device price, not a baht amount (OHM 09-06) —

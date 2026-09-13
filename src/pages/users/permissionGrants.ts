@@ -4,11 +4,17 @@
 // The problem this solves: holding owns the prices and the rules, but usually
 // doesn't do the work — company admins do. Handing the whole COMPANY_ADMIN role
 // the pricing permissions would let *every* company admin edit holding's rates,
-// so instead a holding admin hands them out one person at a time. A grant is
-// scoped to that person's own company; it never crosses into another.
+// so instead a holding admin hands them out one person at a time.
+//
+// A grant covers the prices behind the FIN1/FIN2 calculations on *holding's own*
+// contractable items, and an edit takes effect holding-wide — it is NOT scoped
+// to the recipient's company (corrected 2026-09-13, mig 1214–1216). A company's
+// own items need no grant at all: their COMPANY_ADMIN / COMPANY_INVENTORY price
+// them by role, and holding admin cannot.
 //
 // The DB decides access (role OR an active grant) on every call. `v_my_permissions`
-// is for showing and hiding buttons only — never treat it as the check itself.
+// is for showing and hiding whole pages only; price-edit buttons come from the
+// `can_edit_*` row flags and `v_my_price_capabilities` instead.
 //
 // Shared by the two surfaces of this feature: the per-user modal on the users
 // list, and the holding-wide overview page.
@@ -16,7 +22,9 @@
 
 import { apiClient } from '../../lib/api';
 
-/** One of the four permissions a holding admin is allowed to hand out. */
+/** One permission a holding admin may hand out. The catalogue is whatever
+ *  v_grantable_permissions returns — PRICING.PRICEBOOK_MANAGE left it in mig
+ *  1214, so never hardcode the list here. */
 export interface GrantablePermission {
   permission_code: string;
   /** Thai, written by the DB (mig 1174) — display as-is, never re-word here. */
@@ -57,7 +65,7 @@ export function hasViaRole(roleCode: string | null | undefined): boolean {
 export const grantablePermissionsQuery = {
   queryKey: ['grantable-permissions'],
   queryFn: () => apiClient.get<GrantablePermission[]>('/v_grantable_permissions'),
-  // The catalogue is four rows that change only with a migration.
+  // A handful of rows that change only with a migration.
   staleTime: 10 * 60 * 1000,
 };
 

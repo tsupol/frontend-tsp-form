@@ -7818,7 +7818,7 @@
   "permissionGrants": {
     "title": "Permission grants",
     "navTitle": "Permission grants",
-    "description": "Permissions a holding admin hands to individual company admins. The grant applies inside that person's own company.",
+    "description": "A holding admin hands the pricing work behind the FIN1/FIN2 calculations on holding's own items to individual people. An edit takes effect across the whole holding, not just the recipient's company — grant it to company-level users (company admin / company inventory).",
     "manageFor": "Permission grants",
     "granted": "Granted",
     "revoked": "Revoked",
@@ -7840,7 +7840,8 @@
     "history": "History",
     "reloginHint": "The user sees the change after their next page load or login.",
     "onlyHoldingAdmin": "Only a holding admin can grant permissions.",
-    "companyScope": "Applies within {{company}}"
+    "companyScope": "{{company}}",
+    "holdingWideHint": "Granted pricing work covers holding's own items, and an edit takes effect across the whole holding."
   },
   "fin1Plan": {
     "startHint": "FIN1 plans are set from the model's retail price. Continue to pick the term, down payment and price uplift.",

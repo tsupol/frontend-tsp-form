@@ -118,7 +118,12 @@ export function UserPermissionGrantsModal({ user, open, onClose }: {
               <span>{t('permissionGrants.fromRoleHint')}</span>
             </div>
           ) : (
-            <p className="text-xs text-subtle">{t('permissionGrants.reloginHint')}</p>
+            <div className="flex flex-col gap-1">
+              {/* A grant is holding-wide, not scoped to the recipient's company
+                  (NOTICE 2026-09-13) — say so where it is being handed out. */}
+              <p className="text-xs text-subtle">{t('permissionGrants.holdingWideHint')}</p>
+              <p className="text-xs text-subtle">{t('permissionGrants.reloginHint')}</p>
+            </div>
           )}
 
           <div className="flex flex-col divide-y divide-line border border-line rounded-md">

@@ -6,7 +6,7 @@ import { ArrowRightFromLine, ArrowLeft, SlidersHorizontal, AlertTriangle, CheckC
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavGuard } from '../../contexts/NavGuardContext';
-import { useMyPermissions } from '../../hooks/useMyPermissions';
+import { useMyPriceCapabilities } from '../../hooks/useMyPriceCapabilities';
 import { useFormSnapshot } from '../../hooks/useFormSnapshot';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { ModelName } from '../../components/ModelName';
@@ -41,6 +41,14 @@ interface ProfileRow {
   missing_retail_price: boolean;
   missing_cost_price: boolean;
   variant_override_count: number;
+  // Per-row edit flags (mig 1214–1216). Price permission depends on owner ×
+  // contractable × per-user grant, so the DB answers it per row and per cell —
+  // never v_my_permissions. Cells in one row can differ (a FIN1 grantee edits
+  // retail but not cost).
+  company_id: number | null;
+  can_edit_retail: boolean;
+  can_edit_cost: boolean;
+  can_edit_fin2_profit: boolean;
 }
 
 // v_price_rates_lookup RETAIL_PRICE rows — each row is the full profile
@@ -116,6 +124,10 @@ interface WorkbenchRow {
   missing_retail_price: boolean;
   missing_fin2_profit_rate: boolean;
   needs_price_setup: boolean;
+  // Per-row edit flags (mig 1214–1216) — same contract as v_model_price_profile.
+  can_edit_retail: boolean;
+  can_edit_cost: boolean;
+  can_edit_fin2_profit: boolean;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -178,18 +190,29 @@ function BoundsPairInputs({ label, minValue, maxValue, onMinChange, onMaxChange,
   );
 }
 
+/** A price the caller may not edit — shown as a plain label/value line. */
+function ReadOnlyPriceRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 text-sm">
+      <span className="text-subtle text-xs">{label}</span>
+      <span className="tabular-nums text-right">{value}</span>
+    </div>
+  );
+}
+
 // ── Editor Panel ─────────────────────────────────────────────────────────────
 // Always mounted — accepts modelId which can be null (shows placeholder).
 // Handles model switches internally without remounting.
 
-function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, isDirtyRef, canManage, policyUpliftMax }: {
+function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, isDirtyRef, canManageFin2Terms, policyUpliftMax }: {
   modelId: number | null;
   modelCode: string;
   familyName: string;
   baseModelName: string;
   suffix: string;
   isDirtyRef?: React.MutableRefObject<boolean>;
-  canManage: boolean;
+  /** v_my_price_capabilities.fin2_terms — adding/removing a FIN2 term. */
+  canManageFin2Terms: boolean;
   policyUpliftMax: number | null;
 }) {
   const { t } = useTranslation();
@@ -237,6 +260,14 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
     staleTime: 30 * 1000,
   });
   const profile = profileRows[0]?.model_id === modelId ? profileRows[0] : null;
+
+  // Per-cell editability comes from the row itself, never from a permission
+  // code: a company admin edits its own company's items with no PRICING.* code
+  // at all, and a FIN1 grantee edits retail but not cost on the same row.
+  const canEditRetail = profile?.can_edit_retail ?? false;
+  const canEditCost = profile?.can_edit_cost ?? false;
+  const canEditFin2Profit = profile?.can_edit_fin2_profit ?? false;
+  const canEditAnyProfile = canEditRetail || canEditCost;
 
   // Fetch workbench for selected model (FIN2 per-term profit — unchanged path)
   const { data: workbenchRows = [], isLoading } = useQuery({
@@ -415,7 +446,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
   // JSON null clears the bound (server validates the pairing rules).
   const profilePatch = useMemo(() => {
     const patch: Record<string, number | null> = {};
-    if (!profile) return patch;
+    if (!profile || !canEditRetail) return patch;
     const retailVal = numOrNull(retailPrice);
     if (retailVal !== null && retailVal !== profile.retail_price) patch.retail_price = retailVal;
     const pairs: Array<[string, string, number | null, string, string, number | null]> = [
@@ -432,10 +463,10 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
       }
     }
     return patch;
-  }, [profile, retailPrice, upliftMin, upliftMax, usedRetailMin, usedRetailMax, usedUpliftMin, usedUpliftMax]);
+  }, [profile, canEditRetail, retailPrice, upliftMin, upliftMax, usedRetailMin, usedRetailMax, usedUpliftMin, usedUpliftMax]);
 
   const costVal = numOrNull(costPrice);
-  const costChanged = costVal !== null && costVal !== (profile?.cost_price ?? null);
+  const costChanged = canEditCost && costVal !== null && costVal !== (profile?.cost_price ?? null);
   const profileDirty = Object.keys(profilePatch).length > 0 || costChanged;
 
   const handleSaveProfile = async () => {
@@ -628,8 +659,10 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
             {/* Price profile — retail price + bounds (catalog v2, mig 1181/1183) */}
             <div>
               <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-3">{t('pricing.pricebookSection')}</h3>
-              {canManage ? (
-                <div className="space-y-3">
+              {/* Retail and cost each follow their own can_edit flag — one row
+                  can be half editable (a FIN1 grantee owns retail, not cost). */}
+              <div className="space-y-3">
+                {canEditRetail ? (
                   <div className="flex flex-col">
                     <label className="form-label text-xs" htmlFor="ed-retail">{t('pricing.retailPrice')}</label>
                     <MaskedInput
@@ -642,6 +675,11 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                       disabled={busy}
                     />
                   </div>
+                ) : (
+                  <ReadOnlyPriceRow label={t('pricing.retailPrice')} value={formatTHB(profile?.retail_price ?? null)} />
+                )}
+
+                {canEditCost ? (
                   <div className="flex flex-col">
                     <label className="form-label text-xs" htmlFor="ed-cost">{t('pricing.costPrice')}</label>
                     <MaskedInput
@@ -654,43 +692,70 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                       disabled={busy}
                     />
                   </div>
-                  {retailPrice && costPrice && (
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-subtle">{t('pricing.margin')}</span>
-                      <span className="font-medium tabular-nums">
-                        {calcMargin(parseFloat(retailPrice) || null, parseFloat(costPrice) || null)}
-                      </span>
-                    </div>
-                  )}
-                  {isContractable && (
-                    <>
-                      <BoundsPairInputs
-                        label={t('pricing.upliftBounds')}
-                        minValue={upliftMin} maxValue={upliftMax}
-                        onMinChange={setUpliftMin} onMaxChange={setUpliftMax}
-                        disabled={busy} t={t}
-                      />
-                      {profile && !profile.bounds_set && !upliftMin.trim() && !upliftMax.trim() && (
-                        <div className="text-xs text-subtle -mt-2">
-                          {policyUpliftMax != null
-                            ? t('pricing.boundsNotSet', { range: `0–${formatTHB(policyUpliftMax)}` })
-                            : t('pricing.boundsNotSetNoRange')}
-                        </div>
-                      )}
-                      <BoundsPairInputs
-                        label={t('pricing.usedPriceRange')}
-                        minValue={usedRetailMin} maxValue={usedRetailMax}
-                        onMinChange={setUsedRetailMin} onMaxChange={setUsedRetailMax}
-                        disabled={busy} t={t}
-                      />
-                      <BoundsPairInputs
-                        label={t('pricing.usedUpliftRange')}
-                        minValue={usedUpliftMin} maxValue={usedUpliftMax}
-                        onMinChange={setUsedUpliftMin} onMaxChange={setUsedUpliftMax}
-                        disabled={busy} t={t}
-                      />
-                    </>
-                  )}
+                ) : (
+                  <ReadOnlyPriceRow label={t('pricing.costPrice')} value={formatTHB(profile?.cost_price ?? null)} />
+                )}
+
+                <ReadOnlyPriceRow
+                  label={t('pricing.margin')}
+                  value={
+                    canEditRetail || canEditCost
+                      ? calcMargin(
+                          canEditRetail ? (parseFloat(retailPrice) || null) : (profile?.retail_price ?? null),
+                          canEditCost ? (parseFloat(costPrice) || null) : (profile?.cost_price ?? null),
+                        )
+                      : calcMargin(profile?.retail_price ?? null, profile?.cost_price ?? null)
+                  }
+                />
+
+                {isContractable && (canEditRetail ? (
+                  <>
+                    <BoundsPairInputs
+                      label={t('pricing.upliftBounds')}
+                      minValue={upliftMin} maxValue={upliftMax}
+                      onMinChange={setUpliftMin} onMaxChange={setUpliftMax}
+                      disabled={busy} t={t}
+                    />
+                    {profile && !profile.bounds_set && !upliftMin.trim() && !upliftMax.trim() && (
+                      <div className="text-xs text-subtle -mt-2">
+                        {policyUpliftMax != null
+                          ? t('pricing.boundsNotSet', { range: `0–${formatTHB(policyUpliftMax)}` })
+                          : t('pricing.boundsNotSetNoRange')}
+                      </div>
+                    )}
+                    <BoundsPairInputs
+                      label={t('pricing.usedPriceRange')}
+                      minValue={usedRetailMin} maxValue={usedRetailMax}
+                      onMinChange={setUsedRetailMin} onMaxChange={setUsedRetailMax}
+                      disabled={busy} t={t}
+                    />
+                    <BoundsPairInputs
+                      label={t('pricing.usedUpliftRange')}
+                      minValue={usedUpliftMin} maxValue={usedUpliftMax}
+                      onMinChange={setUsedUpliftMin} onMaxChange={setUsedUpliftMax}
+                      disabled={busy} t={t}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <ReadOnlyPriceRow
+                      label={t('pricing.upliftBounds')}
+                      value={profile?.bounds_set
+                        ? fmtRange(profile.uplift_min, profile.uplift_max) ?? '—'
+                        : (policyUpliftMax != null
+                          ? t('pricing.boundsNotSet', { range: `0–${formatTHB(policyUpliftMax)}` })
+                          : t('pricing.boundsNotSetNoRange'))}
+                    />
+                    {profile?.used_set && (
+                      <>
+                        <ReadOnlyPriceRow label={t('pricing.usedPriceRange')} value={fmtRange(profile.used_retail_min, profile.used_retail_max) ?? '—'} />
+                        <ReadOnlyPriceRow label={t('pricing.usedUpliftRange')} value={fmtRange(profile.used_uplift_min, profile.used_uplift_max) ?? '—'} />
+                      </>
+                    )}
+                  </>
+                ))}
+
+                {canEditAnyProfile && (
                   <Button
                     color="primary"
                     size="sm"
@@ -700,36 +765,8 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                   >
                     {isSaving ? t('pricing.saving') : t('pricing.savePrice')}
                   </Button>
-                </div>
-              ) : (
-                // Read-only profile — no PRICING.PRICEBOOK_MANAGE
-                <div className="space-y-1.5 text-sm">
-                  {[
-                    { label: t('pricing.retailPrice'), value: formatTHB(profile?.retail_price ?? null) },
-                    { label: t('pricing.costPrice'), value: formatTHB(profile?.cost_price ?? null) },
-                    { label: t('pricing.margin'), value: calcMargin(profile?.retail_price ?? null, profile?.cost_price ?? null) },
-                    ...(isContractable ? [
-                      {
-                        label: t('pricing.upliftBounds'),
-                        value: profile?.bounds_set
-                          ? fmtRange(profile.uplift_min, profile.uplift_max) ?? '—'
-                          : (policyUpliftMax != null
-                            ? t('pricing.boundsNotSet', { range: `0–${formatTHB(policyUpliftMax)}` })
-                            : t('pricing.boundsNotSetNoRange')),
-                      },
-                      ...(profile?.used_set ? [
-                        { label: t('pricing.usedPriceRange'), value: fmtRange(profile.used_retail_min, profile.used_retail_max) ?? '—' },
-                        { label: t('pricing.usedUpliftRange'), value: fmtRange(profile.used_uplift_min, profile.used_uplift_max) ?? '—' },
-                      ] : []),
-                    ] : []),
-                  ].map((row, i) => (
-                    <div key={i} className="flex items-center justify-between gap-3">
-                      <span className="text-subtle text-xs">{row.label}</span>
-                      <span className="tabular-nums text-right">{row.value}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+                )}
+              </div>
 
               {/* What the branch calculator resolves for this model */}
               {resolveInfo?.uplift_options && resolveInfo.uplift_options.length > 0 && (
@@ -799,7 +836,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                   <div className="alert alert-warning mb-3">
                     <AlertTriangle size={14} />
                     <div className="alert-description text-xs">
-                      {canManage
+                      {canManageFin2Terms
                         ? t('pricing.fin2EmptyAdmin')
                         : t('pricing.fin2EmptyStaff')}
                     </div>
@@ -812,6 +849,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                       <div key={term}>
                         <label className="form-label text-xs">{t('pricing.termMonths', { months: term })}</label>
                         <div className="flex items-center gap-2">
+                          {canEditFin2Profit ? (
                           <div className="input-group flex-1">
                             <MaskedInput
                               className="w-full"
@@ -833,7 +871,15 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                               {isSavingFin2 === term ? t('pricing.saving') : t('common.save')}
                             </Button>
                           </div>
-                          {canManage && (
+                          ) : (
+                            <div className="flex-1">
+                              <ReadOnlyPriceRow
+                                label={t('pricing.profitAmount')}
+                                value={formatTHB(row.fin2_profit_amount)}
+                              />
+                            </div>
+                          )}
+                          {canManageFin2Terms && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -849,8 +895,8 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                     );
                   })}
                 </div>
-                {/* Add term — HOLDING_ADMIN only */}
-                {canManage && (
+                {/* Add term — v_my_price_capabilities.fin2_terms */}
+                {canManageFin2Terms && (
                   <div className="mt-3 pt-3 border-t border-line space-y-2">
                     <div className="flex gap-2">
                       <div className="flex flex-col shrink-0">
@@ -907,10 +953,12 @@ export function PricebookPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const holdingId = user?.holding_id ?? null;
-  // Per-user grants (mig 1163): a granted company admin edits too — read
-  // v_my_permissions, never role_code.
-  const { hasPermission } = useMyPermissions();
-  const canManage = hasPermission('PRICING.PRICEBOOK_MANAGE');
+  // Price editability is per row × per cell (owner × contractable × grant), so
+  // the DB answers it: can_edit_* on each v_model_price_profile row, and
+  // v_my_price_capabilities for the page-level FIN2 term controls. Never
+  // v_my_permissions — a company admin holds no PRICING.* code yet prices its
+  // own items (NOTICE 2026-09-13, mig 1214–1216).
+  const { capabilities } = useMyPriceCapabilities();
   const navGuard = useNavGuard();
 
   // Table state
@@ -1406,7 +1454,7 @@ export function PricebookPage() {
                       baseModelName={selectedModel?.base_model_name ?? ''}
                       suffix={''}
                       isDirtyRef={editorDirtyRef}
-                      canManage={canManage}
+                      canManageFin2Terms={capabilities.fin2_terms}
                       policyUpliftMax={policyUpliftMax}
                     />
                   </div>

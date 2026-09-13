@@ -7,7 +7,7 @@ import { apiClient, ApiError } from '../../lib/api';
 import { makeDatePickerFormat } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavGuard } from '../../contexts/NavGuardContext';
-import { useMyPermissions } from '../../hooks/useMyPermissions';
+import { useMyPriceCapabilities } from '../../hooks/useMyPriceCapabilities';
 import { useFormSnapshot } from '../../hooks/useFormSnapshot';
 import { ModelName } from '../../components/ModelName';
 import { translateApiError } from '../../lib/apiErrors';
@@ -70,6 +70,11 @@ interface WorkbenchRow {
   missing_retail_price: boolean;
   missing_fin2_profit_rate: boolean;
   needs_price_setup: boolean;
+  // Per-row edit flags (mig 1214–1216) — permission depends on who owns the
+  // item and which grant the user holds, so the DB answers it per row.
+  can_edit_retail: boolean;
+  can_edit_cost: boolean;
+  can_edit_fin2_profit: boolean;
 }
 
 // Aggregated per model
@@ -207,6 +212,10 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
       return next;
     });
   }, [modelId, workbenchRows]);
+
+  // Per-row profit editability — every workbench row of this model carries the
+  // same answer for this model's FIN2 profit, so read it off the first one.
+  const canEditFin2Profit = workbenchRows.some(r => r.can_edit_fin2_profit);
 
   // FIN2 rows (deduplicated)
   const fin2Rows = useMemo(() => {
@@ -410,6 +419,7 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                   <div key={term} className="space-y-1.5">
                     <label className="form-label text-xs">{t('pricing.termMonths', { months: term })}</label>
                     <div className="flex items-center gap-2">
+                      {canEditFin2Profit ? (
                       <div className="input-group flex-1">
                         <MaskedInput
                           className="w-full"
@@ -431,6 +441,12 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                           {isSavingFin2 === term ? t('pricing.saving') : t('common.save')}
                         </Button>
                       </div>
+                      ) : (
+                        <div className="flex-1 flex items-center justify-between gap-3 text-sm">
+                          <span className="text-subtle text-xs">{t('pricing.profitAmount')}</span>
+                          <span className="tabular-nums text-right">{formatTHB(row.fin2_profit_amount)}</span>
+                        </div>
+                      )}
                       {canManageTerms && (
                         <Button
                           variant="ghost"
@@ -443,6 +459,8 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                         </Button>
                       )}
                     </div>
+                    {/* Effective-from only exists to stamp a save — no save, no picker. */}
+                    {canEditFin2Profit && (
                     <InputDatePicker
                       value={fin2EffectiveDates[term] ?? null}
                       onChange={(date) => setFin2EffectiveDates(prev => ({ ...prev, [term]: date }))}
@@ -469,7 +487,8 @@ function EditorPanel({ modelId, modelCode, familyName, baseModelName, suffix, is
                         return d;
                       }}
                     />
-                    {!fin2EffectiveDates[term] && (
+                    )}
+                    {canEditFin2Profit && !fin2EffectiveDates[term] && (
                       <div className="text-[10px] text-subtle">{t('fin2.effectiveFrom')}: {t('fin2.now')}</div>
                     )}
                   </div>
@@ -566,10 +585,11 @@ export function Fin2RatesPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const holdingId = user?.holding_id ?? null;
-  // Per-user grants (mig 1163): a granted company admin edits too — read
-  // v_my_permissions, never role_code.
-  const { hasPermission } = useMyPermissions();
-  const canManageTerms = hasPermission('PRICING.FIN2_RATE_MANAGE');
+  // v_my_price_capabilities.fin2_terms — adding/removing a FIN2 term. Per-row
+  // profit editability comes from the workbench row's can_edit_fin2_profit
+  // instead (NOTICE 2026-09-13, mig 1214–1216).
+  const { capabilities } = useMyPriceCapabilities();
+  const canManageTerms = capabilities.fin2_terms;
   const navGuard = useNavGuard();
 
   // Table state

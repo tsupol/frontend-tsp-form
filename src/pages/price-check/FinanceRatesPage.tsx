@@ -11,7 +11,6 @@ import { apiClient } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { fmtCurrency } from '../../lib/format';
 import { useMyCommercialModels } from '../../hooks/useMyCommercialModels';
-import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { useFormSnapshot } from '../../hooks/useFormSnapshot';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
@@ -28,8 +27,10 @@ import { ModalErrorBand } from '../../components/ModalErrorBand';
 //
 // Per model: a "+ราคา" uplift box (view-only negotiation aid — re-asks the
 // server for that one model), a "คำนวณ" jump into the FIN1 calculator, and —
-// only for holders of PRICING.PRICEBOOK_MANAGE via v_my_permissions — an edit
-// button that writes the retail price through fn_fin1_retail_set.
+// only where v_model_price_profile says can_edit_retail for THAT model — an
+// edit button that writes the retail price through fn_fin1_retail_set. The flag
+// is per model because permission depends on who owns the item and which grant
+// the user holds (NOTICE 2026-09-13, mig 1214–1216), not on a permission code.
 // ============================================================================
 
 interface SheetFamilyRow {
@@ -431,8 +432,6 @@ export function FinanceRatesPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { isHoldingCompany } = useMyCommercialModels();
-  const { hasPermission } = useMyPermissions();
-  const canEdit = hasPermission('PRICING.PRICEBOOK_MANAGE');
 
   // One combobox picks either a whole brand ("b:5") or a family ("f:178") —
   // typing "appl" surfaces the Apple brand row plus every Apple family.
@@ -557,6 +556,30 @@ export function FinanceRatesPage() {
 
   const terms = sheetData?.sheet.terms ?? [];
 
+  // Which of the models on screen this user may re-price. Per model, because
+  // permission is per row (owner × contractable × grant) — a company admin may
+  // edit only its own company's items, a FIN1 grantee only holding's
+  // contractable ones. Models the view hides come back missing = not editable.
+  const sheetModelIds = useMemo(() => {
+    const ids: number[] = [];
+    for (const fam of sheetData?.families ?? []) {
+      for (const m of fam.models) ids.push(m.model_id);
+    }
+    return ids;
+  }, [sheetData]);
+
+  const { data: editableModelIds } = useQuery({
+    queryKey: ['fin1-sheet-can-edit-retail', sheetModelIds],
+    queryFn: async () => {
+      const rows = await apiClient.get<{ model_id: number; can_edit_retail: boolean }[]>(
+        `/v_model_price_profile?model_id=in.(${sheetModelIds.join(',')})&select=model_id,can_edit_retail`,
+      );
+      return new Set(rows.filter(r => r.can_edit_retail).map(r => r.model_id));
+    },
+    enabled: sheetModelIds.length > 0,
+    staleTime: 60_000,
+  });
+
   const onSaved = () => {
     // fn_fin1_retail_set returns the model's new sheet, but invalidating keeps
     // every consumer (family counts, calculator price table) consistent too.
@@ -644,7 +667,7 @@ export function FinanceRatesPage() {
                           familyLabel={`${fam.brand_name} ${fam.family_name}`}
                           terms={terms}
                           ratesVisible={sheetData.rates_visible}
-                          canEdit={canEdit}
+                          canEdit={editableModelIds?.has(model.model_id) ?? false}
                           onEdit={setEditModel}
                           t={t}
                         />

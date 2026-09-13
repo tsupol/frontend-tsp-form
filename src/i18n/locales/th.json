@@ -7808,7 +7808,7 @@
   "permissionGrants": {
     "title": "สิทธิ์พิเศษรายคน",
     "navTitle": "สิทธิ์พิเศษรายคน",
-    "description": "สิทธิ์ที่ holding admin มอบให้ company admin เป็นรายคน ใช้ได้ในขอบเขต company ของคนนั้น",
+    "description": "holding admin มอบงานราคาที่ใช้คำนวณ FIN1/FIN2 ของสินค้า holding ให้ผู้ใช้เป็นรายคน — แก้แล้วมีผลทั้ง holding ไม่ใช่เฉพาะบริษัทของผู้รับ ผู้รับควรเป็นผู้ใช้ระดับบริษัท (company admin / company inventory)",
     "manageFor": "สิทธิ์พิเศษ",
     "granted": "มอบแล้ว",
     "revoked": "ถอนแล้ว",
@@ -7830,7 +7830,8 @@
     "history": "ประวัติ",
     "reloginHint": "ผู้ใช้จะเห็นผลเมื่อโหลดหน้าใหม่หรือ login ใหม่",
     "onlyHoldingAdmin": "เฉพาะ holding admin เท่านั้นที่มอบสิทธิ์ได้",
-    "companyScope": "ใช้ได้ในขอบเขต {{company}}"
+    "companyScope": "{{company}}",
+    "holdingWideHint": "สิทธิ์ที่มอบครอบคลุมราคาสินค้าของ holding — แก้แล้วมีผลทั้ง holding"
   },
   "fin1Plan": {
     "startHint": "แผน FIN1 คิดจากราคาตั้งของรุ่น กดต่อไปเพื่อเลือกจำนวนงวด เงินดาวน์ และราคาเพิ่ม",
