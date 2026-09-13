@@ -5505,7 +5505,13 @@
     "coLesseeRegistered": "ลงทะเบียนผู้เช่าร่วมแล้ว",
     "coLesseeSkippedMsg": "ข้ามผู้เช่าร่วม สามารถเพิ่มได้ภายหลัง",
     "photoUploaded": "อัพโหลดรูปภาพสำเร็จ",
-    "updateCustomer": "อัพเดตข้อมูลลูกค้า"
+    "updateCustomer": "อัพเดตข้อมูลลูกค้า",
+    "savingAppliedTitle": "สัญญานี้มีเงินออม",
+    "savingAppliedBalance": "ยอดเงินออม: {{amount}} ฿",
+    "savingAppliedBody": "ระบบใส่เงินออม {{amount}} ฿ เป็นรายการชำระด้วยกระเป๋าออมให้แล้ว ปรับแก้ได้หากไม่ต้องการ",
+    "savingAppliedLeftover": "หลังชำระบิลนี้ จะเหลือเงินออม {{amount}} ฿",
+    "savingUnusedTitle": "ยังใช้เงินออมไม่ครบ",
+    "savingUnusedBody": "เงินออมอีก {{amount}} ฿ ไม่ได้ถูกนำมาใช้กับบิลนี้ ยืนยันหรือไม่?"
   },
   "wallet": {
     "allDisabled": "บริษัทนี้ไม่ได้เปิดใช้กระเป๋าเงิน",

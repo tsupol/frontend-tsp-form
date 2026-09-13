@@ -5511,7 +5511,13 @@
     "coLesseeRegistered": "Co-lessee registered",
     "coLesseeSkippedMsg": "Co-lessee was skipped. You can add one later.",
     "photoUploaded": "Photo uploaded successfully",
-    "updateCustomer": "Update Customer"
+    "updateCustomer": "Update Customer",
+    "savingAppliedTitle": "This contract has saved money",
+    "savingAppliedBalance": "Saving balance: {{amount}} ฿",
+    "savingAppliedBody": "{{amount}} ฿ has been filled in as a Saving Wallet payment for you. Adjust it if that is not what you want.",
+    "savingAppliedLeftover": "{{amount}} ฿ will remain in the saving wallet after this bill.",
+    "savingUnusedTitle": "Saving money left unused",
+    "savingUnusedBody": "{{amount}} ฿ of the saving balance is not being used on this bill. Are you sure?"
   },
   "wallet": {
     "allDisabled": "No wallets enabled for this company",

@@ -20,6 +20,8 @@ import { BillCart, type DraftCartLine } from './BillCart';
 import { signContractOpenParties } from './signContractOpenParties';
 import { translateApiError } from '../../../lib/apiErrors';
 import { useAuth } from '../../../contexts/AuthContext';
+import { buildSavingSeededPayments, savingApplied, unusedSaving } from '../savingAutoFill';
+import { SavingAppliedDialog, SavingUnusedWarning } from '../SavingAppliedNotice';
 
 /* ─────────────────────────────────────────────────────────────────────────────
    ⚠️  ONE-GO ACTIVATION — DO NOT FIRE BILL/ACTIVATE RPCs ON MOUNT.
@@ -119,22 +121,48 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
     return opts;
   }, [savingBalance, t, isDealPartner]);
 
+  // Saving wallet is auto-spent on open (owner request — see savingAutoFill.ts).
+  // DEAL_PARTNER bills take only PARTNER_COLLECT, so no wallet row there.
+  const savingAutoFillOn = !isDealPartner && savingBalance > 0;
+  const savingUsable = savingAutoFillOn ? savingApplied(savingBalance, totalAmount) : 0;
+
   const [payments, setPayments] = useState<PaymentLine[]>(() => {
-    const defaultMethod: PaymentMethod = isDealPartner
-      ? 'PARTNER_COLLECT'
-      : savingBalance > 0 && savingBalance >= totalAmount ? 'SAVING_WALLET' : 'CASH';
-    return [{ method: defaultMethod, amount: totalAmount, bank_account_id: null }];
+    if (isDealPartner) {
+      return [{ method: 'PARTNER_COLLECT' as PaymentMethod, amount: totalAmount, bank_account_id: null }];
+    }
+    return buildSavingSeededPayments(savingBalance, totalAmount) as PaymentLine[];
   });
-  // Auto-sync the single default payment row's amount to the cart total
-  // until the user manually edits a row.
+  // Auto-sync the default payment rows to the cart total until the user
+  // manually edits a row. With a saving balance this re-seeds both rows
+  // (wallet + remainder) so the split follows the cart as lines are added.
   const userEditedPayments = useRef(false);
   useEffect(() => {
     if (userEditedPayments.current) return;
+    if (savingAutoFillOn) {
+      setPayments(prev => {
+        const next = buildSavingSeededPayments(savingBalance, totalAmount) as PaymentLine[];
+        const same = prev.length === next.length
+          && prev.every((p, i) => p.method === next[i].method && p.amount === next[i].amount);
+        return same ? prev : next;
+      });
+      return;
+    }
     if (payments.length !== 1) return;
     if (payments[0].amount === totalAmount) return;
     setPayments([{ ...payments[0], amount: totalAmount }]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [totalAmount]);
+  }, [totalAmount, savingAutoFillOn, savingBalance]);
+
+  // Announce the saving balance once, when the panel first has something to
+  // apply it to. Staff kept missing it entirely — the dialog is the request.
+  const [savingDialogOpen, setSavingDialogOpen] = useState(false);
+  const savingDialogShown = useRef(false);
+  useEffect(() => {
+    if (savingDialogShown.current) return;
+    if (!savingAutoFillOn || savingUsable <= 0) return;
+    savingDialogShown.current = true;
+    setSavingDialogOpen(true);
+  }, [savingAutoFillOn, savingUsable]);
 
   // Single override-aware receiving account for this (own) branch. Used to
   // label the printed receipt's TRANSFER lines; the picker auto-selects it.
@@ -545,6 +573,10 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
               {fmtCurrency(totalPayment)}
             </span>
           </div>
+
+          {/* Saving wallet left on the table — the "removed it / didn't use it
+              all" alert the owner asked for. Never blocks Confirm. */}
+          <SavingUnusedWarning unused={savingAutoFillOn ? unusedSaving(payments, savingBalance, totalAmount) : 0} />
         </div>
         )}
 
@@ -633,6 +665,15 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
           </Button>
         </div>
       </div>
+
+      {/* Saving balance announce — fires once when the panel opens on a
+          contract that has savings to spend. Always mounted. */}
+      <SavingAppliedDialog
+        open={savingDialogOpen}
+        onClose={() => setSavingDialogOpen(false)}
+        savingBalance={savingBalance}
+        applied={savingUsable}
+      />
 
       {/* Task #4 — 2-step confirm before opening a no-charge contract. Always
           mounted; visibility via `open`. */}

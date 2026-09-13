@@ -48,6 +48,8 @@ import { ResumeContractModal } from './ResumeContractModal';
 import { useContractInvalidate } from './useContractInvalidate';
 import { useCompanyFeatures } from '../../hooks/useCompanyFeatures';
 import { translateApiError } from '../../lib/apiErrors';
+import { buildSavingSeededPayments, savingApplied, unusedSaving } from './savingAutoFill';
+import { SavingAppliedDialog, SavingUnusedWarning } from './SavingAppliedNotice';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -2563,13 +2565,17 @@ function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
   const [payments, setPayments] = useState<PaymentLine[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // Saving wallet is auto-spent here too (see savingAutoFill.ts) — this modal
+  // is the resume path for a contract already at PENDING_PAYMENT.
+  const savingUsable = savingApplied(savingBalance, totalAmount);
+  const [savingDialogOpen, setSavingDialogOpen] = useState(false);
 
   // Reset when opened
   useEffect(() => {
     if (open && totalAmount > 0) {
-      const defaultMethod: PaymentMethod = savingBalance >= totalAmount ? 'SAVING_WALLET' : 'CASH';
-      setPayments([{ method: defaultMethod, amount: totalAmount, bank_account_id: null }]);
+      setPayments(buildSavingSeededPayments(savingBalance, totalAmount) as PaymentLine[]);
       setError('');
+      setSavingDialogOpen(savingApplied(savingBalance, totalAmount) > 0);
     }
   }, [open, totalAmount, savingBalance]);
 
@@ -2714,6 +2720,9 @@ function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
                 {fmtCurrency(totalPayment)}
               </span>
             </div>
+
+            {/* Saving wallet left unspent — warn, never block. */}
+            <SavingUnusedWarning unused={unusedSaving(payments, savingBalance, totalAmount)} />
           </div>
         )}
       </div>
@@ -2728,6 +2737,14 @@ function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
           {loading ? t('common.loading') : t('wizard.confirmPayment')}
         </Button>
       </div>
+
+      {/* Saving balance announce — always mounted, `open` controls it. */}
+      <SavingAppliedDialog
+        open={savingDialogOpen}
+        onClose={() => setSavingDialogOpen(false)}
+        savingBalance={savingBalance}
+        applied={savingUsable}
+      />
     </Modal>
   );
 }
