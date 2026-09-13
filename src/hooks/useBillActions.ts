@@ -37,7 +37,26 @@ export type BillBlockingReason =
   | 'bill_already_reversed'
   // WAIVE_LATE_FEE guards (mig 1159): not a late-fee bill / nothing unpaid left to waive
   | 'charge_type_not_match'
-  | 'nothing_remaining';
+  | 'nothing_remaining'
+  // Previous-day guards (mig 1213). fn_bill_cancel has always refused a PAID bill
+  // while the branch's earlier day was still open; now the evaluator says so up
+  // front instead of letting the click fail. Two distinct cases:
+  //   previous_day_not_closed — the bill is today's; close `unclosed_date` and retry
+  //   previous_day_bill       — the bill itself belongs to that still-open earlier
+  //                             day; the shop can never cancel it, a system admin must
+  | 'previous_day_not_closed'
+  | 'previous_day_bill';
+
+/** Facts behind a blocking reason, for interpolation into its message.
+ *  Populated only for the mig-1213 previous-day reasons; `null` otherwise. */
+export interface BillBlockingParams {
+  bill_date?: string;
+  unclosed_date?: string;
+  today?: string;
+  // Open-ended: a later migration can add facts to a reason without this type
+  // having to know them, and the message just interpolates whatever arrives.
+  [key: string]: unknown;
+}
 
 export interface BillAction {
   action_code: BillActionCode;
@@ -45,6 +64,7 @@ export interface BillAction {
   rpc_name: string;
   is_available: boolean;
   blocking_reason: BillBlockingReason | null;
+  blocking_params: BillBlockingParams | null;
   require_pin: boolean;
   creates_credit_note: boolean;
   target_status: string | null;

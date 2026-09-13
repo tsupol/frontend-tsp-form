@@ -29,7 +29,7 @@ import { useBillActions, type BillAction, type BillActionCode } from '../../hook
 import { useVoidReasons } from '../../hooks/useVoidReasons';
 import { SearchInput } from '../../components/SearchInput';
 import { BillReceipt } from '../contracts/workspace/BillReceipt';
-import { translateApiError } from '../../lib/apiErrors';
+import { blockingReasonText, translateApiError } from '../../lib/apiErrors';
 
 /* ── Types ── */
 
@@ -579,6 +579,28 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
     setPayments(prev => prev.map((p, i) => i === idx ? { ...p, ...updates } : p));
   };
 
+  // Refresh everything a bill mutation touches. Besides the bill itself, paying
+  // or cancelling a contract bill moves money on the contract: cancelling one
+  // that only partly covered an installment drops that installment back from
+  // PAID to PENDING (mig 1212), so paid-installment count, outstanding amount
+  // and the installments tab badge all change. Those live under `contract-*`
+  // keys, which the `['accounting']` sweep in onBillChanged never reaches.
+  const invalidateAfterBillChange = () => {
+    queryClient.invalidateQueries({ queryKey: ['accounting', 'bill-detail', billId] });
+    queryClient.invalidateQueries({ queryKey: ['bill-actions', billId] });
+    const contractId = detail.contract_id;
+    if (contractId) {
+      queryClient.invalidateQueries({ queryKey: ['contract-detail', contractId] });
+      queryClient.invalidateQueries({ queryKey: ['contract-installments', contractId] });
+      queryClient.invalidateQueries({ queryKey: ['contract-installments-due-count', contractId] });
+      queryClient.invalidateQueries({ queryKey: ['contract-txns', contractId] });
+      queryClient.invalidateQueries({ queryKey: ['contract-txns-count', contractId] });
+      queryClient.invalidateQueries({ queryKey: ['contract-payments', contractId] });
+      queryClient.invalidateQueries({ queryKey: ['contract-actions', contractId] });
+      queryClient.invalidateQueries({ queryKey: ['contract-search'] });
+    }
+  };
+
   const handlePay = async () => {
     if (!isPayBalanced) return;
     setPaying(true);
@@ -596,8 +618,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
       if (detail.contract_id) confirmParams.p_contract_id = detail.contract_id;
       await apiClient.rpc('fn_bill_payment_confirm', confirmParams);
       setPayments([]);
-      queryClient.invalidateQueries({ queryKey: ['accounting', 'bill-detail', billId] });
-      queryClient.invalidateQueries({ queryKey: ['bill-actions', billId] });
+      invalidateAfterBillChange();
       onBillChanged();
     } catch (err) {
       if (err instanceof ApiError) {
@@ -627,8 +648,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
       setVoidReason('');
       setVoidReasonCode('');
       setVoidPin('');
-      queryClient.invalidateQueries({ queryKey: ['accounting', 'bill-detail', billId] });
-      queryClient.invalidateQueries({ queryKey: ['bill-actions', billId] });
+      invalidateAfterBillChange();
       // If a CREDIT_NOTE was minted (cancelling a PAID bill), surface its code in the toast.
       const enriched = hasBill(result) && result.bill_type === 'CREDIT_NOTE'
         ? buildBillActionToast(result, t)
@@ -1076,8 +1096,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
         payment={voidPayment}
         onClose={() => setVoidPayment(null)}
         onVoided={() => {
-          queryClient.invalidateQueries({ queryKey: ['accounting', 'bill-detail', billId] });
-          queryClient.invalidateQueries({ queryKey: ['bill-actions', billId] });
+          invalidateAfterBillChange();
           onBillChanged();
         }}
       />
@@ -1089,8 +1108,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
         billTotal={detail.total_amount}
         onClose={() => setCorrectLine(null)}
         onCorrected={() => {
-          queryClient.invalidateQueries({ queryKey: ['accounting', 'bill-detail', billId] });
-          queryClient.invalidateQueries({ queryKey: ['bill-actions', billId] });
+          invalidateAfterBillChange();
           onBillChanged();
         }}
       />
@@ -1103,8 +1121,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
         billCode={detail.bill_code_display}
         billAmount={detail.total_amount}
         onReversed={() => {
-          queryClient.invalidateQueries({ queryKey: ['accounting', 'bill-detail', billId] });
-          queryClient.invalidateQueries({ queryKey: ['bill-actions', billId] });
+          invalidateAfterBillChange();
           onBillChanged();
         }}
       />
@@ -1117,8 +1134,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
         billCode={detail.bill_code_display}
         remaining={remaining}
         onWaived={() => {
-          queryClient.invalidateQueries({ queryKey: ['accounting', 'bill-detail', billId] });
-          queryClient.invalidateQueries({ queryKey: ['bill-actions', billId] });
+          invalidateAfterBillChange();
           onBillChanged();
         }}
       />
@@ -1131,8 +1147,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
         billCode={detail.bill_code_display}
         billAmount={detail.total_amount}
         onCancelled={() => {
-          queryClient.invalidateQueries({ queryKey: ['accounting', 'bill-detail', billId] });
-          queryClient.invalidateQueries({ queryKey: ['bill-actions', billId] });
+          invalidateAfterBillChange();
           // The day-close was recomputed to a new version — refresh those views too.
           queryClient.invalidateQueries({ queryKey: ['day-close'] });
           onBillChanged();
@@ -1403,9 +1418,15 @@ function BillActionBar({ actions, suppressLifecycle, onVoidOrCancel, onCancelClo
   // LIFECYCLE-category action's predicate. Actually simplest: derive from the
   // BE response's is_available across known status-keyed actions. We just need
   // a key into PRIMARY_BY_STATUS — fall back to OPEN if we can't tell.
+  // A PAID bill is still PAID when the previous-day guard (mig 1213) blocks
+  // VOID_BILL — the verb belongs in the footer, disabled, carrying the reason.
+  // Without this it infers VOIDED, primaryActions comes out empty, and the one
+  // button that explains the block hides inside the More dropdown.
+  const PREVIOUS_DAY_REASONS = new Set(['previous_day_not_closed', 'previous_day_bill']);
   const inferredStatus =
     actions.find(a => a.action_code === 'CONFIRM_PAYMENT' && a.is_available) ? 'PARTIAL'
     : actions.find(a => a.action_code === 'VOID_BILL' && a.is_available) ? 'PAID'
+    : actions.find(a => a.action_code === 'VOID_BILL' && a.blocking_reason && PREVIOUS_DAY_REASONS.has(a.blocking_reason)) ? 'PAID'
     // Day-closed PAID bill: VOID_BILL is blocked, CANCEL_CLOSED_DAY is the live verb.
     : actions.find(a => a.action_code === 'CANCEL_CLOSED_DAY' && a.is_available) ? 'PAID_CLOSED'
     : actions.find(a => a.action_code === 'CANCEL_BILL' && a.is_available) ? 'OPEN'
@@ -1461,7 +1482,7 @@ function BillActionBar({ actions, suppressLifecycle, onVoidOrCancel, onCancelClo
       lines.push(t('accounting.bills.notWired'));
     }
     if (!a.is_available && a.blocking_reason) {
-      lines.push(t(`blockingReason.${a.blocking_reason}`, { ns: 'apiErrors', defaultValue: a.blocking_reason }));
+      lines.push(blockingReasonText(a, t));
     }
 
     const tooltipContent: React.ReactNode = lines.length === 1
