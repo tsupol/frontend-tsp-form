@@ -1101,6 +1101,11 @@ export function DealPartnerRatesPage() {
     </Badge>
   );
 
+  // Five columns, not nine. The three rate columns said one thing three
+  // times, and the two fees are one question ("what does this shop charge?"),
+  // so each pair shares a cell with the secondary figure under the primary.
+  // The return branch moved out entirely — it is set in the modal and is not
+  // something you scan a list for.
   const columns: ColumnDef<BranchConfigRow>[] = [
     {
       accessorKey: 'branch_name',
@@ -1113,34 +1118,33 @@ export function DealPartnerRatesPage() {
       ),
     },
     {
-      accessorKey: 'branch_rate_percent',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.branchRate')} />,
-      cell: ({ row }) => <span className="text-sm tabular-nums">{fmtPct(row.original.branch_rate_percent)}</span>,
-      className: 'w-24',
-    },
-    {
-      accessorKey: 'company_rate_percent',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.companyRate')} />,
-      cell: ({ row }) => <span className="text-sm tabular-nums">{fmtPct(row.original.company_rate_percent)}</span>,
-      className: 'w-24',
-    },
-    {
       accessorKey: 'total_rate_percent',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.totalRate')} />,
-      cell: ({ row }) => <span className="text-sm tabular-nums font-medium">{fmtPct(row.original.total_rate_percent)}</span>,
-      className: 'w-24',
+      cell: ({ row }) => (
+        <div className="min-w-0">
+          <div className="text-sm tabular-nums font-medium">{fmtPct(row.original.total_rate_percent)}</div>
+          <div className="text-xs text-subtle tabular-nums truncate">
+            {t('dealPartnerRate.rateSplit', {
+              branch: fmtPct(row.original.branch_rate_percent),
+              company: fmtPct(row.original.company_rate_percent),
+            })}
+          </div>
+        </div>
+      ),
+      className: 'w-32',
     },
     {
       accessorKey: 'doc_fee_amount',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.docFeeAmount')} />,
-      cell: ({ row }) => <span className="text-sm tabular-nums">{fmtBaht(row.original.doc_fee_amount)}</span>,
-      className: 'w-28 max-md:hidden',
-    },
-    {
-      accessorKey: 'guarantee_return_fee_amount',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.guaranteeFeeAmount')} />,
-      cell: ({ row }) => <span className="text-sm tabular-nums">{fmtBaht(row.original.guarantee_return_fee_amount)}</span>,
-      className: 'w-28 max-lg:hidden',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.feesColumn')} />,
+      cell: ({ row }) => (
+        <div className="min-w-0">
+          <div className="text-sm tabular-nums">{fmtBaht(row.original.doc_fee_amount)}</div>
+          <div className="text-xs text-subtle tabular-nums truncate">
+            {t('dealPartnerRate.guaranteeFeeShort', { value: fmtBaht(row.original.guarantee_return_fee_amount) })}
+          </div>
+        </div>
+      ),
+      className: 'w-32 max-md:hidden',
     },
     {
       // Since mig 1217 this reflects `clawback_by_branch` — who repays the
@@ -1159,16 +1163,6 @@ export function DealPartnerRatesPage() {
           : <span className="text-sm text-warning-fg">{t('dealPartnerRate.payoutMissing')}</span>
       ),
       className: 'w-32 max-lg:hidden',
-    },
-    {
-      accessorKey: 'return_to_branch_name',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.returnBranch')} />,
-      cell: ({ row }) => (
-        <span className="text-sm text-subtle truncate max-w-36 block">
-          {row.original.return_to_branch_name ?? '—'}
-        </span>
-      ),
-      className: 'max-lg:hidden',
     },
     ...(canManage ? [{
       id: 'actions',
@@ -1211,13 +1205,17 @@ export function DealPartnerRatesPage() {
         <div className="mobile-header-end w-nav" />
       </MobileHeader>
 
-      <div className="page-content responsive-dvh-mobile-header">
-        <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
+      {/* Not `responsive-dvh-mobile-header`: that pins the page to 100dvh and
+          expects one flexing child. This page is a stack of cards (policy,
+          company terms, warehouses, shop table) that is taller than a screen,
+          so it scrolls in the app's own pane like a document instead. */}
+      <div className="page-content">
+        <div className="flex items-center justify-between mb-4 max-md:hidden">
           <h1 className="heading-2">{t('dealPartnerRate.title')}</h1>
         </div>
 
         {/* Holding policy — the default every new deal partner branch starts from */}
-        <div className="flex-none rounded-lg border border-line p-4 mb-4 max-md:mt-3">
+        <div className="rounded-lg border border-line p-4 mb-4 max-md:mt-3">
           <div className="flex items-start justify-between gap-3 mb-3">
             <div className="min-w-0">
               <div className="font-medium">{t('dealPartnerRate.policyTitle')}</div>
@@ -1304,7 +1302,7 @@ export function DealPartnerRatesPage() {
             which internal branches may receive returned devices. */}
         <DealPartnerCompanySection canManage={canManage} />
 
-        <div className="flex-none text-sm font-medium mb-2">{t('dealPartnerRate.branchConfigs')}</div>
+        <div className="text-sm font-medium mb-2">{t('dealPartnerRate.branchConfigs')}</div>
 
         <DataTable<BranchConfigRow>
           data={paginated}
@@ -1317,13 +1315,13 @@ export function DealPartnerRatesPage() {
           pageSizeOptions={[10, 25, 50]}
           rowCount={totalCount}
           onPageChange={({ pageIndex: pi, pageSize: ps }) => { setPageIndex(pi); setPageSize(ps); }}
-          className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60' : ''} transition-opacity`}
+          className={`hidden md:flex ${isFetching ? 'opacity-60' : ''} transition-opacity`}
           noResults={<div className="p-8 text-center text-subtle">{t('dealPartnerRate.empty')}</div>}
         />
 
         {/* Mobile cards */}
-        <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60' : ''} transition-opacity`}>
-          <div className="flex-1 overflow-auto better-scroll pb-8">
+        <div className={`flex flex-col md:hidden ${isFetching ? 'opacity-60' : ''} transition-opacity`}>
+          <div className="pb-8">
             {configs.length === 0 ? (
               <div className="p-8 text-center text-subtle">{t('dealPartnerRate.empty')}</div>
             ) : (

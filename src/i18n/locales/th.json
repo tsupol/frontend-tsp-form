@@ -2343,7 +2343,13 @@
     "clawbackDefaultIs": "ค่าเริ่มต้นของ holding: {{value}}",
     "noWarehouseForCompany": "company นี้ยังไม่มีคลังรับคืน — ติ๊กเลือกคลังในส่วนระดับ company ด้านบนก่อน",
     "payoutColumn": "บัญชีรับเงินร้าน",
-    "payoutMissing": "ยังไม่ตั้ง"
+    "payoutMissing": "ยังไม่ตั้ง",
+    "rateSplit": "ร้าน {{branch}} · company {{company}}",
+    "feesColumn": "ค่าทำสัญญา / ค่าคืนเครื่อง",
+    "guaranteeFeeShort": "คืนเครื่อง {{value}}",
+    "warehouseGroupWithCount": "เป็นคลัง {{count}}/{{total}} สาขา",
+    "warehouseGroupNone": "ยังไม่มีคลัง (จาก {{total}} สาขา)",
+    "warehouseGroupHasPartner": "มีร้าน deal partner"
   },
   "branchStock": {
     "retailTab": "ขายปลีก",

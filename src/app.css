@@ -994,3 +994,19 @@ input[type="number"
     font-weight: 600;
     font-variant-numeric: tabular-nums;
 }
+
+/* tsp-form's Checkbox hides its real <input> with the sr-only pattern
+   (`position: absolute` + 1px + clip) but gives it no positioned ancestor, so
+   the input resolves against the viewport rather than its own row. Inside a
+   scrolling pane that means it keeps its natural document offset, escapes
+   every overflow clip above it, and stretches documentElement.scrollHeight to
+   reach it — a whole-page scrollbar alongside the pane's own. Measured on the
+   deal partner terms page: 22 checkboxes below the fold took scrollHeight
+   from 1100 (the viewport) to 2017. One positioned parent pins it back.
+   Remove once tsp-form ships `position: relative` on the checkbox wrapper. */
+.checkbox-wrapper,
+label:has(> .checkbox-hidden),
+div:has(> .checkbox-hidden) {
+    position: relative;
+}
+

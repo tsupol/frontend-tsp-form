@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Select, Checkbox, Badge } from 'tsp-form';
-import { AlertTriangle, Building2, Warehouse, XCircle } from 'lucide-react';
+import { AlertTriangle, Building2, ChevronRight, Warehouse, XCircle } from 'lucide-react';
 import { apiClient } from '../lib/api';
 import { ApiError } from '../lib/api';
 import { translateApiError } from '../lib/apiErrors';
@@ -97,6 +97,13 @@ export function DealPartnerCompanySection({ canManage }: { canManage: boolean })
   const [companyErrors, setCompanyErrors] = useState<Record<number, string>>({});
   const [savingBranchId, setSavingBranchId] = useState<number | null>(null);
   const [warehouseErrors, setWarehouseErrors] = useState<Record<number, string>>({});
+  // Only holds groups the user has toggled; everything else falls back to the
+  // group's own `defaultOpen`, so the open/closed default can change with the
+  // data without stale state pinning a group shut.
+  const [openGroups, setOpenGroups] = useState<Record<number, boolean>>({});
+
+  const toggleGroup = (companyId: number, defaultOpen: boolean) =>
+    setOpenGroups(prev => ({ ...prev, [companyId]: !(prev[companyId] ?? defaultOpen) }));
 
   const { data: companyConfigs = [], isLoading: companiesLoading, error: companiesError } = useQuery({
     queryKey: ['deal-partner-company-configs'],
@@ -108,9 +115,16 @@ export function DealPartnerCompanySection({ canManage }: { canManage: boolean })
     queryFn: () => apiClient.get<WarehouseRow[]>('/v_deal_partner_warehouses'),
   });
 
-  // The view is holding-wide and unsorted by company; group it so each company
-  // reads as one block instead of an interleaved 22-row list.
+  // The view is holding-wide and unsorted: every internal branch in the holding,
+  // which on DEV is 22 rows across 5 companies. Rendered flat that is far taller
+  // than the rest of the page put together, and most of it is companies that
+  // have no deal partner at all. So: group by company, collapse each group, and
+  // open only the ones with something to see (a warehouse already ticked, or a
+  // deal partner shop that needs one). Companies that matter sort first.
   const warehousesByCompany = useMemo(() => {
+    const partnerCompanyIds = new Set(
+      companyConfigs.filter(c => c.deal_partner_branch_count > 0).map(c => c.company_id),
+    );
     const groups = new Map<number, { companyName: string; rows: WarehouseRow[] }>();
     for (const row of warehouses) {
       let group = groups.get(row.company_id);
@@ -124,9 +138,35 @@ export function DealPartnerCompanySection({ canManage }: { canManage: boolean })
       group.rows.sort((a, b) => a.branch_name.localeCompare(b.branch_name, 'th'));
     }
     return [...groups.entries()]
-      .map(([companyId, group]) => ({ companyId, ...group }))
-      .sort((a, b) => a.companyName.localeCompare(b.companyName, 'th'));
-  }, [warehouses]);
+      .map(([companyId, group]) => {
+        const warehouseCount = group.rows.filter(r => r.is_company_warehouse).length;
+        return {
+          companyId,
+          ...group,
+          warehouseCount,
+          hasPartner: partnerCompanyIds.has(companyId),
+          defaultOpen: warehouseCount > 0 || partnerCompanyIds.has(companyId),
+        };
+      })
+      .sort((a, b) => {
+        // Companies with a deal partner first, then ones already holding a
+        // warehouse, then the rest alphabetically.
+        if (a.hasPartner !== b.hasPartner) return a.hasPartner ? -1 : 1;
+        if ((a.warehouseCount > 0) !== (b.warehouseCount > 0)) return a.warehouseCount > 0 ? -1 : 1;
+        return a.companyName.localeCompare(b.companyName, 'th');
+      });
+  }, [warehouses, companyConfigs]);
+
+  // Companies that actually have a deal partner shop first — the setting is
+  // meaningless for the rest, and on DEV they are the majority of the list.
+  const sortedCompanyConfigs = useMemo(
+    () => [...companyConfigs].sort((a, b) => {
+      const aHas = a.deal_partner_branch_count > 0, bHas = b.deal_partner_branch_count > 0;
+      if (aHas !== bHas) return aHas ? -1 : 1;
+      return a.company_name.localeCompare(b.company_name, 'th');
+    }),
+    [companyConfigs],
+  );
 
   const ownerOptions = useMemo(
     () => [
@@ -191,7 +231,7 @@ export function DealPartnerCompanySection({ canManage }: { canManage: boolean })
   };
 
   return (
-    <div className="flex-none rounded-lg border border-line p-4 mb-4">
+    <div className="rounded-lg border border-line p-4 mb-4">
       {/* ── 3.1 Doc fee revenue owner ───────────────────────────────────── */}
       <div className="mb-3">
         <div className="font-medium flex items-center gap-1.5">
@@ -212,11 +252,11 @@ export function DealPartnerCompanySection({ canManage }: { canManage: boolean })
         <div className="text-sm text-subtle">{t('dealPartnerRate.noCompanies')}</div>
       ) : (
         <div className="flex flex-col divide-y divide-line border-y border-line">
-          {companyConfigs.map((row) => {
+          {sortedCompanyConfigs.map((row) => {
             const isSaving = savingCompanyId === row.company_id;
             const rowError = companyErrors[row.company_id];
             return (
-              <div key={row.company_id} className="py-3 flex flex-col gap-2">
+              <div key={row.company_id} className="px-3 py-3 flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div className="min-w-0">
                     <div className="text-sm font-medium truncate">{row.company_name}</div>
@@ -286,17 +326,54 @@ export function DealPartnerCompanySection({ canManage }: { canManage: boolean })
         ) : warehousesByCompany.length === 0 ? (
           <div className="text-sm text-subtle">{t('dealPartnerRate.noWarehouseBranches')}</div>
         ) : (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
             {warehousesByCompany.map((group) => (
-              <div key={group.companyId}>
-                <div className="text-xs font-medium text-subtle mb-2">{group.companyName}</div>
-                <div className="flex flex-col divide-y divide-line border-y border-line">
+              // Not CollapsiblePanel: it types `title` as a plain string and
+              // renders it as one text node, so the company name and the count
+              // cannot be styled apart — and its header is sized for a page
+              // section, not a list subheading.
+              <div key={group.companyId} className="rounded-md border border-line overflow-hidden">
+                <button
+                  type="button"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-left bg-surface hover:bg-surface-hover transition-colors cursor-pointer border-none"
+                  onClick={() => toggleGroup(group.companyId, group.defaultOpen)}
+                  aria-expanded={openGroups[group.companyId] ?? group.defaultOpen}
+                >
+                  <ChevronRight
+                    size={16}
+                    className={`shrink-0 text-subtle transition-transform ${(openGroups[group.companyId] ?? group.defaultOpen) ? 'rotate-90' : ''}`}
+                  />
+                  <span className="text-sm font-medium min-w-0 truncate">{group.companyName}</span>
+                  {/* A company with a warehouse gets a badge so a collapsed
+                      group still says whether anything is set inside it; the
+                      rest stay quiet text so only the answered ones stand out.
+                      The branch total is the trailing hint either way. */}
+                  {group.warehouseCount > 0 ? (
+                    <Badge color="success" size="sm">
+                      {t('dealPartnerRate.warehouseGroupWithCount', {
+                        count: group.warehouseCount,
+                        total: group.rows.length,
+                      })}
+                    </Badge>
+                  ) : (
+                    <span className="text-xs text-subtle min-w-0 truncate">
+                      {t('dealPartnerRate.warehouseGroupNone', { total: group.rows.length })}
+                    </span>
+                  )}
+                  {group.hasPartner && (
+                    <Badge color="info" size="sm">
+                      {t('dealPartnerRate.warehouseGroupHasPartner')}
+                    </Badge>
+                  )}
+                </button>
+                {(openGroups[group.companyId] ?? group.defaultOpen) && (
+                <div className="flex flex-col divide-y divide-line border-t border-line">
                   {group.rows.map((row) => {
                     const isSaving = savingBranchId === row.branch_id;
                     const rowError = warehouseErrors[row.branch_id];
                     const shops = row.return_shops ?? [];
                     return (
-                      <div key={row.branch_id} className="py-2.5 flex flex-col gap-1.5">
+                      <div key={row.branch_id} className="px-3 py-2.5 flex flex-col gap-1.5">
                         <div className="flex items-start gap-2.5">
                           <div className="pt-0.5 shrink-0">
                             <Checkbox
@@ -337,6 +414,7 @@ export function DealPartnerCompanySection({ canManage }: { canManage: boolean })
                     );
                   })}
                 </div>
+                )}
               </div>
             ))}
           </div>
