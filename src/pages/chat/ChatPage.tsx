@@ -260,7 +260,13 @@ export function ChatPage() {
   useEffect(() => {
     if (!visibleContractIdsKey) return;
     const ids = visibleContractIdsKey.split(',').map(Number);
-    const refresh = () => {
+    // `chat_read` (the customer opened a room and read our messages) changes
+    // nothing in this list: unread counts and the nav badge count what the
+    // CUSTOMER sent to us, not what they read. Ignore it rather than pay 2
+    // requests per read receipt — see
+    // UI_FEEDBACK/2026-09-15_NOTICE_chat_read_event_live.md.
+    const refresh = (raw: unknown) => {
+      if ((raw as { type?: string } | null)?.type === 'chat_read') return;
       queryClient.invalidateQueries({ queryKey: ['chat-inbox'] });
       queryClient.invalidateQueries({ queryKey: ['nav', 'counters'] });
     };

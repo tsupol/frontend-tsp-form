@@ -232,6 +232,35 @@ export function ChatThreadPanel({
     });
   }, [contractId, queryClient]);
 
+  // A `chat_read` event means the customer opened the room and our messages up
+  // to `last_read_message_id` are now read. Nothing else on this screen changes
+  // — inbox, badge, slips and the status log are all about what the CUSTOMER
+  // sent, not what they read — so this flips the ticks in the cache and issues
+  // ZERO requests. See UI_FEEDBACK/2026-09-15_NOTICE_chat_read_event_live.md.
+  //
+  // Compare by `id` only, never `created_at`: some chat rows carry a display
+  // time rather than their insert time, so a staff message sent AFTER the
+  // customer read (higher id, possibly lower created_at) must stay unticked.
+  //
+  // Every loaded page is walked, not just page 0 — an unread message the user
+  // has scrolled back past lives in an older page.
+  const applyCustomerRead = useCallback((lastReadId: number, readAt: string | null) => {
+    if (contractId === null) return;
+    queryClient.setQueryData<InfiniteData<ChatMessage[]>>(
+      ['chat-messages', contractId],
+      (prev) => {
+        if (!prev) return prev;
+        let changed = false;
+        const pages = prev.pages.map(page => page.map((m) => {
+          if (m.sender_type !== 'STAFF' || m.is_read || m.id > lastReadId) return m;
+          changed = true;
+          return { ...m, is_read: true, read_at: readAt ?? m.read_at };
+        }));
+        return changed ? { ...prev, pages } : prev;
+      },
+    );
+  }, [contractId, queryClient]);
+
   // Reset composer state when switching threads
   useEffect(() => {
     setComposer('');
@@ -305,18 +334,34 @@ export function ChatThreadPanel({
 
     // Messages refresh page 0 rather than invalidate — see refreshNewestMessages.
     const onChatEvent = (raw: unknown) => {
+      const p = raw as {
+        type?: string;
+        sender_type?: string;
+        reader_side?: string;
+        read_at?: string | null;
+        last_read_message_id?: number;
+      };
+
+      // Read receipts update the cache in place and fetch nothing — this must
+      // stay ABOVE the refresh/reload calls below.
+      if (p?.type === 'chat_read' && p.reader_side === 'CUSTOMER') {
+        if (typeof p.last_read_message_id === 'number') {
+          applyCustomerRead(p.last_read_message_id, p.read_at ?? null);
+        }
+        return;
+      }
+
       refreshNewestMessages().catch(err => console.warn('[chat] refresh failed', err));
       reloadSidecars();
       // A customer message landing in the open room is being read right now —
       // mark it before the user has to leave and re-enter the thread.
-      const p = raw as { type?: string; sender_type?: string };
       if (p?.type === 'chat_message' && p.sender_type === 'CUSTOMER') markRead();
     };
 
     const unsubChat = wsClient.subscribe(`chat:contract:${contractId}`, onChatEvent);
     const unsubSlip = wsClient.subscribe(`slip:contract:${contractId}`, reloadSidecars);
     return () => { unsubChat(); unsubSlip(); };
-  }, [contractId, enabled, queryClient, refreshNewestMessages, markRead]);
+  }, [contractId, enabled, queryClient, refreshNewestMessages, markRead, applyCustomerRead]);
 
   // Snapshot the first unread CUSTOMER message ID on initial load — this
   // pins the "unread below" divider so it stays put as the user reads, just

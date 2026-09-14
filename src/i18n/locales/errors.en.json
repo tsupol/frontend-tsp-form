@@ -252,6 +252,8 @@
   "sale.validation.insurance_balance_insufficient": "Insurance wallet balance is insufficient",
   "SALE.VALIDATION.STATE_OR_CONTRACT_REQUIRED": "A contract is required for wallet payments",
   "sale.validation.state_or_contract_required": "A contract is required for wallet payments",
+  "SALE.INTERNAL.CREDIT_NOTE_NOT_SETTLED": "A credit note must be paid out in the same action — the whole action was cancelled. Nothing was saved; please try again.",
+  "sale.internal.credit_note_not_settled": "A credit note must be paid out in the same action — the whole action was cancelled. Nothing was saved; please try again.",
   "CONTRACT.AUTH.NOT_OWNED": "You are not authorized to access this contract",
   "RENDER_FAILED": "Failed to render the PDF. Please try again.",
   "PDF_RENDERER_UNAVAILABLE": "The PDF renderer is temporarily unavailable. Please try again later.",

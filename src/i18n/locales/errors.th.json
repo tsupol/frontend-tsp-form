@@ -252,6 +252,8 @@
   "sale.validation.insurance_balance_insufficient": "ยอดเงินในกระเป๋าประกันไม่พอ",
   "SALE.VALIDATION.STATE_OR_CONTRACT_REQUIRED": "การชำระด้วยกระเป๋าเงินต้องระบุสัญญา",
   "sale.validation.state_or_contract_required": "การชำระด้วยกระเป๋าเงินต้องระบุสัญญา",
+  "SALE.INTERNAL.CREDIT_NOTE_NOT_SETTLED": "ใบลดหนี้ต้องจ่ายเงินให้เสร็จในรายการเดียวกัน — ระบบยกเลิกรายการนี้ทั้งหมด ไม่มีอะไรถูกบันทึก กรุณาลองใหม่อีกครั้ง",
+  "sale.internal.credit_note_not_settled": "ใบลดหนี้ต้องจ่ายเงินให้เสร็จในรายการเดียวกัน — ระบบยกเลิกรายการนี้ทั้งหมด ไม่มีอะไรถูกบันทึก กรุณาลองใหม่อีกครั้ง",
   "CONTRACT.AUTH.NOT_OWNED": "คุณไม่มีสิทธิ์เข้าถึงสัญญานี้",
   "RENDER_FAILED": "สร้างไฟล์ PDF ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
   "PDF_RENDERER_UNAVAILABLE": "ระบบสร้าง PDF ไม่พร้อมใช้งานชั่วคราว กรุณาลองใหม่ภายหลัง",
