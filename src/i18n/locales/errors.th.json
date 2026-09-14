@@ -1058,5 +1058,9 @@
   "MDM.CONFLICT.ABM_ACCOUNT_NO_TENANT": "บัญชี ABM นี้ยังไม่ผูก org — แจ้งแอดมินผูก ABM ให้บัญชีนี้",
   "mdm.conflict.abm_account_no_tenant": "บัญชี ABM นี้ยังไม่ผูก org — แจ้งแอดมินผูก ABM ให้บัญชีนี้",
   "MDM.CONFLICT.ACTLOCK_PENDING": "มีงาน Activation Lock ค้างอยู่ — รอสักครู่แล้วลองใหม่",
-  "mdm.conflict.actlock_pending": "มีงาน Activation Lock ค้างอยู่ — รอสักครู่แล้วลองใหม่"
+  "mdm.conflict.actlock_pending": "มีงาน Activation Lock ค้างอยู่ — รอสักครู่แล้วลองใหม่",
+  "sale.partner.doc_fee_owner_invalid": "เจ้าของรายได้ค่าทำสัญญาต้องเป็น Holding หรือ Company",
+  "core.warehouse.branch_type": "คลังรับคืนเครื่อง deal partner ต้องเป็นสาขาภายในเท่านั้น",
+  "core.warehouse.in_use": "ยกเลิกคลังนี้ไม่ได้ เพราะมีร้าน deal partner ใช้เป็นคลังรับคืนเครื่องอยู่ — เปลี่ยนคลังของร้านก่อน",
+  "sale.warehouse.no_sales": "สาขานี้เป็นคลังรับคืนเครื่อง deal partner — เปิดสัญญาหรือขายปลีกไม่ได้"
 }

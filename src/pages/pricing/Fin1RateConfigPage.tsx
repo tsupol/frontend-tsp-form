@@ -50,9 +50,11 @@ interface Fin1Policy {
   uplift_max: number;
   branch_min_down_default: number;
   branch_max_down_default: number;
-  clawback_days: number;
-  clawback_min_paid: number;
-  clawback_notice_days: number;
+  // clawback_days / clawback_min_paid / clawback_notice_days used to live here.
+  // mig 1226 dropped them from v_fin1_policy and fn_fin1_policy_set now rejects
+  // the keys: the clawback rule is the commission on a FIN1 contract written
+  // through a deal partner shop, not a rate the holding applies to every
+  // branch, so it belongs to the deal partner terms page. Do not add it back.
   settlement_discount_min: number;
   settlement_discount_max: number;
 }

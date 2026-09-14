@@ -7,12 +7,20 @@ import {
   Button, Select, Modal, Badge, TextArea, MaskedInput, FormErrorMessage,
   type ColumnDef, type SortingState,
 } from 'tsp-form';
-import { ArrowRightFromLine, Pencil, Undo2, ChevronsRight, Receipt, ShieldCheck } from 'lucide-react';
+import { ArrowRightFromLine, Pencil, Undo2, ChevronsRight, Receipt, ShieldCheck, Undo, Landmark } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { translateApiError } from '../../lib/apiErrors';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { ActionDoneView } from '../contracts/ActionDoneView';
+import {
+  ClawbackTiersEditor, validateClawbackTiers, renumberTiers, type ClawbackTier,
+} from '../../components/ClawbackTiersEditor';
+import {
+  DealPartnerPayoutAccountField, useRefBanks, validatePayoutAccount,
+  payoutAccountDigits, EMPTY_PAYOUT_VALUE, type DealPartnerPayoutValue,
+} from '../../components/DealPartnerPayoutAccountField';
+import { DealPartnerCompanySection } from '../../components/DealPartnerCompanySection';
 
 // ============================================================================
 // Deal partner terms — mig 1154/1155 model, extended by migs 1173/1191/1192.
@@ -71,6 +79,14 @@ interface PolicyRow {
   guarantee_days: number;
   guarantee_days_uplift: number;
   approved_ttl_days: number;
+  // Clawback defaults (mig 1217) — the commission on a FIN1 contract written
+  // through a deal partner shop is taken back when the customer stops paying
+  // early. These four are the seed every new shop starts from; each shop can
+  // then override the first two plus its own tiers (§6b).
+  clawback_by_branch_default: boolean;
+  clawback_check_days: number;
+  clawback_notice_days: number;
+  clawback_tiers_default: ClawbackTier[];
   updated_at: string;
 }
 
@@ -100,11 +116,38 @@ interface BranchConfigRow {
   is_active: boolean;
   note: string | null;
   updated_at: string;
+  // Clawback, per shop (mig 1217). The `_default` triplet is the holding's
+  // value, carried along so the modal can show "same as default" and offer to
+  // put it back without a second query.
+  clawback_by_branch: boolean;
+  clawback_check_days: number;
+  clawback_tiers: ClawbackTier[];
+  clawback_by_branch_default: boolean;
+  clawback_check_days_default: number;
+  clawback_tiers_default: ClawbackTier[];
+  // Payout account — where the holding transfers this shop's money. The DB
+  // nulls all four for a viewer without the permission, so `has_payout_account`
+  // is the only honest way to tell "no account" from "not allowed to see it".
+  payout_bank_code: string | null;
+  payout_bank_name: string | null;
+  payout_account_no: string | null;
+  payout_account_name: string | null;
+  has_payout_account: boolean;
 }
 
-interface BranchLookup {
-  id: number;
-  name: string;
+/** v_deal_partner_warehouses — every internal branch in the holding, flagged.
+ *  Not pre-filtered, so a shop's return-branch options must be narrowed to
+ *  `is_company_warehouse` within that shop's own company. */
+interface WarehouseRow {
+  branch_id: number;
+  branch_code: string;
+  branch_name: string;
+  company_id: number;
+  company_name: string;
+  is_active: boolean;
+  is_company_warehouse: boolean;
+  return_shop_count: number;
+  return_shops: Array<{ branch_id: number; branch_name: string }> | null;
 }
 
 const fmtPct = (n: number) => `${Number(n)}%`;
@@ -126,6 +169,8 @@ interface PolicyFormData {
   guarantee_days: string;
   guarantee_days_uplift: string;
   approved_ttl_days: string;
+  clawback_check_days: string;
+  clawback_notice_days: string;
 }
 
 const EMPTY_POLICY_FORM: PolicyFormData = {
@@ -133,7 +178,18 @@ const EMPTY_POLICY_FORM: PolicyFormData = {
   doc_fee_min: '', doc_fee_max: '', doc_fee_default: '',
   guarantee_return_fee_min: '', guarantee_return_fee_max: '', guarantee_return_fee_default: '',
   guarantee_days: '', guarantee_days_uplift: '', approved_ttl_days: '',
+  clawback_check_days: '', clawback_notice_days: '',
 };
+
+/** Who repays the deal partner commission. Stored as a boolean on the row
+ *  (true = the shop), shown as a two-way choice. */
+const clawbackPartyOptions = (t: (k: string) => string) => [
+  { value: 'BRANCH', label: t('dealPartnerRate.clawbackPartyBranch') },
+  { value: 'COMPANY', label: t('dealPartnerRate.clawbackPartyCompany') },
+];
+
+const tiersEqual = (a: ClawbackTier[], b: ClawbackTier[]) =>
+  a.length === b.length && a.every((tier, i) => tier.paid === b[i].paid && tier.pct === b[i].pct);
 
 function PolicyModal({ open, onClose, policy, onSaved }: {
   open: boolean;
@@ -147,6 +203,13 @@ function PolicyModal({ open, onClose, policy, onSaved }: {
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+  // The tier table and the who-repays choice are not text fields, so they sit
+  // outside react-hook-form; `seededTiers` is what the modal opened with, which
+  // is what makes "is this dirty?" answerable for them.
+  const [clawbackByBranch, setClawbackByBranch] = useState(true);
+  const [tiers, setTiers] = useState<ClawbackTier[]>([]);
+  const [seededTiers, setSeededTiers] = useState<ClawbackTier[]>([]);
+  const [seededByBranch, setSeededByBranch] = useState(true);
 
   const { handleSubmit, control, formState: { errors, isDirty }, reset, watch } = useForm<PolicyFormData>({
     defaultValues: EMPTY_POLICY_FORM,
@@ -175,7 +238,15 @@ function PolicyModal({ open, onClose, policy, onSaved }: {
         guarantee_days: String(p.guarantee_days),
         guarantee_days_uplift: String(p.guarantee_days_uplift),
         approved_ttl_days: String(p.approved_ttl_days),
+        clawback_check_days: String(p.clawback_check_days),
+        clawback_notice_days: String(p.clawback_notice_days),
       } : EMPTY_POLICY_FORM);
+      const seedTiers = renumberTiers(p?.clawback_tiers_default ?? []);
+      const seedByBranch = p?.clawback_by_branch_default ?? true;
+      setTiers(seedTiers);
+      setSeededTiers(seedTiers);
+      setClawbackByBranch(seedByBranch);
+      setSeededByBranch(seedByBranch);
       setView('form');
       setResult(null);
       setErrorMessage('');
@@ -209,6 +280,12 @@ function PolicyModal({ open, onClose, policy, onSaved }: {
   const grtRangeInvalid = grtFilled && vGrtMax < vGrtMin;
   const grtDefaultInvalid = grtFilled && !grtRangeInvalid && (vGrtDef < vGrtMin || vGrtDef > vGrtMax);
 
+  // Clawback (mig 1217). The tier shape is checked here only to save a round
+  // trip — the DB is still the one that decides.
+  const tiersErrorKey = validateClawbackTiers(tiers);
+  const tiersIncomplete = tiers.some(tier => Number.isNaN(tier.pct));
+  const clawbackDirty = !tiersEqual(tiers, seededTiers) || clawbackByBranch !== seededByBranch;
+
   const onSubmit = async (data: PolicyFormData) => {
     setIsSaving(true);
     setErrorMessage('');
@@ -228,6 +305,10 @@ function PolicyModal({ open, onClose, policy, onSaved }: {
           guarantee_days: parseInt(data.guarantee_days),
           guarantee_days_uplift: parseInt(data.guarantee_days_uplift),
           approved_ttl_days: parseInt(data.approved_ttl_days),
+          clawback_by_branch_default: clawbackByBranch,
+          clawback_check_days: parseInt(data.clawback_check_days),
+          clawback_notice_days: parseInt(data.clawback_notice_days),
+          clawback_tiers_default: renumberTiers(tiers),
         },
       });
       setResult(saved);
@@ -242,7 +323,7 @@ function PolicyModal({ open, onClose, policy, onSaved }: {
 
   const handleClose = () => {
     if (view === 'done') { forceClose(); return; }
-    if (isDirty) { setConfirmCloseOpen(true); return; }
+    if (isDirty || clawbackDirty) { setConfirmCloseOpen(true); return; }
     forceClose();
   };
   const forceClose = () => {
@@ -337,6 +418,10 @@ function PolicyModal({ open, onClose, policy, onSaved }: {
               { label: t('dealPartnerRate.guaranteeDays'), value: t('dealPartnerRate.daysValue', { days: result.guarantee_days }) },
               { label: t('dealPartnerRate.guaranteeDaysUplift'), value: t('dealPartnerRate.daysValue', { days: result.guarantee_days_uplift }) },
               { label: t('dealPartnerRate.approvedTtlDays'), value: t('dealPartnerRate.daysValue', { days: result.approved_ttl_days }) },
+              { label: t('dealPartnerRate.clawbackByBranchDefault'), value: result.clawback_by_branch_default ? t('dealPartnerRate.clawbackPartyBranch') : t('dealPartnerRate.clawbackPartyCompany') },
+              { label: t('dealPartnerRate.clawbackCheckDays'), value: t('dealPartnerRate.daysValue', { days: result.clawback_check_days }) },
+              { label: t('dealPartnerRate.clawbackNoticeDays'), value: t('dealPartnerRate.daysValue', { days: result.clawback_notice_days }) },
+              { label: t('dealPartnerRate.clawbackTiersLabel'), value: t('dealPartnerRate.clawbackTiersSummary', { count: (result.clawback_tiers_default ?? []).length }) },
             ]}
             onClose={forceClose}
           />
@@ -440,12 +525,42 @@ function PolicyModal({ open, onClose, policy, onSaved }: {
                   {t('dealPartnerRate.guaranteeFeeRangeHint', { min: vGrtMin, max: vGrtMax })}
                 </p>
               )}
+
+              {/* Clawback defaults (mig 1217) — the commission taken back when a
+                  FIN1 contract written through a deal partner shop stops being
+                  paid early. Owner 09-14 insists the wording names the deal
+                  partner, so it is not read as staff commission. */}
+              <div className="border-t border-line pt-4 -mb-1">
+                <div className="text-sm font-medium">{t('dealPartnerRate.clawbackSection')}</div>
+                <div className="text-xs text-subtle mt-0.5">{t('dealPartnerRate.clawbackSectionHint')}</div>
+              </div>
+
+              <div className="flex flex-col">
+                <label className="form-label">{t('dealPartnerRate.clawbackByBranchDefault')}</label>
+                <Select
+                  options={clawbackPartyOptions(t)}
+                  value={clawbackByBranch ? 'BRANCH' : 'COMPANY'}
+                  onChange={val => setClawbackByBranch(val === 'BRANCH')}
+                  searchable={false}
+                  showChevron
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {dayField('clawback_check_days', t('dealPartnerRate.clawbackCheckDays'))}
+                {dayField('clawback_notice_days', t('dealPartnerRate.clawbackNoticeDays'))}
+              </div>
+
+              <div className="flex flex-col">
+                <label className="form-label">{t('dealPartnerRate.clawbackTiersLabel')}</label>
+                <ClawbackTiersEditor value={tiers} onChange={setTiers} />
+              </div>
             </div>
           </div>
           <ModalErrorBand message={errorMessage} onDismiss={() => setErrorMessage('')} />
           <div className="modal-footer">
             <Button variant="outline" onClick={handleClose} type="button">{t('common.cancel')}</Button>
-            <Button color="primary" type="submit" disabled={isSaving || rangeInvalid || totalInvalid || feeRangeInvalid || feeDefaultInvalid || grtRangeInvalid || grtDefaultInvalid}>
+            <Button color="primary" type="submit" disabled={isSaving || rangeInvalid || totalInvalid || feeRangeInvalid || feeDefaultInvalid || grtRangeInvalid || grtDefaultInvalid || tiersErrorKey !== null || tiersIncomplete}>
               {isSaving ? t('pricing.saving') : t('common.save')}
             </Button>
           </div>
@@ -473,20 +588,21 @@ interface ConfigFormData {
   doc_fee_amount: string;
   guarantee_return_fee_amount: string;
   return_to_branch_id: string;
+  clawback_check_days: string;
   note: string;
 }
 
 const EMPTY_CONFIG_FORM: ConfigFormData = {
   branch_rate_percent: '', company_rate_percent: '', doc_fee_amount: '',
   guarantee_return_fee_amount: '',
-  return_to_branch_id: '', note: '',
+  return_to_branch_id: '', clawback_check_days: '', note: '',
 };
 
-function BranchConfigModal({ open, onClose, config, internalBranches, onSaved }: {
+function BranchConfigModal({ open, onClose, config, warehouses, onSaved }: {
   open: boolean;
   onClose: () => void;
   config: BranchConfigRow | null;
-  internalBranches: BranchLookup[];
+  warehouses: WarehouseRow[];
   onSaved: () => void;
 }) {
   const { t } = useTranslation();
@@ -495,6 +611,16 @@ function BranchConfigModal({ open, onClose, config, internalBranches, onSaved }:
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+  // Non-text-field state, same reasoning as the policy modal: these are not
+  // inputs react-hook-form can track, so their "opened with" values are kept
+  // alongside to answer the dirty check.
+  const [clawbackByBranch, setClawbackByBranch] = useState(true);
+  const [tiers, setTiers] = useState<ClawbackTier[]>([]);
+  const [seededTiers, setSeededTiers] = useState<ClawbackTier[]>([]);
+  const [seededByBranch, setSeededByBranch] = useState(true);
+  const [payout, setPayout] = useState<DealPartnerPayoutValue>(EMPTY_PAYOUT_VALUE);
+  const [payoutCleared, setPayoutCleared] = useState(false);
+  const { data: banks = [] } = useRefBanks();
 
   const { handleSubmit, control, formState: { errors, isDirty }, reset, watch, setValue } = useForm<ConfigFormData>({
     defaultValues: EMPTY_CONFIG_FORM,
@@ -508,8 +634,24 @@ function BranchConfigModal({ open, onClose, config, internalBranches, onSaved }:
         doc_fee_amount: String(config.doc_fee_amount),
         guarantee_return_fee_amount: String(config.guarantee_return_fee_amount),
         return_to_branch_id: config.return_to_branch_id ? String(config.return_to_branch_id) : '',
+        clawback_check_days: String(config.clawback_check_days),
         note: config.note ?? '',
       } : EMPTY_CONFIG_FORM);
+      const seedTiers = renumberTiers(config?.clawback_tiers ?? []);
+      const seedByBranch = config?.clawback_by_branch ?? true;
+      setTiers(seedTiers);
+      setSeededTiers(seedTiers);
+      setClawbackByBranch(seedByBranch);
+      setSeededByBranch(seedByBranch);
+      // The account number is write-only for a viewer without the permission
+      // (the DB nulls it), so an empty form here means "not shown", never
+      // "cleared" — which is why clearing needs its own explicit flag.
+      setPayout({
+        bank_code: config?.payout_bank_code ?? '',
+        account_no: config?.payout_account_no ?? '',
+        account_name: config?.payout_account_name ?? '',
+      });
+      setPayoutCleared(false);
       setView('form');
       setResult(null);
       setErrorMessage('');
@@ -521,7 +663,22 @@ function BranchConfigModal({ open, onClose, config, internalBranches, onSaved }:
   const bothFilled = !Number.isNaN(vBr) && !Number.isNaN(vCo);
   const total = bothFilled ? vBr + vCo : null;
   const outOfRange = config != null && total !== null && (total < config.total_min || total > config.total_max);
-  const riskParty: 'BRANCH' | 'COMPANY' = bothFilled && vCo > 0 ? 'COMPANY' : 'BRANCH';
+
+  // Only this company's ticked warehouses can receive this shop's returns.
+  const branchOptions = useMemo(
+    () => warehouses
+      .filter(w => w.is_company_warehouse && w.is_active && w.company_id === config?.company_id)
+      .map(w => ({ value: String(w.branch_id), label: w.branch_name })),
+    [warehouses, config?.company_id],
+  );
+
+  // A company with exactly one warehouse has nothing to choose — fill it in
+  // rather than making the user open a one-option dropdown (work order §2).
+  const returnBranchId = watch('return_to_branch_id');
+  useEffect(() => {
+    if (!open || returnBranchId || branchOptions.length !== 1) return;
+    setValue('return_to_branch_id', branchOptions[0].value, { shouldDirty: true });
+  }, [open, returnBranchId, branchOptions, setValue]);
 
   const vFee = parseFloat(watch('doc_fee_amount'));
   const feeOutOfRange = config != null && !Number.isNaN(vFee)
@@ -531,12 +688,41 @@ function BranchConfigModal({ open, onClose, config, internalBranches, onSaved }:
   const grtOutOfRange = config != null && !Number.isNaN(vGrt)
     && (vGrt < config.guarantee_return_fee_min || vGrt > config.guarantee_return_fee_max);
 
+  const tiersErrorKey = validateClawbackTiers(tiers);
+  const tiersIncomplete = tiers.some(tier => Number.isNaN(tier.pct));
+  const payoutErrorKey = payoutCleared ? null : validatePayoutAccount(payout, banks);
+  const payoutDirty = payoutCleared
+    || payout.bank_code !== (config?.payout_bank_code ?? '')
+    || payout.account_no !== (config?.payout_account_no ?? '')
+    || payout.account_name !== (config?.payout_account_name ?? '');
+  const clawbackDirty = !tiersEqual(tiers, seededTiers) || clawbackByBranch !== seededByBranch;
+
+  // "Same as the holding default" is the question the user actually asks here,
+  // so it is answered rather than left to be worked out from two screens.
+  const matchesDefault = config != null
+    && clawbackByBranch === config.clawback_by_branch_default
+    && parseInt(watch('clawback_check_days')) === config.clawback_check_days_default
+    && tiersEqual(tiers, renumberTiers(config.clawback_tiers_default ?? []));
+
+  const restoreClawbackDefaults = () => {
+    if (!config) return;
+    setClawbackByBranch(config.clawback_by_branch_default);
+    setValue('clawback_check_days', String(config.clawback_check_days_default), { shouldDirty: true });
+    setTiers(renumberTiers(config.clawback_tiers_default ?? []));
+  };
+
   const onSubmit = async (data: ConfigFormData) => {
     if (!config) return;
     setIsSaving(true);
     setErrorMessage('');
     try {
       const retId = data.return_to_branch_id ? parseInt(data.return_to_branch_id) : null;
+      // The three payout params are all-or-none: once any one of them is sent,
+      // an omitted sibling reads as empty (not "keep current") and the DB
+      // answers INCOMPLETE. Omitting all three is the only "don't touch" form.
+      const hasPayoutInput = payout.bank_code !== ''
+        || payoutAccountDigits(payout.account_no) !== ''
+        || payout.account_name.trim() !== '';
       const saved = await apiClient.rpc<BranchConfigRow>('fn_deal_partner_branch_config_set', {
         p_branch_id: config.branch_id,
         p_branch_rate_percent: parseFloat(data.branch_rate_percent),
@@ -547,6 +733,18 @@ function BranchConfigModal({ open, onClose, config, internalBranches, onSaved }:
         // NULL params mean "keep current" on the BE, so clearing the Select
         // needs the explicit flag.
         p_clear_return_branch: retId === null && config.return_to_branch_id !== null,
+        p_clawback_by_branch: clawbackByBranch,
+        p_clawback_check_days: parseInt(data.clawback_check_days),
+        p_clawback_tiers: renumberTiers(tiers),
+        ...(payoutCleared
+          ? { p_clear_payout_account: true }
+          : hasPayoutInput
+            ? {
+                p_payout_bank_code: payout.bank_code,
+                p_payout_account_no: payout.account_no,
+                p_payout_account_name: payout.account_name.trim(),
+              }
+            : {}),
         p_note: data.note.trim(),
       });
       setResult(saved);
@@ -561,18 +759,13 @@ function BranchConfigModal({ open, onClose, config, internalBranches, onSaved }:
 
   const handleClose = () => {
     if (view === 'done') { forceClose(); return; }
-    if (isDirty) { setConfirmCloseOpen(true); return; }
+    if (isDirty || clawbackDirty || payoutDirty) { setConfirmCloseOpen(true); return; }
     forceClose();
   };
   const forceClose = () => {
     setConfirmCloseOpen(false);
     onClose();
   };
-
-  const branchOptions = useMemo(
-    () => internalBranches.map(b => ({ value: String(b.id), label: b.name })),
-    [internalBranches],
-  );
 
   const riskLabel = (p: 'BRANCH' | 'COMPANY') =>
     p === 'COMPANY' ? t('dealPartnerRate.riskCompany') : t('dealPartnerRate.riskBranch');
@@ -597,6 +790,9 @@ function BranchConfigModal({ open, onClose, config, internalBranches, onSaved }:
               { label: t('dealPartnerRate.docFeeAmount'), value: fmtBaht(result.doc_fee_amount) },
               { label: t('dealPartnerRate.guaranteeFeeAmount'), value: fmtBaht(result.guarantee_return_fee_amount) },
               { label: t('dealPartnerRate.returnBranch'), value: result.return_to_branch_name ?? '—' },
+              { label: t('dealPartnerRate.clawbackCheckDays'), value: t('dealPartnerRate.daysValue', { days: result.clawback_check_days }) },
+              { label: t('dealPartnerRate.clawbackTiersLabel'), value: t('dealPartnerRate.clawbackTiersSummary', { count: (result.clawback_tiers ?? []).length }) },
+              { label: t('dealPartnerRate.payoutSection'), value: result.has_payout_account ? (result.payout_bank_name ?? t('common.yes')) : '—' },
             ]}
             onClose={forceClose}
           />
@@ -650,10 +846,6 @@ function BranchConfigModal({ open, onClose, config, internalBranches, onSaved }:
                 <div className="flex items-center justify-between">
                   <span>{t('dealPartnerRate.totalRate')}</span>
                   <span className="tabular-nums font-medium">{total !== null ? fmtPct(total) : '—'}</span>
-                </div>
-                <div className={`flex items-center justify-between mt-1 text-xs ${outOfRange ? '' : 'text-subtle'}`}>
-                  <span>{t('dealPartnerRate.riskParty')}</span>
-                  <span>{riskLabel(riskParty)}</span>
                 </div>
               </div>
               {outOfRange && config && (
@@ -726,9 +918,97 @@ function BranchConfigModal({ open, onClose, config, internalBranches, onSaved }:
                   searchable
                   showChevron
                   clearable
+                  disabled={branchOptions.length === 0}
                 />
-                <p className="text-xs text-subtle mt-1">{t('dealPartnerRate.returnBranchHint')}</p>
+                <p className={`text-xs mt-1 ${branchOptions.length === 0 ? 'text-warning-fg' : 'text-subtle'}`}>
+                  {branchOptions.length === 0
+                    ? t('dealPartnerRate.noWarehouseForCompany')
+                    : t('dealPartnerRate.returnBranchHint')}
+                </p>
               </div>
+
+              {/* Per-shop clawback (mig 1217). Seeded from the holding default
+                  but owned by the shop from then on, so the default is shown
+                  alongside with a way back to it. */}
+              <div className="border-t border-line pt-4 -mb-1">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium">{t('dealPartnerRate.clawbackSection')}</div>
+                    <div className="text-xs text-subtle mt-0.5">{t('dealPartnerRate.clawbackShopHint')}</div>
+                  </div>
+                  {!matchesDefault && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      type="button"
+                      startIcon={<Undo2 size={14} />}
+                      onClick={restoreClawbackDefaults}
+                    >
+                      {t('dealPartnerRate.clawbackRestoreDefault')}
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-col">
+                <label className="form-label">{t('dealPartnerRate.clawbackByBranch')}</label>
+                <Select
+                  options={clawbackPartyOptions(t)}
+                  value={clawbackByBranch ? 'BRANCH' : 'COMPANY'}
+                  onChange={val => setClawbackByBranch(val === 'BRANCH')}
+                  searchable={false}
+                  showChevron
+                />
+                <p className="text-xs text-subtle mt-1">
+                  {t('dealPartnerRate.clawbackDefaultIs', {
+                    value: config?.clawback_by_branch_default
+                      ? t('dealPartnerRate.clawbackPartyBranch')
+                      : t('dealPartnerRate.clawbackPartyCompany'),
+                  })}
+                </p>
+              </div>
+
+              <div className="flex flex-col">
+                <label className="form-label">{t('dealPartnerRate.clawbackCheckDays')}</label>
+                <Controller
+                  name="clawback_check_days"
+                  control={control}
+                  rules={{ required: t('dealPartnerRate.valueRequired') }}
+                  render={({ field }) => (
+                    <MaskedInput
+                      mask="number"
+                      decimalScale={0}
+                      value={field.value}
+                      onChange={raw => field.onChange(raw)}
+                      endIcon={config ? <ChevronsRight size={14} /> : undefined}
+                      onEndIconClick={config ? () => setValue('clawback_check_days', String(config.clawback_check_days_default), { shouldDirty: true }) : undefined}
+                    />
+                  )}
+                />
+                <FormErrorMessage error={errors.clawback_check_days} />
+                <p className="text-xs text-subtle mt-1">
+                  {t('dealPartnerRate.clawbackDefaultIs', {
+                    value: t('dealPartnerRate.daysValue', { days: config?.clawback_check_days_default ?? 0 }),
+                  })}
+                </p>
+              </div>
+
+              <div className="flex flex-col">
+                <label className="form-label">{t('dealPartnerRate.clawbackTiersLabel')}</label>
+                <ClawbackTiersEditor value={tiers} onChange={setTiers} />
+              </div>
+
+              {/* Payout account — where the holding transfers this shop's
+                  money. The field carries its own heading, so this is only the
+                  separator that sets it apart from the clawback block above. */}
+              <div className="border-t border-line pt-1" />
+              <DealPartnerPayoutAccountField
+                value={payout}
+                onChange={setPayout}
+                hasExistingAccount={config?.has_payout_account ?? false}
+                cleared={payoutCleared}
+                onClearedChange={setPayoutCleared}
+              />
 
               <div className="flex flex-col">
                 <label className="form-label">{t('dealPartnerRate.note')}</label>
@@ -745,7 +1025,7 @@ function BranchConfigModal({ open, onClose, config, internalBranches, onSaved }:
           <ModalErrorBand message={errorMessage} onDismiss={() => setErrorMessage('')} />
           <div className="modal-footer">
             <Button variant="outline" onClick={handleClose} type="button">{t('common.cancel')}</Button>
-            <Button color="primary" type="submit" disabled={isSaving || outOfRange || feeOutOfRange || grtOutOfRange}>
+            <Button color="primary" type="submit" disabled={isSaving || outOfRange || feeOutOfRange || grtOutOfRange || tiersErrorKey !== null || tiersIncomplete || payoutErrorKey !== null}>
               {isSaving ? t('pricing.saving') : t('common.save')}
             </Button>
           </div>
@@ -793,9 +1073,12 @@ export function DealPartnerRatesPage() {
     staleTime: 30 * 1000,
   });
 
-  const { data: internalBranches = [] } = useQuery({
-    queryKey: ['branches-internal'],
-    queryFn: () => apiClient.get<BranchLookup[]>('/v_branches?select=id,name&branch_type=eq.INTERNAL&is_active=is.true&order=name'),
+  // Return-branch options come from the warehouse view, not the full branch
+  // list: only a branch ticked as a company warehouse may receive returns, and
+  // only within the shop's own company (work order §2). Shared with §6c below.
+  const { data: warehouses = [] } = useQuery({
+    queryKey: ['deal-partner-warehouses'],
+    queryFn: () => apiClient.get<WarehouseRow[]>('/v_deal_partner_warehouses'),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -860,10 +1143,22 @@ export function DealPartnerRatesPage() {
       className: 'w-28 max-lg:hidden',
     },
     {
+      // Since mig 1217 this reflects `clawback_by_branch` — who repays the
+      // commission — rather than being inferred from a non-zero company rate.
       accessorKey: 'risk_party',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.riskParty')} />,
       cell: ({ row }) => riskBadge(row.original.risk_party),
       className: 'w-28 max-md:hidden',
+    },
+    {
+      accessorKey: 'has_payout_account',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.payoutColumn')} />,
+      cell: ({ row }) => (
+        row.original.has_payout_account
+          ? <span className="text-sm text-subtle truncate block">{row.original.payout_bank_name ?? t('common.yes')}</span>
+          : <span className="text-sm text-warning-fg">{t('dealPartnerRate.payoutMissing')}</span>
+      ),
+      className: 'w-32 max-lg:hidden',
     },
     {
       accessorKey: 'return_to_branch_name',
@@ -973,11 +1268,41 @@ export function DealPartnerRatesPage() {
                   {policyStat(t('dealPartnerRate.guaranteeFeeDefault'), fmtBaht(policy.guarantee_return_fee_default), true)}
                 </div>
               </div>
+              <div className="border-t border-line pt-3">
+                <div className="text-xs font-medium text-subtle mb-2 flex items-center gap-1">
+                  <Undo size={12} />{t('dealPartnerRate.clawbackSection')}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {policyStat(
+                    t('dealPartnerRate.clawbackByBranchDefault'),
+                    policy.clawback_by_branch_default ? t('dealPartnerRate.clawbackPartyBranch') : t('dealPartnerRate.clawbackPartyCompany'),
+                  )}
+                  {policyStat(t('dealPartnerRate.clawbackCheckDays'), t('dealPartnerRate.daysValue', { days: policy.clawback_check_days }))}
+                  {policyStat(t('dealPartnerRate.clawbackNoticeDays'), t('dealPartnerRate.daysValue', { days: policy.clawback_notice_days }))}
+                </div>
+                {/* The tiers are the actual rule, so they are spelled out rather
+                    than counted — "จ่าย 1 งวด → คืน 50%" is the thing to check. */}
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {(policy.clawback_tiers_default ?? []).length === 0 ? (
+                    <span className="text-xs text-subtle">{t('dealPartnerRate.clawbackNoTiers')}</span>
+                  ) : (
+                    (policy.clawback_tiers_default ?? []).map(tier => (
+                      <Badge key={tier.paid} size="sm" color="default">
+                        {t('dealPartnerRate.clawbackTierRow', { paid: tier.paid })} {tier.pct}%
+                      </Badge>
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
           ) : (
             <div className="text-sm text-subtle">—</div>
           )}
         </div>
+
+        {/* §6c — company-level terms: who owns the contract-fee revenue, and
+            which internal branches may receive returned devices. */}
+        <DealPartnerCompanySection canManage={canManage} />
 
         <div className="flex-none text-sm font-medium mb-2">{t('dealPartnerRate.branchConfigs')}</div>
 
@@ -1038,6 +1363,12 @@ export function DealPartnerRatesPage() {
                         <span className="truncate">{row.return_to_branch_name}</span>
                       </div>
                     )}
+                    {!row.has_payout_account && (
+                      <div className="flex items-center gap-1 text-xs text-warning-fg mt-1">
+                        <Landmark size={12} />
+                        <span>{t('dealPartnerRate.payoutColumn')} · {t('dealPartnerRate.payoutMissing')}</span>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1067,7 +1398,7 @@ export function DealPartnerRatesPage() {
         open={configModalOpen}
         onClose={() => setConfigModalOpen(false)}
         config={editConfig}
-        internalBranches={internalBranches}
+        warehouses={warehouses}
         onSaved={handleSaved}
       />
     </>

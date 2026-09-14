@@ -1058,5 +1058,9 @@
   "MDM.CONFLICT.ABM_ACCOUNT_NO_TENANT": "That ABM account is not linked to an ABM organisation yet. Ask an administrator to link it.",
   "mdm.conflict.abm_account_no_tenant": "That ABM account is not linked to an ABM organisation yet. Ask an administrator to link it.",
   "MDM.CONFLICT.ACTLOCK_PENDING": "An Activation Lock job is still running. Wait a minute and try again.",
-  "mdm.conflict.actlock_pending": "An Activation Lock job is still running. Wait a minute and try again."
+  "mdm.conflict.actlock_pending": "An Activation Lock job is still running. Wait a minute and try again.",
+  "sale.partner.doc_fee_owner_invalid": "The contract fee revenue owner must be Holding or Company.",
+  "core.warehouse.branch_type": "A deal partner return warehouse must be an internal branch.",
+  "core.warehouse.in_use": "This warehouse cannot be turned off — deal partner shops still use it as their return warehouse. Repoint those shops first.",
+  "sale.warehouse.no_sales": "This branch is a deal partner return warehouse — it cannot open contracts or do retail sales."
 }
