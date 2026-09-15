@@ -672,6 +672,9 @@ export function PanelProductPlan(_props: Props) {
   const [fin1Open, setFin1Open] = useState(contractIsFin1 && !!contract?.value_month);
   const [fin1Preparing, setFin1Preparing] = useState(false);
   const [fin1Error, setFin1Error] = useState('');
+  // The plan editor previews as the user drags; the footer keeps showing the
+  // plan on the contract and says it is out of date rather than following along.
+  const [fin1Dirty, setFin1Dirty] = useState(false);
 
   // Commit product + commercial model, then hand over to the plan editor.
   const handleOpenFin1 = async () => {
@@ -1106,7 +1109,9 @@ export function PanelProductPlan(_props: Props) {
               initialDownAmount={contract.down_payment ?? null}
               initialUplift={contract.uplift_amount ?? null}
               initialPrice={contract.is_used_asset ? contract.snapshot_retail_price ?? null : null}
+              onDirtyChange={setFin1Dirty}
               onSaved={() => {
+                setFin1Dirty(false);
                 invalidateContract();
                 addSnackbar({
                   message: (
@@ -1217,7 +1222,15 @@ export function PanelProductPlan(_props: Props) {
         lighter final installment spelled out when the plan isn't uniform. */}
     {contractIsFin1 && contract?.value_month != null && contract?.installment_amount != null ? (
       <div className="shrink-0 border-t border-primary bg-primary-soft px-4 py-3">
-        <div className="text-xs text-primary-fg font-medium mb-2">{t('wizard.selectedPlan')}</div>
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
+          <span className="text-xs text-primary-fg font-medium">{t('wizard.selectedPlan')}</span>
+          {fin1Dirty && (
+            <span className="inline-flex items-center gap-1 text-xs text-warning-fg">
+              <AlertTriangle size={12} />
+              {t('fin1Plan.footerOutOfDate')}
+            </span>
+          )}
+        </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div>
             <div className="text-xs text-subtle">{t('wizard.financeModel')}</div>

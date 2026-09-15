@@ -987,8 +987,14 @@ input[type="number"
    The rule has to target the inner <input>: tsp-form's Input puts `className`
    on `.input-wrapper` whenever an icon slot is present, and `.form-control`
    sets its own font-size, so a utility class on the component never reaches
-   the text. */
-.fin1-amount-input .form-control {
+   the text.
+
+   Both placements need naming. With an icon the class lands on the wrapper and
+   the descendant selector applies; with no icon it lands on the <input> itself,
+   which a descendant selector cannot match — that left the second-hand price
+   box at 14px next to a 24px box beside it. */
+.fin1-amount-input .form-control,
+input.fin1-amount-input.form-control {
     font-size: 1.5rem;
     line-height: 2rem;
     font-weight: 600;

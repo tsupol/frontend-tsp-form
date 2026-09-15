@@ -124,6 +124,11 @@ type DownMode = 'percent' | 'amount';
  *  list, the real rule is 0..uplift_max in steps of 500). */
 const UPLIFT_STEP = 500;
 
+/** The figure the staff and the customer read off the screen together, set
+ *  larger than the words around it (owner 2026-09-15). Half the step the
+ *  เช็คราคา page uses — that page is all numbers, this one is a form. */
+const BIG_NUM = 'text-lg font-semibold tabular-nums leading-none';
+
 interface Props {
   contractId: number;
   /** Plan already on the contract (server truth) — seeds the controls on open. */
@@ -133,6 +138,9 @@ interface Props {
   /** Price already on the contract — only meaningful on a used contract (mig 1235). */
   initialPrice?: number | null;
   onSaved: () => void;
+  /** True while the previewed plan differs from the one on the contract, so the
+   *  footer can keep showing the saved plan and say it is out of date. */
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 export function Fin1PlanEditor({
@@ -142,6 +150,7 @@ export function Fin1PlanEditor({
   initialUplift,
   initialPrice,
   onSaved,
+  onDirtyChange,
 }: Props) {
   const { t } = useTranslation();
 
@@ -412,6 +421,23 @@ export function Fin1PlanEditor({
   const terms = policy?.terms ?? [];
   const shown = saved ?? preview;
 
+  // Tell the panel when the preview no longer matches the contract, so its
+  // footer keeps showing the saved plan and marks it out of date. Compared
+  // against what the contract was holding when this editor opened — the same
+  // figures the footer reads.
+  const previewDiffers = !saved && preview != null && (
+    preview.term_months !== initialTermMonths
+    || preview.down_amount !== initialDownAmount
+    || preview.uplift_amount !== (initialUplift ?? 0)
+    || (isUsedRange && initialPrice != null && preview.price !== initialPrice)
+  );
+  useEffect(() => {
+    onDirtyChange?.(previewDiffers);
+    // Leaving the step with a preview on screen must not strand the warning.
+    return () => onDirtyChange?.(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewDiffers]);
+
   // ── Saved receipt ────────────────────────────────────────────────────
   if (saved) {
     return (
@@ -435,41 +461,39 @@ export function Fin1PlanEditor({
   return (
     <div className="flex flex-col gap-5">
       {/* ── Used-device price (mig 1235) ───────────────────────────── */}
-      {/* Only a used device gets this box: its price is the branch's call,
+      {/* Only a used device gets this control: its price is the branch's call,
           inside the model's used range. A new device keeps the list price and
-          never shows it. */}
-      {isUsedRange && (
+          never shows it. A slider, like every other bounded value here — it can
+          only land on a legal step, so a price the server would refuse cannot
+          be entered in the first place. */}
+      {isUsedRange && usedMin != null && usedMax != null && (
         <div className="flex flex-col gap-2">
-          <label className="form-label mb-0">{t('fin1Plan.usedPriceLabel')}</label>
-          <div className="w-44">
-            <MaskedInput
-              mask="number"
-              decimalScale={0}
-              size="sm"
-              value={priceStr}
-              onChange={(raw) => setPriceStr(raw)}
-              className="w-full"
-            />
+          <div className="flex flex-wrap items-baseline gap-x-2">
+            <label className="form-label mb-0">{t('fin1Plan.usedPriceLabel')}</label>
+            {priceNum != null && <span className={BIG_NUM}>{fmtCurrency(priceNum)}</span>}
           </div>
-          {usedMin != null && usedMax != null && (
-            <span className="text-xs text-subtle tabular-nums">
-              {t('fin1Plan.usedPriceHint', {
-                min: fmtCurrency(usedMin),
-                max: fmtCurrency(usedMax),
-                unit: usedStep,
-              })}
-            </span>
-          )}
+          <Slider
+            value={priceNum ?? usedMin}
+            onChange={(v) => setPriceStr(String(
+              Math.min(usedMax, Math.max(usedMin, Math.round(v / usedStep) * usedStep)),
+            ))}
+            min={usedMin}
+            max={usedMax}
+            step={usedStep}
+          />
+          <div className="flex justify-between text-[11px] text-subtler tabular-nums">
+            <span>{fmtCurrency(usedMin)}</span>
+            <span>{fmtCurrency(usedMax)}</span>
+          </div>
         </div>
       )}
 
       {/* ── Price + uplift ─────────────────────────────────────────── */}
       <div className="flex flex-col gap-2">
-        <label className="form-label mb-0">
-          {uplift > 0
-            ? t('fin1Plan.upliftLabel', { amount: fmtCurrency(uplift) })
-            : t('fin1Plan.priceUplift')}
-        </label>
+        <div className="flex flex-wrap items-baseline gap-x-2">
+          <label className="form-label mb-0">{t('fin1Plan.priceUplift')}</label>
+          {uplift > 0 && <span className={BIG_NUM}>+{fmtCurrency(uplift)}</span>}
+        </div>
         {upliftMax > 0 && (
           <div className="flex flex-col gap-1">
             <Slider
@@ -492,10 +516,10 @@ export function Fin1PlanEditor({
                 <span className="text-subtle">
                   {fmtCurrency(shown.base_price)} + {fmtCurrency(shown.uplift_amount)} ={' '}
                 </span>
-                <span className="font-semibold">{fmtCurrency(shown.price)}</span>
+                <span className={BIG_NUM}>{fmtCurrency(shown.price)}</span>
               </>
             ) : (
-              <span className="font-semibold">{fmtCurrency(shown.price)}</span>
+              <span className={BIG_NUM}>{fmtCurrency(shown.price)}</span>
             )}
             <span className="text-subtle"> {t('fin1Plan.baht')}</span>
             {shown.guarantee_days != null && (
@@ -519,17 +543,22 @@ export function Fin1PlanEditor({
       {policy && (
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-2 flex-wrap">
-            <label className="form-label mb-0">
-              {downPercent != null && preview
-                ? t('fin1Plan.downLabel', {
-                    // % mode shows the whole percent the user chose (like the
-                    // FIN1 calculator page); the resolved decimal only appears
-                    // in baht mode, where it IS the answer to what was typed.
-                    pct: downMode === 'percent' ? Math.round(downPercent) : preview.down_percent,
-                    amount: fmtCurrency(preview.down_amount),
-                  })
-                : t('fin1Plan.downPayment')}
-            </label>
+            <div className="flex flex-wrap items-baseline gap-x-2">
+              <label className="form-label mb-0">{t('fin1Plan.downPayment')}</label>
+              {downPercent != null && preview && (
+                <>
+                  <span className={BIG_NUM}>{fmtCurrency(preview.down_amount)}</span>
+                  <span className="text-sm text-subtle tabular-nums">
+                    {t('fin1Plan.baht')}
+                    {' · '}
+                    {/* % mode shows the whole percent the user chose (like the
+                        FIN1 calculator page); the resolved decimal only appears
+                        in baht mode, where it IS the answer to what was typed. */}
+                    {downMode === 'percent' ? Math.round(downPercent) : preview.down_percent}%
+                  </span>
+                </>
+              )}
+            </div>
             <div className="flex items-center gap-1">
               <Button
                 size="sm"
@@ -584,9 +613,11 @@ export function Fin1PlanEditor({
       {/* ── Term ───────────────────────────────────────────────────── */}
       {policy && terms.length > 0 && termMonths != null && (
         <div className="flex flex-col gap-1">
-          <label className="form-label mb-0">
-            {t('fin1Plan.monthsLabel', { count: termMonths })}
-          </label>
+          <div className="flex flex-wrap items-baseline gap-x-2">
+            <label className="form-label mb-0">{t('fin1Plan.termTitle')}</label>
+            <span className={BIG_NUM}>{termMonths}</span>
+            <span className="text-sm text-subtle">{t('fin1Plan.unitMonths')}</span>
+          </div>
           <Slider
             value={Math.max(0, terms.indexOf(termMonths))}
             onChange={(v) => {
