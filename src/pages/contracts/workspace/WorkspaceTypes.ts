@@ -231,7 +231,10 @@ export const ERROR_TO_MODAL: Record<string, ModalId> = {
   'CONTRACT.VALIDATION.RATE_CARD_REQUIRED': 'productPlan',
   'CONTRACT.VALIDATION.SNAPSHOT_REQUIRED': 'productPlan',
   'CONTRACT.STATE.DISCOUNT_APPROVAL_REQUIRED': null,
-  'CONTRACT.STATE.DEAL_PARTNER_APPROVAL_REQUIRED': null,
+  // Deal-partner contracts are blocked until the credit-department approval flow
+  // ships (mig 1231 retired the old request/approve RPCs). No modal can clear it,
+  // and there is deliberately no "request approval" button — fix_rpc is null.
+  'CONTRACT.STATE.PARTNER_APPROVAL_REQUIRED': null,
   'CONTRACT.VALIDATION.SIGNATORY_INCOMPLETE': 'signatory',
   'CONTRACT.VALIDATION.NO_BRANCH_DEFAULT_SIGNATORY': 'signatory',
   'SALE.VALIDATION.NO_OPEN_AMOUNT': 'productPlan',

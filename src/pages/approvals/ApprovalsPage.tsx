@@ -20,7 +20,7 @@ import { translateApiError } from '../../lib/apiErrors';
  * TOC projection: list/headline fields only. Detail is fetched per-type.
  * ─────────────────────────────────────────────────────────────────────────── */
 
-type ApprovalType = 'NEGOTIATION' | 'BILL_LINE_DISCOUNT' | 'DEAL_PARTNER' | 'BUYBACK' | 'ASSET_SELL_OUT' | 'PO';
+type ApprovalType = 'NEGOTIATION' | 'BILL_LINE_DISCOUNT' | 'BUYBACK' | 'ASSET_SELL_OUT' | 'PO';
 type ApprovalStatus =
   | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
   | 'EXPIRED' | 'INVALIDATED' | 'COMPLETED';
@@ -72,7 +72,6 @@ const typeColor = (type: ApprovalType): 'info' | 'primary' | 'secondary' | 'warn
   switch (type) {
     case 'NEGOTIATION': return 'info';
     case 'BILL_LINE_DISCOUNT': return 'warning';
-    case 'DEAL_PARTNER': return 'primary';
     case 'BUYBACK': return 'secondary';
     case 'ASSET_SELL_OUT': return 'success';
     case 'PO': return 'default';
@@ -147,7 +146,6 @@ export function ApprovalsPage() {
   const typeOptions: { value: ApprovalType; label: string }[] = [
     { value: 'NEGOTIATION', label: t('approvals.type_NEGOTIATION') },
     { value: 'BILL_LINE_DISCOUNT', label: t('approvals.type_BILL_LINE_DISCOUNT') },
-    { value: 'DEAL_PARTNER', label: t('approvals.type_DEAL_PARTNER') },
     { value: 'BUYBACK', label: t('approvals.type_BUYBACK') },
     { value: 'ASSET_SELL_OUT', label: t('approvals.type_ASSET_SELL_OUT') },
     { value: 'PO', label: t('approvals.type_PO') },
@@ -392,7 +390,7 @@ function BuybackApprovalPanel({
 }
 
 /* ───────────────────────────────────────────────────────────────────────────
- * Simple approval panel — NEGOTIATION / DEAL_PARTNER / BILL_LINE_DISCOUNT.
+ * Simple approval panel — NEGOTIATION / BILL_LINE_DISCOUNT.
  * Flat decide-RPC + reason. Dispatches the RPC on row.type (doc 21 mistake #1:
  * row.id is type-specific).
  * ─────────────────────────────────────────────────────────────────────────── */
@@ -437,15 +435,6 @@ function SimpleApprovalPanel({
             p_reason: trimmed || null,
           },
         };
-      }
-      case 'DEAL_PARTNER': {
-        const rpc = action === 'approve'
-          ? 'fn_contract_deal_partner_approve'
-          : 'fn_contract_deal_partner_reject';
-        const params: Record<string, unknown> = { p_request_id: row.id };
-        if (action === 'reject') params.p_reason = trimmed || null;
-        else params.p_note = trimmed || null;
-        return { rpc, params };
       }
       case 'PO':
         // PO never routes here (handled by PoApprovalPanel).

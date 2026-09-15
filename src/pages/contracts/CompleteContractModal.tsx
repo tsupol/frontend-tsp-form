@@ -34,7 +34,8 @@ interface ContractForClosure {
 export type ClosureAction =
   | { kind: 'complete'; closeReason: 'NORMAL' | 'EARLY_PAYOFF' }
   | { kind: 'terminate' };
-// terminate_partner intentionally deferred — needs DP-only RPC + extra fields.
+// Deal-partner contracts terminate through this same 'terminate' action — the
+// separate partner-only terminate RPC was retired (mig 1231).
 
 type View = 'payoff' | 'conflict' | 'wallets' | 'clear-wallet' | 'confirm' | 'done';
 

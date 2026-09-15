@@ -3717,7 +3717,6 @@
     "notePlaceholder": "หมายเหตุ (จำเป็นสำหรับการปฏิเสธ)",
     "type_NEGOTIATION": "ต่อรองราคา",
     "type_BILL_LINE_DISCOUNT": "ส่วนลดบิล",
-    "type_DEAL_PARTNER": "Deal Partner",
     "type_BUYBACK": "รับซื้อ",
     "type_ASSET_SELL_OUT": "ขายออก",
     "type_PO": "ใบสั่งซื้อ",
@@ -6809,7 +6808,6 @@
       "ct_LATE_FEE_OVERDUE": "ค่าปรับ",
       "ct_LATE_FEE_WAIVE": "ยกเว้นค่าปรับ",
       "ct_SERVICE_CHARGE": "ค่าบริการ",
-      "ct_PARTNER_COMMISSION": "คอมมิชชั่น",
       "ct_COMMISSION_WITHDRAW": "เบิกคอมมิชชั่น",
       "ct_SETTLEMENT_REFUND": "เงินคืนเจรจา"
     },

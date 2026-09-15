@@ -58,8 +58,8 @@ import { DealPartnerCompanySection } from '../../components/DealPartnerCompanySe
 // not FIN1 policy. Price/plan RPCs answer guarantee_days: null for internal
 // branches and the UI hides the line. The return flow is not built yet.
 //
-// The old scoped rates (fn_deal_partner_rate_upsert / set_active) are
-// deprecated — any p_scope other than HOLDING now answers DEPRECATED_SCOPE.
+// The old scoped-rate RPCs (fn_deal_partner_rate_upsert / set_active) were
+// removed from the database in mig 1231 — this page never called them.
 // ============================================================================
 
 interface PolicyRow {

@@ -3721,7 +3721,6 @@
     "notePlaceholder": "Note (required for reject)",
     "type_NEGOTIATION": "Negotiation",
     "type_BILL_LINE_DISCOUNT": "Bill Discount",
-    "type_DEAL_PARTNER": "Deal Partner",
     "type_BUYBACK": "Buyback",
     "type_ASSET_SELL_OUT": "Sell out",
     "type_PO": "Purchase Order",
@@ -6815,7 +6814,6 @@
       "ct_LATE_FEE_OVERDUE": "Late fee",
       "ct_LATE_FEE_WAIVE": "Fee waive",
       "ct_SERVICE_CHARGE": "Service",
-      "ct_PARTNER_COMMISSION": "Commission",
       "ct_COMMISSION_WITHDRAW": "Com. withdraw",
       "ct_SETTLEMENT_REFUND": "Settlement"
     },
