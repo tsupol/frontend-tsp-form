@@ -1070,5 +1070,12 @@
   "CONTRACT.VALIDATION.ASSET_NOT_OWNED_BY_BRANCH": "สัญญาของร้านใช้ได้เฉพาะเครื่องของร้านที่อยู่ร้านนั้น — เครื่องนี้เป็นของ{{owner_name}}",
   "CONTRACT.VALIDATION.ASSET_NOT_OWNED_BY_BRANCH_basic": "สัญญาของร้านใช้ได้เฉพาะเครื่องของร้านนั้นที่อยู่ร้านนั้น",
   "CONTRACT.VALIDATION.ASSET_OWNED_BY_PARTNER": "เครื่องนี้เป็นของ{{owner_branch_name}} (ร้าน deal partner) ใช้ได้เฉพาะสัญญาของร้านนั้น",
-  "CONTRACT.VALIDATION.ASSET_OWNED_BY_PARTNER_basic": "เครื่องนี้เป็นของร้าน deal partner ใช้ได้เฉพาะสัญญาของร้านนั้น"
+  "CONTRACT.VALIDATION.ASSET_OWNED_BY_PARTNER_basic": "เครื่องนี้เป็นของร้าน deal partner ใช้ได้เฉพาะสัญญาของร้านนั้น",
+  "PRICING.VALIDATION.FIN1_USED_PRICE": "ราคานี้อยู่นอกกรอบของรุ่น หรือไม่ลงหลักร้อย",
+  "PRICING.VALIDATION.FIN1_USED_PRICE_basic": "ราคานี้อยู่นอกกรอบของรุ่น หรือไม่ลงหลักร้อย",
+  "PRICING.VALIDATION.FIN1_USED_RANGE_NOT_SET": "รุ่นนี้ยังไม่ได้ตั้งกรอบราคามือสอง — ตั้งที่หน้าราคาตั้งของรุ่นก่อนใช้เครื่องมือสอง",
+  "PRICING.VALIDATION.FIN1_PRICE_NOT_ALLOWED_NEW": "เครื่องมือหนึ่งใช้ราคาตั้งของรุ่น — ตั้งราคาเองได้เฉพาะสัญญาที่ชี้เครื่องมือสอง",
+  "CONTRACT.VALIDATION.DEVICE_NOT_TARGET": "สัญญาของร้านผูกได้เฉพาะเครื่องที่ชี้ไว้ ({{target_asset_code}}) ไม่ใช่ {{asset_code}}",
+  "CONTRACT.VALIDATION.DEVICE_NOT_TARGET_basic": "สัญญาของร้านผูกได้เฉพาะเครื่องที่ชี้ไว้",
+  "CONTRACT.VALIDATION.TARGET_ASSET_REQUIRED": "ชี้เครื่องให้สัญญาก่อนจึงจะไปต่อได้"
 }

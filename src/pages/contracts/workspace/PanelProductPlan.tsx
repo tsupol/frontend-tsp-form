@@ -105,6 +105,8 @@ interface StockAsset {
 /** Where the user is browsing — affects the search list, not the submit path */
 type SourceTab = 'instock' | 'catalog';
 /** The actual contract path — derived from the chosen item */
+/** `'used'` reads literally only for FIN2. Since mig 1235 it means "a specific
+ *  device is on the contract", which for FIN1 may be a new one. */
 type SelectionMode = 'new' | 'used';
 /** Condition filter for the In-Stock tab */
 type ConditionFilter = 'NEW' | 'USED' | null;
@@ -138,7 +140,9 @@ export function PanelProductPlan(_props: Props) {
   const { isDealPartner } = useAuth();
 
   // ── Mode: new vs used (drives the submit RPC path) ──────────────────
-  const initialMode: SelectionMode = contract?.is_used_asset ? 'used' : 'new';
+  // A pointed device puts the panel in device mode regardless of its grade —
+  // FIN1 may point at a new one (mig 1235), which leaves `is_used_asset` false.
+  const initialMode: SelectionMode = contract?.target_asset_id ? 'used' : 'new';
   const [mode, setMode] = useState<SelectionMode>(initialMode);
 
   // ── Source tab: where the user is browsing ──────────────────────────
@@ -261,7 +265,11 @@ export function PanelProductPlan(_props: Props) {
   useEffect(() => {
     if (restoredRef.current || selectedModel) return;
     if (!contract?.model_id || !contract?.model_name) return;
-    if (contract.is_used_asset) return; // USED restore is separate
+    // A contract that points at a device restores through the device branch
+    // below, whatever the device's grade. Since mig 1235 a pointed NEW device
+    // leaves `is_used_asset` false, so keying this on the grade would restore
+    // it as a catalog pick and lose the device from the screen.
+    if (contract.target_asset_id) return;
     restoredRef.current = true;
 
     setLocalModelId(contract.model_id);
@@ -306,9 +314,11 @@ export function PanelProductPlan(_props: Props) {
   const restoredUsedRef = useRef(false);
   useEffect(() => {
     if (restoredUsedRef.current) return;
-    if (!contract?.is_used_asset || !contract?.target_asset_id) return;
+    // Keyed on the device, not its grade — FIN1 can point at a new one too.
+    if (!contract?.target_asset_id) return;
     restoredUsedRef.current = true;
 
+    setMode('used');
     setLocalTargetAssetId(contract.target_asset_id);
     setLocalModelId(contract.model_id);
     setLocalModelName(contract.model_name ?? '');
@@ -640,16 +650,25 @@ export function PanelProductPlan(_props: Props) {
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState('');
 
-  // ── FIN1 rate step (DELIVERY 2026-09-09) ─────────────────────────────
+  // ── FIN1 rate step (DELIVERY 2026-09-09; used devices added mig 1235) ──
   // FIN1 no longer has rate cards, so fn_quote_calculate returns nothing for
   // it (mig 1172) and there is no table row to click. The plan is chosen with
   // fn_contract_set_fin1_plan instead, which needs the product already on the
   // contract — so the product is committed first, then the editor opens.
-  // Used assets are out of scope for this engine (FIN1_USED_ASSET_UNSUPPORTED).
-  const fin1Available = fin1Enabled && mode === 'new';
+  //
+  // Since mig 1235 FIN1 takes a device of either grade: a new one prices off
+  // the model's list price exactly as before, a used one lets the branch name
+  // the price inside the model's range. So the step is offered in both modes,
+  // and what gets committed first differs — a model+variant for a catalog
+  // pick, a target asset for a device pick.
+  const fin1Available = fin1Enabled;
   const contractIsFin1 = contract?.commercial_model === 'FIN1';
-  const productOnContract =
+  // What the plan editor needs on the contract before it can price anything:
+  // the picked device, or the picked model when there is no device.
+  const targetOnContract = !!localTargetAssetId && localTargetAssetId === contract?.target_asset_id;
+  const modelOnContract =
     !!localModelId && localModelId === contract?.model_id && localVariantId === contract?.variant_id;
+  const productOnContract = mode === 'used' ? targetOnContract : modelOnContract;
   const [fin1Open, setFin1Open] = useState(contractIsFin1 && !!contract?.value_month);
   const [fin1Preparing, setFin1Preparing] = useState(false);
   const [fin1Error, setFin1Error] = useState('');
@@ -657,19 +676,35 @@ export function PanelProductPlan(_props: Props) {
   // Commit product + commercial model, then hand over to the plan editor.
   const handleOpenFin1 = async () => {
     const contractId = contract?.id ?? wizardData.contractId;
-    if (!contractId || !localModelId || !localVariantId) return;
+    if (!contractId) return;
+    if (mode === 'used' ? !localTargetAssetId : !localModelId || !localVariantId) return;
     setFin1Preparing(true);
     setFin1Error('');
     try {
-      if (contract?.is_used_asset && contract?.target_asset_id) {
-        await apiClient.rpc('fn_contract_clear_target', { p_contract_id: contractId });
-      }
-      if (!productOnContract) {
-        await apiClient.rpc('fn_contract_set_product', {
-          p_contract_id: contractId,
-          p_model_id: localModelId,
-          p_variant_id: localVariantId,
-        });
+      if (mode === 'used') {
+        // Pointing at a device carries its own model and variant, so there is
+        // no set_product call here. Re-pointing means clearing first — the
+        // backend refuses a second target while one is held.
+        if (!targetOnContract) {
+          if (contract?.target_asset_id) {
+            await apiClient.rpc('fn_contract_clear_target', { p_contract_id: contractId });
+          }
+          await apiClient.rpc('fn_contract_set_target_asset', {
+            p_contract_id: contractId,
+            p_asset_id: localTargetAssetId,
+          });
+        }
+      } else {
+        if (contract?.is_used_asset && contract?.target_asset_id) {
+          await apiClient.rpc('fn_contract_clear_target', { p_contract_id: contractId });
+        }
+        if (!modelOnContract) {
+          await apiClient.rpc('fn_contract_set_product', {
+            p_contract_id: contractId,
+            p_model_id: localModelId!,
+            p_variant_id: localVariantId!,
+          });
+        }
       }
       if (contract?.commercial_model !== 'FIN1') {
         await apiClient.rpc('fn_contract_set_commercial_model', {
@@ -1054,7 +1089,7 @@ export function PanelProductPlan(_props: Props) {
       {/* Its own section, not a quote row: FIN1 is priced by
           fn_contract_set_fin1_plan, and the product has to be on the contract
           before that RPC will answer. */}
-      {fin1Available && localVariantId && (
+      {fin1Available && (mode === 'used' ? localTargetAssetId : localVariantId) && (
         <div>
           <div className="flex items-center gap-2 mb-3">
             <Badge size="sm" color="info">FIN1</Badge>
@@ -1062,10 +1097,15 @@ export function PanelProductPlan(_props: Props) {
           </div>
           {fin1Open && contract?.id && contractIsFin1 && productOnContract ? (
             <Fin1PlanEditor
+              // Re-mount on a device change: the editor probes the contract
+              // once on mount to learn its price mode and bounds, and a new
+              // device can change both.
+              key={contract.target_asset_id ?? contract.model_id ?? 'none'}
               contractId={contract.id}
               initialTermMonths={contract.value_month ?? null}
               initialDownAmount={contract.down_payment ?? null}
               initialUplift={contract.uplift_amount ?? null}
+              initialPrice={contract.is_used_asset ? contract.snapshot_retail_price ?? null : null}
               onSaved={() => {
                 invalidateContract();
                 addSnackbar({

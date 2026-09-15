@@ -1070,5 +1070,12 @@
   "CONTRACT.VALIDATION.ASSET_NOT_OWNED_BY_BRANCH": "A shop contract can only use a device the shop owns and holds — this one belongs to {{owner_name}}",
   "CONTRACT.VALIDATION.ASSET_NOT_OWNED_BY_BRANCH_basic": "A shop contract can only use a device the shop itself owns and holds",
   "CONTRACT.VALIDATION.ASSET_OWNED_BY_PARTNER": "This device belongs to {{owner_branch_name}}, a deal-partner shop — only that shop’s contracts can use it",
-  "CONTRACT.VALIDATION.ASSET_OWNED_BY_PARTNER_basic": "This device belongs to a deal-partner shop — only that shop’s contracts can use it"
+  "CONTRACT.VALIDATION.ASSET_OWNED_BY_PARTNER_basic": "This device belongs to a deal-partner shop — only that shop’s contracts can use it",
+  "PRICING.VALIDATION.FIN1_USED_PRICE": "That price is outside the range for this model, or is not a round hundred",
+  "PRICING.VALIDATION.FIN1_USED_PRICE_basic": "That price is outside the range for this model, or is not a round hundred",
+  "PRICING.VALIDATION.FIN1_USED_RANGE_NOT_SET": "This model has no second-hand price range yet — set it on the model’s pricing page before using a second-hand device",
+  "PRICING.VALIDATION.FIN1_PRICE_NOT_ALLOWED_NEW": "A new device uses the model’s list price — only a contract pointed at a second-hand device can set its own price",
+  "CONTRACT.VALIDATION.DEVICE_NOT_TARGET": "A shop contract can only bind the device it pointed to ({{target_asset_code}}), not {{asset_code}}",
+  "CONTRACT.VALIDATION.DEVICE_NOT_TARGET_basic": "A shop contract can only bind the device it pointed to",
+  "CONTRACT.VALIDATION.TARGET_ASSET_REQUIRED": "Point the contract at a device before going on"
 }

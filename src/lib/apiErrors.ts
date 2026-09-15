@@ -21,6 +21,33 @@ const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 type TranslateFn = TFunction | ((k: string, opts?: Record<string, unknown>) => string);
 
 /**
+ * The multi-check RPCs (`fn_contract_set_target_asset`, `fn_contract_bind_device`,
+ * `_can_bind_asset_to_contract`) report every failed check at once and put the
+ * facts one level down:
+ *
+ *   params: { errors: [ { code, detail: { owner_branch_name, … } }, … ] }
+ *
+ * The top-level `params` then holds nothing a message can interpolate, so a
+ * string like "belongs to {{owner_branch_name}}" (mig 1234) would always demote
+ * to its `_basic` form and drop the branch name the error exists to name.
+ * Hoist those details so they are reachable. Earlier entries win, matching the
+ * backend's own rule that the first failed check becomes the top-level code;
+ * real top-level params still override everything (spread after this).
+ */
+function flattenCheckDetails(raw: Record<string, unknown> | undefined): Record<string, unknown> {
+  const errors = raw?.errors;
+  if (!Array.isArray(errors)) return {};
+  const flat: Record<string, unknown> = {};
+  for (let i = errors.length - 1; i >= 0; i--) {
+    const detail = (errors[i] as { detail?: unknown } | null)?.detail;
+    if (detail && typeof detail === 'object' && !Array.isArray(detail)) {
+      Object.assign(flat, detail as Record<string, unknown>);
+    }
+  }
+  return flat;
+}
+
+/**
  * Prepare backend error `params` for i18next interpolation.
  *
  * Backend ships enum *codes*, never translated labels (adding a language must
@@ -35,7 +62,7 @@ export function prepareErrorParams(
   raw: Record<string, unknown> | undefined,
   t: TranslateFn,
 ): Record<string, unknown> {
-  const params: Record<string, unknown> = { ...(raw ?? {}) };
+  const params: Record<string, unknown> = { ...flattenCheckDetails(raw), ...(raw ?? {}) };
   if (typeof params.type === 'string') {
     params.type = t(`asset.idType.${params.type}`, { defaultValue: params.type });
   }

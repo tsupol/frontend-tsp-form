@@ -235,6 +235,12 @@ export const ERROR_TO_MODAL: Record<string, ModalId> = {
   // ships (mig 1231 retired the old request/approve RPCs). No modal can clear it,
   // and there is deliberately no "request approval" button — fix_rpc is null.
   'CONTRACT.STATE.PARTNER_APPROVAL_REQUIRED': null,
+  // A shop's contract must point at a device from the draft on (mig 1235), and
+  // a device that has since become unusable has to be re-picked — both are
+  // answered in the product step.
+  'CONTRACT.VALIDATION.TARGET_ASSET_REQUIRED': 'productPlan',
+  'CONTRACT.STATE.TARGET_ASSET_UNAVAILABLE': 'productPlan',
+  'CONTRACT.VALIDATION.FIN1_SNAPSHOT_REQUIRED': 'productPlan',
   'CONTRACT.VALIDATION.SIGNATORY_INCOMPLETE': 'signatory',
   'CONTRACT.VALIDATION.NO_BRANCH_DEFAULT_SIGNATORY': 'signatory',
   'SALE.VALIDATION.NO_OPEN_AMOUNT': 'productPlan',

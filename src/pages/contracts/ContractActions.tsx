@@ -67,6 +67,8 @@ interface ContractForActions {
   model_id: number | null;
   variant_id: number | null;
   device_id: number | null;
+  /** The device the contract points at before one is bound (mig 1235). */
+  target_asset_id?: number | null;
   outstanding_amount: number | null;
   late_fee_balance: number | null;
   credit_balance: number | null;
@@ -1438,9 +1440,17 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
     return branches.map(b => ({ value: String(b.id), label: b.name }));
   }, [branches]);
 
-  // Assets for bind_device — must match contract branch + model (backend enforces both)
+  // Assets for bind_device — must match contract branch + model (backend enforces both).
+  //
+  // A shop's contract binding for the first time may only take the device it
+  // pointed at (mig 1235 — CONTRACT.VALIDATION.DEVICE_NOT_TARGET), so offer
+  // exactly that one rather than a list where every other row fails on submit.
+  // Swapping a device that is already bound is unrestricted, so the full list
+  // stays for that case.
+  const bindLockedToTarget =
+    !!config?.needsDevice && contract.device_id == null && contract.target_asset_id != null;
   const { data: assets } = useQuery({
-    queryKey: ['assets-available', contract.branch_id, contract.model_id],
+    queryKey: ['assets-available', contract.branch_id, contract.model_id, bindLockedToTarget ? contract.target_asset_id : null],
     queryFn: () => {
       const params = new URLSearchParams({
         select: 'asset_id,asset_code,asset_code_display,family_name,model_name,variant_name,physical_color,master_color_hex,master_color_name_en,serial_no,imei,condition_grade,has_box,box_branch_id,box_branch_name',
@@ -1449,14 +1459,23 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
         order: 'asset_code',
         limit: '500',
       });
-      if (contract.model_id != null) params.set('model_id', `eq.${contract.model_id}`);
+      if (bindLockedToTarget) params.set('asset_id', `eq.${contract.target_asset_id}`);
+      else if (contract.model_id != null) params.set('model_id', `eq.${contract.model_id}`);
       return apiClient.get<Asset[]>(`/v_assets?${params.toString()}`);
     },
     staleTime: 60 * 1000,
-    enabled: !!config?.needsDevice && contract.model_id != null,
+    enabled: !!config?.needsDevice && (bindLockedToTarget || contract.model_id != null),
   });
 
   const [assetSearch, setAssetSearch] = useState('');
+
+  // When only the pointed device may be bound there is nothing to choose, so
+  // fill it in rather than making the user pick the single row on offer.
+  useEffect(() => {
+    if (bindLockedToTarget && contract.target_asset_id != null) {
+      setDeviceId(String(contract.target_asset_id));
+    }
+  }, [bindLockedToTarget, contract.target_asset_id]);
 
   const assetMap = useMemo(() => {
     const m = new Map<string, Asset>();
