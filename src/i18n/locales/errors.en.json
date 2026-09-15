@@ -1077,5 +1077,9 @@
   "PRICING.VALIDATION.FIN1_PRICE_NOT_ALLOWED_NEW": "A new device uses the model’s list price — only a contract pointed at a second-hand device can set its own price",
   "CONTRACT.VALIDATION.DEVICE_NOT_TARGET": "A shop contract can only bind the device it pointed to ({{target_asset_code}}), not {{asset_code}}",
   "CONTRACT.VALIDATION.DEVICE_NOT_TARGET_basic": "A shop contract can only bind the device it pointed to",
-  "CONTRACT.VALIDATION.TARGET_ASSET_REQUIRED": "Point the contract at a device before going on"
+  "CONTRACT.VALIDATION.TARGET_ASSET_REQUIRED": "Point the contract at a device before going on",
+  "SALE.VALIDATION.TERM_MONTHS_REQUIRED": "Enter the number of instalments",
+  "SALE.VALIDATION.DOWN_NOT_AMENDABLE": "The down payment cannot be changed — it is already paid",
+  "SALE.STATE.CONTRACT_PAUSED": "This contract is paused, so its terms cannot be corrected",
+  "SALE.VALIDATION.PENDING_SIGNING_EXISTS": "There is a signing still in progress — finish or cancel it first"
 }

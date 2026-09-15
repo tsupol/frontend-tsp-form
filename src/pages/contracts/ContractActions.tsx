@@ -43,6 +43,7 @@ import { ActionDoneView, type ActionDoneDetailRow } from './ActionDoneView';
 import { ContractFeeModal } from './ContractFeeModal';
 import { LateFeeCollectModal } from './LateFeeCollectModal';
 import { RescheduleDueDayModal } from './RescheduleDueDayModal';
+import { AmendSignedTermsModal } from './AmendSignedTermsModal';
 import { PauseContractModal } from './PauseContractModal';
 import { ResumeContractModal } from './ResumeContractModal';
 import { useContractInvalidate } from './useContractInvalidate';
@@ -116,6 +117,7 @@ type ContractAction =
   | 'service_charge'
   | 'late_fee_collect'
   | 'reschedule_due_day'
+  | 'amend_signed_terms'
   | 'expire_draft';
 
 // ── Action config ────────────────────────────────────────────────────────────
@@ -399,6 +401,19 @@ const ACTION_CONFIGS: Partial<Record<ContractAction, ActionConfig>> = {
     needsNewOwner: false,
     successKey: 'lateFee.done',
   },
+  amend_signed_terms: {
+    rpc: '', // handled by AmendSignedTermsModal (preview + commit in one RPC)
+    color: 'primary',
+    successKey: 'amendTerms.done',
+    needsPin: false, // PIN is driven by evaluator pin_required, handled inside the modal
+    needsNote: false,
+    needsReason: false,
+    needsBranch: false,
+    needsDevice: false,
+    needsAmount: false,
+    needsCloseReason: false,
+    needsNewOwner: false,
+  },
   reschedule_due_day: {
     rpc: '', // handled by RescheduleDueDayModal (options view + fn_contract_reschedule_due_day)
     color: 'primary',
@@ -568,6 +583,7 @@ const FE_TO_BACKEND_ACTION: Record<ContractAction, string> = {
   service_charge: 'SERVICE_CHARGE',
   late_fee_collect: 'LATE_FEE_COLLECT',
   reschedule_due_day: 'RESCHEDULE_DUE_DAY',
+  amend_signed_terms: 'AMEND_SIGNED_TERMS',
   expire_draft: 'EXPIRE_DRAFT',
 };
 
@@ -590,7 +606,7 @@ const FOOTER_ACTION_ALLOWLIST: ReadonlySet<string> = new Set([
   'COMPLETE_CONTRACT', 'TERMINATE_CONTRACT', 'VOID_CONTRACT',
   'EXPIRE_DRAFT',
   'TRANSFER_BRANCH', 'TRANSFER_ACCEPT', 'TRANSFER_CANCEL',
-  'RESCHEDULE_DUE_DAY',
+  'RESCHEDULE_DUE_DAY', 'AMEND_SIGNED_TERMS',
   'APPOINTMENT_CREATE', 'APPOINTMENT_CANCEL',
   'HOLDING_REFUND',
   'UPDATE_DELIVERY', 'ADD_NOTE',
@@ -832,6 +848,7 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   const isServiceCharge = activeAction === 'service_charge';
   const isLateFeeCollect = activeAction === 'late_fee_collect';
   const isReschedule = activeAction === 'reschedule_due_day';
+  const isAmendTerms = activeAction === 'amend_signed_terms';
   const isDepositDevice = activeAction === 'deposit_device';
   const isReturnDeposit = activeAction === 'return_deposit';
   const isPause = activeAction === 'pause';
@@ -841,6 +858,8 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   // response for this specific action, never hard-code it.
   const reschedulePinRequired = (actionsResp?.actions ?? [])
     .find(a => a.action_code === 'RESCHEDULE_DUE_DAY')?.pin_required ?? true;
+  const amendPinRequired = (actionsResp?.actions ?? [])
+    .find(a => a.action_code === 'AMEND_SIGNED_TERMS')?.pin_required ?? true;
 
   const handleSuccess = (msgKey: string, override?: ReactNode) => {
     setActiveAction(null);
@@ -1236,6 +1255,16 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
           queryClient.invalidateQueries({ queryKey: ['contract-actions', contract.id] });
         }}
       />
+      <AmendSignedTermsModal
+        open={isAmendTerms}
+        contract={contract}
+        pinRequired={amendPinRequired}
+        onClose={() => setActiveAction(null)}
+        onSuccess={() => {
+          onRefresh();
+          queryClient.invalidateQueries({ queryKey: ['contract-actions', contract.id] });
+        }}
+      />
       <PauseContractModal
         open={isPause}
         contract={contract}
@@ -1269,7 +1298,7 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
         onNavigateMoney={() => onNavigateTab?.('money')}
       />
       <ContractActionModal
-        open={!!activeAction && !isSavingDeposit && !isCancelSaving && !isEarlyPayoff && !isContinuePay && !isVoidBill && !isPayInstallment && !isComplete && !isTerminate && !isLoanAssign && !isLoanReturn && !isRepairRequest && !isAppointmentCreate && !isAppointmentCancel && !isTransferBranch && !isServiceCharge && !isLateFeeCollect && !isReschedule && !isDepositDevice && !isReturnDeposit && !isPause && !isResume}
+        open={!!activeAction && !isSavingDeposit && !isCancelSaving && !isEarlyPayoff && !isContinuePay && !isVoidBill && !isPayInstallment && !isComplete && !isTerminate && !isLoanAssign && !isLoanReturn && !isRepairRequest && !isAppointmentCreate && !isAppointmentCancel && !isTransferBranch && !isServiceCharge && !isLateFeeCollect && !isReschedule && !isAmendTerms && !isDepositDevice && !isReturnDeposit && !isPause && !isResume}
         action={activeAction}
         contract={contract}
         onClose={() => setActiveAction(null)}

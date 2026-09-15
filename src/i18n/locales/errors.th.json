@@ -1077,5 +1077,9 @@
   "PRICING.VALIDATION.FIN1_PRICE_NOT_ALLOWED_NEW": "เครื่องมือหนึ่งใช้ราคาตั้งของรุ่น — ตั้งราคาเองได้เฉพาะสัญญาที่ชี้เครื่องมือสอง",
   "CONTRACT.VALIDATION.DEVICE_NOT_TARGET": "สัญญาของร้านผูกได้เฉพาะเครื่องที่ชี้ไว้ ({{target_asset_code}}) ไม่ใช่ {{asset_code}}",
   "CONTRACT.VALIDATION.DEVICE_NOT_TARGET_basic": "สัญญาของร้านผูกได้เฉพาะเครื่องที่ชี้ไว้",
-  "CONTRACT.VALIDATION.TARGET_ASSET_REQUIRED": "ชี้เครื่องให้สัญญาก่อนจึงจะไปต่อได้"
+  "CONTRACT.VALIDATION.TARGET_ASSET_REQUIRED": "ชี้เครื่องให้สัญญาก่อนจึงจะไปต่อได้",
+  "SALE.VALIDATION.TERM_MONTHS_REQUIRED": "ใส่จำนวนงวด",
+  "SALE.VALIDATION.DOWN_NOT_AMENDABLE": "เงินดาวน์แก้ไม่ได้ เพราะชำระไปแล้ว",
+  "SALE.STATE.CONTRACT_PAUSED": "สัญญานี้พักชำระอยู่ แก้เงื่อนไขไม่ได้",
+  "SALE.VALIDATION.PENDING_SIGNING_EXISTS": "มีใบเซ็นค้างอยู่ — ทำให้เสร็จหรือยกเลิกก่อน"
 }
