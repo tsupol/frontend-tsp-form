@@ -563,6 +563,7 @@
     "branchHint": "Override the owner for a specific branch. Owner options are limited to what the branch allows.",
     "resetToTemplate": "Reset to template",
     "saved": "Saved",
+    "ownerFixed": "A deal-partner shop always owns its devices — every intake at this branch is owned by {{owner}}. There is nothing to set here.",
     "resyncDone": "Branch reset to company template"
   },
   "owners": {

@@ -1,8 +1,10 @@
 // Intake Owner Config — admin sets the DEFAULT owner (HOLDING / COMPANY / BRANCH) per
 // intake channel, at two levels:
-//   Panel A — company template: branch_type × channel grid (15 cells). Applies to NEW branches.
+//   Panel A — company template: branch_type × channel grid (10 cells — INTERNAL and
+//             EXTERNAL only). Applies to NEW branches.
 //   Panel B — branch override: one branch × 5 channels, owner_type limited to the branch's
 //             allowed set. "Reset to template" re-pulls the company template into the branch.
+//             A deal-partner shop has no cells at all — it always owns its devices (mig 1234).
 //
 // Doc: UI_SUMMARY/125_INTAKE_OWNER_CONFIG.md · work order: UI_FEEDBACK/2026-07-10_IMPLEMENT_intake_owner_config.md
 // Each cell autosaves on change (per-cell RPC). This is a settings grid, not a form — no dirty guard.
@@ -30,14 +32,22 @@ interface RefOwnerType { code: OwnerType; name_th: string; name_en: string; sort
 
 interface TemplateCell { branch_type: BranchType; channel: IntakeChannel; default_owner_type: OwnerType; allow_user_override: boolean; }
 interface BranchCell { channel: IntakeChannel; default_owner_type: OwnerType; allow_user_override: boolean; }
-interface BranchConfig { branch_id: number; branch_type: BranchType; allowed_owner_types: OwnerType[]; cells: BranchCell[]; }
-
-// Channel × branch_type combos that don't make sense are hidden in the grid.
-// (doc §5: e.g. channel DEAL_PARTNER only on branch_type DEAL_PARTNER.)
-function channelApplies(channel: IntakeChannel, branchType: BranchType): boolean {
-  if (channel === 'DEAL_PARTNER') return branchType === 'DEAL_PARTNER';
-  return true;
+interface BranchConfig {
+  branch_id: number;
+  branch_type: BranchType;
+  // Non-null when the branch has no choice of owner at all (mig 1234: a
+  // deal-partner shop always owns its own devices → 'BRANCH'). The BE then
+  // sends cells: [] and rejects every set call, so the grid is replaced by a
+  // plain statement of the rule.
+  owner_fixed: OwnerType | null;
+  allowed_owner_types: OwnerType[];
+  cells: BranchCell[];
 }
+
+// Branch types the company template covers. Deal-partner shops are excluded:
+// they always own their own devices, so there is nothing to template for them
+// (mig 1234 — fn_set_company_owner_template rejects the DEAL_PARTNER row).
+const TEMPLATE_BRANCH_TYPES = BRANCH_TYPES.filter(bt => bt !== 'DEAL_PARTNER');
 
 export function OwnerConfigPage() {
   const { t, i18n } = useTranslation();
@@ -245,13 +255,13 @@ export function OwnerConfigPage() {
 
           {/* One card (row) per branch-type; channels inside flow as a responsive grid. */}
           <div className="flex flex-col gap-4">
-            {BRANCH_TYPES.map(bt => (
+            {TEMPLATE_BRANCH_TYPES.map(bt => (
               <div key={bt} className="border border-line rounded-lg overflow-hidden">
                 <div className="px-4 py-2.5 bg-surface-soft border-b border-line font-medium">
                   {t(`branchType.${bt}`)}
                 </div>
                 <div className="grid gap-x-6 gap-y-4 p-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-                  {INTAKE_CHANNELS.filter(ch => channelApplies(ch, bt)).map(ch => {
+                  {INTAKE_CHANNELS.map(ch => {
                     const cell = templateCell(bt, ch);
                     const busy = pending.has(`t:${bt}:${ch}`);
                     return (
@@ -298,7 +308,9 @@ export function OwnerConfigPage() {
                 />
               </div>
             </div>
-            {branchId != null && (
+            {/* A fixed-owner branch has no cells to reset — hide the button rather
+                than offer a reset the backend refuses. */}
+            {branchId != null && branchConfig && !branchConfig.owner_fixed && (
               <Button
                 variant="outline"
                 size="sm"
@@ -311,10 +323,18 @@ export function OwnerConfigPage() {
             )}
           </div>
 
-          {branchId != null && branchConfig && (
+          {branchId != null && branchConfig?.owner_fixed && (
+            <div className="border border-line rounded-lg p-4">
+              <p className="text-sm flex items-start gap-1.5">
+                <Info size={14} className="mt-0.5 shrink-0 text-info-fg" />
+                <span>{t('ownerConfig.ownerFixed', { owner: ownerLabel(branchConfig.owner_fixed) })}</span>
+              </p>
+            </div>
+          )}
+
+          {branchId != null && branchConfig && !branchConfig.owner_fixed && (
             <div className="border border-line rounded-lg grid gap-x-6 gap-y-4 p-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
               {INTAKE_CHANNELS
-                .filter(ch => channelApplies(ch, branchConfig.branch_type))
                 .map(ch => {
                   const cell = branchConfig.cells.find(c => c.channel === ch);
                   const busy = pending.has(`b:${ch}`);

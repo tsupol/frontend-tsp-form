@@ -204,16 +204,31 @@ export function PanelProductPlan(_props: Props) {
   // filter by branch config, so the UI must hide a plan the contract's branch
   // can't sell on. Only hide on an explicit `false` — never hide because the
   // read failed. PRICEBOOK is always available and isn't gated here.
-  const { data: branchModels } = useQuery({
-    queryKey: ['branch-commercial-models', branchId],
-    queryFn: () => apiClient.get<{ commercial_models: { FIN1?: boolean; FIN2?: boolean } }[]>(
-      `/v_branches?id=eq.${branchId}&select=commercial_models`,
-    ).then(rows => rows[0]?.commercial_models ?? null),
+  // branch_type rides along because the in-stock picker below needs it: a
+  // deal-partner shop may only put its OWN devices on a contract, and an
+  // internal branch may never use a shop-owned one (mig 1234).
+  const { data: branchInfo } = useQuery({
+    queryKey: ['branch-contract-info', branchId],
+    queryFn: () => apiClient.get<{ branch_type: string; commercial_models: { FIN1?: boolean; FIN2?: boolean } }[]>(
+      `/v_branches?id=eq.${branchId}&select=branch_type,commercial_models`,
+    ).then(rows => rows[0] ?? null),
     enabled: branchId != null,
     staleTime: 60_000,
   });
+  const branchModels = branchInfo?.commercial_models ?? null;
   const fin1Enabled = branchModels?.FIN1 !== false;
   const fin2Enabled = branchModels?.FIN2 !== false;
+
+  // Owner filter for the in-stock picker. A shop's contract only accepts devices
+  // the shop owns; every other branch only accepts devices it does NOT own
+  // (owner HOLDING or COMPANY). Skipped until branch_type is known, so a slow
+  // lookup never silently narrows the list to nothing.
+  const isPartnerBranch = branchInfo?.branch_type === 'DEAL_PARTNER';
+  const ownerFilterClause = !branchInfo
+    ? ''
+    : isPartnerBranch
+      ? `&owner_type=eq.BRANCH&owner_id=eq.${branchId}`
+      : '&owner_type=neq.BRANCH';
 
   const conditionFilterClause = conditionFilter === 'NEW'
     ? '&condition_grade=eq.NEW'
@@ -222,9 +237,9 @@ export function PanelProductPlan(_props: Props) {
       : '';
 
   const { data: assetResults, isFetching: assetSearching } = useQuery({
-    queryKey: ['stock-asset-search', debouncedAssetSearch, branchId, conditionFilter],
+    queryKey: ['stock-asset-search', debouncedAssetSearch, branchId, conditionFilter, ownerFilterClause],
     queryFn: () => {
-      let url = `/v_assets?current_bucket=eq.ON_HAND_AVAILABLE&is_contractable=is.true&order=asset_code&limit=50${conditionFilterClause}`;
+      let url = `/v_assets?current_bucket=eq.ON_HAND_AVAILABLE&is_contractable=is.true&order=asset_code&limit=50${conditionFilterClause}${ownerFilterClause}`;
       if (branchId) url += `&branch_id=eq.${branchId}`;
       if (debouncedAssetSearch) {
         url += `&${assetSearchOrClause(debouncedAssetSearch, [
@@ -235,7 +250,7 @@ export function PanelProductPlan(_props: Props) {
       return apiClient.get<StockAsset[]>(url);
     },
     staleTime: 30_000,
-    enabled: shouldAssetSearch && sourceTab === 'instock',
+    enabled: shouldAssetSearch && sourceTab === 'instock' && branchInfo != null,
   });
 
   const assets = assetResults ?? [];
