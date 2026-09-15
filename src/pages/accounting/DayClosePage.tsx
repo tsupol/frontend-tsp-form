@@ -1718,7 +1718,12 @@ function DayCloseOverview({ close, branchId, closeDate }: { close: DayCloseHisto
             <Stat label={t('accounting.dayClose.holdingBudget')} value={fmtCurrency(row.holding_budget_amount)} tone="warning" />
           )}
           <Stat label={t('accounting.dayClose.refundCashOut')} value={fmtCurrency(row.refund_cash_out)} tone={row.refund_cash_out > 0 ? 'warning' : undefined} />
-          <Stat label={t('accounting.dayClose.drawerNet')} value={fmtCurrency(row.cash_amount + row.transfer_amount)} />
+          {/* Money out has to come off the net, or the line contradicts the
+              refund shown beside it (OHM 2026-09-15: a day with money in and a
+              refund out read as if nothing had gone out). The company-budget
+              refund is deliberately left out — it never passes through the
+              till, which is what its own line says. */}
+          <Stat label={t('accounting.dayClose.drawerNet')} value={fmtCurrency(row.cash_amount + row.transfer_amount - row.refund_cash_out)} />
         </dl>
       </div>
 
