@@ -1102,5 +1102,7 @@
   "blockingReason.partner_case_open": "The contract has a credit request open — withdraw it before editing the bill",
   "contract.validation.snapshot_required": "Set the instalment plan before submitting.",
   "contract.validation.agreed_price_required": "The agreed price is missing — set the instalment plan.",
-  "contract.state.fin1_plan_required": "Set the FIN1 plan before going on."
+  "contract.state.fin1_plan_required": "Set the FIN1 plan before going on.",
+  "contract.validation.device_not_target": "This contract can only take the device it was approved for ({{target_asset_code}}), not {{asset_code}}.",
+  "contract.validation.device_not_target_basic": "This contract can only take the device it was approved for."
 }
