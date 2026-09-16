@@ -15,7 +15,7 @@ import { PageNav, PageNavPanel, DataTable, MobileHeader, Badge, Switch, Select }
 import { ArrowLeft, ArrowRightFromLine } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { SearchInput } from '../../components/SearchInput';
-import { fmtCurrency } from '../../lib/format';
+import { fmtCurrency, formatRelativeAgo } from '../../lib/format';
 import {
   usePartnerCaseQueue,
   usePartnerCaseDetail,
@@ -32,7 +32,9 @@ import {
   type PartnerCaseOutcome,
 } from './partnerCaseTypes';
 
-/** A request waiting this long deserves a colour. Hours. */
+// How long a request may sit before the wait itself is worth flagging. Below
+// the first threshold the age is plain text — a badge on every fresh request is
+// noise, and the queue should only shout when something is actually stale.
 const AGE_WARNING_HOURS = 4;
 const AGE_DANGER_HOURS = 24;
 
@@ -274,9 +276,15 @@ export function PartnerCaseQueuePage() {
                   onRowActivate={row => select(row.original.case_id)}
                   renderRow={row => {
                     const r = row.original;
-                    const ageColor = (r.age_hours ?? 0) >= AGE_DANGER_HOURS ? 'danger'
-                      : (r.age_hours ?? 0) >= AGE_WARNING_HOURS ? 'warning'
-                      : 'default';
+                    // "0h" told a reviewer nothing — two minutes and fifty-nine
+                    // read the same. Show how long it has actually waited, and
+                    // only wrap it in a badge once that wait matters.
+                    const ageHours = r.age_hours ?? 0;
+                    const ageText = formatRelativeAgo(r.timestamp, i18n.language).rel;
+                    const ageColor: 'danger' | 'warning' | null =
+                      ageHours >= AGE_DANGER_HOURS ? 'danger'
+                      : ageHours >= AGE_WARNING_HOURS ? 'warning'
+                      : null;
                     return (
                       <button
                         type="button"
@@ -296,9 +304,11 @@ export function PartnerCaseQueuePage() {
                                 <Badge color="warning" size="sm">{t('partnerCase.used')}</Badge>
                               )}
                               <span className="flex-1" />
-                              <Badge color={ageColor} size="sm">
-                                {t('partnerCase.ageHours', { count: Math.floor(r.age_hours ?? 0) })}
-                              </Badge>
+                              {ageColor ? (
+                                <Badge color={ageColor} size="sm">{ageText}</Badge>
+                              ) : (
+                                <span className="text-xs text-subtle shrink-0">{ageText}</span>
+                              )}
                             </>
                           ) : (
                             <>

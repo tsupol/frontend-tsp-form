@@ -8021,7 +8021,6 @@
     "waitingCount": "รอตรวจ {{count}} รายการ",
     "onlyMyPool": "เฉพาะของฉัน",
     "mine": "ของฉัน",
-    "ageHours": "{{count}} ชม.",
     "selectToReview": "เลือกคำขอเพื่อตรวจ",
     "status_SUBMITTED": "รอตรวจ",
     "status_APPROVED": "อนุมัติแล้ว",

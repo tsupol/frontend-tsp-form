@@ -8031,7 +8031,6 @@
     "waitingCount": "{{count}} waiting",
     "onlyMyPool": "Only mine",
     "mine": "Mine",
-    "ageHours": "{{count}}h",
     "selectToReview": "Pick a request to review",
     "status_SUBMITTED": "Waiting",
     "status_APPROVED": "Approved",
