@@ -3753,7 +3753,8 @@
       "lines": "items",
       "noLines": "No items in this PO",
       "type": "PO type"
-    }
+    },
+    "type_DEAL_PARTNER": "Shop credit"
   },
   "retail": {
     "walkIn": "Walk-in",

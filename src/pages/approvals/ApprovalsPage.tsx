@@ -14,13 +14,15 @@ import { useMediaUrl } from '../../hooks/useMediaUrl';
 import { normalizeKey } from '../../lib/mediaPath';
 import { fmtCurrency } from '../../lib/format';
 import { translateApiError } from '../../lib/apiErrors';
+import { PartnerCaseDetailPanel } from '../partner-cases/PartnerCaseDetailPanel';
+import { usePartnerCaseDetail } from '../partner-cases/usePartnerCases';
 
 /* ───────────────────────────────────────────────────────────────────────────
  * Types — match api.v_approvals_all_statuses (doc 59 / 92)
  * TOC projection: list/headline fields only. Detail is fetched per-type.
  * ─────────────────────────────────────────────────────────────────────────── */
 
-type ApprovalType = 'NEGOTIATION' | 'BILL_LINE_DISCOUNT' | 'BUYBACK' | 'ASSET_SELL_OUT' | 'PO';
+type ApprovalType = 'NEGOTIATION' | 'BILL_LINE_DISCOUNT' | 'BUYBACK' | 'ASSET_SELL_OUT' | 'PO' | 'DEAL_PARTNER';
 type ApprovalStatus =
   | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
   | 'EXPIRED' | 'INVALIDATED' | 'COMPLETED';
@@ -75,6 +77,7 @@ const typeColor = (type: ApprovalType): 'info' | 'primary' | 'secondary' | 'warn
     case 'BUYBACK': return 'secondary';
     case 'ASSET_SELL_OUT': return 'success';
     case 'PO': return 'default';
+    case 'DEAL_PARTNER': return 'primary';
   }
 };
 
@@ -149,6 +152,7 @@ export function ApprovalsPage() {
     { value: 'BUYBACK', label: t('approvals.type_BUYBACK') },
     { value: 'ASSET_SELL_OUT', label: t('approvals.type_ASSET_SELL_OUT') },
     { value: 'PO', label: t('approvals.type_PO') },
+    { value: 'DEAL_PARTNER', label: t('approvals.type_DEAL_PARTNER') },
   ];
 
   return (
@@ -292,6 +296,16 @@ export function ApprovalsPage() {
                       addSnackbar({
                         message: <div className="alert alert-success"><CheckCircle size={16} /><span>{t(key)}</span></div>,
                       });
+                    }}
+                  />
+                ) : selected.type === 'DEAL_PARTNER' ? (
+                  <PartnerCaseApprovalPanel
+                    caseId={selected.id}
+                    isMobile={isMobile}
+                    onDecided={() => {
+                      setSelected(null);
+                      if (isMobile) goBack();
+                      refresh();
                     }}
                   />
                 ) : selected.type === 'PO' ? (
@@ -445,6 +459,12 @@ function SimpleApprovalPanel({
       case 'ASSET_SELL_OUT':
         // Sell-out never routes here (handled by SellOutApprovalPanel).
         return { rpc: 'fn_asset_sell_request_approve', params: { p_request_id: row.id } };
+      case 'DEAL_PARTNER':
+        // Deal-partner credit requests are decided on their own panel, which
+        // calls fn_partner_case_approve / _return with the case id. There is no
+        // correct generic RPC here — throwing beats sending a shop's request
+        // into the negotiation flow.
+        throw new Error('DEAL_PARTNER approvals are handled by PartnerCaseApprovalPanel');
     }
   };
 
@@ -942,5 +962,28 @@ function PoApprovalPanel({
         </div>
       )}
     </div>
+  );
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * Deal-partner credit request — reuse the real reviewer panel, the same way
+ * the buyback arm reuses BuybackDetailPanel. The combined inbox carries only a
+ * headline row; the panel fetches the request itself (its `id` IS the case id)
+ * and drives fn_partner_case_approve / _return. Never fn_negotiation_*.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+function PartnerCaseApprovalPanel({ caseId, isMobile, onDecided }: {
+  caseId: number;
+  isMobile: boolean;
+  onDecided: () => void;
+}) {
+  const { detail, isLoading } = usePartnerCaseDetail(caseId);
+  return (
+    <PartnerCaseDetailPanel
+      detail={detail}
+      loading={isLoading}
+      isMobile={isMobile}
+      onDecided={onDecided}
+    />
   );
 }
