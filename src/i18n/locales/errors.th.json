@@ -1099,5 +1099,8 @@
   "partner.not_found.case": "ไม่พบคำขอนี้แล้ว",
   "blockingReason.not_in_pool": "คุณไม่ใช่ผู้ตรวจของสาขานี้",
   "blockingReason.snapshot_stale": "ข้อมูลสัญญาเปลี่ยนหลังยื่น",
-  "blockingReason.partner_case_open": "สัญญามีคำขออนุมัติค้างอยู่ ต้องถอนคำขอก่อนแก้ไขบิล"
+  "blockingReason.partner_case_open": "สัญญามีคำขออนุมัติค้างอยู่ ต้องถอนคำขอก่อนแก้ไขบิล",
+  "contract.validation.snapshot_required": "ต้องตั้งแผนผ่อนก่อนยื่น",
+  "contract.validation.agreed_price_required": "ยังไม่มีราคาตกลง — กรุณาตั้งแผนผ่อน",
+  "contract.state.fin1_plan_required": "ตั้งแผน FIN1 ก่อนจึงจะไปต่อได้"
 }

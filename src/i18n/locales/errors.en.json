@@ -1099,5 +1099,8 @@
   "partner.not_found.case": "That request no longer exists.",
   "blockingReason.not_in_pool": "You aren't a reviewer for this branch",
   "blockingReason.snapshot_stale": "The contract changed after it was submitted",
-  "blockingReason.partner_case_open": "The contract has a credit request open — withdraw it before editing the bill"
+  "blockingReason.partner_case_open": "The contract has a credit request open — withdraw it before editing the bill",
+  "contract.validation.snapshot_required": "Set the instalment plan before submitting.",
+  "contract.validation.agreed_price_required": "The agreed price is missing — set the instalment plan.",
+  "contract.state.fin1_plan_required": "Set the FIN1 plan before going on."
 }
