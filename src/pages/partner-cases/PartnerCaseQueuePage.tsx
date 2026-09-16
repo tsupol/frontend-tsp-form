@@ -10,7 +10,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { PageNav, PageNavPanel, DataTable, MobileHeader, Badge, Switch, Select } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
@@ -24,6 +24,7 @@ import {
   usePartnerCaseStatusRef,
 } from './usePartnerCases';
 import { PartnerCaseDetailPanel } from './PartnerCaseDetailPanel';
+import { useAuth } from '../../contexts/AuthContext';
 import {
   outcomeBadgeColor,
   type PartnerCase,
@@ -94,6 +95,7 @@ const fromHistory = (r: PartnerCase): RailRow => ({
 export function PartnerCaseQueuePage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const { isDealPartner } = useAuth();
   const { caseId: caseIdParam } = useParams<{ caseId?: string }>();
 
   const selectedId = caseIdParam ? Number(caseIdParam) : null;
@@ -138,6 +140,12 @@ export function PartnerCaseQueuePage() {
   const { detail, isLoading: detailLoading } = usePartnerCaseDetail(selectedId);
 
   const select = (id: number) => navigate(`/admin/partner-cases/${id}`);
+
+  // A shop has no business on the reviewer's page. The menu never offers it and
+  // every query behind it 403s, but the address is typeable — without this the
+  // shop lands on an empty queue shell that looks broken rather than forbidden.
+  // Placed after the hooks so the hook order never changes between renders.
+  if (isDealPartner) return <Navigate to="/admin/contracts/search" replace />;
 
   const statusLabel = (code: PartnerCaseStatus) => {
     const row = statusRef.find(s => s.code === code);
