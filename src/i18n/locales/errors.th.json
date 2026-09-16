@@ -1098,5 +1098,6 @@
   "partner.auth.not_in_pool": "คุณไม่ได้อยู่ในกลุ่มผู้ตรวจของสาขานี้",
   "partner.not_found.case": "ไม่พบคำขอนี้แล้ว",
   "blockingReason.not_in_pool": "คุณไม่ใช่ผู้ตรวจของสาขานี้",
-  "blockingReason.snapshot_stale": "ข้อมูลสัญญาเปลี่ยนหลังยื่น"
+  "blockingReason.snapshot_stale": "ข้อมูลสัญญาเปลี่ยนหลังยื่น",
+  "blockingReason.partner_case_open": "สัญญามีคำขออนุมัติค้างอยู่ ต้องถอนคำขอก่อนแก้ไขบิล"
 }

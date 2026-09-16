@@ -1098,5 +1098,6 @@
   "partner.auth.not_in_pool": "You aren't one of this branch's credit reviewers.",
   "partner.not_found.case": "That request no longer exists.",
   "blockingReason.not_in_pool": "You aren't a reviewer for this branch",
-  "blockingReason.snapshot_stale": "The contract changed after it was submitted"
+  "blockingReason.snapshot_stale": "The contract changed after it was submitted",
+  "blockingReason.partner_case_open": "The contract has a credit request open — withdraw it before editing the bill"
 }
