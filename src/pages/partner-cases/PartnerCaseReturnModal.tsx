@@ -42,6 +42,10 @@ export function PartnerCaseReturnModal({ open, detail, onClose, onReturned }: Pa
   const [blockingBillIds, setBlockingBillIds] = useState<number[]>([]);
   const [result, setResult] = useState<PartnerCaseReturnResult | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
+  // Sending back is one-way — the backend refuses every action on a returned
+  // request afterwards, and only the shop can revive it by resubmitting. So the
+  // reviewer confirms before it happens.
+  const [confirmSend, setConfirmSend] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -53,6 +57,7 @@ export function PartnerCaseReturnModal({ open, detail, onClose, onReturned }: Pa
     setBlockingBillIds([]);
     setResult(null);
     setConfirmClose(false);
+    setConfirmSend(false);
   }, [open]);
 
   const contractCode = detail?.contract_code ?? '';
@@ -86,6 +91,7 @@ export function PartnerCaseReturnModal({ open, detail, onClose, onReturned }: Pa
         p_reason_code: reasonCode,
         p_note: note.trim() || null,
       });
+      setConfirmSend(false);
       setResult(res);
       setView('done');
       invalidate(detail.contract_id);
@@ -99,6 +105,8 @@ export function PartnerCaseReturnModal({ open, detail, onClose, onReturned }: Pa
       } else {
         setError(String(err));
       }
+      // Drop back to the form so the error band is the thing on screen.
+      setConfirmSend(false);
     } finally {
       setSaving(false);
     }
@@ -181,7 +189,7 @@ export function PartnerCaseReturnModal({ open, detail, onClose, onReturned }: Pa
               <Button variant="ghost" onClick={handleClose} disabled={saving}>
                 {t('common.cancel')}
               </Button>
-              <Button color="danger" onClick={handleReturn} disabled={saving || !canSubmit}>
+              <Button color="danger" onClick={() => setConfirmSend(true)} disabled={saving || !canSubmit}>
                 {title}
               </Button>
             </div>
@@ -210,6 +218,43 @@ export function PartnerCaseReturnModal({ open, detail, onClose, onReturned }: Pa
             onClose={() => { onReturned?.(); forceClose(); }}
           />
         )}
+      </Modal>
+
+      <Modal
+        open={confirmSend}
+        onClose={() => setConfirmSend(false)}
+        maxWidth="26rem"
+        width="100%"
+        ariaLabel={title}
+      >
+        <div className="modal-header">
+          <h2 className="modal-title">{title}</h2>
+        </div>
+        <div className="modal-content">
+          <p className="text-sm">
+            {isUnapprove
+              ? t('partnerCase.confirmUnapproveBody')
+              : t('partnerCase.confirmReturnBody')}
+          </p>
+          <div className="mt-3 px-3 py-2.5 rounded-md bg-surface border border-line">
+            <div className="font-medium text-sm">{contractCode}</div>
+            <div className="text-sm text-subtle mt-0.5">
+              {reasonOptions.find(o => o.value === reasonCode)?.label}
+            </div>
+            {note.trim() && <div className="text-sm mt-1">{note.trim()}</div>}
+          </div>
+          <div className="alert alert-warning mt-3">
+            <span>{t('partnerCase.confirmReturnIrreversible')}</span>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <Button variant="ghost" onClick={() => setConfirmSend(false)} disabled={saving}>
+            {t('common.cancel')}
+          </Button>
+          <Button color="danger" onClick={handleReturn} disabled={saving}>
+            {t('partnerCase.confirmReturnAction')}
+          </Button>
+        </div>
       </Modal>
 
       <Modal

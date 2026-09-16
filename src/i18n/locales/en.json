@@ -8097,6 +8097,10 @@
     "foundCount": "{{count}} found",
     "historyEmpty": "No requests match",
     "searchPlaceholder": "Contract code or customer",
-    "allBranches": "All shops"
+    "allBranches": "All shops",
+    "confirmReturnBody": "Send this request back to the shop?",
+    "confirmUnapproveBody": "Take this approval back and send the request to the shop?",
+    "confirmReturnIrreversible": "This can't be undone. The shop has to fix the request and submit it again.",
+    "confirmReturnAction": "Send back"
   }
 }

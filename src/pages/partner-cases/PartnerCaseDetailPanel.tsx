@@ -230,14 +230,17 @@ export function PartnerCaseDetailPanel({
             />
             <Field label={t('partnerCase.pool')} value={detail.pool_name ?? '—'} />
           </div>
+          {/* The tint's own padding would push this text past the left edge of
+              the fields above, which reads as a stray indent. Pull the box out
+              by that padding so the label lines up with "สาขา". */}
           {detail.submit_note && (
-            <div className="mt-3 rounded-md bg-surface-soft px-3 py-2">
+            <div className="mt-3 -mx-3 rounded-md bg-surface-soft px-3 py-2">
               <div className="text-xs text-subtle">{t('partnerCase.submitNoteLabel')}</div>
               <div className="text-sm mt-0.5">{detail.submit_note}</div>
             </div>
           )}
           {detail.status === 'RETURNED' && detail.return_reason_code && (
-            <div className="mt-3 rounded-md border border-danger-border bg-danger-soft px-3 py-2">
+            <div className="mt-3 -mx-3 rounded-md border border-danger-border bg-danger-soft px-3 py-2">
               <div className="text-sm font-medium text-danger-fg">
                 {reasonLabel(detail.return_reason_code)}
               </div>
@@ -247,7 +250,7 @@ export function PartnerCaseDetailPanel({
             </div>
           )}
           {detail.status === 'APPROVED' && detail.approved_expires_at && (
-            <div className="mt-3 rounded-md border border-success-border bg-success-soft px-3 py-2 text-sm text-success-fg">
+            <div className="mt-3 -mx-3 rounded-md border border-success-border bg-success-soft px-3 py-2 text-sm text-success-fg">
               {t('partnerCase.usableUntil')} <DateTime value={detail.approved_expires_at} showTime />
             </div>
           )}
