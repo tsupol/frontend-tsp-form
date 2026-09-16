@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Modal, Button, TextArea, MaskedInput } from 'tsp-form';
-import { XCircle, AlertCircle, Loader2, CheckCircle, ArrowRight } from 'lucide-react';
+import { XCircle, AlertCircle, Loader2, CheckCircle, ArrowRight, Printer } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { DateTime } from '../../components/DateTime';
 import { ActionDoneView, type ActionDoneDetailRow } from './ActionDoneView';
+import { ContractPreviewModal } from './ContractPreviewModal';
+import type { ContractMin } from '../../lib/contractPdf/contractMin';
 import { translateApiError } from '../../lib/apiErrors';
 import { fmtCurrency } from '../../lib/format';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
@@ -115,6 +117,7 @@ export function AmendSignedTermsModal({ open, contract, pinRequired, onClose, on
   const [result, setResult] = useState<AmendResult | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [previewDocOpen, setPreviewDocOpen] = useState(false);
 
   const { data: current, isLoading, isError } = useQuery({
     queryKey: ['contract-rate-comparison', contract?.id],
@@ -226,6 +229,16 @@ export function AmendSignedTermsModal({ open, contract, pinRequired, onClose, on
 
   const contractCode = contract?.code_display ?? contract?.code ?? '';
 
+  // Only the commit response carries the addendum, so this is null until the
+  // change is written — which is also the only time the document exists.
+  const amendSigningId = result?.addendum?.signing_id ?? null;
+
+  // The preview viewer reads only these three; everything else on ContractMin
+  // is a display fallback for call sites that render the full lease packet.
+  const contractForPreview: ContractMin | null = contract
+    ? ({ id: contract.id, code: contract.code, code_display: contract.code_display } as ContractMin)
+    : null;
+
   const doneDetailRows: ActionDoneDetailRow[] = result ? [
     {
       label: t('amendTerms.installmentLabel'),
@@ -260,6 +273,16 @@ export function AmendSignedTermsModal({ open, contract, pinRequired, onClose, on
               extras={
                 <div className="text-xs text-subtle">{t('amendTerms.addendumNote')}</div>
               }
+              /* The change record renders through the ordinary contract PDF
+                 route, addressed by the addendum's own signing id (BE answer
+                 2026-09-16). It carries no customer signature line, so there is
+                 nothing to collect — staff just file or hand over a copy.
+                 Absent only if the server omitted the addendum block. */
+              secondaryAction={amendSigningId != null ? {
+                label: t('amendTerms.printAddendum'),
+                startIcon: <Printer size={16} />,
+                onClick: () => setPreviewDocOpen(true),
+              } : undefined}
               onClose={forceClose}
             />
           ) : (
@@ -510,6 +533,13 @@ export function AmendSignedTermsModal({ open, contract, pinRequired, onClose, on
           <Button color="danger" onClick={forceClose}>{t('common.discard')}</Button>
         </div>
       </Modal>
+
+      <ContractPreviewModal
+        open={previewDocOpen}
+        onClose={() => setPreviewDocOpen(false)}
+        contract={contractForPreview}
+        target={amendSigningId != null ? { signingId: amendSigningId } : undefined}
+      />
     </>
   );
 }

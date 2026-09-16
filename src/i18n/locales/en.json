@@ -7940,7 +7940,8 @@
     "notDeployed": "The change cannot be saved yet — waiting for the backend to ship it. Everything up to this point works.",
     "confirm": "Save the correction",
     "done": "Terms corrected",
-    "addendumNote": "A record of the change is filed with the contract. It needs no signature."
+    "addendumNote": "A record of the change is filed with the contract. It needs no signature.",
+    "printAddendum": "Print change record"
   },
   "fin1Plan": {
     "startHint": "FIN1 plans are set from the model's retail price. Continue to pick the term, down payment and price uplift.",
