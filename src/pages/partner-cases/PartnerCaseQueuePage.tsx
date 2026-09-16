@@ -1,46 +1,154 @@
-// The credit reviewer's queue of waiting shop requests.
+// The credit reviewer's queue and history of shop requests.
 //
-// Two-panel: the rail lists what is waiting, the right panel is the full
-// request. The view only ever returns requests still awaiting review for the
-// reviewer's own company, so there is no status filter — a decided request
-// leaves the queue and lives on in the request history.
+// Two-panel: the rail lists requests, the right panel is the full request.
+// Tabs pick which list — the first is the work queue (still waiting), the rest
+// are history, because a decided request leaves the queue view entirely and
+// would otherwise be unfindable.
 //
-// The default is "mine": requests from branches whose reviewer pool this user
-// belongs to. The toggle widens it to the whole company, where a reviewer can
-// look but the capability RPC will refuse the buttons (`not_in_pool`).
+// The two lists come from different views with different columns, so the rail
+// renders from a small shared row shape rather than pretending they are one.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
-import { PageNav, PageNavPanel, DataTable, MobileHeader, Badge, Switch } from 'tsp-form';
+import { PageNav, PageNavPanel, DataTable, MobileHeader, Badge, Switch, Select } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
+import { SearchInput } from '../../components/SearchInput';
 import { fmtCurrency } from '../../lib/format';
-import { usePartnerCaseQueue, usePartnerCaseDetail } from './usePartnerCases';
+import {
+  usePartnerCaseQueue,
+  usePartnerCaseDetail,
+  usePartnerCaseHistory,
+  usePartnerBranches,
+  usePartnerCaseStatusRef,
+} from './usePartnerCases';
 import { PartnerCaseDetailPanel } from './PartnerCaseDetailPanel';
-import type { PartnerCaseQueueRow } from './partnerCaseTypes';
+import {
+  outcomeBadgeColor,
+  type PartnerCase,
+  type PartnerCaseQueueRow,
+  type PartnerCaseStatus,
+  type PartnerCaseOutcome,
+} from './partnerCaseTypes';
 
 /** A request waiting this long deserves a colour. Hours. */
 const AGE_WARNING_HOURS = 4;
 const AGE_DANGER_HOURS = 24;
 
+/** `null` status = the work queue; everything else reads the history view. */
+type TabKey = 'QUEUE' | PartnerCaseStatus | 'ALL';
+
+const TABS: TabKey[] = ['QUEUE', 'APPROVED', 'RETURNED', 'WITHDRAWN', 'ALL'];
+
+/** What the rail needs, from either view. */
+interface RailRow {
+  case_id: number;
+  contract_code: string;
+  customer_name: string | null;
+  branch_name: string | null;
+  model_label: string | null;
+  financed_amount: number | null;
+  is_used_asset: boolean;
+  submitted_by_name: string | null;
+  /** Queue: when it arrived. History: when it was last acted on. */
+  timestamp: string;
+  /** Queue only. */
+  age_hours?: number;
+  in_my_pool?: boolean;
+  /** History only. */
+  status?: PartnerCaseStatus;
+  outcome?: PartnerCaseOutcome;
+}
+
+const fromQueue = (r: PartnerCaseQueueRow): RailRow => ({
+  case_id: r.case_id,
+  contract_code: r.contract_code,
+  customer_name: r.customer_name,
+  branch_name: r.branch_name,
+  model_label: r.variant_name ?? r.model_name,
+  financed_amount: r.financed_amount,
+  is_used_asset: r.is_used_asset,
+  submitted_by_name: r.submitted_by_name,
+  timestamp: r.submitted_at,
+  age_hours: r.age_hours,
+  in_my_pool: r.in_my_pool,
+});
+
+const fromHistory = (r: PartnerCase): RailRow => ({
+  case_id: r.case_id,
+  contract_code: r.contract_code,
+  customer_name: r.customer_name,
+  branch_name: r.branch_name,
+  model_label: r.variant_name ?? r.model_name,
+  financed_amount: r.financed_amount,
+  is_used_asset: r.is_used_asset,
+  submitted_by_name: r.submitted_by_name,
+  timestamp: r.updated_at,
+  status: r.status,
+  outcome: r.outcome,
+});
+
 export function PartnerCaseQueuePage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { caseId: caseIdParam } = useParams<{ caseId?: string }>();
 
   const selectedId = caseIdParam ? Number(caseIdParam) : null;
 
+  const [tab, setTab] = useState<TabKey>('QUEUE');
   const [onlyMyPool, setOnlyMyPool] = useState(true);
+  const [branchId, setBranchId] = useState<string>('');
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
 
-  useEffect(() => { setPageIndex(0); }, [onlyMyPool]);
+  const isQueue = tab === 'QUEUE';
 
-  const { rows, totalCount, isFetching } = usePartnerCaseQueue({ onlyMyPool, pageIndex, pageSize });
+  useEffect(() => { setPageIndex(0); }, [tab, onlyMyPool, branchId, debouncedSearch]);
+
+  const branches = usePartnerBranches();
+  const statusRef = usePartnerCaseStatusRef();
+
+  const queue = usePartnerCaseQueue({
+    onlyMyPool,
+    pageIndex,
+    pageSize,
+    // React Query keeps the queue cached while a history tab is open; that is
+    // fine, it just refetches on return.
+  });
+  const history = usePartnerCaseHistory({
+    status: isQueue || tab === 'ALL' ? null : (tab as PartnerCaseStatus),
+    branchId,
+    search: debouncedSearch,
+    pageIndex,
+    pageSize,
+  });
+
+  const rows: RailRow[] = useMemo(
+    () => (isQueue ? queue.rows.map(fromQueue) : history.rows.map(fromHistory)),
+    [isQueue, queue.rows, history.rows],
+  );
+  const totalCount = isQueue ? queue.totalCount : history.totalCount;
+  const isFetching = isQueue ? queue.isFetching : history.isFetching;
+
   const { detail, isLoading: detailLoading } = usePartnerCaseDetail(selectedId);
 
   const select = (id: number) => navigate(`/admin/partner-cases/${id}`);
+
+  const statusLabel = (code: PartnerCaseStatus) => {
+    const row = statusRef.find(s => s.code === code);
+    if (!row) return code;
+    return i18n.language === 'th' ? row.name_th : row.name_en;
+  };
+
+  const tabLabel = (key: TabKey) =>
+    key === 'QUEUE' ? t('partnerCase.tabQueue')
+      : key === 'ALL' ? t('partnerCase.tabAll')
+      : statusLabel(key);
+
+  const branchOptions = branches.map(b => ({ value: String(b.id), label: b.name }));
 
   return (
     <PageNav
@@ -49,7 +157,7 @@ export function PartnerCaseQueuePage() {
       className="h-dvh overflow-hidden"
     >
       {({ isMobile, isRoot, goTo, goBack }) => {
-        const pick = (row: PartnerCaseQueueRow) => {
+        const pick = (row: RailRow) => {
           select(row.case_id);
           if (isMobile) goTo('detail');
         };
@@ -87,7 +195,9 @@ export function PartnerCaseQueuePage() {
               <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
                 <h1 className="heading-2 shrink-0">{t('partnerCase.queueTitle')}</h1>
                 <span className="text-sm text-subtle">
-                  {t('partnerCase.waitingCount', { count: totalCount })}
+                  {isQueue
+                    ? t('partnerCase.waitingCount', { count: queue.totalCount })
+                    : t('partnerCase.foundCount', { count: totalCount })}
                 </span>
               </div>
             )}
@@ -97,18 +207,64 @@ export function PartnerCaseQueuePage() {
                 id="list"
                 className={isMobile ? '' : 'w-1/2 xl:w-5/12 border-r border-line flex flex-col'}
               >
-                <div className="flex-none flex items-center gap-2 p-2 border-b border-line">
-                  <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <Switch
-                      size="sm"
-                      checked={onlyMyPool}
-                      onChange={e => setOnlyMyPool(e.target.checked)}
-                    />
-                    {t('partnerCase.onlyMyPool')}
-                  </label>
+                {/* Tabs — the queue first, history after it. */}
+                <div className="flex-none border-b border-line flex px-2 overflow-x-auto hidden-scroll">
+                  {TABS.map(key => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setTab(key)}
+                      className={`py-2 px-3 text-sm font-medium transition-colors cursor-pointer border-b-2 whitespace-nowrap bg-transparent ${
+                        tab === key
+                          ? 'border-primary-fg text-primary-fg'
+                          : 'border-transparent text-fg'
+                      }`}
+                    >
+                      {tabLabel(key)}
+                    </button>
+                  ))}
                 </div>
 
-                <DataTable<PartnerCaseQueueRow>
+                {/* Filters — the queue has its own pool toggle; history gets
+                    branch + search, which is how anyone finds a past request. */}
+                <div className="flex-none flex items-center gap-2 p-2 border-b border-line">
+                  {isQueue ? (
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Switch
+                        size="sm"
+                        checked={onlyMyPool}
+                        onChange={e => setOnlyMyPool(e.target.checked)}
+                      />
+                      {t('partnerCase.onlyMyPool')}
+                    </label>
+                  ) : (
+                    <>
+                      <div className="flex-1 min-w-0">
+                        <SearchInput
+                          value={search}
+                          onChange={setSearch}
+                          onDebouncedChange={setDebouncedSearch}
+                          placeholder={t('partnerCase.searchPlaceholder')}
+                          size="sm"
+                          className="w-full"
+                        />
+                      </div>
+                      <div className="w-44 shrink-0">
+                        <Select
+                          options={branchOptions}
+                          value={branchId || null}
+                          onChange={v => setBranchId((v as string) ?? '')}
+                          placeholder={t('partnerCase.allBranches')}
+                          size="sm"
+                          showChevron
+                          clearable
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <DataTable<RailRow>
                   data={rows}
                   getRowProps={row => ({
                     'data-state': row.original.case_id === selectedId ? 'selected' : undefined,
@@ -118,8 +274,8 @@ export function PartnerCaseQueuePage() {
                   onRowActivate={row => select(row.original.case_id)}
                   renderRow={row => {
                     const r = row.original;
-                    const ageColor = r.age_hours >= AGE_DANGER_HOURS ? 'danger'
-                      : r.age_hours >= AGE_WARNING_HOURS ? 'warning'
+                    const ageColor = (r.age_hours ?? 0) >= AGE_DANGER_HOURS ? 'danger'
+                      : (r.age_hours ?? 0) >= AGE_WARNING_HOURS ? 'warning'
                       : 'default';
                     return (
                       <button
@@ -129,28 +285,46 @@ export function PartnerCaseQueuePage() {
                       >
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-sm truncate">{r.contract_code}</span>
-                          {r.in_my_pool && (
-                            <Badge color="primary" size="sm">{t('partnerCase.mine')}</Badge>
+                          {/* Queue: whose pool + how long it has sat.
+                              History: what was decided. */}
+                          {isQueue ? (
+                            <>
+                              {r.in_my_pool && (
+                                <Badge color="primary" size="sm">{t('partnerCase.mine')}</Badge>
+                              )}
+                              {r.is_used_asset && (
+                                <Badge color="warning" size="sm">{t('partnerCase.used')}</Badge>
+                              )}
+                              <span className="flex-1" />
+                              <Badge color={ageColor} size="sm">
+                                {t('partnerCase.ageHours', { count: Math.floor(r.age_hours ?? 0) })}
+                              </Badge>
+                            </>
+                          ) : (
+                            <>
+                              {r.is_used_asset && (
+                                <Badge color="warning" size="sm">{t('partnerCase.used')}</Badge>
+                              )}
+                              <span className="flex-1" />
+                              {r.outcome && r.status && (
+                                <Badge color={outcomeBadgeColor(r.outcome)} size="sm">
+                                  {statusLabel(r.status)}
+                                </Badge>
+                              )}
+                            </>
                           )}
-                          {r.is_used_asset && (
-                            <Badge color="warning" size="sm">{t('partnerCase.used')}</Badge>
-                          )}
-                          <span className="flex-1" />
-                          <Badge color={ageColor} size="sm">
-                            {t('partnerCase.ageHours', { count: Math.floor(r.age_hours) })}
-                          </Badge>
                         </div>
                         <div className="text-sm mt-0.5 truncate">{r.customer_name ?? '—'}</div>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className="text-xs text-subtle truncate flex-1 min-w-0">
-                            {r.branch_name} · {r.variant_name ?? r.model_name ?? '—'}
+                            {r.branch_name} · {r.model_label ?? '—'}
                           </span>
                           <span className="text-xs tabular-nums shrink-0">
                             {fmtCurrency(r.financed_amount)}
                           </span>
                         </div>
                         <div className="text-xs text-subtle mt-0.5">
-                          {r.submitted_by_name ?? '—'} · <DateTime value={r.submitted_at} showTime />
+                          {r.submitted_by_name ?? '—'} · <DateTime value={r.timestamp} showTime />
                         </div>
                       </button>
                     );
@@ -163,7 +337,9 @@ export function PartnerCaseQueuePage() {
                   onPageChange={({ pageIndex: pi, pageSize: ps }) => { setPageIndex(pi); setPageSize(ps); }}
                   className={`flex-1 min-h-0 panel-datatable ${isFetching ? 'opacity-60' : ''} transition-opacity`}
                   noResults={
-                    <div className="p-8 text-center text-subtler">{t('partnerCase.queueEmpty')}</div>
+                    <div className="p-8 text-center text-subtler">
+                      {isQueue ? t('partnerCase.queueEmpty') : t('partnerCase.historyEmpty')}
+                    </div>
                   }
                 />
               </PageNavPanel>

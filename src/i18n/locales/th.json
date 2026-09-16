@@ -8081,6 +8081,12 @@
     "submitNoteLabel": "หมายเหตุจากร้าน",
     "slotsEmpty": "รูปที่ยังไม่มี ({{count}})",
     "showAllContracts": "ดูอีก {{count}} รายการ",
-    "showFewer": "ย่อรายการ"
+    "showFewer": "ย่อรายการ",
+    "tabQueue": "รอตรวจ",
+    "tabAll": "ทั้งหมด",
+    "foundCount": "พบ {{count}} รายการ",
+    "historyEmpty": "ไม่พบคำขอที่ตรงเงื่อนไข",
+    "searchPlaceholder": "รหัสสัญญา หรือ ชื่อลูกค้า",
+    "allBranches": "ทุกร้าน"
   }
 }

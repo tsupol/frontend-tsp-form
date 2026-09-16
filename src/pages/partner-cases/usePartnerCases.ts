@@ -15,6 +15,7 @@ import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import type {
   PartnerCase,
+  PartnerCaseStatus,
   PartnerCaseDetail,
   PartnerCaseQueueRow,
   PartnerCaseStatusRef,
@@ -73,6 +74,17 @@ export function usePartnerCaseDetail(caseId: number | null) {
   return { ...query, detail: query.data ?? null };
 }
 
+export interface PartnerCaseHistoryOptions {
+  /** Null = every status (the "all" tab). */
+  status: PartnerCaseStatus | null;
+  /** Empty string = every branch. */
+  branchId: string;
+  /** Contract code or customer name. */
+  search: string;
+  pageIndex: number;
+  pageSize: number;
+}
+
 export interface PartnerCaseQueueOptions {
   /** Only the requests this reviewer's pool is responsible for. */
   onlyMyPool: boolean;
@@ -99,6 +111,63 @@ export function usePartnerCaseQueue({ onlyMyPool, pageIndex, pageSize }: Partner
     rows: query.data?.data ?? [],
     totalCount: query.data?.totalCount ?? 0,
   };
+}
+
+/**
+ * Decided requests — the reviewer's history.
+ *
+ * The queue view only holds what is still waiting, so once a request is decided
+ * it can only be found here. Filters on the request's own status (approved /
+ * sent back / withdrawn), not on the derived outcome, because the tabs name
+ * what a person did rather than what became of the contract afterwards.
+ *
+ * Ordered by last change, so the most recently decided sits on top.
+ *
+ * Note this view has no `in_my_pool` flag — that belongs to the queue only. A
+ * reviewer browsing history sees every request in their company, which is what
+ * history is for.
+ */
+export function usePartnerCaseHistory({
+  status, branchId, search, pageIndex, pageSize,
+}: PartnerCaseHistoryOptions) {
+  const params: string[] = [];
+  if (status) params.push(`status=eq.${status}`);
+  if (branchId) params.push(`branch_id=eq.${branchId}`);
+  // One search box over the two things anyone actually remembers about a past
+  // request: its contract code, or who the customer was.
+  const term = search.trim();
+  if (term) {
+    const esc = term.replace(/[(),]/g, ' ');
+    params.push(`or=(contract_code.ilike.*${esc}*,customer_name.ilike.*${esc}*)`);
+  }
+  params.push('order=updated_at.desc');
+
+  const query = useQuery({
+    queryKey: ['partner-cases', 'history', status, branchId, term, pageIndex, pageSize],
+    queryFn: () => apiClient.getPaginated<PartnerCase>(
+      `/v_partner_cases?${params.join('&')}`,
+      { page: pageIndex + 1, pageSize },
+    ),
+    placeholderData: keepPreviousData,
+  });
+
+  return {
+    ...query,
+    rows: query.data?.data ?? [],
+    totalCount: query.data?.totalCount ?? 0,
+  };
+}
+
+/** Deal-partner branches, for the history's branch filter. */
+export function usePartnerBranches() {
+  const query = useQuery({
+    queryKey: ['partner-branches'],
+    queryFn: () => apiClient.get<Array<{ id: number; name: string }>>(
+      '/v_branches?branch_type=eq.DEAL_PARTNER&select=id,name&order=name',
+    ),
+    staleTime: 60 * 60 * 1000,
+  });
+  return query.data ?? [];
 }
 
 /**

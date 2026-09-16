@@ -8091,6 +8091,12 @@
     "submitNoteLabel": "Note from the shop",
     "slotsEmpty": "Missing photos ({{count}})",
     "showAllContracts": "Show {{count}} more",
-    "showFewer": "Show fewer"
+    "showFewer": "Show fewer",
+    "tabQueue": "Waiting",
+    "tabAll": "All",
+    "foundCount": "{{count}} found",
+    "historyEmpty": "No requests match",
+    "searchPlaceholder": "Contract code or customer",
+    "allBranches": "All shops"
   }
 }
