@@ -8087,6 +8087,10 @@
     "unapproveHint": "This request is already approved. Sending it back takes that approval away and returns the contract to draft.",
     "unapproveDone": "Approval taken back",
     "voidBillFirstReviewer": "The shop has an open bill on this contract. It must be voided first.",
-    "snapshotStaleWarning": "The contract changed after it was submitted. Send it back instead of approving it."
+    "snapshotStaleWarning": "The contract changed after it was submitted. Send it back instead of approving it.",
+    "submitNoteLabel": "Note from the shop",
+    "slotsEmpty": "Missing photos ({{count}})",
+    "showAllContracts": "Show {{count}} more",
+    "showFewer": "Show fewer"
   }
 }

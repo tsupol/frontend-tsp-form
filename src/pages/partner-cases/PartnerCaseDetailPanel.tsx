@@ -38,6 +38,9 @@ interface PartnerCaseDetailPanelProps {
   onDecided?: () => void;
 }
 
+/** How many of the customer's other contracts show before the "see all" toggle. */
+const PAST_CONTRACT_PREVIEW = 5;
+
 /** One slot of the device's photo album, as `v_asset_evidence` returns it. */
 interface EvidenceSlot {
   asset_id: number;
@@ -89,6 +92,7 @@ export function PartnerCaseDetailPanel({
   const [approveOpen, setApproveOpen] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
   const [lightbox, setLightbox] = useState<{ keys: string[]; index: number } | null>(null);
+  const [showAllContracts, setShowAllContracts] = useState(false);
 
   const { actions } = usePartnerCaseActions(detail?.case_id ?? null);
   const returnReasons = usePartnerCaseReturnReasons();
@@ -147,6 +151,12 @@ export function PartnerCaseDetailPanel({
     if (!row) return code;
     return i18n.language === 'th' ? row.name_th : row.name_en;
   };
+
+  const emptySlots = evidence.filter(s => s.photo_count === 0);
+
+  // A long-standing customer can have twenty contracts; showing them all buries
+  // the decision buttons. Lead with the most recent, expand on demand.
+  const shownContracts = showAllContracts ? pastContracts : pastContracts.slice(0, PAST_CONTRACT_PREVIEW);
 
   const openSlotLightbox = (slot: EvidenceSlot, index: number) => {
     const keys = (slot.photos ?? []).map(p => p.storage_path);
@@ -221,8 +231,9 @@ export function PartnerCaseDetailPanel({
             <Field label={t('partnerCase.pool')} value={detail.pool_name ?? '—'} />
           </div>
           {detail.submit_note && (
-            <div className="mt-3 rounded-md bg-surface-soft px-3 py-2 text-sm">
-              {detail.submit_note}
+            <div className="mt-3 rounded-md bg-surface-soft px-3 py-2">
+              <div className="text-xs text-subtle">{t('partnerCase.submitNoteLabel')}</div>
+              <div className="text-sm mt-0.5">{detail.submit_note}</div>
             </div>
           )}
           {detail.status === 'RETURNED' && detail.return_reason_code && (
@@ -290,30 +301,40 @@ export function PartnerCaseDetailPanel({
               <div className="text-sm text-subtler flex items-center gap-2">
                 <ImageOff size={14} /> {t('partnerCase.noPhotos')}
               </div>
-            ) : evidence.map(slot => (
-              <div key={slot.slot}>
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="text-xs font-medium text-subtle">{slot.label_th}</span>
-                  {slot.photo_count === 0 && (
-                    <Badge color="warning" size="sm">{t('partnerCase.slotEmpty')}</Badge>
-                  )}
-                </div>
-                {slot.photo_count === 0 ? (
-                  <div className="text-xs text-subtler">—</div>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {(slot.photos ?? []).map((p, i) => (
-                      <MediaThumbButton
-                        key={p.entity_media_id}
-                        mediaKey={p.variants_json?.sm ?? p.storage_path}
-                        alt={slot.label_th}
-                        onClick={() => openSlotLightbox(slot, i)}
-                      />
-                    ))}
+            ) : (
+              <>
+                {/* Filled slots first, each with its strip of thumbnails. */}
+                {evidence.filter(s => s.photo_count > 0).map(slot => (
+                  <div key={slot.slot}>
+                    <div className="text-xs font-medium text-subtle mb-1.5">{slot.label_th}</div>
+                    <div className="flex flex-wrap gap-2">
+                      {(slot.photos ?? []).map((p, i) => (
+                        <MediaThumbButton
+                          key={p.entity_media_id}
+                          mediaKey={p.variants_json?.sm ?? p.storage_path}
+                          alt={slot.label_th}
+                          onClick={() => openSlotLightbox(slot, i)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                {/* Empty ones are a single wrapped line of labels — a reviewer
+                    needs to know which shots are missing, not six empty rows. */}
+                {emptySlots.length > 0 && (
+                  <div>
+                    <div className="text-xs font-medium text-subtle mb-1.5">
+                      {t('partnerCase.slotsEmpty', { count: emptySlots.length })}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {emptySlots.map(slot => (
+                        <Badge key={slot.slot} color="warning" size="sm">{slot.label_th}</Badge>
+                      ))}
+                    </div>
                   </div>
                 )}
-              </div>
-            ))}
+              </>
+            )}
           </div>
         </Section>
 
@@ -371,7 +392,7 @@ export function PartnerCaseDetailPanel({
               <div className="text-xs text-subtler">{t('partnerCase.noPastContracts')}</div>
             ) : (
               <div className="rounded-md border border-line overflow-hidden">
-                {pastContracts.map(c => (
+                {shownContracts.map(c => (
                   <div key={c.contract_id} className="flex items-center gap-2 px-3 py-2 border-b border-line last:border-b-0">
                     <button
                       type="button"
@@ -398,6 +419,17 @@ export function PartnerCaseDetailPanel({
                     )}
                   </div>
                 ))}
+                {pastContracts.length > PAST_CONTRACT_PREVIEW && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllContracts(v => !v)}
+                    className="w-full px-3 py-2 text-sm text-primary-fg hover:underline bg-transparent border-none cursor-pointer text-left"
+                  >
+                    {showAllContracts
+                      ? t('partnerCase.showFewer')
+                      : t('partnerCase.showAllContracts', { count: pastContracts.length - PAST_CONTRACT_PREVIEW })}
+                  </button>
+                )}
               </div>
             )}
           </div>

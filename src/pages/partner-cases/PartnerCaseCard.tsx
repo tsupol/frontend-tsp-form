@@ -128,13 +128,14 @@ export function PartnerCaseCard({
     : isExpired ? <AlertTriangle size={16} className="text-danger-fg shrink-0" />
     : <ClipboardCheck size={16} className="text-subtle shrink-0" />;
 
+  // The badge already carries the request's own status word. A headline that
+  // repeats it verbatim (approved / approved) is noise, so only states whose
+  // headline SAYS something the badge doesn't get one.
   const headline = !latest ? t('partnerCase.stateNever')
     : isWaiting ? t('partnerCase.stateWaiting')
-    : isApproved ? t('partnerCase.stateApproved')
     : isExpired ? t('partnerCase.stateExpired')
     : isReturned ? t('partnerCase.stateReturned')
-    : isWithdrawn ? t('partnerCase.stateWithdrawn')
-    : label(latest.status);
+    : null;
 
   const wrapperClass = variant === 'flush'
     ? `border-b border-line px-4 py-4 ${className ?? ''}`
@@ -158,7 +159,7 @@ export function PartnerCaseCard({
             <span className="text-subtle">{t('common.loading')}</span>
           ) : (
             <>
-              <div className="font-medium">{headline}</div>
+              {headline && <div className="font-medium">{headline}</div>}
 
               {/* Waiting — who is looking at it and since when. */}
               {isWaiting && latest && (
