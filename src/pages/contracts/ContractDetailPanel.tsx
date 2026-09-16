@@ -22,6 +22,7 @@ import { ColorSwatch } from '../../components/ColorAutocomplete';
 import { fmtCurrency } from '../../lib/format';
 import { getStateColor, getStateLabel, productName, formatInstallment } from './contractUtils';
 import { ContractActionButtons } from './ContractActions';
+import { PartnerCaseCard } from '../partner-cases/PartnerCaseCard';
 import { WalletsTab } from './wallet/WalletsTab';
 import { DeviceTab } from './DeviceTab';
 import { SigningTab } from './SigningTab';
@@ -892,6 +893,15 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
 
   return (
     <div className="p-4 flex flex-col gap-4">
+      {/* Deal-partner FIN1 credit request — renders nothing for every other
+          shop/contract, and drops away once the contract goes active. */}
+      <PartnerCaseCard
+        contractId={contract.id}
+        contractCode={contract.code_display ?? contract.code}
+        commercialModel={contract.commercial_model}
+        contractState={contract.state}
+      />
+
       {/* Paused reminder — device in for repair, debt clock frozen. Staff must not
           chase a paused customer. Days from paused_from (v_contract_detail.pause_days
           is the overdue-clock deduction, not calendar days — pause/resume guide §0.1). */}

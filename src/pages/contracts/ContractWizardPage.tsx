@@ -32,6 +32,7 @@ import { PanelInsurance } from './workspace/PanelInsurance';
 import { CardContactRef } from './workspace/CardContactRef';
 import { PanelContactRef } from './workspace/PanelContactRef';
 import type { ModalId } from './workspace/WorkspaceTypes';
+import { PartnerCaseCard } from '../partner-cases/PartnerCaseCard';
 
 interface Branch {
   id: number;
@@ -430,6 +431,19 @@ function WorkspaceContent() {
                     <CardContactRef onEdit={() => handleEditOpen('contactRef')} active={isCardActive('contactRef')} shake={shakingCards.has('contactRef')} />
                     <CardCoLessee onEdit={() => handleEditOpen('co_lessee')} active={isCardActive('co_lessee')} shake={shakingCards.has('co_lessee')} />
                     <CardDocuments onEdit={() => handleEditOpen('documents')} active={isCardActive('documents')} shake={shakingCards.has('documents')} />
+
+                    {/* Deal-partner FIN1: the shop can't open the bill until the
+                        company's credit team approves, so the request card sits
+                        directly above Review & Pay. Renders nothing for anyone else. */}
+                    {data.contractId && (
+                      <PartnerCaseCard
+                        contractId={data.contractId}
+                        contractCode={data.contractCode ?? contract?.code_display ?? ''}
+                        commercialModel={contract?.commercial_model}
+                        contractState={contract?.state}
+                        variant="flush"
+                      />
+                    )}
 
                     <div ref={reviewPayCardRef}>
                       {!data.billConfirmed && data.contractId && <CardReviewPay onEdit={reviewPayReady ? () => handleEditOpen('reviewPay') : undefined} active={isCardActive('reviewPay')} disabled={!reviewPayReady} />}

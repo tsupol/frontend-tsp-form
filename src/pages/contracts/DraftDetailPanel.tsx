@@ -8,6 +8,7 @@ import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
 import { getStateColor, getStateLabel, productName, formatInstallment } from './contractUtils';
 import { ContractActionButtons } from './ContractActions';
+import { PartnerCaseCard } from '../partner-cases/PartnerCaseCard';
 
 interface ContractDetail {
   id: number;
@@ -167,6 +168,14 @@ function DraftOverviewTab({ contract, t }: { contract: ContractDetail; t: Return
 
   return (
     <div className="p-4 flex flex-col gap-4">
+      {/* Deal-partner FIN1 only — renders nothing for every other shop/contract. */}
+      <PartnerCaseCard
+        contractId={contract.id}
+        contractCode={contract.code_display ?? contract.code}
+        commercialModel={contract.commercial_model}
+        contractState={contract.state}
+      />
+
       <div className="border border-line rounded-md px-4 py-3">
         <div className="grid grid-cols-2 gap-3">
           <InfoCell label={t('contract.customer')} value={contract.customer_name ?? '—'} />
