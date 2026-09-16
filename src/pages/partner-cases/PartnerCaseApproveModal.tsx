@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Button, TextArea, Input } from 'tsp-form';
+import { Info } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
@@ -111,6 +112,7 @@ export function PartnerCaseApproveModal({ open, detail, onClose, onApproved }: P
               </div>
 
               <div className="alert alert-info mt-3">
+                <Info size={16} className="shrink-0" />
                 <span>{t('partnerCase.approveHint')}</span>
               </div>
 

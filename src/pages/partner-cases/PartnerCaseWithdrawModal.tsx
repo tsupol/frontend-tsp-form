@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Button, TextArea, Badge } from 'tsp-form';
+import { AlertTriangle, Info } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
@@ -108,6 +109,9 @@ export function PartnerCaseWithdrawModal({
               </div>
 
               <div className={`alert ${wasApproved ? 'alert-warning' : 'alert-info'} mt-3`}>
+                {wasApproved
+                  ? <AlertTriangle size={16} className="shrink-0" />
+                  : <Info size={16} className="shrink-0" />}
                 <span>
                   {wasApproved ? t('partnerCase.withdrawApprovedWarning') : t('partnerCase.withdrawHint')}
                 </span>
@@ -165,6 +169,7 @@ export function PartnerCaseWithdrawModal({
             ]}
             extras={
               <div className="alert alert-info">
+                <Info size={16} className="shrink-0" />
                 <span>{t('partnerCase.withdrawDoneHint')}</span>
               </div>
             }

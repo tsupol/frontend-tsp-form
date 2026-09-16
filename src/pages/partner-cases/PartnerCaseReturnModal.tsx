@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Button, TextArea, Select, Badge } from 'tsp-form';
+import { AlertTriangle, Info } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
@@ -141,6 +142,7 @@ export function PartnerCaseReturnModal({ open, detail, onClose, onReturned }: Pa
 
               {isUnapprove && (
                 <div className="alert alert-warning mt-3">
+                  <AlertTriangle size={16} className="shrink-0" />
                   <span>{t('partnerCase.unapproveHint')}</span>
                 </div>
               )}
@@ -212,6 +214,7 @@ export function PartnerCaseReturnModal({ open, detail, onClose, onReturned }: Pa
             ]}
             extras={
               <div className="alert alert-info">
+                <Info size={16} className="shrink-0" />
                 <span>{t('partnerCase.returnDoneHint')}</span>
               </div>
             }
@@ -244,6 +247,7 @@ export function PartnerCaseReturnModal({ open, detail, onClose, onReturned }: Pa
             {note.trim() && <div className="text-sm mt-1">{note.trim()}</div>}
           </div>
           <div className="alert alert-warning mt-3">
+            <AlertTriangle size={16} className="shrink-0" />
             <span>{t('partnerCase.confirmReturnIrreversible')}</span>
           </div>
         </div>
