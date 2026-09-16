@@ -205,6 +205,10 @@ export const AppSideNav = () => {
   const role = user?.role_code ?? '';
   const { showFin1, showFin2 } = useMyCommercialModels();
   const canApprove = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
+  // Deal-partner credit review — the credit desk plus the admins above it.
+  // Visibility only; every RPC re-checks PARTNER.CREDIT_APPROVE and pool
+  // membership server-side.
+  const canReviewPartnerCases = ['COMPANY_CREDIT', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
   // Repo/legal access is grant-based at the DB, but nav visibility is by role:
   // repo staff + admins see the section (DB returns empty rows for anyone without a grant).
   const isRepoRole = ['COMPANY_REPO', 'HOLDING_REPO', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
@@ -365,6 +369,14 @@ export const AppSideNav = () => {
           ...iconWithCount(<ClipboardCheck size="1rem" />, pendingApprovals),
           label: t('nav.approvals'),
           path: '/admin/approvals',
+        }]
+      : []),
+    ...(canReviewPartnerCases
+      ? [{
+          key: 'partner-cases',
+          icon: <Store size="1rem" />,
+          label: t('nav.partnerCases'),
+          path: '/admin/partner-cases',
         }]
       : []),
     {

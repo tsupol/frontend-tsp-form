@@ -51,6 +51,7 @@ import { FinanceRatesPage } from './pages/price-check/FinanceRatesPage';
 import { DunningTargetsPage } from './pages/legal/DunningTargetsPage';
 import { StaffCommissionPage } from './pages/commission/StaffCommissionPage';
 import { ApprovalsPage } from './pages/approvals/ApprovalsPage';
+import { PartnerCaseQueuePage } from './pages/partner-cases/PartnerCaseQueuePage';
 import { ChatPage } from './pages/chat/ChatPage';
 import { NnfAppPage } from './pages/nnf-app/NnfAppPage';
 import { NnfMdmPage } from './pages/nnf-mdm/NnfMdmPage';
@@ -888,6 +889,18 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <ApprovalsPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      {/* Deal-partner credit review — company credit staff. The optional id
+          keeps a request linkable from the combined approvals inbox. */}
+      <Route
+        path="/admin/partner-cases/:caseId?"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <PartnerCaseQueuePage />
             </AdminLayout>
           </ProtectedRoute>
         }
