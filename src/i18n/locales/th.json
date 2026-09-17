@@ -5397,7 +5397,8 @@
     "attachSlip_needAmount": "กรุณาระบุยอดเงิน",
     "attachSlip_submissionId": "หมายเลขรายการ",
     "attachSlip_viewQueue": "ไปที่คิวตรวจสลิป",
-    "tab_notify": "แจ้งเตือน"
+    "tab_notify": "แจ้งเตือน",
+    "attachmentsAddGeneral": "เพิ่มเข้ากลุ่มทั่วไป"
   },
   "wizard": {
     "barcodeNotFound": "ไม่พบบาร์โค้ด {{barcode}} ในระบบ",
@@ -8104,5 +8105,27 @@
     "myEmpty_ALL": "ยังไม่มีคำขอ",
     "lastUpdated": "อัปเดต",
     "selectToView": "เลือกคำขอเพื่อดูสัญญา"
+  },
+  "contractPhotos": {
+    "title": "รูปสัญญา",
+    "addPhoto": "เพิ่มรูป",
+    "required": "บังคับ",
+    "ok": "ครบแล้ว",
+    "locked": "ล็อก",
+    "emptyGroup": "ยังไม่มีรูปในกลุ่มนี้",
+    "checklistComplete": "รูปกลุ่มบังคับครบทุกกลุ่มแล้ว",
+    "checklistMissing": "ยังขาด: {{groups}}",
+    "lockedNotice": "รูปส่งมอบถูกล็อก — ยื่นปิดงานแล้ว ต้องถอนการยื่นก่อนจึงแก้รูปได้",
+    "moveToGroup": "ย้ายกลุ่ม",
+    "moveTitle": "ย้ายรูปไปกลุ่มอื่น",
+    "moveTarget": "กลุ่มปลายทาง",
+    "selectGroup": "เลือกกลุ่ม",
+    "replace": "แทนที่",
+    "replaceTitle": "แทนที่รูป",
+    "confirmRemove": "ลบรูปนี้ใช่ไหม",
+    "photoActions": "จัดการรูป",
+    "dragToGroup": "ลากเพื่อเรียงลำดับหรือย้ายกลุ่ม",
+    "errorPickImage": "เลือกรูปก่อน",
+    "groupCapacity": "ใช้ไป {{count}} จาก {{max}} รูปในกลุ่มนี้"
   }
 }

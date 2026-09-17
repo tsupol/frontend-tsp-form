@@ -18,7 +18,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Modal, useSnackbarContext, resizeToVariants } from 'tsp-form';
 import { QRCodeSVG } from 'qrcode.react';
 import {
-  Plus, XCircle, ImageOff, Trash2, Image as ImageIcon, CheckCircle, Camera, Loader2,
+  Plus, XCircle, ImageOff, Image as ImageIcon, CheckCircle, Camera, Loader2,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -36,6 +36,7 @@ import {
 } from '../../lib/beMedia';
 import { useMobileCaptureSession } from './workspace/useMobileCaptureSession';
 import { translateApiError } from '../../lib/apiErrors';
+import { ContractPhotoGroups } from './ContractPhotoGroups';
 
 const ENTITY_TYPE = 'CONTRACT';
 const USAGE_TYPE = 'ATTACHMENT';
@@ -58,15 +59,6 @@ function pickFullKey(m: ContractAttachment): string | null {
   const v = m.variants_json ?? {};
   return v.md || v.lg || v.original || v.sm || m.storage_path || null;
 }
-function collectMediaKeys(m: ContractAttachment): string[] {
-  const keys: string[] = [];
-  if (m.storage_path) keys.push(m.storage_path);
-  for (const v of Object.values(m.variants_json ?? {})) {
-    if (typeof v === 'string' && v) keys.push(v);
-  }
-  return keys;
-}
-
 // ── Page section — compact strip + a single button into the manage modal ─────
 
 export function ContractAttachments({
@@ -238,7 +230,6 @@ function ManageModal({
     const k = pickFullKey(m);
     return k ? normalizeKey(k) : '';
   });
-  const [removingId, setRemovingId] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
 
@@ -264,21 +255,6 @@ function ManageModal({
     if (session?.expires_at) onSessionActive?.(session.expires_at);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.expires_at]);
-
-  const handleRemove = async (m: ContractAttachment) => {
-    setRemovingId(m.entity_media_id);
-    setError('');
-    try {
-      await apiClient.rpc('fn_media_detach', { p_entity_media_id: m.entity_media_id });
-      const keys = collectMediaKeys(m);
-      if (keys.length > 0) beMediaDelete(keys).catch(() => {});
-      onChanged();
-    } catch (err) {
-      setError(formatApiError(err, t));
-    } finally {
-      setRemovingId(null);
-    }
-  };
 
   // Resize-only to sm/md webp → upload each variant → attach. No crop:
   // delivery evidence keeps the whole frame. `sortOrder` is the target index
@@ -398,27 +374,23 @@ function ManageModal({
           onChange={handlePick}
         />
 
-        {/* Live photo list — small thumbs that wrap to fit + an add tile. */}
-        <div className="flex flex-wrap gap-2 mb-5">
-          {photos.map((m, i) => (
-            <ManageThumb
-              key={m.entity_media_id}
-              media={m}
-              removing={removingId === m.entity_media_id}
-              onPreview={() => setLightboxIndex(i)}
-              onRemove={() => handleRemove(m)}
-            />
-          ))}
+        {/* Grouped album (mig 1252) — the four handover groups plus "general",
+            which is this album's original flat contents. Owns its own add /
+            move / replace / remove; the quick-add tile below stays for dropping
+            a batch straight into "general". */}
+        <ContractPhotoGroups contractId={contractId} className="mb-5" />
+
+        <div className="flex items-center gap-2 mb-5">
           {!atMax && (
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              className="w-20 h-20 shrink-0 rounded-md border-2 border-dashed border-line flex flex-col items-center justify-center gap-1 text-subtle hover:border-primary hover:text-primary hover:bg-surface-hover transition-colors cursor-pointer bg-transparent disabled:opacity-50"
+              className="h-9 px-3 rounded-md border border-dashed border-line flex items-center justify-center gap-1.5 text-subtle text-xs hover:border-primary hover:text-primary hover:bg-surface-hover transition-colors cursor-pointer bg-transparent disabled:opacity-50"
             >
               {uploading
-                ? <Loader2 size={18} className="animate-spin" />
-                : <><Camera size={18} /><span className="text-[10px] font-medium">{t('contract.attachmentsAddPhoto', { defaultValue: 'Add' })}</span></>}
+                ? <Loader2 size={14} className="animate-spin" />
+                : <><Camera size={14} /><span className="font-medium">{t('contract.attachmentsAddGeneral', { defaultValue: 'Add to general' })}</span></>}
             </button>
           )}
         </div>
@@ -473,46 +445,6 @@ function ManageModal({
         alt={t('contract.attachments', { defaultValue: 'Photos' })}
       />
     </Modal>
-  );
-}
-
-function ManageThumb({
-  media,
-  removing,
-  onPreview,
-  onRemove,
-}: {
-  media: ContractAttachment;
-  removing: boolean;
-  onPreview: () => void;
-  onRemove: () => void;
-}) {
-  const thumbKey = pickThumbKey(media);
-  const { url } = useMediaUrl(thumbKey ? normalizeKey(thumbKey) : null);
-  return (
-    <div className="relative group w-20 h-20 shrink-0">
-      <button
-        type="button"
-        onClick={onPreview}
-        className="block w-full h-full rounded-md border border-line overflow-hidden bg-surface cursor-zoom-in p-0"
-        aria-label="Preview photo"
-      >
-        {url ? (
-          <img src={url} alt={media.caption ?? ''} className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-subtler"><ImageOff size={16} /></div>
-        )}
-      </button>
-      <button
-        type="button"
-        onClick={onRemove}
-        disabled={removing}
-        aria-label="Remove"
-        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-danger text-white flex items-center justify-center shadow-sm hover:bg-danger-soft disabled:opacity-50 border-none p-0 cursor-pointer"
-      >
-        <Trash2 size={11} />
-      </button>
-    </div>
   );
 }
 

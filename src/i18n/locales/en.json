@@ -5403,7 +5403,8 @@
     "attachSlip_needAmount": "Please enter the amount",
     "attachSlip_submissionId": "Submission #",
     "attachSlip_viewQueue": "Open review queue",
-    "tab_notify": "Notifications"
+    "tab_notify": "Notifications",
+    "attachmentsAddGeneral": "Add to general"
   },
   "wizard": {
     "barcodeNotFound": "Barcode {{barcode}} not registered",
@@ -8114,5 +8115,27 @@
     "myEmpty_ALL": "No requests yet",
     "lastUpdated": "Updated",
     "selectToView": "Select a request to see its contract"
+  },
+  "contractPhotos": {
+    "title": "Contract photos",
+    "addPhoto": "Add",
+    "required": "Required",
+    "ok": "Complete",
+    "locked": "Locked",
+    "emptyGroup": "No photos in this group yet",
+    "checklistComplete": "All required photo groups are complete.",
+    "checklistMissing": "Still missing: {{groups}}",
+    "lockedNotice": "Handover photos are locked — the close-out has been submitted. Withdraw it first to edit them.",
+    "moveToGroup": "Move to group",
+    "moveTitle": "Move photo to another group",
+    "moveTarget": "Target group",
+    "selectGroup": "Select a group",
+    "replace": "Replace",
+    "replaceTitle": "Replace photo",
+    "confirmRemove": "Remove this photo?",
+    "photoActions": "Photo actions",
+    "dragToGroup": "Drag to reorder or move between groups",
+    "errorPickImage": "Pick an image first",
+    "groupCapacity": "{{count}} of {{max}} photos used in this group"
   }
 }
