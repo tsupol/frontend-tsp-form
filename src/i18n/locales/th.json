@@ -527,7 +527,8 @@
     "lotIntake": "รายงานเครื่องเข้า",
     "lotIntakeByModel": "รายงานเครื่องเข้าตามรุ่น",
     "permissionGrants": "สิทธิ์พิเศษรายคน",
-    "partnerCases": "ตรวจสินเชื่อร้าน"
+    "partnerCases": "ตรวจสินเชื่อร้าน",
+    "pendingApproval": "รออนุมัติ"
   },
   "ownerType": {
     "HOLDING": "Holding",
@@ -8090,6 +8091,18 @@
     "confirmReturnBody": "ยืนยันส่งคำขอนี้กลับไปที่ร้าน?",
     "confirmUnapproveBody": "ยืนยันถอนการอนุมัติ และส่งคำขอกลับไปที่ร้าน?",
     "confirmReturnIrreversible": "ย้อนกลับไม่ได้ ร้านต้องแก้ไขแล้วยื่นใหม่เท่านั้น",
-    "confirmReturnAction": "ยืนยันส่งกลับ"
+    "confirmReturnAction": "ยืนยันส่งกลับ",
+    "myTab_PENDING": "รออนุมัติ",
+    "myTab_IN_FORCE": "อนุมัติแล้ว",
+    "myTab_EXPIRED": "หมดอายุ",
+    "myTab_RETURNED": "ส่งกลับ",
+    "myTab_ALL": "ทั้งหมด",
+    "myEmpty_PENDING": "ไม่มีคำขอที่รออนุมัติ",
+    "myEmpty_IN_FORCE": "ไม่มีคำขอที่อนุมัติแล้ว",
+    "myEmpty_EXPIRED": "ไม่มีคำขอที่หมดอายุ",
+    "myEmpty_RETURNED": "ไม่มีคำขอที่ถูกส่งกลับ",
+    "myEmpty_ALL": "ยังไม่มีคำขอ",
+    "lastUpdated": "อัปเดต",
+    "selectToView": "เลือกคำขอเพื่อดูสัญญา"
   }
 }

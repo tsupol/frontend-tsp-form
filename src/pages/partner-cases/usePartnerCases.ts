@@ -158,6 +158,68 @@ export function usePartnerCaseHistory({
   };
 }
 
+/** Which slice of its own requests the shop is looking at. */
+export type PartnerMyCaseTab = 'PENDING' | 'IN_FORCE' | 'EXPIRED' | 'RETURNED' | 'ALL';
+
+export interface PartnerMyCaseListOptions {
+  tab: PartnerMyCaseTab;
+  /** Contract code or customer name. */
+  search: string;
+  pageIndex: number;
+  pageSize: number;
+}
+
+// Each tab is one filter on the same view, per NOTICE 2026-09-17. The waiting
+// tab reads the view's own `is_pending` flag rather than a status, because
+// "waiting" is a fact about the contract as much as the request. The other
+// decided tabs filter `outcome`, which the view derives — the request's own
+// status can't tell an approval still in force from one that lapsed unused.
+//
+// Every tab but "all" is restricted to the latest request per contract, so a
+// contract that was returned and resubmitted appears once, under where it
+// stands now. "All" drops that filter and becomes the history, withdrawn
+// requests included.
+const MY_CASE_TAB_FILTER: Record<PartnerMyCaseTab, string[]> = {
+  PENDING: ['is_pending=eq.true', 'order=submitted_at.asc'],
+  IN_FORCE: ['is_latest=eq.true', 'outcome=eq.IN_FORCE', 'order=approved_at.desc'],
+  EXPIRED: ['is_latest=eq.true', 'outcome=eq.EXPIRED', 'order=approved_at.desc'],
+  RETURNED: ['is_latest=eq.true', 'outcome=eq.RETURNED', 'order=returned_at.desc'],
+  ALL: ['order=submitted_at.desc'],
+};
+
+/**
+ * The shop's own requests across every contract — the list behind its
+ * "waiting for approval" menu.
+ *
+ * Shop-only: it reads the shop view unconditionally, unlike the per-contract
+ * hook above which serves both sides. Staff have their own queue and history
+ * pages over the wider views.
+ */
+export function usePartnerMyCases({ tab, search, pageIndex, pageSize }: PartnerMyCaseListOptions) {
+  const params = [...MY_CASE_TAB_FILTER[tab]];
+
+  const term = search.trim();
+  if (term) {
+    const esc = term.replace(/[(),]/g, ' ');
+    params.push(`or=(contract_code.ilike.*${esc}*,customer_name.ilike.*${esc}*)`);
+  }
+
+  const query = useQuery({
+    queryKey: ['partner-cases', 'mine', tab, term, pageIndex, pageSize],
+    queryFn: () => apiClient.getPaginated<PartnerCase>(
+      `/v_partner_my_cases?${params.join('&')}`,
+      { page: pageIndex + 1, pageSize },
+    ),
+    placeholderData: keepPreviousData,
+  });
+
+  return {
+    ...query,
+    rows: query.data?.data ?? [],
+    totalCount: query.data?.totalCount ?? 0,
+  };
+}
+
 /** Deal-partner branches, for the history's branch filter. */
 export function usePartnerBranches() {
   const query = useQuery({

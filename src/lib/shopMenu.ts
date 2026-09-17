@@ -23,6 +23,9 @@ export const SHOP_ALLOWED_PATHS = new Set<string>([
   // Contracts — the FIN1 wizard + the shop's own contract lists
   '/admin/contracts/search',
   '/admin/contracts/draft',
+  // The shop's own credit-approval requests (NOTICE 2026-09-17) — reads the
+  // same shop view the per-contract approval card already uses.
+  '/admin/contracts/pending-approval',
   '/admin/contracts/pending-payment',
   '/admin/contracts/pending-pairing',
   '/admin/contracts/new',

@@ -529,7 +529,8 @@
     "lotIntake": "Goods Received",
     "lotIntakeByModel": "Goods Received by Model",
     "permissionGrants": "Permission grants",
-    "partnerCases": "Shop credit review"
+    "partnerCases": "Shop credit review",
+    "pendingApproval": "Waiting Approval"
   },
   "ownerType": {
     "HOLDING": "Holding",
@@ -8100,6 +8101,18 @@
     "confirmReturnBody": "Send this request back to the shop?",
     "confirmUnapproveBody": "Take this approval back and send the request to the shop?",
     "confirmReturnIrreversible": "This can't be undone. The shop has to fix the request and submit it again.",
-    "confirmReturnAction": "Send back"
+    "confirmReturnAction": "Send back",
+    "myTab_PENDING": "Waiting",
+    "myTab_IN_FORCE": "Approved",
+    "myTab_EXPIRED": "Expired",
+    "myTab_RETURNED": "Sent back",
+    "myTab_ALL": "All",
+    "myEmpty_PENDING": "Nothing waiting for approval",
+    "myEmpty_IN_FORCE": "No approved requests",
+    "myEmpty_EXPIRED": "No expired approvals",
+    "myEmpty_RETURNED": "Nothing sent back",
+    "myEmpty_ALL": "No requests yet",
+    "lastUpdated": "Updated",
+    "selectToView": "Select a request to see its contract"
   }
 }

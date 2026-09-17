@@ -288,6 +288,12 @@ export const AppSideNav = () => {
         { key: 'contract-search', icon: <Search size="1rem" />, label: t('nav.contractSearch'), path: '/admin/contracts/search' },
         { key: 'saving-contracts', ...iconWithCount(<PiggyBank size="1rem" />, savingContractsCount), label: t('nav.savingContracts'), path: '/admin/contracts/saving' },
         { key: 'draft-contracts', ...iconWithCount(<FileEdit size="1rem" />, draftContractsCount), label: t('nav.draftContracts'), path: '/admin/contracts/draft' },
+        // Shop-only — the shop menu set keeps it, and it is added only for a
+        // shop session so staff never see a page whose view they can't read.
+        // No badge until BE adds a counter key (NOTICE 2026-09-17 §3).
+        ...(isDealPartner
+          ? [{ key: 'pending-approval', icon: <ClipboardCheck size="1rem" />, label: t('nav.pendingApproval'), path: '/admin/contracts/pending-approval' }]
+          : []),
         { key: 'pending-payment', ...iconWithCount(<CreditCard size="1rem" />, pendingPaymentCount), label: t('nav.pendingPayment'), path: '/admin/contracts/pending-payment' },
         { key: 'pending-pairing', ...iconWithCount(<Link2 size="1rem" />, pendingPairingCount), label: t('nav.pendingPairing'), path: '/admin/contracts/pending-pairing' },
         { key: 'deposited-devices', ...iconWithCount(<Archive size="1rem" />, depositOverdueCount), label: t('nav.depositedDevices'), path: '/admin/contracts/deposited' },

@@ -62,6 +62,7 @@ import { ContractsLayout } from './pages/contracts/ContractsLayout';
 import { ContractSearchPage } from './pages/contracts/ContractSearchPage';
 import { SavingContractsPage } from './pages/contracts/SavingContractsPage';
 import { DraftContractsPage } from './pages/contracts/DraftContractsPage';
+import { PendingApprovalPage } from './pages/contracts/PendingApprovalPage';
 import { PendingPairingPage } from './pages/contracts/PendingPairingPage';
 import { DepositedDevicesPage } from './pages/contracts/DepositedDevicesPage';
 import { LoanersOutPage } from './pages/contracts/LoanersOutPage';
@@ -704,6 +705,18 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <ContractsLayout><DraftContractsPage /></ContractsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      {/* The shop's own credit-approval requests. The optional id keeps a
+          contract linkable straight from the list. */}
+      <Route
+        path="/admin/contracts/pending-approval/:contractId?"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <ContractsLayout><PendingApprovalPage /></ContractsLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

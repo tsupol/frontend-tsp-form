@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Badge } from 'tsp-form';
-import { Search, PiggyBank, FilePlus, Link2, FileEdit, CreditCard, Archive, Repeat2, PauseCircle } from 'lucide-react';
+import { Search, PiggyBank, FilePlus, Link2, FileEdit, CreditCard, Archive, Repeat2, PauseCircle, ClipboardCheck } from 'lucide-react';
 import { useNavCounts } from '../../hooks/useNavCounts';
 import { useAuth } from '../../contexts/AuthContext';
 import { shopMenuAllows } from '../../lib/shopMenu';
@@ -16,6 +16,12 @@ export function ContractsLayout({ children }: { children: ReactNode }) {
     { path: '/admin/contracts/search', labelKey: 'nav.contractSearch', icon: Search, count: 0 },
     { path: '/admin/contracts/saving', labelKey: 'nav.savingContracts', icon: PiggyBank, count: savingContractsCount },
     { path: '/admin/contracts/draft', labelKey: 'nav.draftContracts', icon: FileEdit, count: draftContractsCount },
+    // Shop-only — the view behind it holds the shop's own requests, and staff
+    // have their own reviewer queue. No badge until BE adds a counter key
+    // (NOTICE 2026-09-17 §3 — don't count the view on every menu open).
+    ...(isDealPartner
+      ? [{ path: '/admin/contracts/pending-approval', labelKey: 'nav.pendingApproval', icon: ClipboardCheck, count: 0 }]
+      : []),
     { path: '/admin/contracts/pending-payment', labelKey: 'nav.pendingPayment', icon: CreditCard, count: pendingPaymentCount },
     { path: '/admin/contracts/pending-pairing', labelKey: 'nav.pendingPairing', icon: Link2, count: pendingPairingCount },
     { path: '/admin/contracts/deposited', labelKey: 'nav.depositedDevices', icon: Archive, count: depositOverdueCount },
