@@ -54,8 +54,28 @@
     color:var(--dim); font:inherit; font-size:13.2px; line-height:1.4;
     padding:8px 18px 8px 16px; border-left:2px solid transparent;
     transition:background .16s, color .16s, border-color .16s;
+    position:relative; overflow:hidden;
   }
   .bm:hover{background:var(--panel-2); color:var(--text)}
+  /* progress fill — how far through this scene we are */
+  .bm .prog{
+    position:absolute; left:0; top:0; bottom:0; width:0;
+    background:linear-gradient(90deg,rgba(95,176,255,.16),rgba(95,176,255,.05));
+    pointer-events:none; transition:width .5s cubic-bezier(.4,0,.2,1);
+  }
+  .bm.seen .prog{width:100%; background:rgba(95,176,255,.05)}
+  .bm > *{position:relative}
+  /* dots: one per point in the scene, only on the scene being played */
+  .bm .dots{
+    display:none; gap:4px; margin-top:6px;
+  }
+  .bm[aria-current="true"] .dots{display:flex}
+  .bm .dot{
+    width:16px; height:3px; border-radius:2px; background:#2f3746;
+    transition:background .25s;
+  }
+  .bm .dot.on{background:var(--accent)}
+  .bm .dot.past{background:rgba(95,176,255,.45)}
   .bm .n{
     font-family:var(--mono); font-size:11px; color:var(--faint);
     background:var(--panel-2); border:1px solid var(--line); border-radius:5px;
@@ -109,7 +129,7 @@
     position:relative; width:100%; border-radius:12px; overflow:hidden;
     border:1px solid var(--line); background:#000; box-shadow:var(--shadow);
     aspect-ratio:2524/1481;
-    width:min(100%, calc((100vh - 340px) * 2524 / 1481));
+    width:min(100%, calc((100vh - 300px) * 2524 / 1481));
     margin:0 auto;
   }
   .frame img{
@@ -168,7 +188,7 @@
 
   .marker{
     position:absolute; pointer-events:none;
-    width:22px; height:22px; margin:-11px 0 0 -11px;
+    width:22px; height:22px; margin:-11px 0 0 -26px;
     border-radius:50%; background:var(--accent); color:#06121f;
     font-size:12px; font-weight:800; font-family:var(--mono);
     display:grid; place-items:center;
@@ -182,32 +202,6 @@
   .transport{
     padding:14px 30px 26px; display:flex; flex-direction:column; gap:11px;
   }
-  .scrub{
-    display:flex; gap:3px; align-items:stretch; width:100%;
-  }
-  .seg{
-    flex:1 1 0; min-width:0; height:100%; background:none; border:0; padding:0;
-    cursor:pointer; position:relative;
-  }
-  .seg .bar{
-    height:5px; border-radius:3px; background:#232a38; overflow:hidden;
-    transition:background .2s;
-  }
-  .seg:hover .bar{background:#31394b}
-  .seg .fill{
-    display:block; height:100%; width:0; border-radius:3px;
-    background:var(--accent);
-  }
-  .seg.done .fill{width:100%}
-  .seg.cur .fill{background:var(--accent)}
-  .seg .lab{
-    display:block; font-size:10px; color:var(--faint); margin-top:5px;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:left;
-    padding-right:6px;
-  }
-  .seg.cur .lab{color:var(--text)}
-  .scrub{margin-bottom:6px}
-
   .controls{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
   .btn{
     background:var(--panel-2); border:1px solid var(--line); color:var(--text);
@@ -307,7 +301,6 @@
     </div>
 
     <div class="transport">
-      <div class="scrub" id="scrub"></div>
       <div class="controls">
         <button class="btn primary" id="play">
           <svg width="13" height="13" viewBox="0 0 12 12" fill="currentColor"><path d="M2 1l8 5-8 5z"/></svg>
@@ -465,7 +458,6 @@ const capWho  = document.getElementById('capwho');
 const capTxt  = document.getElementById('captext');
 const capSub  = document.getElementById('capsub');
 const railEl  = document.getElementById('rail');
-const scrubEl = document.getElementById('scrub');
 const beatsEl = document.getElementById('beats');
 const posEl   = document.getElementById('pos');
 const playBtn = document.getElementById('play');
@@ -495,22 +487,13 @@ SCENES.forEach((sc, i) => {
   const li = document.createElement('li');
   const b = document.createElement('button');
   b.className = 'bm'; b.type = 'button'; b.dataset.i = i;
-  b.innerHTML = '<span class="n">' + (i+1) + '</span><span>' + sc.short +
-    '<span class="who ' + sc.who + '">' + WHO_TH[sc.who] + '</span></span>';
+  b.innerHTML = '<span class="prog"></span><span class="n">' + (i+1) + '</span>' +
+    '<span>' + sc.short + '<span class="who ' + sc.who + '">' + WHO_TH[sc.who] + '</span>' +
+    '<span class="dots">' + sc.beats.map(() => '<span class="dot"></span>').join('') + '</span></span>';
   b.addEventListener('click', () => { go(i, 0); pause(); });
   li.appendChild(b); railEl.appendChild(li);
 });
 const bms = [...railEl.querySelectorAll('.bm')];
-
-/* --- scrubber --- */
-SCENES.forEach((sc, i) => {
-  const s = document.createElement('button');
-  s.className = 'seg'; s.type = 'button'; s.title = sc.short;
-  s.innerHTML = '<span class="bar"><span class="fill"></span></span><span class="lab">' + sc.short + '</span>';
-  s.addEventListener('click', () => { go(i, 0); pause(); });
-  scrubEl.appendChild(s);
-});
-const segs = [...scrubEl.querySelectorAll('.seg')];
 
 /* --- beat cards --- */
 function renderBeats() {
@@ -543,21 +526,23 @@ function show(sceneIdx, beatIdx) {
 
   layers.forEach((im, i) => im.classList.toggle('on', i === si));
 
-  bms.forEach((b, i) => b.setAttribute('aria-current', i === si ? 'true' : 'false'));
-  if (changedScene) bms[si].scrollIntoView({ block:'nearest' });
-
-  segs.forEach((s, i) => {
-    s.classList.toggle('done', i < si);
-    s.classList.toggle('cur', i === si);
-    s.querySelector('.fill').style.width =
+  bms.forEach((b, i) => {
+    b.setAttribute('aria-current', i === si ? 'true' : 'false');
+    b.classList.toggle('seen', i < si);
+    b.querySelector('.prog').style.width =
       i < si ? '100%' : i === si ? (((bi+1)/sc.beats.length)*100).toFixed(1)+'%' : '0%';
+    b.querySelectorAll('.dot').forEach((d, j) => {
+      d.classList.toggle('on', i === si && j === bi);
+      d.classList.toggle('past', i === si && j < bi);
+    });
   });
+  if (changedScene) bms[si].scrollIntoView({ block:'nearest' });
 
   const [x, y, w, h] = bt.box;
   spotEl.style.left = x + '%'; spotEl.style.top = y + '%';
   spotEl.style.width = w + '%'; spotEl.style.height = h + '%';
   spotEl.classList.add('on');
-  markEl.style.left = x + '%'; markEl.style.top = y + '%';
+  markEl.style.left = Math.max(x, 2.2) + '%'; markEl.style.top = y + '%';
   markEl.textContent = bi + 1; markEl.classList.add('on');
   setMask(bt.box);
 
