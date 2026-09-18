@@ -48,7 +48,7 @@ import { PauseContractModal } from './PauseContractModal';
 import { ResumeContractModal } from './ResumeContractModal';
 import { useContractInvalidate } from './useContractInvalidate';
 import { useCompanyFeatures } from '../../hooks/useCompanyFeatures';
-import { translateApiError } from '../../lib/apiErrors';
+import { blockingReasonText, translateApiError } from '../../lib/apiErrors';
 import { buildSavingSeededPayments, savingApplied, unusedSaving } from './savingAutoFill';
 import { SavingRowNote, SavingUnusedWarning, SavingUnusedConfirmDialog } from './SavingAppliedNotice';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
@@ -530,6 +530,11 @@ interface BackendContractAction {
   rpc_name: string;
   is_available: boolean;
   blocking_reason: string | null;
+  // Facts behind the reason. mig 1250/1254 fill it for `partner_settlement_locked`
+  // with `{code, settlement_code, settlement_status, …}` — `code` is the very
+  // error the RPC would answer, so the button and the failed call say the same
+  // sentence. Null on every reason that ships no facts.
+  blocking_params?: Record<string, unknown> | null;
   require_pin: boolean;
   // mig 600: per-user permission + per-user PIN requirement. Present on every action.
   // Legacy actions (no required_permission) always come back is_permitted=true.
@@ -964,10 +969,14 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
       lines.push(t('contract.actionNotImplemented', { defaultValue: 'Not yet wired in this page' }));
     }
     if (!a.is_available && a.blocking_reason) {
-      lines.push(t(`blockingReason.${a.blocking_reason}`, {
-        ns: 'apiErrors',
-        defaultValue: a.blocking_reason,
-      }));
+      // When the backend names the error it would answer (`blocking_params.code`,
+      // mig 1250/1254's settlement locks), say that sentence — it explains what
+      // the shop must do, where the reason label only names the category.
+      const code = typeof a.blocking_params?.code === 'string' ? a.blocking_params.code : null;
+      const codeLine = code
+        ? t(code.toLowerCase(), { ns: 'apiErrors', defaultValue: '', ...a.blocking_params })
+        : '';
+      lines.push(codeLine || blockingReasonText(a, t));
     }
     const tooltipContent: React.ReactNode = lines.length === 1
       ? lines[0]
@@ -986,6 +995,16 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
           color={primary && a.is_available && isWired ? (config?.color ?? 'primary') : config?.color}
           disabled={!a.is_available || !isWired}
           endIcon={endIcon}
+          // Machine-readable footer state: the label is translated and the
+          // reason lives in a hover-only tooltip portal, so a driver otherwise
+          // sees a dead button with no explanation.
+          // See .claude/playwright-affordances.md.
+          data-action={a.action_code}
+          data-blocked-reason={
+            !a.is_available ? (a.blocking_reason ?? 'unavailable')
+              : !isWired ? 'not_wired'
+                : undefined
+          }
           onClick={() => {
             handleBackendAction(a);
             setMoreOpen(false);

@@ -45,7 +45,11 @@ export type BillBlockingReason =
   //   previous_day_bill       — the bill itself belongs to that still-open earlier
   //                             day; the shop can never cancel it, a system admin must
   | 'previous_day_not_closed'
-  | 'previous_day_bill';
+  | 'previous_day_bill'
+  // The shop's payment request locks the contract's opening bill once the shop
+  // submits its close-out (mig 1250). `blocking_params.code` names the error the
+  // RPC would answer, so the button says exactly what a failed call would.
+  | 'partner_settlement_locked';
 
 /** Facts behind a blocking reason, for interpolation into its message.
  *  Populated only for the mig-1213 previous-day reasons; `null` otherwise. */

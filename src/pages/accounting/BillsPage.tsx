@@ -1482,7 +1482,14 @@ function BillActionBar({ actions, suppressLifecycle, onVoidOrCancel, onCancelClo
       lines.push(t('accounting.bills.notWired'));
     }
     if (!a.is_available && a.blocking_reason) {
-      lines.push(blockingReasonText(a, t));
+      // A reason that names the error it would answer (`blocking_params.code` —
+      // the shop's payment-request locks, mig 1250) says what to do about it;
+      // the reason label alone only names the category.
+      const code = typeof a.blocking_params?.code === 'string' ? a.blocking_params.code : null;
+      const codeLine = code
+        ? t(code.toLowerCase(), { ns: 'apiErrors', defaultValue: '', ...a.blocking_params })
+        : '';
+      lines.push(codeLine || blockingReasonText(a, t));
     }
 
     const tooltipContent: React.ReactNode = lines.length === 1
