@@ -133,7 +133,10 @@
     justify-content:space-between; gap:20px; flex-wrap:wrap;
     position:relative; border-bottom:1px solid var(--line);
   }
-  /* no rule between the points and the controls — they read as one foot */
+  /* a line divides the screen from the foot; the points and controls
+     inside that foot are not divided from each other. It sits on the
+     content edge so it stays put when the points row hides. */
+  .stagefoot{border-top:1px solid var(--line)}
   /* a quiet chevron that sits in the row, not floating over it */
   .headtoggle{
     flex:0 0 auto; align-self:center; margin-left:auto;
@@ -380,9 +383,10 @@
       </div>
     </div>
 
-    <div class="beats" id="beats"></div>
     </div><!-- /stagebody -->
 
+    <div class="stagefoot">
+    <div class="beats" id="beats"></div>
     <div class="transport">
       <div class="controls">
         <button class="btn primary" id="play">
@@ -406,6 +410,7 @@
         <span class="hint"><kbd>space</kbd> เล่น/หยุด · <kbd>←</kbd> <kbd>→</kbd> เปลี่ยนฉาก</span>
       </div>
     </div>
+    </div><!-- /stagefoot -->
 
   </main>
 </div>
