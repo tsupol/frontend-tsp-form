@@ -173,7 +173,8 @@ export interface SettlementCloseResult {
   contract_id: number;
   status: string;
   previous_status: string;
-  close_submit_count: number;
+  /** Submit answers with it; withdraw does not. */
+  close_submit_count?: number | null;
   net_amount: number;
 }
 

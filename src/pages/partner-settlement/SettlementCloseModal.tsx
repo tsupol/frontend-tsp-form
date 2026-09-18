@@ -175,9 +175,11 @@ export function SettlementCloseModal({
               to: t(`settlement.status_${result.status}`, { defaultValue: result.status }),
               toColor: isSubmit ? 'info' : 'warning',
             }}
-            detailRows={[
-              { label: t('settlement.submitCount'), value: result.close_submit_count },
-            ]}
+            // Withdraw's answer carries no submit count (only submit's does),
+            // so the row appears only when there is a number to put in it.
+            detailRows={result.close_submit_count != null
+              ? [{ label: t('settlement.submitCount'), value: result.close_submit_count }]
+              : undefined}
             extras={
               <div className="alert alert-info">
                 <Info size={16} className="shrink-0" />
