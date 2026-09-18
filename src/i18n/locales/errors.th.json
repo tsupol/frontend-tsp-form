@@ -1213,5 +1213,14 @@
   "blockingReason.ready_to_close": "พร้อมปิดใบ",
   "blockingReason.resolution_mismatch": "ไม่ตรงกับแบบจบของใบนี้",
   "blockingReason.already_paid": "บันทึกไปแล้ว",
-  "blockingReason.already_received": "รับแล้ว"
+  "blockingReason.already_received": "รับแล้ว",
+  "FUND.NOT_FOUND.COMPANY": "ไม่ใช่บริษัทกองทุน หรืออยู่นอกขอบเขตที่คุณเห็นได้",
+  "FUND.VALIDATION.DATE_INVALID": "เลือกวันที่เป็นวันนี้หรือก่อนหน้า",
+  "FUND.VALIDATION.ACCOUNTS_REQUIRED": "กรอกอย่างน้อย 1 บัญชีก่อนบันทึกผล",
+  "FUND.VALIDATION.ACCOUNT_KEY_INVALID": "{{account_key}} ไม่ใช่บัญชีของบริษัทนี้ จึงกระทบยอดไม่ได้",
+  "FUND.VALIDATION.COUNTED_INVALID": "ยอดที่กรอกของ {{account_key}} ต้องเป็นตัวเลขตั้งแต่ 0 ขึ้นไป",
+  "FUND.VALIDATION.NOTE_REQUIRED_FOR_DIFF": "{{account_key}} กรอกยอดต่างจากยอดระบบ ต้องใส่หมายเหตุ",
+  "FUND.VALIDATION.EDIT_REASON_REQUIRED": "{{account_key}} ของวันนั้นเคยบันทึกผลไว้แล้ว ต้องระบุเหตุผลจึงบันทึกซ้ำได้",
+  "PARTNER.VALIDATION.SOURCE_ACCOUNT_INVALID": "บัญชีนั้นไม่ใช่บัญชีที่ใช้งานอยู่ของบริษัทนี้ เลือกบัญชีอื่น",
+  "PARTNER.STATE.ADJUSTMENT_VOID_SAME_DAY_ONLY": "ยกเลิกแถวปรับยอดได้เฉพาะวันที่บันทึกแถวนั้น · ให้บันทึกแถวปรับยอดทิศตรงข้ามแทน"
 }

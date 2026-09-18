@@ -1205,5 +1205,14 @@
   "partner.validation.received_date_required": "Enter the day the device arrived.",
   "partner.auth.company_side_only": "Only the fund company can record a return shipped directly to it.",
   "partner.not_found.return": "That return document no longer exists, or is outside what you can see.",
-  "blockingReason.ready_to_close": "Ready to close"
+  "blockingReason.ready_to_close": "Ready to close",
+  "FUND.NOT_FOUND.COMPANY": "This is not a fund company, or it is outside what you can see.",
+  "FUND.VALIDATION.DATE_INVALID": "Pick a day that is today or earlier.",
+  "FUND.VALIDATION.ACCOUNTS_REQUIRED": "Fill in at least one account before recording.",
+  "FUND.VALIDATION.ACCOUNT_KEY_INVALID": "{{account_key}} is not a bank account of this company, so it cannot be reconciled.",
+  "FUND.VALIDATION.COUNTED_INVALID": "The counted figures for {{account_key}} must be numbers of zero or more.",
+  "FUND.VALIDATION.NOTE_REQUIRED_FOR_DIFF": "{{account_key}} was counted differently from the system figure, so it needs a note.",
+  "FUND.VALIDATION.EDIT_REASON_REQUIRED": "{{account_key}} was already recorded for that day. Give a reason to record it again.",
+  "PARTNER.VALIDATION.SOURCE_ACCOUNT_INVALID": "That bank account is not an active account of this company. Pick another one.",
+  "PARTNER.STATE.ADJUSTMENT_VOID_SAME_DAY_ONLY": "An adjustment can only be cancelled on the day it was made. Add an opposite adjustment instead."
 }

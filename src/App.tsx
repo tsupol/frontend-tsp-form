@@ -57,6 +57,8 @@ import { PartnerPayoutBuildPage } from './pages/partner-payouts/PartnerPayoutBui
 import { PartnerPayoutDetailPage } from './pages/partner-payouts/PartnerPayoutDetailPage';
 import { PartnerSettlementQueuePage } from './pages/partner-settlements/PartnerSettlementQueuePage';
 import { PartnerBalancePage } from './pages/partner-settlements/PartnerBalancePage';
+import { FundDayMoneyPage } from './pages/fund-day/FundDayMoneyPage';
+import { FundDayReconPage } from './pages/fund-day/FundDayReconPage';
 import { PartnerReturnsPage } from './pages/partner-returns/PartnerReturnsPage';
 import { PartnerReturnWarehousePage } from './pages/partner-returns/PartnerReturnWarehousePage';
 import { ChatPage } from './pages/chat/ChatPage';
@@ -1069,6 +1071,30 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <PartnerBalancePage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      {/* A fund company's own money, one day at a time (UI_SUMMARY/148): what the
+          system knows was received and paid, and the counted figures the finance
+          desk writes back after matching the bank statement by hand. The day is
+          a query param so the history page can link to one particular day. */}
+      <Route
+        path="/admin/fund-day-money"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <FundDayMoneyPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/fund-day-recon"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <FundDayReconPage />
             </AdminLayout>
           </ProtectedRoute>
         }

@@ -61,6 +61,8 @@ import {
   UserX,
   Hourglass,
   KeySquare,
+  // Fund company — daily money summary + reconciliation history
+  CalendarClock, History,
 } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
 import { filterSideNavForShop } from './lib/shopMenu';
@@ -232,6 +234,14 @@ export const AppSideNav = () => {
   // the queue returns zero rows for them — an entry they can only ever find
   // empty.
   const canReviewSlips = hasPermission('PAYMENT.SUBMISSION_REVIEW');
+  // A fund company's daily money screens (UI_SUMMARY/148). Read the permission
+  // from v_my_permissions, never role_code: the finance desk and the fund admin
+  // both hold FUND.RECON_SAVE, and the credit desk in the same company does
+  // not. The summary itself needs only REPORT.DAILY.READ, but everyone who can
+  // see these screens at all holds one of the two, and a shop or operating-side
+  // user holds neither — the RPC answers FUND.NOT_FOUND.COMPANY for them, so
+  // showing the entry would be showing a dead end.
+  const canSeeFundDayMoney = hasPermission('FUND.RECON_SAVE') || hasPermission('REPORT.DAILY.READ');
   const { visible: dockVisible, toggleDock } = useChatDock();
 
   const {
@@ -446,6 +456,19 @@ export const AppSideNav = () => {
           icon: <Wallet size="1rem" />,
           label: t('nav.partnerBalance'),
           path: '/admin/partner-balance',
+        }]
+      : []),
+    ...(canSeeFundDayMoney
+      ? [{
+          key: 'fund-day-money',
+          icon: <CalendarClock size="1rem" />,
+          label: t('nav.fundDayMoney'),
+          path: '/admin/fund-day-money',
+        }, {
+          key: 'fund-day-recon',
+          icon: <History size="1rem" />,
+          label: t('nav.fundDayRecon'),
+          path: '/admin/fund-day-recon',
         }]
       : []),
     {
