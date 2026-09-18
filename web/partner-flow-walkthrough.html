@@ -1,0 +1,1981 @@
+<!doctype html>
+<html lang="th" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ร้านค้าคู่ค้า — เดินทั้งเส้น</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel-2: #1e222b;
+    --line: #2b313d;
+    --text: #e7eaf0;
+    --dim: #9aa3b2;
+    --accent: #6aa9ff;
+    --shop: #f0a13c;
+    --fund: #63c9a8;
+    --warn: #e0705f;
+    --ok: #63c9a8;
+  }
+  :root[data-theme="light"] {
+    --bg: #f6f7f9;
+    --panel: #ffffff;
+    --panel-2: #f0f2f6;
+    --line: #dde1e8;
+    --text: #1a1e26;
+    --dim: #5d6672;
+    --accent: #1f6fd6;
+    --shop: #b96d10;
+    --fund: #17805f;
+    --warn: #b23b2a;
+    --ok: #17805f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.65 "Segoe UI", "Noto Sans Thai", system-ui, sans-serif;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 20px 100px; }
+  header.top {
+    padding: 42px 0 26px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 32px;
+  }
+  h1 { font-size: 30px; margin: 0 0 10px; letter-spacing: -0.4px; }
+  .sub { color: var(--dim); font-size: 15px; max-width: 70ch; }
+  .themebtn {
+    position: fixed; top: 14px; right: 14px; z-index: 50;
+    background: var(--panel); color: var(--dim); border: 1px solid var(--line);
+    border-radius: 8px; padding: 6px 12px; cursor: pointer; font-size: 13px;
+  }
+  .themebtn:hover { color: var(--text); }
+
+  /* --- easy / detailed switch --- */
+  .modebar {
+    display: flex; gap: 0; margin: 22px 0 6px;
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 4px; width: max-content;
+  }
+  .modebar button {
+    background: transparent; border: 0; cursor: pointer;
+    color: var(--dim); padding: 7px 18px; border-radius: 7px;
+    font: 500 14px/1.3 "Segoe UI", "Noto Sans Thai", system-ui, sans-serif;
+  }
+  .modebar button:hover { color: var(--text); }
+  .modebar button.sel { background: var(--accent); color: #07101f; font-weight: 600; }
+  .modenote { color: var(--dim); font-size: 13px; margin: 8px 0 0; }
+
+  /* story blocks */
+  .story {
+    border-left: 3px solid var(--shop); background: rgba(240,161,60,.07);
+    padding: 14px 18px; border-radius: 0 10px 10px 0; margin: 18px 0 8px;
+    font-size: 15px; line-height: 1.75;
+  }
+  .story.fund { border-left-color: var(--fund); background: rgba(99,201,168,.07); }
+  .story p { margin: 0 0 10px; }
+  .story p:last-child { margin-bottom: 0; }
+  .story b { color: var(--text); }
+  .story .beat {
+    display: block; color: var(--dim); font-size: 12.5px;
+    text-transform: uppercase; letter-spacing: .7px; margin-bottom: 7px;
+  }
+  .story .said {
+    display: block; margin: 10px 0; padding-left: 14px;
+    border-left: 2px solid var(--line); color: var(--dim); font-style: italic;
+  }
+
+  body[data-mode="easy"] .screen > .body > ul.sees,
+  body[data-mode="easy"] .screen > .body > .note,
+  body[data-mode="easy"] .screen > .body > p,
+  body[data-mode="easy"] .screen > .body > .tablewrap,
+  body[data-mode="easy"] .three,
+  body[data-mode="easy"] .lead,
+  body[data-mode="easy"] nav.toc { display: none; }
+  body[data-mode="easy"] .screen > .body > figure.shot { margin-top: 0; }
+  body[data-mode="detail"] .story { display: none; }
+  body[data-mode="easy"] h2.step { margin-top: 44px; }
+  /* screens that carry no picture are pure detail — drop them in easy mode */
+  body[data-mode="easy"] .screen.nopic { display: none; }
+
+  /* actor chips */
+  .who.dpx { background: rgba(240,161,60,.16); color: var(--shop); border: 1px solid rgba(240,161,60,.35); }
+
+  /* --- role mode --- */
+  body[data-mode="role"] > .wrap > h2.step,
+  body[data-mode="role"] > .wrap > .story,
+  body[data-mode="role"] > .wrap > .screen,
+  body[data-mode="role"] > .wrap > .lead,
+  body[data-mode="role"] > .wrap > .three,
+  body[data-mode="role"] > .wrap > .tablewrap,
+  body[data-mode="role"] > .wrap > .note,
+  body[data-mode="role"] > .wrap > nav.toc,
+  body[data-mode="role"] > .wrap > .map,
+  body[data-mode="role"] > .wrap > figure.shot { display: none; }
+  body[data-mode="role"] #rolemode { display: block; }
+  #rolemode { display: none; }
+
+  .roleblock { margin-top: 44px; padding-top: 16px; border-top: 1px solid var(--line); }
+  .roleblock > h2 {
+    font-size: 23px; margin: 0 0 4px; letter-spacing: -.2px;
+    display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  }
+  .roleblock > h2 .tag {
+    font: 600 12px/1 system-ui; letter-spacing: 1px; padding: 5px 10px; border-radius: 6px;
+  }
+  .roleblock.shop > h2 .tag { background: rgba(240,161,60,.16); color: var(--shop); border: 1px solid rgba(240,161,60,.4); }
+  .roleblock.fund > h2 .tag { background: rgba(99,201,168,.14); color: var(--fund); border: 1px solid rgba(99,201,168,.4); }
+  .roleblock.credit > h2 .tag { background: rgba(106,169,255,.14); color: var(--accent); border: 1px solid rgba(106,169,255,.4); }
+  .roleblock > .rolelead { color: var(--dim); margin: 0 0 4px; max-width: 74ch; }
+  .roleblock > .rolelead code { font-size: 12px; }
+
+  .pg {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    margin: 16px 0; overflow: hidden;
+  }
+  .pg > h3 {
+    margin: 0; padding: 12px 16px; background: var(--panel-2);
+    border-bottom: 1px solid var(--line);
+    font-size: 15.5px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap;
+  }
+  .pg > h3 code { font-size: 12px; font-weight: 400; }
+  .pg > h3 .when { color: var(--dim); font-size: 12.5px; font-weight: 400; margin-left: auto; }
+  .pg > .in { padding: 14px 16px; }
+  .pg > .in > :first-child { margin-top: 0; }
+  .pg > .in > :last-child { margin-bottom: 0; }
+  .pg ul { margin: 0 0 10px; padding-left: 20px; }
+  .pg li { margin-bottom: 5px; }
+  .pg .does { color: var(--dim); font-size: 13.5px; margin: 0 0 10px; }
+  .pg .does b { color: var(--text); font-weight: 600; }
+
+  nav.toc {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 18px 22px; margin-bottom: 40px;
+  }
+  nav.toc h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); margin: 0 0 12px; font-weight: 600; }
+  nav.toc ol { margin: 0; padding-left: 22px; columns: 2; column-gap: 34px; }
+  nav.toc li { margin-bottom: 6px; break-inside: avoid; }
+  nav.toc a { color: var(--text); text-decoration: none; }
+  nav.toc a:hover { color: var(--accent); text-decoration: underline; }
+
+  h2.step {
+    font-size: 22px; margin: 52px 0 6px; padding-top: 14px;
+    border-top: 1px solid var(--line); letter-spacing: -0.2px;
+  }
+  h2.step .num {
+    display: inline-block; min-width: 30px; color: var(--dim); font-variant-numeric: tabular-nums;
+  }
+  .lead { color: var(--dim); margin: 0 0 22px; max-width: 72ch; }
+
+  .who {
+    display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: 0.4px;
+    padding: 3px 10px; border-radius: 999px; vertical-align: middle;
+    margin-left: 8px; position: relative; top: -2px;
+  }
+  .who.shop { background: rgba(240,161,60,.16); color: var(--shop); border: 1px solid rgba(240,161,60,.35); }
+  .who.fund { background: rgba(99,201,168,.14); color: var(--fund); border: 1px solid rgba(99,201,168,.35); }
+  .who.auto { background: rgba(106,169,255,.14); color: var(--accent); border: 1px solid rgba(106,169,255,.35); }
+  .who.admin { background: rgba(154,163,178,.16); color: var(--dim); border: 1px solid var(--line); }
+
+  .screen {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 0; margin: 20px 0; overflow: hidden;
+  }
+  .screen > .bar {
+    background: var(--panel-2); border-bottom: 1px solid var(--line);
+    padding: 10px 16px; font-size: 13px; color: var(--dim);
+    display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap;
+  }
+  .screen > .bar b { color: var(--text); font-weight: 600; font-size: 14px; }
+  .screen > .bar code { font-size: 12px; }
+  .screen > .body { padding: 16px 18px; }
+  .screen > .body > :first-child { margin-top: 0; }
+  .screen > .body > :last-child { margin-bottom: 0; }
+
+  ul.sees { margin: 0 0 12px; padding-left: 20px; }
+  ul.sees li { margin-bottom: 5px; }
+  .label { color: var(--text); background: var(--panel-2); border: 1px solid var(--line);
+           border-radius: 5px; padding: 1px 7px; font-size: 13.5px; white-space: nowrap; }
+  code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px;
+         padding: 1px 6px; font-size: 12.5px; font-family: "Cascadia Mono", Consolas, monospace; }
+
+  figure.shot { margin: 16px 0 6px; }
+  figure.shot img {
+    width: 100%; display: block; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--bg);
+  }
+  figure.shot figcaption {
+    color: var(--dim); font-size: 12.5px; margin-top: 7px; padding-left: 2px;
+  }
+  .screen > .body > figure.shot:last-child { margin-bottom: 0; }
+
+  /* --- hotspots: hover cuts the box out and magnifies it --- */
+  .pic { position: relative; line-height: 0; border-radius: 8px; }
+
+  .hs {
+    position: absolute; border: 2px solid var(--accent); border-radius: 5px;
+    background: transparent; cursor: zoom-in; padding: 0;
+    opacity: .34; transition: opacity .16s;
+  }
+  .pic .hs:hover, .pic .hs.pin { opacity: 1; z-index: 4; }
+  .hs::before {
+    content: attr(data-n);
+    position: absolute; top: -11px; left: -11px;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--accent); color: #07101f;
+    font: 600 12px/22px "Segoe UI", system-ui, sans-serif;
+    text-align: center;
+  }
+
+  /* the magnified cut-out */
+  .loupe {
+    position: absolute; z-index: 9; pointer-events: none;
+    opacity: 0; visibility: hidden; transform: translateY(6px) scale(.98);
+    transform-origin: top center;
+    transition: opacity .17s ease, transform .17s ease, visibility .17s;
+    width: max-content; max-width: min(96%, 760px);
+  }
+  .pic.on .loupe.show { opacity: 1; visibility: visible; transform: translateY(0) scale(1); }
+  .loupe .crop {
+    border: 2px solid var(--accent); border-radius: 9px; overflow: hidden;
+    background: var(--bg); box-shadow: 0 18px 48px rgba(0,0,0,.62);
+    background-repeat: no-repeat;
+  }
+  :root[data-theme="light"] .loupe .crop { box-shadow: 0 18px 44px rgba(20,25,35,.28); }
+  .loupe .say {
+    margin-top: 8px; background: var(--panel); color: var(--text);
+    border: 1px solid var(--accent); border-radius: 8px;
+    padding: 9px 13px; font: 400 13.5px/1.55 "Segoe UI", "Noto Sans Thai", system-ui, sans-serif;
+    box-shadow: 0 10px 30px rgba(0,0,0,.45); white-space: normal;
+  }
+  :root[data-theme="light"] .loupe .say { box-shadow: 0 10px 26px rgba(20,25,35,.18); }
+  .loupe .say b { color: var(--accent); font-weight: 600; }
+  .loupe .say .n {
+    display: inline-block; width: 17px; height: 17px; border-radius: 50%;
+    background: var(--accent); color: #07101f; font: 600 11px/17px system-ui;
+    text-align: center; margin-right: 6px; position: relative; top: -1px;
+  }
+
+  figure.shot > .hint {
+    color: var(--dim); font-size: 12.5px; margin-top: 7px; padding-left: 2px;
+  }
+  figure.shot > .hint .k {
+    display: inline-block; width: 15px; height: 15px; border-radius: 50%;
+    background: var(--accent); color: #07101f; font: 600 10px/15px system-ui;
+    text-align: center; margin-right: 4px; position: relative; top: -1px;
+  }
+  .hs .tip { display: none; }
+  @media (hover: none) { .hs { opacity: .75; } }
+
+  .flip { margin: 14px 0 4px; font-size: 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .flip .t { color: var(--dim); font-size: 12.5px; text-transform: uppercase; letter-spacing: .6px; margin-right: 2px; }
+  .badge { border-radius: 6px; padding: 2px 9px; font-size: 13px; border: 1px solid var(--line); background: var(--panel-2); }
+  .badge.after { border-color: rgba(99,201,168,.45); color: var(--ok); background: rgba(99,201,168,.1); }
+  .arrow { color: var(--dim); }
+
+  .note {
+    border-left: 3px solid var(--accent); background: rgba(106,169,255,.07);
+    padding: 10px 14px; margin: 14px 0; border-radius: 0 8px 8px 0; font-size: 14px;
+  }
+  .note.warn { border-left-color: var(--warn); background: rgba(224,112,95,.08); }
+  .note b { color: var(--text); }
+
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--dim); font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: .5px; }
+  tbody tr:last-child td { border-bottom: 0; }
+  .tablewrap { overflow-x: auto; }
+
+  .money { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 18px 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .card h4 { margin: 0 0 6px; font-size: 15px; }
+  .card p { margin: 0 0 8px; font-size: 13.5px; color: var(--dim); }
+  .card .tag { font-size: 12px; color: var(--dim); }
+
+  .map { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin: 24px 0; }
+  .map svg { width: 100%; height: auto; display: block; }
+
+  footer.end { margin-top: 60px; padding-top: 22px; border-top: 1px solid var(--line); color: var(--dim); font-size: 13.5px; }
+  a { color: var(--accent); }
+
+  @media (max-width: 700px) {
+    .three { grid-template-columns: 1fr; }
+    nav.toc ol { columns: 1; }
+    h1 { font-size: 24px; }
+  }
+</style>
+</head>
+<body>
+<button class="themebtn" id="tb">สว่าง / มืด</button>
+<div class="wrap">
+
+<header class="top">
+  <h1>ร้านค้าคู่ค้า (deal partner) — เดินทั้งเส้น</h1>
+  <p class="sub">
+    ร้านขายเครื่องผ่อนแทนกองทุน กองทุนจ่ายค่าเครื่องบวกค่าคอมให้ร้านเมื่อสัญญาใช้งานและร้านพิสูจน์การส่งมอบแล้ว
+    ถ้าลูกค้าคืนเครื่องภายหลัง สัญญาจบทางใบคืนเครื่องทางเดียว หน้านี้เดินทีละจอ ว่าใครเห็นอะไร กดอะไร แล้วอะไรเปลี่ยน
+  </p>
+  <p class="sub" style="margin-top:10px">
+    ทุกจอในนี้ถูกเดินจริงบน DEV วันที่ 17–18 กันยายน 2026 · ป้ายภาษาไทยคือป้ายที่ขึ้นบนหน้าจอจริง
+  </p>
+  <div class="modebar" role="group" aria-label="เลือกวิธีอ่าน">
+    <button id="mEasy" type="button">แบบเข้าใจง่าย</button>
+    <button id="mDetail" type="button">แบบละเอียด</button>
+    <button id="mRole" type="button">แยกตามบทบาท</button>
+  </div>
+  <p class="modenote" id="modenote"></p>
+</header>
+
+<div class="map">
+  <svg viewBox="0 0 900 262" role="img" aria-label="ภาพรวมเส้นทางเอกสาร">
+    <defs>
+      <marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="3.2" orient="auto">
+        <path d="M0,0 L7,3.2 L0,6.4 z" fill="currentColor"/>
+      </marker>
+    </defs>
+    <g font-family="Segoe UI, Noto Sans Thai, sans-serif" font-size="12.5">
+      <!-- lane labels -->
+      <text x="4" y="48" fill="var(--shop)" font-size="12" font-weight="600">ร้าน</text>
+      <text x="4" y="142" fill="var(--fund)" font-size="12" font-weight="600">กองทุน</text>
+      <text x="4" y="230" fill="var(--dim)" font-size="12" font-weight="600">เครื่อง</text>
+
+      <!-- shop lane -->
+      <g fill="var(--panel-2)" stroke="var(--shop)" stroke-opacity=".5">
+        <rect x="56" y="24" width="176" height="42" rx="8"/>
+        <rect x="272" y="24" width="176" height="42" rx="8"/>
+        <rect x="488" y="24" width="176" height="42" rx="8"/>
+      </g>
+      <g fill="var(--text)" text-anchor="middle">
+        <text x="144" y="42">เปิดสัญญา</text>
+        <text x="144" y="58">รับเงินดาวน์ที่ร้าน</text>
+        <text x="360" y="50">ยื่นปิดงานส่งมอบ</text>
+        <text x="576" y="50">รับเงินจากกองทุน</text>
+      </g>
+
+      <!-- fund lane -->
+      <g fill="var(--panel-2)" stroke="var(--fund)" stroke-opacity=".5">
+        <rect x="56" y="118" width="176" height="42" rx="8"/>
+        <rect x="272" y="118" width="176" height="42" rx="8"/>
+        <rect x="488" y="118" width="176" height="42" rx="8"/>
+        <rect x="704" y="118" width="176" height="42" rx="8"/>
+      </g>
+      <g fill="var(--text)" text-anchor="middle">
+        <text x="144" y="144">อนุมัติสินเชื่อ</text>
+        <text x="360" y="144">ตรวจปิดงาน</text>
+        <text x="576" y="136">ออกใบจ่ายเงิน</text>
+        <text x="576" y="152">แล้วโอน</text>
+        <text x="792" y="144">ปิดใบคืนเครื่อง</text>
+      </g>
+
+      <!-- device lane -->
+      <g fill="var(--panel-2)" stroke="var(--line)">
+        <rect x="56" y="204" width="176" height="38" rx="8"/>
+        <rect x="488" y="204" width="176" height="38" rx="8"/>
+        <rect x="704" y="204" width="176" height="38" rx="8"/>
+      </g>
+      <g fill="var(--dim)" text-anchor="middle" font-size="12">
+        <text x="144" y="228">เครื่องของร้าน</text>
+        <text x="576" y="228">เครื่องเป็นของกองทุน</text>
+        <text x="792" y="228">คืนตามแบบที่เลือก</text>
+      </g>
+
+      <!-- arrows -->
+      <g stroke="var(--dim)" fill="none" marker-end="url(#a)" color="var(--dim)">
+        <path d="M232,45 L268,45"/>
+        <path d="M448,45 L484,45"/>
+        <path d="M232,139 L268,139"/>
+        <path d="M448,139 L484,139"/>
+        <path d="M664,139 L700,139"/>
+        <path d="M144,66 L144,114"/>
+        <path d="M360,66 L360,114"/>
+        <path d="M576,160 L576,200"/>
+        <path d="M664,45 L684,45 L684,139 L700,139" stroke-opacity=".4"/>
+      </g>
+      <text x="690" y="84" fill="var(--dim)" font-size="11.5">ลูกค้าคืนเครื่อง</text>
+    </g>
+  </svg>
+</div>
+
+<nav class="toc">
+  <h2>ในหน้านี้</h2>
+  <ol>
+    <li><a href="#s0">คนและเอกสาร 3 ใบ</a></li>
+    <li><a href="#s1">ร้านเปิดสัญญา + ขออนุมัติ</a></li>
+    <li><a href="#s2">ลูกค้าจ่ายที่ร้าน แล้วเซ็น</a></li>
+    <li><a href="#s3">ใบขอรับเงินเกิดเอง</a></li>
+    <li><a href="#s4">ร้านยื่นปิดงานส่งมอบ</a></li>
+    <li><a href="#s5">กองทุนตรวจ หรือส่งกลับ</a></li>
+    <li><a href="#s6">ออกใบจ่ายเงินแล้วโอน</a></li>
+    <li><a href="#s7">ค่างวดเข้ากองทุนอย่างไร</a></li>
+    <li><a href="#s8">ใบคืนเครื่อง — สามแบบจบ</a></li>
+    <li><a href="#s9">ของประกอบที่ทำวันเดียวกัน</a></li>
+    <li><a href="#s10">ตัวอย่างจริงบน DEV</a></li>
+    <li><a href="#s11">ที่ยังไม่เรียบร้อย</a></li>
+  </ol>
+</nav>
+
+<!-- ============ 0 ============ -->
+<h2 class="step" id="s0"><span class="num">0</span> คนและเอกสาร 3 ใบ</h2>
+<p class="lead">
+  ทั้งเรื่องมีคนสามฝ่าย และเอกสารสามใบที่ไม่ใช่บิลลูกค้า เอกสารแต่ละใบมีเลขขึ้นต้นต่างกัน จำเลขก็พอ
+</p>
+
+<div class="story">
+  <span class="beat">สามตัวละคร จำสามชื่อนี้พอ</span>
+  <p>
+    <b>SHOP</b> — ร้านคู่ค้า มีเครื่อง มีลูกค้า ไม่มีเงินก้อน · ล็อกอิน <code>db_dealpartner</code><br>
+    <b>FUND</b> — ฝ่ายการเงินกองทุน มีเงินก้อน ไม่มีหน้าร้าน · ล็อกอิน <code>ui_fund_finance_a</code><br>
+    <b>CREDIT</b> — ฝ่ายสินเชื่อกองทุน อนุมัติลูกค้าอย่างเดียว · ล็อกอิน <code>ui_fund_credit_a</code>
+  </p>
+  <span class="said">
+    SHOP ออกเครื่อง · FUND ออกเงิน · ลูกค้าผ่อนกับ FUND · FUND จ่ายค่าเครื่อง+ค่าคอมคืน SHOP ทีหลัง
+  </span>
+  <p>
+    ทั้งระบบตอบคำถามเดียว: <b>FUND จะจ่ายเงินให้ SHOP ตอนไหน</b> จ่ายเร็วไปเสี่ยงเครื่องไม่ถึงลูกค้า
+    จ่ายช้าไป SHOP ขาดสภาพคล่อง ทุกจอที่เหลือคือคำตอบของข้อนี้
+  </p>
+</div>
+
+<div class="three">
+  <div class="card">
+    <h4>ร้าน <span class="who shop">ร้าน</span></h4>
+    <p>สาขาชนิด "คู่ค้า" ของบริษัทกองทุน ขายเครื่องผ่อนแทนกองทุน เก็บเงินดาวน์ไว้เอง</p>
+    <span class="tag">DEV: <code>db_dealpartner</code> · สาขา 7</span>
+  </div>
+  <div class="card">
+    <h4>กองทุน <span class="who fund">กองทุน</span></h4>
+    <p>บริษัทชนิด "บริษัทกองทุน" ฝ่ายสินเชื่ออนุมัติ ฝ่ายการเงินตรวจและจ่ายเงินให้ร้าน</p>
+    <span class="tag">DEV: <code>ui_fund_credit_a</code> · <code>ui_fund_finance_a</code></span>
+  </div>
+  <div class="card">
+    <h4>ลูกค้า</h4>
+    <p>ซื้อเครื่องผ่อน จ่ายดาวน์ที่ร้าน แล้วโอนค่างวดเข้าบัญชีกองทุนผ่านแอป</p>
+    <span class="tag">ไม่เห็นเอกสารสามใบนี้เลย</span>
+  </div>
+</div>
+
+<div class="tablewrap">
+<table>
+  <thead><tr><th>เอกสาร</th><th>เลข</th><th>ใครทำ</th><th>คืออะไร</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><b>ใบขออนุมัติสินเชื่อ</b></td><td><code>—</code></td><td><span class="who shop">ร้าน</span> ยื่น · <span class="who fund">สินเชื่อ</span> อนุมัติ</td>
+      <td>ขอให้กองทุนอนุมัติลูกค้ารายนี้ ก่อนสัญญาจะเปิดบิลได้ อายุ 14 วัน</td>
+    </tr>
+    <tr>
+      <td><b>ใบขอรับเงิน</b></td><td><code>PS-…</code></td><td><span class="who auto">ระบบสร้างเอง</span></td>
+      <td>สิ่งที่กองทุนต้องจ่ายร้าน 1 ใบต่อ 1 สัญญา เกิดเองตอนสัญญาใช้งาน</td>
+    </tr>
+    <tr>
+      <td><b>ใบจ่ายเงินร้าน</b></td><td><code>PP-…</code></td><td><span class="who fund">การเงิน</span></td>
+      <td>รวมใบขอรับเงินหลายใบของร้านเดียวกัน แล้วโอนก้อนเดียว</td>
+    </tr>
+    <tr>
+      <td><b>ใบคืนเครื่อง</b></td><td><code>PR-…</code></td><td><span class="who shop">ร้าน</span> หรือ <span class="who fund">การเงิน</span></td>
+      <td>ทางเดียวที่สัญญาร้านซึ่งใช้งานอยู่จะจบได้</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note">
+  <b>เงินไหลสวนทางกันหนึ่งจุด</b> — เงินดาวน์กับค่าทำสัญญาลูกค้าจ่ายที่ร้าน และร้านเก็บไว้เลย
+  ไม่ต้องส่งเข้ากองทุน ตัวเลขนั้นถูกหักออกจากยอดที่กองทุนต้องจ่ายร้านแทน ส่วนค่างวดเดือนถัดไป
+  ลูกค้าโอนเข้าบัญชีกองทุนโดยตรง ร้านไม่ยุ่ง
+</div>
+
+<!-- ============ 1 ============ -->
+<h2 class="step" id="s1"><span class="num">1</span> ร้านเปิดสัญญา แล้วขออนุมัติจากกองทุน</h2>
+<p class="lead">
+  ร้านกรอกสัญญาด้วยตัวช่วยเปิดสัญญาชุดเดิม แต่จะกดต่อไม่ได้ถ้ายังไม่ได้ขออนุมัติจากฝ่ายสินเชื่อของกองทุน
+</p>
+
+<div class="story">
+  <span class="beat">SHOP เปิดสัญญา แล้วติดด่านแรก</span>
+  <p>
+    SHOP กรอกสัญญาตามปกติด้วยตัวช่วยชุดเดิม กดตรวจความพร้อม แล้วเจอข้อความเดียว:
+    <b>ต้องได้รับอนุมัติจากกองทุนก่อน</b> เพราะเงินที่จะปล่อยผ่อนเป็นของ FUND ไม่ใช่ของ SHOP
+  </p>
+  <span class="said">
+    SHOP ยื่น → CREDIT กดอนุมัติ (ไม่มีพิน มีแค่หน้ายืนยัน) → สัญญาเดินต่อได้ ·
+    ถ้าส่งกลับ สัญญาย้อนเป็นร่าง แก้แล้วยื่นใหม่ · ใบที่อนุมัติมีอายุ 14 วัน
+  </span>
+</div>
+
+<div class="screen nopic">
+  <div class="bar"><b>หน้าสัญญา — ตัวช่วยเปิดสัญญา</b> <span class="who shop">ร้าน</span> <code>/admin/contracts</code></div>
+  <div class="body">
+    <ul class="sees">
+      <li>กรอกลูกค้า เลือกเครื่องจากสต็อกของร้าน ตั้งงวดและเงินดาวน์ เหมือนสาขาปกติ</li>
+      <li>กดตรวจความพร้อม แล้วขึ้นข้อความเดียวว่า <span class="label">ต้องได้รับอนุมัติจากกองทุนก่อน</span></li>
+      <li>ปุ่มยื่นขออนุมัติพาไปสร้างใบขออนุมัติสินเชื่อ</li>
+    </ul>
+    <div class="flip"><span class="t">สัญญา</span><span class="badge">ร่าง</span><span class="arrow">→</span><span class="badge after">รออนุมัติ</span></div>
+  </div>
+</div>
+
+<div class="screen nopic">
+  <div class="bar"><b>รออนุมัติ</b> <span class="who shop">ร้าน</span> <code>/admin/contracts/pending-approval</code></div>
+  <div class="body">
+    <ul class="sees">
+      <li>รายการใบที่ร้านยื่นไว้ พร้อมสถานะ <span class="label">ยื่นแล้ว</span> <span class="label">อนุมัติแล้ว</span> <span class="label">ส่งกลับ</span> <span class="label">ถอนแล้ว</span></li>
+      <li>ยื่นซ้ำได้ ใบเก่าไม่หาย กลายเป็นประวัติ ใบล่าสุดคือใบที่มีผล</li>
+    </ul>
+  </div>
+</div>
+
+<div class="screen nopic">
+  <div class="bar"><b>ใบขออนุมัติร้าน</b> <span class="who fund">ฝ่ายสินเชื่อ</span> <code>/admin/partner-cases</code></div>
+  <div class="body">
+    <ul class="sees">
+      <li>คิวใบที่ร้านยื่นมา เปิดดูรายละเอียดลูกค้าและเครื่อง</li>
+      <li>ปุ่ม อนุมัติ หรือ ส่งกลับ (ไม่ต้องใส่รหัสพิน มีแค่หน้าต่างยืนยัน)</li>
+      <li>อนุมัติแล้วมีอายุ 14 วัน เลยกำหนดต้องยื่นใหม่</li>
+    </ul>
+    <div class="flip"><span class="t">สัญญา</span><span class="badge">รออนุมัติ</span><span class="arrow">→</span><span class="badge after">อนุมัติแล้ว</span></div>
+    <div class="note">ถ้าฝ่ายสินเชื่อส่งกลับหรือร้านถอนใบ สัญญากลับไปเป็นร่าง แก้แล้วยื่นใหม่ได้</div>
+  </div>
+</div>
+
+<!-- ============ 2 ============ -->
+<h2 class="step" id="s2"><span class="num">2</span> ลูกค้าจ่ายเงินดาวน์ที่ร้าน แล้วเซ็น</h2>
+<p class="lead">
+  บิลเปิดสัญญาของสาขาร้านรับได้ช่องทางเดียวคือ "ร้านเก็บเงินไว้" เพราะเงินไม่ได้เข้ากองทุน
+  จ่ายครบแล้วไปหน้าเซ็น เซ็นครบสัญญาใช้งานทันที
+</p>
+
+<div class="story">
+  <span class="beat">ลูกค้าจ่ายดาวน์ที่ร้าน แล้วเซ็น</span>
+  <p>
+    ลูกค้าจ่ายเงินดาวน์ + ค่าทำสัญญาให้ SHOP ตรงนั้น <b>SHOP เก็บไว้เลย ไม่ส่งเข้า FUND</b>
+    ก้อนนี้จะถูกหักออกตอน FUND จ่ายเงินให้ทีหลัง หน้าจอรับเงินจึงมีตัวเลือกเดียว — เงินสด/โอน ไม่ขึ้นให้เลือก
+  </p>
+  <span class="said">
+    จ่ายครบ → เซ็น (ลูกค้า + พยาน 2 คน · ฝั่ง FUND เซ็นให้เองตั้งแต่ต้น) → เซ็นครบ ระบบผูกเครื่องให้เอง สัญญาใช้งานทันที
+  </span>
+</div>
+
+<div class="screen nopic">
+  <div class="bar"><b>บิลเปิดสัญญา — รับชำระ</b> <span class="who shop">ร้าน</span></div>
+  <div class="body">
+    <ul class="sees">
+      <li>บิลมีสองบรรทัด เงินดาวน์ และค่าทำสัญญา</li>
+      <li>ช่องเลือกวิธีชำระมีตัวเลือกเดียว <span class="label">ร้านเก็บเงินไว้</span> — เงินสดกับโอนไม่ขึ้นให้เลือก</li>
+      <li>ยืนยันแล้วบิลเป็นจ่ายแล้ว สัญญาไปรอเซ็น</li>
+    </ul>
+    <div class="flip"><span class="t">สัญญา</span><span class="badge">อนุมัติแล้ว</span><span class="arrow">→</span><span class="badge after">รอเซ็น</span></div>
+  </div>
+</div>
+
+<div class="screen nopic">
+  <div class="bar"><b>แท็บเซ็นเอกสาร</b> <span class="who shop">ร้าน</span> + ลูกค้า</div>
+  <div class="body">
+    <ul class="sees">
+      <li>ฝั่งกองทุน (ผู้ให้เช่า) เซ็นให้เองตั้งแต่ตอนออกชุดเอกสาร</li>
+      <li>เหลือลูกค้าเซ็น และพยานอีกสองคนของสาขา</li>
+      <li>เซ็นครบ ระบบผูกเครื่องเข้าสัญญาให้เอง แล้วสัญญาเป็นใช้งาน</li>
+    </ul>
+    <div class="flip"><span class="t">สัญญา</span><span class="badge">รอเซ็น</span><span class="arrow">→</span><span class="badge after">ใช้งาน</span></div>
+    <div class="note warn">
+      <b>ติดอยู่จริงข้อหนึ่ง</b> — ร้านเซ็นชุดเอกสารเองจนจบไม่ได้ เพราะคำสั่งที่ใส่ชื่อพยานลงช่องเซ็น
+      ยังไม่เปิดให้บัญชีร้านใช้ ต้องมีคนฝั่งบริษัทช่วยหนึ่งจังหวะ แจ้ง BE ไว้แล้ว
+    </div>
+  </div>
+</div>
+
+<!-- ============ 3 ============ -->
+<h2 class="step" id="s3"><span class="num">3</span> ใบขอรับเงินเกิดขึ้นเอง</h2>
+<p class="lead">
+  วินาทีที่สัญญาเป็นใช้งาน ระบบออกใบขอรับเงินให้ทันที ไม่มีปุ่มสร้าง ร้านไม่ต้องทำอะไร
+  ใบนี้คือยอดที่กองทุนติดค้างร้านอยู่
+</p>
+
+<div class="story">
+  <span class="beat">ยอดที่ FUND ติด SHOP เกิดขึ้นเอง</span>
+  <p>
+    สัญญาใช้งานปุ๊บ ระบบตั้งยอดนี้ให้เอง ไม่มีปุ่มสร้าง สูตรคือ
+    <b>ค่าเครื่อง + ค่าคอม − เงินดาวน์ที่ SHOP เก็บไว้แล้ว</b> — ดูการ์ดในภาพข้างล่าง ชี้ที่กรอบ 2 กับ 3 เห็นสองฝั่งชัด
+  </p>
+  <span class="said">
+    แต่ยังไม่ได้เงิน — FUND ยังไม่รู้ว่าเครื่องถึงมือลูกค้าจริงไหม การ์ดจึงขึ้น "รอยื่นปิดงาน" = ถึงคิว SHOP พิสูจน์
+  </span>
+</div>
+
+<div class="screen">
+  <div class="bar"><b>การ์ดใบขอรับเงิน — บนหน้าสัญญา</b> <span class="who shop">ร้าน</span></div>
+  <div class="body">
+    <p style="margin-top:0">ตัวเลขบนการ์ด (ตัวอย่างจริงจากสัญญา <code>CT-2609-000503-9</code>):</p>
+    <div class="tablewrap">
+    <table>
+      <thead><tr><th>บรรทัด</th><th class="money">จำนวน</th><th>ทางไหน</th></tr></thead>
+      <tbody>
+        <tr><td>ค่าเครื่อง</td><td class="money">+41,000</td><td>กองทุนจ่ายร้าน</td></tr>
+        <tr><td>ค่าคอมร้าน (17% ของยอดจัด 32,800)</td><td class="money">+5,576</td><td>กองทุนจ่ายร้าน</td></tr>
+        <tr><td>เงินดาวน์</td><td class="money">−8,200</td><td>ร้านถือไว้แล้ว</td></tr>
+        <tr><td>ค่าทำสัญญา</td><td class="money">−100</td><td>ร้านถือไว้แล้ว</td></tr>
+        <tr><td><b>สุทธิที่ร้านจะได้รับ</b></td><td class="money"><b>38,276</b></td><td></td></tr>
+      </tbody>
+    </table>
+    </div>
+    <ul class="sees">
+      <li>ใต้ตัวเลขเป็นรายการตรวจ: <span class="label">ผูกเครื่องแล้ว</span> และ <span class="label">รูปส่งมอบครบ</span></li>
+      <li>ปุ่ม <span class="label">ยื่นปิดงาน</span> ยังกดไม่ได้จนกว่ารายการตรวจจะเขียวหมด</li>
+      <li>มีแท็บประวัติ บันทึกทุกครั้งที่ยื่น ถอน หรือถูกส่งกลับ</li>
+    </ul>
+    <div class="flip"><span class="t">ใบขอรับเงิน</span><span class="badge after">รอยื่นปิดงาน</span></div>
+    <figure class="shot">
+      <div class="pic">
+        <img src="shots/shop-settlement-card.png" alt="การ์ดใบขอรับเงินบนหน้าสัญญา">
+        <button class="hs" data-n="1" style="left:53.7%;top:26.4%;width:44%;height:5.4%">
+          <span class="tip"><b>เลขใบขอรับเงิน</b> เกิดเองตอนสัญญาใช้งาน ป้ายขวาบอกว่ากองทุนจ่ายแล้ว</span>
+        </button>
+        <button class="hs" data-n="2" style="left:54.3%;top:33.5%;width:42.8%;height:10.5%">
+          <span class="tip"><b>ที่กองทุนต้องจ่าย</b> ค่าเครื่องตามราคาตั้ง บวกค่าคอมของร้าน ที่นี่คือ 17% ของยอดจัด</span>
+        </button>
+        <button class="hs" data-n="3" style="left:54.3%;top:44.2%;width:42.8%;height:11.2%">
+          <span class="tip"><b>ที่ร้านถือไว้แล้ว</b> เงินดาวน์กับค่าทำสัญญาที่ลูกค้าจ่ายที่ร้าน ถูกหักออกแทนการส่งเข้ากองทุน</span>
+        </button>
+        <button class="hs up" data-n="4" style="left:54.3%;top:56%;width:42.8%;height:4.6%">
+          <span class="tip"><b>สุทธิที่ร้านได้รับ</b> ยอดนี้คือสิ่งที่จะไปอยู่บนใบจ่ายเงินในขั้นถัดไป</span>
+        </button>
+        <button class="hs up" data-n="5" style="left:54%;top:64.2%;width:20%;height:3.6%">
+          <span class="tip"><b>ประวัติ</b> ทุกครั้งที่ยื่น ถอน หรือถูกส่งกลับ ถูกบันทึกไว้ที่นี่</span>
+        </button>
+      </div>
+      <p class="hint"><span class="k">1</span>เอาเมาส์ชี้กรอบ ระบบจะตัดส่วนนั้นมาขยายให้พร้อมคำอธิบาย · กดเพื่อค้างไว้</p>
+      <figcaption>การ์ด "เงินที่ร้านจะได้รับจากสัญญานี้" บนหน้าสัญญาจริง</figcaption>
+    </figure>
+  </div>
+</div>
+
+<div class="screen">
+  <div class="bar"><b>เมนูใหม่ของร้าน — ใต้ "สัญญา"</b> <span class="who shop">ร้าน</span></div>
+  <div class="body">
+    <ul class="sees">
+      <li><span class="label">รอยื่นปิดงาน</span> — สัญญาที่ยังไม่ได้ยื่น หัวหน้าจอบอกยอดที่ยังไม่ได้รับรวม</li>
+      <li><span class="label">รอรับเงิน</span> — ยื่นแล้ว รอกองทุน</li>
+      <li><span class="label">รับเงินแล้ว</span> — ใบจ่ายเงินที่โอนมาแล้ว</li>
+      <li><span class="label">รายงานค่าคอม</span> — ค่าคอมรายสัญญาและรายเดือน</li>
+      <li><span class="label">ใบคืนเครื่อง</span> — เอกสารคืนเครื่องทั้งหมดของร้าน</li>
+    </ul>
+    <figure class="shot">
+      <div class="pic">
+        <img src="shots/shop-paid.png" alt="เมนูรอรับเงินของร้าน">
+        <button class="hs" data-n="1" style="left:15.5%;top:20.5%;width:12.5%;height:17.5%">
+          <span class="tip"><b>เมนูใหม่ห้ารายการ</b> รอยื่นปิดงาน · รอรับเงิน · รับเงินแล้ว · รายงานค่าคอม · ใบคืนเครื่อง ทั้งหมดอยู่ใต้ "สัญญา"</span>
+        </button>
+        <button class="hs" data-n="2" style="left:28.4%;top:5.5%;width:29.5%;height:6.5%">
+          <span class="tip"><b>หัวจอบอกเงินสองก้อน</b> ยอดที่ยังไม่ได้รับ และยอดที่รับแล้ว พร้อมจำนวนสัญญาของแต่ละก้อน</span>
+        </button>
+      </div>
+      <figcaption>เมนู "รอรับเงิน" ของร้าน</figcaption>
+    </figure>
+  </div>
+</div>
+
+<!-- ============ 4 ============ -->
+<h2 class="step" id="s4"><span class="num">4</span> ร้านยื่นปิดงานส่งมอบ</h2>
+<p class="lead">
+  ก่อนขอเงิน ร้านต้องพิสูจน์ว่าส่งเครื่องถึงมือลูกค้าจริง ด้วยรูปสามกลุ่มบังคับ
+  ยื่นแล้วรูปกลุ่มส่งมอบถูกล็อก และปุ่มยกเลิก/ถอดเครื่องบนสัญญาถูกปิดตาม
+</p>
+
+<div class="story">
+  <span class="beat">SHOP พิสูจน์ด้วยรูป 3 กลุ่ม</span>
+  <p>
+    FUND ไม่ได้อยู่ที่ร้าน รูปคือสายตาแทน บังคับ 3 กลุ่ม ตอบ 3 คำถาม:
+    <b>ลูกค้าคู่บัตร</b> (คนนี้คือใคร) · <b>ตอนเซ็น</b> (เซ็นเองไหม) · <b>ถือบัตรพร้อมเครื่อง</b> (ของถึงมือไหม)
+  </p>
+  <span class="said">
+    ครบ → ปุ่มยื่นปิดงานกดได้ · ยื่นแล้วรูปล็อก + ปุ่มยกเลิกสัญญาปิดตาม ·
+    ถอนการยื่นได้ ทุกอย่างปลดล็อก แต่ระบบจดว่ายื่นมากี่ครั้ง และ FUND เห็นตัวเลขนั้น
+  </span>
+</div>
+
+<div class="screen nopic">
+  <div class="bar"><b>อัลบั้มรูปสัญญา</b> <span class="who shop">ร้าน</span></div>
+  <div class="body">
+    <ul class="sees">
+      <li>กลุ่มบังคับสามกลุ่ม: <span class="label">ลูกค้าถ่ายคู่บัตรประชาชน</span> <span class="label">ลูกค้ากำลังเซ็นสัญญา</span> <span class="label">ลูกค้าถือบัตรพร้อมเครื่อง</span></li>
+      <li>อีกกลุ่มไม่บังคับคือลูกค้าถือสัญญา และกลุ่มทั่วไป กลุ่มละไม่เกินสามรูป</li>
+      <li>ลากรูปข้ามกลุ่มได้ ไม่ต้องอัปโหลดใหม่</li>
+      <li>ครบแล้วแบนเนอร์เปลี่ยนเป็น <span class="label">รูปกลุ่มบังคับครบทุกกลุ่มแล้ว</span></li>
+    </ul>
+  </div>
+</div>
+
+<div class="screen nopic">
+  <div class="bar"><b>กด "ยื่นปิดงาน"</b> <span class="who shop">ร้าน</span></div>
+  <div class="body">
+    <ul class="sees">
+      <li>หน้าต่างยืนยันสรุปเครื่องและจำนวนรูป ยืนยันแล้วขึ้นหน้าสำเร็จ</li>
+      <li>ปุ่มบนการ์ดเปลี่ยนเป็น <span class="label">ถอนการยื่น</span> ถอนแล้วยื่นใหม่ได้ ระบบนับว่ายื่นมากี่ครั้ง</li>
+    </ul>
+    <div class="flip"><span class="t">ใบขอรับเงิน</span><span class="badge">รอยื่นปิดงาน</span><span class="arrow">→</span><span class="badge after">รอตรวจปิดงาน</span></div>
+    <div class="note">
+      <b>สิ่งที่ล็อกทันทีหลังยื่น</b> — รูปสี่กลุ่มส่งมอบขึ้นคำว่า ล็อก แทนปุ่มเพิ่มรูป และปุ่ม
+      ยกเลิกสัญญา ผูกเครื่อง ถอดเครื่อง ยุติสัญญา ถูกปิด พร้อมข้อความ
+      <span class="label">ร้านยื่นปิดงานแล้ว ต้องถอนการยื่นก่อนจึงทำรายการนี้ได้</span>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 5 ============ -->
+<h2 class="step" id="s5"><span class="num">5</span> กองทุนตรวจ หรือส่งกลับให้แก้</h2>
+<p class="lead">
+  ฝ่ายการเงินของกองทุนเปิดคิว ไล่ดูรูปแล้วติ๊กว่าตรวจแล้ว ใบที่ติ๊กแล้วเท่านั้นจึงเข้ารอบจ่ายได้
+  ร้านมองไม่เห็นการติ๊กนี้เลย
+</p>
+
+<div class="story fund">
+  <span class="beat">FUND ไล่ดูรูป แล้วติ๊กหรือส่งกลับ</span>
+  <p>
+    FUND เปิดคิว ดูรูป เช็คว่าคนในรูปตรงกับลูกค้าไหม เครื่องตรงกับที่ผูกไหม
+    ผ่าน → ติ๊ก <b>ตรวจแล้ว</b> (<b>SHOP ไม่เห็นติ๊กนี้</b>) · ไม่ผ่าน → ส่งกลับพร้อมเหตุผลเป็นคำไทย รูปปลดล็อกให้แก้
+  </p>
+  <span class="said">
+    กับดัก: SHOP ถอนแล้วยื่นใหม่ → ติ๊กถูกล้างเอง หลักฐานชุดใหม่ต้องตรวจใหม่ ·
+    แท็บในภาพข้างล่างคือลำดับขั้น เดินจากซ้ายไปขวา
+  </span>
+</div>
+
+<div class="screen">
+  <div class="bar"><b>คิวใบขอรับเงิน</b> <span class="who fund">การเงิน</span> <code>/admin/partner-settlements</code></div>
+  <div class="body">
+    <ul class="sees">
+      <li>แท็บ: <span class="label">ร้านค้างยื่น</span> · <span class="label">รอตรวจ — ยังไม่ตรวจ</span> · <span class="label">ตรวจแล้ว รอออกใบจ่ายเงิน</span> · <span class="label">อยู่ในรอบจ่าย</span></li>
+      <li>แต่ละแถวบอกยอดสุทธิ ยื่นมาแล้วกี่วัน และกี่ครั้ง</li>
+      <li>ถ้าร้านยังไม่ได้ลงบัญชีรับเงิน ขึ้นเตือน <span class="label">ร้านยังไม่มีบัญชีรับเงิน</span> พร้อมลิงก์ไปหน้าเงื่อนไขร้าน</li>
+    </ul>
+    <figure class="shot">
+      <div class="pic">
+        <img src="shots/fund-settlement-queue.png" alt="คิวใบขอรับเงินของฝ่ายการเงิน">
+        <button class="hs" data-n="1" style="left:15.5%;top:5.5%;width:36.5%;height:5%">
+          <span class="tip"><b>แท็บสี่ขั้น</b> ร้านค้างยื่น → รอตรวจ ยังไม่ตรวจ → ตรวจแล้ว รอออกใบจ่ายเงิน → อยู่ในใบจ่ายเงิน ใบเดินจากซ้ายไปขวา</span>
+        </button>
+        <button class="hs" data-n="2" style="left:15.5%;top:10.8%;width:16%;height:4.5%">
+          <span class="tip"><b>กรองตามร้าน</b> ฝ่ายการเงินดูทีละร้านได้ เพราะใบจ่ายเงินหนึ่งใบรวมได้เฉพาะใบของร้านเดียวกัน</span>
+        </button>
+        <button class="hs" data-n="3" style="left:1.3%;top:29.5%;width:12.5%;height:4.8%">
+          <span class="tip"><b>เมนูของกองทุน</b> ใบขอรับเงินร้าน · ยอดค้างต่อร้าน · และใบคืนเครื่องอยู่ในแถบเดียวกัน</span>
+        </button>
+      </div>
+      <figcaption>คิว "ใบขอรับเงินร้าน" — ว่างอยู่ตอนถ่าย เพราะทุกใบเดินจนจบไปแล้ว</figcaption>
+    </figure>
+  </div>
+</div>
+
+<div class="screen nopic">
+  <div class="bar"><b>เปิดใบขึ้นมาตรวจ</b> <span class="who fund">การเงิน</span></div>
+  <div class="body">
+    <ul class="sees">
+      <li>เห็นรูปส่งมอบทั้งหมด ล็อกอยู่ ดูได้แต่แก้ไม่ได้ พร้อมลิงก์เปิดแท็บเครื่อง</li>
+      <li>ประวัติไล่เรียง: ร้านยื่น → ร้านถอน → ร้านยื่นใหม่ แต่ละแถวบอกว่ามีกี่รูป กี่กลุ่ม</li>
+      <li>ท้ายหน้ามีช่องติ๊ก <span class="label">ตรวจแล้ว</span> และปุ่ม <span class="label">ส่งกลับให้แก้</span></li>
+    </ul>
+    <div class="flip"><span class="t">ติ๊กแล้ว</span><span class="badge">ยังไม่ตรวจ</span><span class="arrow">→</span><span class="badge after">ตรวจแล้ว โดย ui_fund_finance_a</span></div>
+    <div class="note">
+      ติ๊กแล้วถอนติ๊กได้ และถ้าร้านถอนการยื่นแล้วยื่นใหม่ ติ๊กจะถูกล้างเอง หลักฐานชุดใหม่ต้องตรวจใหม่
+    </div>
+  </div>
+</div>
+
+<div class="screen nopic">
+  <div class="bar"><b>ส่งกลับให้แก้</b> <span class="who fund">การเงิน</span></div>
+  <div class="body">
+    <ul class="sees">
+      <li>ต้องเลือกเหตุผลจากรายการ: รูปส่งมอบไม่ครบ · รูปไม่ชัด/ไม่ตรงกลุ่ม · คนในรูปไม่ตรงกับลูกค้า · เครื่องในรูปไม่ตรงกับที่ผูก · สถานะเครื่องยังไม่พร้อม · อื่น ๆ (ระบุ)</li>
+      <li>เลือก "อื่น ๆ" แล้วช่องข้อความกลายเป็นบังคับ ปุ่มบันทึกยังกดไม่ได้จนพิมพ์</li>
+      <li>หน้ายืนยันเตือนว่า รูปส่งมอบจะปลดล็อก และติ๊กตรวจแล้วจะถูกล้าง</li>
+    </ul>
+    <div class="flip"><span class="t">ใบขอรับเงิน</span><span class="badge">รอตรวจปิดงาน</span><span class="arrow">→</span><span class="badge after">ส่งกลับให้แก้</span></div>
+    <p style="margin-bottom:0;color:var(--dim)">ฝั่งร้าน: การ์ดขึ้นกล่องเหตุผลที่ถูกส่งกลับ อัลบั้มปลดล็อก แก้รูปแล้วยื่นใหม่ได้</p>
+  </div>
+</div>
+
+<div class="screen">
+  <div class="bar"><b>ยอดค้างต่อร้าน</b> <span class="who fund">การเงิน</span> <code>/admin/partner-balance</code></div>
+  <div class="body">
+    <ul class="sees">
+      <li>หนึ่งแถวต่อร้าน: จำนวนใบที่ยังเปิด แยกว่ารออยู่ที่ร้านหรือที่กองทุน</li>
+      <li>ยอดที่ยังไม่ได้จ่าย และยอดที่จ่ายไปแล้ว</li>
+    </ul>
+    <figure class="shot">
+      <div class="pic">
+        <img src="shots/fund-balance.png" alt="หน้ายอดค้างต่อร้าน">
+        <button class="hs" data-n="1" style="left:46.5%;top:15.5%;width:16%;height:5.5%">
+          <span class="tip"><b>รออยู่ที่ใคร</b> แยกว่าค้างเพราะร้านยังไม่ยื่น หรือเพราะกองทุนยังไม่ตรวจ ตัวเลขนี้ชี้ว่าต้องไปตามใคร</span>
+        </button>
+        <button class="hs" data-n="2" style="left:71.5%;top:15.5%;width:12%;height:6.5%">
+          <span class="tip"><b>จ่ายแล้วทั้งหมด</b> ยอดสะสมที่กองทุนโอนให้ร้านนี้ไปแล้ว พร้อมจำนวนใบ</span>
+        </button>
+      </div>
+      <figcaption>ร้านเดียวบน DEV จ่ายไปแล้วสองใบ รวม 56,802 ไม่มียอดค้าง</figcaption>
+    </figure>
+  </div>
+</div>
+
+<!-- ============ 6 ============ -->
+<h2 class="step" id="s6"><span class="num">6</span> ออกใบจ่ายเงิน แล้วโอนก้อนเดียว</h2>
+<p class="lead">
+  การเงินรวมใบขอรับเงินที่ตรวจแล้วของร้านเดียวกันเป็นใบจ่ายเงินหนึ่งใบ โอนเงินจริงนอกระบบ แล้วกลับมากดจ่ายแล้ว
+  จังหวะที่กดจ่ายแล้ว เครื่องทุกเครื่องในใบเปลี่ยนเจ้าของจากร้านเป็นกองทุน
+</p>
+
+<div class="story fund">
+  <span class="beat">FUND รวบหลายใบ โอนครั้งเดียว</span>
+  <p>
+    FUND รวมใบที่ติ๊กแล้วของร้านเดียวกันเป็นก้อนเดียว โอนจริงนอกระบบ แล้วกลับมากด <b>จ่ายแล้ว</b> + วันที่โอน
+  </p>
+  <p>
+    <b>จังหวะนี้เครื่องเปลี่ยนมือ จาก SHOP เป็น FUND</b> — จ่ายค่าเครื่องแล้ว เครื่องก็ต้องเป็นของผู้จ่าย
+    ผลคือ SHOP ยกเลิกสัญญาเองไม่ได้อีก ปุ่มปิดสนิท จบได้ทางคืนเครื่องอย่างเดียว
+  </p>
+  <span class="said">
+    จ่ายผิดทั้งก้อน → กลับรายการทั้งใบ เงินถอย เครื่องถอย · ผิดแค่ยอด → เพิ่มแถวปรับยอดบนใบเดิม ·
+    ในภาพข้างล่าง กรอบ 2 คือสองยอดที่ไม่เท่ากัน กรอบ 4 คือแถวปรับยอด
+  </span>
+</div>
+
+<div class="screen">
+  <div class="bar"><b>จัดใบจ่ายเงิน — รายร้าน</b> <span class="who fund">การเงิน</span> <code>/admin/partner-payouts</code></div>
+  <div class="body">
+    <ul class="sees">
+      <li>แท็บ: <span class="label">จัดใบจ่ายเงิน</span> · <span class="label">กำลังจัดใบ</span> · <span class="label">จ่ายแล้ว</span> · <span class="label">กลับรายการแล้ว</span></li>
+      <li>แถวร้านบอก รอกี่ใบ ตรวจแล้วกี่ใบ พร้อมจ่ายกี่ใบ ยอดรวม และรอมาตั้งแต่เมื่อไหร่</li>
+    </ul>
+    <figure class="shot">
+      <div class="pic">
+        <img src="shots/fund-payout-list.png" alt="รายการใบจ่ายเงินร้าน แท็บจ่ายแล้ว">
+        <button class="hs" data-n="1" style="left:15.5%;top:5.5%;width:26%;height:5%">
+          <span class="tip"><b>สี่แท็บ</b> จัดใบจ่ายเงิน (รายร้าน) · กำลังจัดใบ (ร่าง) · จ่ายแล้ว · กลับรายการแล้ว</span>
+        </button>
+        <button class="hs" data-n="2" style="left:15.5%;top:15.5%;width:29%;height:5%">
+          <span class="tip"><b>กรองตามวันที่โอน</b> ใช้หายอดที่โอนในช่วงเวลาหนึ่ง</span>
+        </button>
+        <button class="hs" data-n="3" style="left:15.5%;top:21.5%;width:84%;height:8%">
+          <span class="tip"><b>จ่ายจริง 17,526</b> ไม่ใช่ยอดหน้าใบ เพราะใบนี้มีแถวปรับยอดจากการซื้อคืนหักอยู่หนึ่งรายการ</span>
+        </button>
+      </div>
+      <figcaption>แท็บ "จ่ายแล้ว" ของฝ่ายการเงิน</figcaption>
+    </figure>
+  </div>
+</div>
+
+<div class="screen nopic">
+  <div class="bar"><b>หน้าจัดใบของร้านหนึ่งร้าน</b> <span class="who fund">การเงิน</span></div>
+  <div class="body">
+    <ul class="sees">
+      <li>ใบที่ยังไม่ติ๊ก ช่องเลือกเป็นสีจาง กดไม่ได้ พร้อมปุ่มติ๊กตรวจแล้วตรงแถวนั้นเลย</li>
+      <li>ปุ่ม <span class="label">เลือกทั้งหมดที่พร้อม</span> แล้วหัวจอสรุป เลือกแล้วกี่ใบ ยอดเท่าไหร่</li>
+      <li><span class="label">ออกใบจ่ายเงิน</span> → ได้เลข <code>PP-…</code> สถานะร่าง บัญชีรับเงินของร้านถูกจดลงบนใบ</li>
+    </ul>
+    <div class="flip"><span class="t">ใบขอรับเงินทุกใบในนั้น</span><span class="badge">รอตรวจปิดงาน</span><span class="arrow">→</span><span class="badge after">อยู่ในรอบจ่าย</span></div>
+    <div class="note">ระหว่างเป็นร่าง ถอดใบออกหรือเพิ่มใบเข้าได้ ร่างที่ผิดให้ยกเลิกร่าง (ต้องใส่เหตุผล) แล้วออกใหม่ ไม่มีการแก้ตัวเลขบนใบ</div>
+  </div>
+</div>
+
+<div class="screen nopic">
+  <div class="bar"><b>กด "จ่ายแล้ว"</b> <span class="who fund">การเงิน</span></div>
+  <div class="body">
+    <ul class="sees">
+      <li>บังคับใส่วันที่โอน (ใส่วันอนาคตไม่ได้ ปุ่มถูกปิด) บัญชีต้นทางและเลขอ้างอิงใส่หรือไม่ใส่ก็ได้</li>
+      <li>หน้าสำเร็จบอกด้วยว่า <span class="label">เครื่อง 2 เครื่องเป็นของ holding แล้ว</span> พร้อมเลขเครื่องและต้นทุน</li>
+    </ul>
+    <div class="flip"><span class="t">ใบจ่ายเงิน</span><span class="badge">ร่าง</span><span class="arrow">→</span><span class="badge after">จ่ายแล้ว</span></div>
+    <div class="note warn">
+      <b>หลังจ่ายแล้ว สัญญายกเลิกไม่ได้อีก</b> — ปุ่มบนสัญญาขึ้นข้อความ
+      <span class="label">holding จ่ายเงินร้านแล้ว ทำรายการนี้ไม่ได้ — ใช้ขั้นตอนคืนเครื่อง</span>
+      จบสัญญาได้ทางใบคืนเครื่องอย่างเดียว
+    </div>
+  </div>
+</div>
+
+<div class="screen">
+  <div class="bar"><b>แก้เมื่อจ่ายผิด — สองทาง</b> <span class="who fund">การเงิน</span></div>
+  <div class="body">
+    <ul class="sees">
+      <li><b>ผิดทั้งใบ</b> (กดพลาด ผิดร้าน จ่ายซ้ำ) → <span class="label">กลับรายการทั้งใบ</span> เลือกเหตุผลจากรายการ
+        แล้วยืนยันอีกชั้น ใบขอรับเงินกลับไปรอตรวจ เครื่องกลับเป็นของร้าน และติ๊กตรวจแล้วถูกล้าง</li>
+      <li><b>ผิดแค่ยอด</b> (โอนเพิ่ม หรือร้านโอนคืน) → <span class="label">ปรับยอด</span> เพิ่มแถวบนใบ
+        หัวใบเปลี่ยนเป็นจ่ายจริงรวม แถวที่ยกเลิกยังอยู่บนใบแบบขีดฆ่า พร้อมเหตุผล</li>
+      <li>มีแถวปรับยอดอยู่ กลับรายการทั้งใบไม่ได้ ปุ่มถูกปิดพร้อมคำอธิบาย <span class="label">ยกเลิกแถวปรับยอดก่อน</span></li>
+    </ul>
+    <figure class="shot">
+      <div class="pic">
+        <img src="shots/fund-payout-detail.png" alt="ใบจ่ายเงินร้านที่จ่ายแล้ว">
+        <button class="hs" data-n="1" style="left:26%;top:12.5%;width:35%;height:9%">
+          <span class="tip"><b>บัญชีที่จดไว้บนใบ</b> บัญชีรับเงินของร้าน ณ ตอนออกใบ ถ้าร้านเปลี่ยนบัญชีทีหลัง ใบเก่ายังจำของเดิม</span>
+        </button>
+        <button class="hs" data-n="2" style="left:80%;top:12.5%;width:17%;height:11%">
+          <span class="tip"><b>สองยอดไม่เท่ากัน</b> ยอดที่ต้องโอนคือยอดหน้าใบ ส่วนจ่ายจริงรวมคือหลังหักแถวปรับยอดแล้ว</span>
+        </button>
+        <button class="hs" data-n="3" style="left:26%;top:35%;width:71%;height:19%">
+          <span class="tip"><b>ใบขอรับเงินในใบนี้</b> สองสัญญารวมอยู่ในใบจ่ายเดียว โอนเงินครั้งเดียวจบ</span>
+        </button>
+        <button class="hs" data-n="4" style="left:26%;top:56%;width:71%;height:14%">
+          <span class="tip"><b>แถวปรับยอด</b> เงินที่ร้านโอนคืนจากการซื้อคืนเครื่อง มาเกาะบนใบจ่ายเงินเดิม ไม่ได้ไปสร้างเอกสารใหม่</span>
+        </button>
+        <button class="hs up" data-n="5" style="left:26%;top:72%;width:71%;height:18%">
+          <span class="tip"><b>เครื่องเปลี่ยนมือตอนกดจ่าย</b> ทั้งสองเครื่องย้ายจากร้านไปเป็นของ holding พร้อมต้นทุนที่บันทึกไว้</span>
+        </button>
+      </div>
+      <figcaption>ใบจ่ายเงินจริงที่จ่ายแล้ว</figcaption>
+    </figure>
+  </div>
+</div>
+
+<div class="screen">
+  <div class="bar"><b>ฝั่งร้านเห็นอะไร</b> <span class="who shop">ร้าน</span></div>
+  <div class="body">
+    <ul class="sees">
+      <li>เมนู <span class="label">รับเงินแล้ว</span> ขึ้นใบจ่ายเงิน วันที่โอน บัญชีที่เข้า และเลขอ้างอิง</li>
+      <li>ใบที่ถูกกลับรายการขึ้นยอดขีดฆ่า พร้อมเหตุผล เช่น <span class="label">จ่ายผิดพลาด</span></li>
+      <li>เมนู <span class="label">รายงานค่าคอม</span> แสดงค่าคอมรายสัญญาและแถบรวมรายเดือน</li>
+      <li>หัวจอสลับเป็น ยอดที่ยังไม่ได้รับ 0 · ยอดที่รับแล้ว 56,802</li>
+    </ul>
+    <figure class="shot">
+      <div class="pic">
+        <img src="shots/shop-received.png" alt="เมนูรับเงินแล้วของร้าน">
+        <button class="hs" data-n="1" style="left:28.4%;top:18.5%;width:29.5%;height:8%">
+          <span class="tip"><b>ใบที่จ่ายแล้ว</b> วันที่โอนและยอดจริงที่เข้าร้าน กดเปิดดูได้ว่ามาจากสัญญาไหนบ้าง</span>
+        </button>
+        <button class="hs" data-n="2" style="left:28.4%;top:28.5%;width:29.5%;height:10%">
+          <span class="tip"><b>ใบที่ถูกกลับรายการ</b> ยอดขีดฆ่า พร้อมเหตุผลเป็นคำไทย ร้านเห็นเองว่าเงินก้อนนั้นถูกยกเลิก</span>
+        </button>
+      </div>
+      <figcaption>เมนู "รับเงินแล้ว" ของร้าน</figcaption>
+    </figure>
+    <figure class="shot">
+      <div class="pic">
+        <img src="shots/shop-commission.png" alt="รายงานค่าคอมของร้าน">
+        <button class="hs" data-n="1" style="left:28.4%;top:5.5%;width:20%;height:6.5%">
+          <span class="tip"><b>รวมรายเดือน</b> ค่าคอมทั้งเดือน จำนวนสัญญา และยอดสุทธิ</span>
+        </button>
+        <button class="hs" data-n="2" style="left:57.5%;top:19%;width:18%;height:14%">
+          <span class="tip"><b>อัตราและค่าคอม</b> 17% ของยอดจัด ปัดลงเป็นบาทเต็ม อัตราที่ใช้คืออัตรา ณ วันที่สัญญาใช้งาน</span>
+        </button>
+        <button class="hs" data-n="3" style="left:76.5%;top:19%;width:10%;height:8%">
+          <span class="tip"><b>ปรับยอด</b> ติดลบเพราะสัญญานี้ถูกซื้อคืน ร้านจึงคืนเงินก้อนนั้นให้กองทุน</span>
+        </button>
+      </div>
+      <figcaption>รายงานค่าคอมของร้าน</figcaption>
+    </figure>
+  </div>
+</div>
+
+<!-- ============ 7 ============ -->
+<h2 class="step" id="s7"><span class="num">7</span> ค่างวดของลูกค้าเข้ากองทุนอย่างไร</h2>
+<p class="lead">
+  ร้านไม่รับค่างวด เป็นแค่คนแนะนำ ลูกค้าโอนเข้าบัญชีของกองทุนแล้วส่งสลิปในแอป
+  ฝ่ายการเงินของกองทุนเป็นคนตรวจสลิป
+</p>
+
+<div class="story fund">
+  <span class="beat">ค่างวดไม่ผ่าน SHOP เลย</span>
+  <p>
+    ลูกค้าโอนเข้าบัญชี FUND ตรง ๆ แล้วส่งสลิปในแอป — SHOP จบหน้าที่ตั้งแต่วันส่งเครื่อง
+    ผลกับ FE: หน้ารับค่างวดของสัญญาร้าน <b>ไม่มีตัวเลือกเงินสด</b> เหลือแต่โอน และร้านไม่ต้องปิดยอดสิ้นวัน
+  </p>
+  <span class="said">
+    FUND เป็นคนตรวจสลิป · CREDIT ไม่เกี่ยว เมนูนี้จึงไม่ขึ้นให้เขา ·
+    สิทธิ์บันทึก/ยืนยันการชำระต้องให้เป็นรายคน ไม่ได้ติดมากับตำแหน่ง
+  </span>
+</div>
+
+<div class="screen nopic">
+  <div class="bar"><b>ช่องทางรับเงินที่เลือกได้ ขึ้นกับประเภทบิล</b></div>
+  <div class="body">
+    <div class="tablewrap">
+    <table>
+      <thead><tr><th>บิล</th><th>รับได้ทางไหน</th><th>ทำไม</th></tr></thead>
+      <tbody>
+        <tr><td>บิลเปิดสัญญา (ดาวน์ + ค่าทำสัญญา)</td><td><span class="label">ร้านเก็บเงินไว้</span> เท่านั้น</td><td>เงินอยู่กับร้าน หักในใบขอรับเงิน</td></tr>
+        <tr><td>ค่างวด ปิดก่อนกำหนด ค่าธรรมเนียม</td><td><span class="label">โอนเงิน</span> และกระเป๋าเงินต่าง ๆ</td><td>เงินเข้าบัญชีกองทุน ไม่มีเงินสด</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <ul class="sees">
+      <li>บัญชีรับเงินของกองทุนถูกตั้งไว้ที่สาขาร้าน แอปลูกค้าเลือกบัญชีให้เองตามสาขาของสัญญา</li>
+      <li>หน้ารับชำระค่างวดของสัญญาร้าน ช่องวิธีชำระเหลือ <span class="label">โอนเงิน</span> อย่างเดียว เงินสดหายไปจากรายการ</li>
+      <li>ร้านไม่ต้องปิดวัน เพราะไม่มีเงินสดให้นับ กฎ "วันก่อนหน้ายังไม่ปิด" ไม่ใช้กับสัญญาของร้าน</li>
+    </ul>
+  </div>
+</div>
+
+<div class="screen nopic">
+  <div class="bar"><b>คิวสลิปรอตรวจ</b> <span class="who fund">การเงิน</span> <code>/admin/payment-submissions</code></div>
+  <div class="body">
+    <ul class="sees">
+      <li>ลูกค้าส่งสลิปในแอป เข้าคิวของบริษัทกองทุน อนุมัติแล้วระบบลงรับค่างวดให้</li>
+      <li>ปฏิเสธได้ พร้อมเหตุผล แล้วฝ่ายการเงินติดต่อลูกค้าเอง</li>
+      <li>ฝ่ายสินเชื่อไม่ได้เป็นคนตรวจสลิป เมนูนี้จึงไม่ขึ้นให้เขา</li>
+    </ul>
+    <div class="note">
+      สิทธิ์บันทึกและยืนยันการชำระไม่ได้ติดมากับตำแหน่งฝ่ายการเงิน ต้องให้เป็นรายคนจากหน้าสิทธิ์พิเศษ
+      คนให้คือผู้ดูแลระดับ holding
+    </div>
+  </div>
+</div>
+
+<!-- ============ 8 ============ -->
+<h2 class="step" id="s8"><span class="num">8</span> ใบคืนเครื่อง — จบได้สามแบบ</h2>
+<p class="lead">
+  สัญญาร้านที่ใช้งานอยู่จบได้ทางเดียวคือใบคืนเครื่อง ร้านหรือฝ่ายการเงินเปิดใบก็ได้
+  แต่คนปิดใบคือฝ่ายการเงินเสมอ ปิดใบครั้งเดียวจบทั้งสัญญาและจัดการเจ้าของเครื่องให้ถูกคน
+</p>
+
+<div class="story">
+  <span class="beat">ลูกค้าคืนเครื่อง — SHOP ยกเลิกสัญญาเองไม่ได้</span>
+  <p>
+    ปุ่มยกเลิก/ถอดเครื่องปิดหมด เหลือปุ่มเดียว <b>คืนเครื่อง / ยุติสัญญา</b>
+    เพราะเครื่องเป็นของ FUND ไปแล้ว · <b>เปิดใบได้ทั้ง SHOP และ FUND แต่คนปิดคือ FUND เสมอ</b>
+  </p>
+  <span class="said">
+    รับที่ร้าน → ลูกค้าเซ็นใบรับคืน · ส่งให้บริษัท → FUND ระบุวันที่รับ ·
+    รับเครื่องแล้ว = เครื่องหลุดจากสัญญา เข้าถังกักตรวจ · ยกเลิกใบได้เฉพาะก่อนรับเครื่อง
+  </span>
+</div>
+
+<div class="story fund">
+  <span class="beat">แบบจบมี 3 ทาง ตัดสินด้วยคำถามเดียว: จ่ายไปแล้วหรือยัง</span>
+  <p>
+    <b>ยังไม่จ่าย</b> → ไม่มีเงินเคลื่อน ยอดที่ค้างถูกยกเลิก เครื่องเป็นของ SHOP อยู่แล้ว กลับเข้าสต็อก<br>
+    <b>จ่ายแล้ว + ในประกัน</b> → SHOP โอนคืนเท่าที่รับไป + ค่าคืนเครื่อง แล้วเครื่องกลับเป็นของ SHOP<br>
+    <b>จ่ายแล้ว + เกินประกัน</b> → SHOP ส่งเครื่องเข้าคลัง FUND ไม่มีเงินไปมา เครื่องเป็นของ FUND
+  </p>
+  <span class="said">
+    ระบบเสนอทางที่ถูกให้เองจากสองเงื่อนไขนั้น FUND แค่ยืนยัน · ปิดใบครั้งเดียว = สัญญาจบ + งวดที่เหลือยกเลิก + เครื่องไปอยู่กับเจ้าของที่ถูก ·
+    สองภาพข้างล่างคือใบเดียวกันคนละแบบจบ ชี้กรอบเดียวกันเทียบได้เลย
+  </span>
+</div>
+
+<div class="screen nopic">
+  <div class="bar"><b>เปิดใบจากท้ายหน้าสัญญา</b> <span class="who shop">ร้าน</span> หรือ <span class="who fund">การเงิน</span></div>
+  <div class="body">
+    <ul class="sees">
+      <li>ปุ่ม <span class="label">คืนเครื่อง / ยุติสัญญา</span> มาแทนปุ่มยกเลิกและถอดเครื่องที่ถูกปิดไป
+        เอาเมาส์ชี้ขึ้นคำอธิบาย <span class="label">สัญญาร้านที่ ACTIVE จบได้ทางเดียวคือใบคืนเครื่อง</span></li>
+      <li>ในหน้าต่างเลือกเหตุผล: ลูกค้าเปลี่ยนใจ/ขอยกเลิก · ลูกค้าผ่อนต่อไม่ไหว · เครื่องมีปัญหา · อื่น ๆ (ระบุ)</li>
+      <li><b>ร้าน</b>ไม่มีช่องเลือกจุดรับเครื่อง ร้านคือจุดรับเสมอ · <b>การเงิน</b>เลือกได้สองแบบ</li>
+    </ul>
+  </div>
+</div>
+
+<div class="three">
+  <div class="card">
+    <h4>รับที่ร้าน</h4>
+    <p>ลูกค้าเอาเครื่องมาคืนที่ร้าน ระบบออกใบรับคืนให้ลูกค้าเซ็นคนเดียว ไม่มีพยาน อายุ 7 วัน ออกใหม่ได้</p>
+    <span class="tag">เซ็นครบ = รับเครื่องแล้ว</span>
+  </div>
+  <div class="card">
+    <h4>ส่งให้บริษัท</h4>
+    <p>ลูกค้าอยู่ไกล ส่งเครื่องมาให้กองทุนตรง ฝ่ายการเงินระบุวันที่เครื่องมาถึง ไม่มีการเซ็น</p>
+    <span class="tag">ระบุวันที่ = รับเครื่องแล้วทันที</span>
+  </div>
+  <div class="card">
+    <h4>รับเครื่องแล้ว</h4>
+    <p>เครื่องหลุดจากสัญญา เข้าถังกักตรวจ รูปกลุ่มคืนเครื่องถูกล็อก และใบจ่ายเงินที่เกี่ยวกลับรายการไม่ได้</p>
+    <span class="tag">ยกเลิกใบคืนได้เฉพาะก่อนรับเครื่อง</span>
+  </div>
+</div>
+
+<div class="screen">
+  <div class="bar"><b>คิวใบคืนเครื่อง</b> <span class="who fund">การเงิน</span> <code>/admin/partner-returns</code></div>
+  <div class="body">
+    <ul class="sees">
+      <li>แท็บเรียงตามขั้นถัดไป: รอลูกค้าเซ็น · รอตั้งแบบจบ · รอเงินซื้อคืน · รอส่งเครื่อง · รอคลังรับ · ยอดค้างสัญญา · พร้อมปิดใบ · และ <span class="label">ทั้งหมด</span></li>
+      <li>แถวบอก เลขใบ สถานะ ขั้นถัดไป ลูกค้า ร้าน สัญญา เครื่อง เหตุผล และใครเปิดใบ</li>
+      <li>กดแถวเปิดรายละเอียดด้านขวา มีแท็บ <span class="label">ประวัติ</span> เป็นไทม์ไลน์รวมทุกเรื่องของใบนั้น</li>
+    </ul>
+    <div class="note">
+      เปิดใบคืนใหม่จากหน้าคิวไม่ได้ ต้องไปเปิดจากท้ายหน้าสัญญา เป็นคำถามที่ค้างไว้ให้ BE/PO ตัดสิน
+    </div>
+    <figure class="shot">
+      <div class="pic">
+        <img src="shots/fund-returns-queue.png" alt="คิวใบคืนเครื่องของฝ่ายการเงิน">
+        <button class="hs" data-n="1" style="left:15.5%;top:5.5%;width:35%;height:5%">
+          <span class="tip"><b>แท็บคือขั้นถัดไป</b> ไม่ใช่สถานะของใบ แต่ละแท็บบอกว่า "ตอนนี้รออะไรอยู่" ฝ่ายการเงินจึงรู้ว่าต้องทำอะไรต่อ</span>
+        </button>
+        <button class="hs" data-n="2" style="left:15.5%;top:10.8%;width:16%;height:4.5%">
+          <span class="tip"><b>กรองตามร้าน</b> เมื่อมีหลายร้าน ใช้ดูเฉพาะใบของร้านหนึ่ง</span>
+        </button>
+      </div>
+      <figcaption>คิวใบคืนเครื่อง — ว่างทุกแท็บตอนถ่าย เพราะใบทั้งสี่เดินจนปิดหมดแล้ว</figcaption>
+    </figure>
+  </div>
+</div>
+
+<div class="screen nopic">
+  <div class="bar"><b>ตั้งแบบจบ</b> <span class="who fund">การเงิน</span></div>
+  <div class="body">
+    <p style="margin-top:0">ระบบเสนอแบบจบให้ก่อนแล้ว ตามว่ากองทุนจ่ายเงินไปหรือยัง และยังอยู่ในประกันไหม เปลี่ยนได้จนกว่าจะบันทึกเงินหรือส่งเครื่อง</p>
+    <div class="tablewrap">
+    <table>
+      <thead><tr><th>แบบจบ</th><th>ใช้เมื่อ</th><th>เงิน</th><th>เครื่องจบที่ใคร</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>ก่อนกองทุนจ่าย</b></td>
+          <td>ยังไม่ได้จ่ายใบขอรับเงิน</td>
+          <td>ไม่มีเงินเคลื่อน ใบขอรับเงินถูกยกเลิก ยอดเหลือ 0</td>
+          <td>ร้าน (ของร้านอยู่แล้ว) กลับเข้าสต็อกขายได้</td>
+        </tr>
+        <tr>
+          <td><b>ร้านซื้อคืน</b></td>
+          <td>จ่ายแล้ว และยังอยู่ในประกัน</td>
+          <td>ร้านโอนคืน = ยอดที่รับไป + ค่าคืนเครื่อง บันทึกเป็นแถวปรับยอดบนใบจ่ายเงินเดิม</td>
+          <td>ร้าน ขายต่อหรือผูกสัญญาใหม่ได้</td>
+        </tr>
+        <tr>
+          <td><b>ส่งคืนคลังกองทุน</b></td>
+          <td>จ่ายแล้ว และเกินประกัน</td>
+          <td>ไม่มีเงินคืน</td>
+          <td>กองทุน อยู่ที่คลัง ถูกกักตรวจ</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    <p style="margin-bottom:0;color:var(--dim)">
+      ตั้งแบบจบแล้ว ปุ่มที่ใช้ไม่ได้กับแบบนั้นจะถูกปิด และท้ายจอบอกเสมอว่ายังปิดใบไม่ได้เพราะอะไร
+    </p>
+  </div>
+</div>
+
+<div class="screen">
+  <div class="bar"><b>เส้นทางแบบร้านซื้อคืน</b> <span class="who fund">การเงิน</span></div>
+  <div class="body">
+    <ul class="sees">
+      <li>หลังตั้งแบบจบ จอสรุปว่า ยอดที่กองทุนจ่ายไป 38,276 · ค่าคืนเครื่อง 1,000 · <b>ร้านต้องโอนคืน 39,276</b></li>
+      <li>กด <span class="label">บันทึกร้านโอนเงินซื้อคืน</span> ใส่วันที่และเลขอ้างอิง หน้าสำเร็จบอกว่าไปเป็นแถวปรับยอดบนใบจ่ายเงินใบไหน</li>
+      <li>เปิดใบจ่ายเงินนั้น เห็นแถว <span class="label">ร้านโอนคืน 39,276</span> และหัวใบเปลี่ยนเป็นจ่ายจริงรวม 17,526</li>
+      <li>ปุ่ม <span class="label">ปิดใบ (สัญญาจบ)</span> ค่อยกดได้</li>
+    </ul>
+    <div class="flip"><span class="t">สัญญา</span><span class="badge">ใช้งาน</span><span class="arrow">→</span><span class="badge after">ยกเลิก · เหตุที่จบ: ร้านซื้อคืน</span></div>
+    <figure class="shot">
+      <div class="pic">
+        <img src="shots/fund-return-buyback.png" alt="หน้าใบคืนเครื่องแบบร้านซื้อคืน">
+        <button class="hs" data-n="1" style="left:15.5%;top:15.5%;width:34%;height:22%">
+          <span class="tip"><b>รายการใบทางซ้าย</b> แต่ละแถวบอกเหตุผล ร้าน สัญญา เครื่อง และใครเป็นคนเปิดใบ — ร้านเปิดใบ หรือกองทุนเปิดใบ</span>
+        </button>
+        <button class="hs" data-n="2" style="left:51.5%;top:17%;width:47%;height:22%">
+          <span class="tip"><b>เครื่องกับจุดรับ</b> เครื่องอยู่ในสถานะไหนและเป็นของใครแล้ว คู่กับจุดที่ลูกค้าคืนเครื่อง</span>
+        </button>
+        <button class="hs" data-n="3" style="left:51.5%;top:41%;width:47%;height:17%">
+          <span class="tip"><b>เรื่องเงิน</b> ใบขอรับเงินจ่ายไปแล้ว 38,276 ใต้ใบจ่ายเงินใบไหน และเครื่องยังอยู่ในประกัน — สองอย่างนี้ตัดสินว่าแบบจบควรเป็นอะไร</span>
+        </button>
+        <button class="hs up" data-n="4" style="left:51.5%;top:60%;width:47%;height:19%">
+          <span class="tip"><b>ยอดที่ร้านต้องโอนคืน</b> ยอดที่กองทุนจ่ายไป บวกค่าคืนเครื่อง เป็น 39,276 และป้ายบอกว่าบันทึกเงินก้อนนี้แล้ว</span>
+        </button>
+      </div>
+      <figcaption>ใบที่จบแบบร้านซื้อคืน</figcaption>
+    </figure>
+  </div>
+</div>
+
+<div class="screen nopic">
+  <div class="bar"><b>เส้นทางแบบส่งคืนคลัง</b> <span class="who fund">การเงิน</span> + <span class="who admin">คลัง</span></div>
+  <div class="body">
+    <ul class="sees">
+      <li>กด <span class="label">ส่งเครื่องไปคลัง</span> เครื่องเป็นกำลังส่ง ใบไปรออยู่ที่ <span class="label">รอคลังรับ</span></li>
+      <li>หน้าคลัง <code>/admin/partner-returns/warehouse</code> รับเครื่องเข้า เครื่องกลับเป็นกักตรวจที่คลัง</li>
+      <li>กดปิดใบก่อนคลังรับไม่ได้ ระบบตอบว่ายังรอคลังรับอยู่</li>
+    </ul>
+    <div class="flip"><span class="t">สัญญา</span><span class="badge">ใช้งาน</span><span class="arrow">→</span><span class="badge after">ยกเลิก · เหตุที่จบ: คืนเครื่อง</span></div>
+  </div>
+</div>
+
+<div class="screen">
+  <div class="bar"><b>ปิดใบ — หน้าสำเร็จบอกผลทั้งหมดในจอเดียว</b> <span class="who fund">การเงิน</span></div>
+  <div class="body">
+    <ul class="sees">
+      <li>สัญญาเลขนั้น <span class="label">ยกเลิก</span> พร้อมเหตุที่สัญญาจบเป็นคำไทย ไม่ใช่รหัส</li>
+      <li>เจ้าของเครื่องหลังจบ และสถานะเครื่อง เช่น <span class="label">อยู่ในสต็อก พร้อมขาย</span></li>
+      <li>จำนวนงวดที่ถูกยกเลิก</li>
+      <li>หน้าต่างเตือนก่อนกดว่า ปิดแล้วย้อนไม่ได้</li>
+    </ul>
+    <figure class="shot">
+      <div class="pic">
+        <img src="shots/fund-return-none.png" alt="หน้าใบคืนเครื่องแบบก่อนกองทุนจ่าย">
+        <button class="hs" data-n="1" style="left:51.5%;top:41%;width:47%;height:17%">
+          <span class="tip"><b>ต่างจากใบข้างบนตรงนี้</b> ใบขอรับเงินขึ้น "ยกเลิก" ยอดสุทธิเหลือ 0 และช่องจ่ายในใบเขียนว่ายังไม่ได้จ่าย ไม่มีลิงก์ใบจ่ายเงินเลย</span>
+        </button>
+        <button class="hs" data-n="2" style="left:51.5%;top:60%;width:47%;height:16%">
+          <span class="tip"><b>แบบจบ ก่อนกองทุนจ่าย</b> ไม่มีเงินเคลื่อน จึงไม่มีบรรทัดยอดโอนคืนแบบใบซื้อคืน ปิดใบได้เลย</span>
+        </button>
+        <button class="hs" data-n="3" style="left:51.5%;top:17%;width:47%;height:22%">
+          <span class="tip"><b>เครื่องยังเป็นของร้าน</b> เพราะกองทุนไม่เคยจ่าย เครื่องจึงไม่เคยเปลี่ยนมือ กลับเข้าสต็อกขายต่อได้ทันที</span>
+        </button>
+      </div>
+      <figcaption>ใบที่จบแบบก่อนกองทุนจ่าย — เทียบกับใบข้างบนได้ตรง ๆ</figcaption>
+    </figure>
+    <div class="note">
+      แท็บประวัติของใบเป็นไทม์ไลน์เดียวรวมห้าเรื่อง: ก้าวของใบ · ใบรับคืนที่ลูกค้าเซ็น · เครื่องย้ายถัง ·
+      เปลี่ยนเจ้าของ · แถวเงินซื้อคืน แบบร้านซื้อคืนมี 11 แถว แบบก่อนกองทุนจ่ายมี 6 แถว และไม่มีแถวเงินเลย
+    </div>
+    <figure class="shot">
+      <div class="pic">
+        <img src="shots/fund-return-timeline.png" alt="แท็บประวัติของใบคืนเครื่อง">
+        <button class="hs" data-n="1" style="left:51.5%;top:16%;width:47%;height:15%">
+          <span class="tip"><b>ร้านเปิดใบ แล้วออกใบให้ลูกค้าเซ็น</b> สองแถวแรกเป็นของร้าน ชื่อคนทำอยู่ท้ายแถว</span>
+        </button>
+        <button class="hs" data-n="2" style="left:51.5%;top:33%;width:47%;height:25%">
+          <span class="tip"><b>เซ็นครบ = รับเครื่องแล้ว</b> ทันทีนั้นเครื่องหลุดจากสัญญาไปอยู่ถังกักตรวจ แถวสีเทาคือเรื่องของสต็อก ไม่ใช่ก้าวของใบ</span>
+        </button>
+        <button class="hs" data-n="3" style="left:51.5%;top:68%;width:47%;height:13%">
+          <span class="tip"><b>แถวเงิน</b> ยอดซื้อคืนไปเกาะบนใบจ่ายเงิน มีลิงก์เปิดใบจ่ายเงินนั้นได้จากตรงนี้</span>
+        </button>
+        <button class="hs up" data-n="4" style="left:51.5%;top:87%;width:47%;height:9%">
+          <span class="tip"><b>เครื่องเปลี่ยนเจ้าของ</b> จาก holding กลับไปเป็นของร้าน เป็นผลของแบบจบที่เลือกไว้</span>
+        </button>
+      </div>
+      <figcaption>ไทม์ไลน์ของใบที่จบแบบร้านซื้อคืน อ่านไล่ลงมาได้เป็นเรื่อง</figcaption>
+    </figure>
+  </div>
+</div>
+
+<!-- ============ 9 ============ -->
+<h2 class="step" id="s9"><span class="num">9</span> ของประกอบที่ทำวันเดียวกัน</h2>
+<p class="lead">
+  สี่เรื่องเล็กที่ไม่อยู่ในเส้นทางหลัก แต่เป็นสิ่งที่ทำให้เส้นทางหลักเดินได้
+</p>
+
+<div class="story fund">
+  <span class="beat">ของที่ต้องตั้งไว้ก่อน ไม่งั้นเส้นทางหลักเดินไม่ได้</span>
+  <p>
+    <b>ชนิดบริษัท</b> — มีแค่บริษัทกองทุนที่มีร้านคู่ค้าได้และถือเงินได้ · <b>คลังกองทุน</b> — มีได้แห่งเดียว
+    เป็นปลายทางของเครื่องที่ส่งคืน · <b>รูปจากตัวช่วยเปิดสัญญา</b> — เข้ากลุ่ม "ทั่วไป" แล้ว ลากเข้ากลุ่มส่งมอบได้
+  </p>
+  <span class="said">
+    เรื่องที่กระทบ FE ตรง ๆ: คนของบริษัทอื่นไม่ได้เจอ 403 แต่ได้ลิสต์ว่าง จึงต้องซ่อนเมนูด้วยสิทธิ์ ไม่ใช่รอ error
+  </span>
+</div>
+
+<div class="screen nopic">
+  <div class="bar"><b>ชนิดของบริษัท</b> <span class="who admin">ผู้ดูแล holding</span> <code>/admin/settings/companies</code></div>
+  <div class="body">
+    <ul class="sees">
+      <li>คอลัมน์ใหม่ <span class="label">ชนิด</span> — บริษัทดำเนินงาน หรือ บริษัทกองทุน ตอนสร้างบริษัทก็เลือกได้</li>
+      <li>บริษัทดำเนินงานมีสาขาคู่ค้าไม่ได้ ตัวเลือกจึงไม่ขึ้นในฟอร์ม</li>
+      <li>บริษัทที่มีข้อมูลแล้วเปลี่ยนชนิดไม่ได้ ระบบบอกเลยว่าติดสาขากี่แห่ง เครื่องกี่เครื่อง สัญญากี่ฉบับ</li>
+    </ul>
+  </div>
+</div>
+
+<div class="screen nopic">
+  <div class="bar"><b>คลังของบริษัทกองทุน</b> <span class="who admin">ผู้ดูแล holding</span> <code>/admin/company/branches</code></div>
+  <div class="body">
+    <ul class="sees">
+      <li>ตอนสร้างสาขาภายในใต้บริษัทกองทุน มีช่องติ๊ก <span class="label">เป็นคลังของบริษัท</span> ที่ต้องติ๊ก ปุ่มบันทึกถึงจะกดได้</li>
+      <li>บริษัทกองทุนมีคลังได้ใบเดียว สร้างซ้ำระบบบอกว่ามีอยู่แล้วที่สาขาไหน</li>
+      <li>คลังนี้คือปลายทางของเครื่องที่คืนแบบส่งคืนคลัง</li>
+    </ul>
+  </div>
+</div>
+
+<div class="screen nopic">
+  <div class="bar"><b>ใครเห็นแถวของใคร</b></div>
+  <div class="body">
+    <ul class="sees">
+      <li>คนของบริษัทดำเนินงานไม่เห็นแถวฝั่งกองทุนเลย ไม่ใช่ขึ้นว่าไม่มีสิทธิ์ แต่ไม่มีแถวให้เห็น</li>
+      <li>ฝ่ายสินเชื่อเปิดคิวของฝ่ายการเงินได้แต่ว่างเปล่า หน้าจอจึงซ่อนเมนูตามสิทธิ์แทนที่จะปล่อยให้เห็นคิวเปล่า</li>
+    </ul>
+  </div>
+</div>
+
+<div class="screen nopic">
+  <div class="bar"><b>รูปจากตัวช่วยเปิดสัญญาเข้ากลุ่มแล้ว</b></div>
+  <div class="body">
+    <ul class="sees">
+      <li>รูปที่แนบตอนเปิดสัญญาเข้ากลุ่ม "ทั่วไป" ของอัลบั้ม ไม่ลอยอยู่นอกกลุ่มอีกต่อไป</li>
+      <li>อยากให้นับเป็นรูปส่งมอบ ลากเข้ากลุ่มบนแท็บรูปของสัญญา</li>
+    </ul>
+    <div class="note">ข้อนี้ตรวจจากโค้ดอย่างเดียว ไม่ได้เดินตัวช่วยเปิดสัญญาบน DEV เพราะจะเกิดบิลจริง</div>
+  </div>
+</div>
+
+<!-- ============ 10 ============ -->
+<h2 class="step" id="s10"><span class="num">10</span> ตัวอย่างจริงที่เดินไว้บน DEV</h2>
+<p class="lead">
+  ทั้งหมดอยู่ที่ร้าน "DEV Deal Partner X" (สาขา 7) ของบริษัท DEV กองทุน A เปิดดูตามเลขได้เลย
+</p>
+
+<div class="story">
+  <span class="beat">ของจริงบน DEV — สาขา 7 "DEV Deal Partner X"</span>
+  <p>
+    สัญญา 3 ฉบับเดินครบทั้งเส้นแล้ว จบคนละแบบพอดี — ร้านซื้อคืน · ส่งเข้าคลัง · จบก่อน FUND จ่าย
+    บวกใบจ่ายเงินที่ถูกกลับรายการ 1 ใบ และใบคืนเครื่องที่ถูกยกเลิก 1 ใบ ไว้ดูเคสพิเศษ
+  </p>
+  <span class="said">
+    เข้าดูเอง: <code>/dev-login?u=db_dealpartner</code> (SHOP) หรือ <code>u=ui_fund_finance_a</code> (FUND) ·
+    หนึ่งบัญชีเปิดได้ครั้งละหน้าต่างเดียว · เลขเอกสารทั้งหมดอยู่ในแบบละเอียด
+  </span>
+</div>
+
+<div class="tablewrap">
+<table>
+  <thead><tr><th>สัญญา</th><th>ใบขอรับเงิน</th><th>ใบจ่ายเงิน</th><th>ใบคืนเครื่อง</th><th>จบแบบไหน</th><th>เครื่องจบที่</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>CT-2609-000503-9</code></td>
+      <td><code>PS-2609-000001-4</code><br><span class="money">38,276</span></td>
+      <td><code>PP-2609-000002-2</code></td>
+      <td><code>PR-2609-000003-0</code><br>รับที่ร้าน</td>
+      <td><b>ร้านซื้อคืน</b> 39,276</td>
+      <td>ร้าน · พร้อมขาย</td>
+    </tr>
+    <tr>
+      <td><code>CT-2609-000572-4</code></td>
+      <td><code>PS-2609-000002-2</code><br><span class="money">18,526</span></td>
+      <td><code>PP-2609-000002-2</code></td>
+      <td><code>PR-2609-000001-4</code><br>ส่งให้บริษัท</td>
+      <td><b>ส่งคืนคลัง</b></td>
+      <td>กองทุน · คลัง 444 กักตรวจ</td>
+    </tr>
+    <tr>
+      <td><code>CT-2609-000590-6</code></td>
+      <td><code>PS-2609-000003-0</code><br><span class="money">11,132</span> ไม่เคยจ่าย</td>
+      <td>—</td>
+      <td><code>PR-2609-000004-8</code><br>ส่งให้บริษัท</td>
+      <td><b>ก่อนกองทุนจ่าย</b></td>
+      <td>ร้าน · กลับเข้าสต็อก</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="screen">
+  <div class="bar"><b>อีกสองใบไว้ดูกรณีพิเศษ</b></div>
+  <div class="body">
+    <ul class="sees">
+      <li><code>PP-2609-000001-4</code> — ใบจ่ายเงินที่ถูก <b>กลับรายการทั้งใบ</b> เหตุผล "จ่ายผิดพลาด"</li>
+      <li><code>PR-2609-000002-2</code> — ใบคืนเครื่องที่ถูก <b>ยกเลิก</b> ตอนยังไม่ได้รับเครื่อง</li>
+    </ul>
+    <figure class="shot">
+      <div class="pic">
+        <img src="shots/shop-returns-all.png" alt="เมนูใบคืนเครื่องของร้าน แท็บทั้งหมด">
+        <button class="hs" data-n="1" style="left:28.4%;top:15.5%;width:29.5%;height:19%">
+          <span class="tip"><b>สองใบบนคือสองแบบจบ</b> ใบบนจบแบบก่อนกองทุนจ่าย ใบถัดมาจบแบบร้านซื้อคืน ป้ายเหมือนกันเพราะทั้งคู่ปิดใบแล้ว</span>
+        </button>
+        <button class="hs" data-n="2" style="left:28.4%;top:34.5%;width:29.5%;height:9.5%">
+          <span class="tip"><b>ใบที่ถูกยกเลิก</b> ยกเลิกได้เพราะยังไม่ได้รับเครื่อง หลังรับเครื่องแล้วต้องเดินไปจนปิด</span>
+        </button>
+        <button class="hs up" data-n="3" style="left:28.4%;top:5.5%;width:29.5%;height:5%">
+          <span class="tip"><b>แท็บของร้าน</b> มีแค่สามแท็บ — รอลูกค้าเซ็น · รับเครื่องแล้วรอกองทุน · ทั้งหมด งานที่เหลือเป็นของกองทุน</span>
+        </button>
+      </div>
+      <figcaption>ฝั่งร้าน แท็บ "ทั้งหมด": ใบทั้งสี่ใบในตารางข้างบน</figcaption>
+    </figure>
+  </div>
+</div>
+
+<div class="screen nopic">
+  <div class="bar"><b>บัญชีสำหรับเข้าไปดูเอง</b></div>
+  <div class="body">
+    <div class="tablewrap">
+    <table>
+      <thead><tr><th>ใคร</th><th>บัญชี</th><th>เห็นเมนูไหน</th></tr></thead>
+      <tbody>
+        <tr><td><span class="who shop">ร้าน</span></td><td><code>db_dealpartner</code></td><td>เมนูห้ารายการใต้ "สัญญา"</td></tr>
+        <tr><td><span class="who fund">สินเชื่อ</span></td><td><code>ui_fund_credit_a</code></td><td>ใบขออนุมัติร้าน</td></tr>
+        <tr><td><span class="who fund">การเงิน</span></td><td><code>ui_fund_finance_a</code></td><td>ใบขอรับเงิน · ยอดค้าง · ใบจ่ายเงิน · ใบคืนเครื่อง · ตรวจสลิป</td></tr>
+        <tr><td><span class="who admin">ผู้ดูแล</span></td><td><code>mcp_holding_admin</code></td><td>บริษัท สาขา สิทธิ์พิเศษ เงื่อนไขร้าน</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p style="margin-bottom:0;color:var(--dim)">
+      เข้าเร็ว: เปิด <code>https://localhost:5173/dev-login?u=ชื่อบัญชี&amp;to=เส้นทางที่อยากไป</code> ·
+      หนึ่งบัญชีเปิดได้ครั้งละหนึ่งหน้าต่างเท่านั้น
+    </p>
+  </div>
+</div>
+
+<!-- ============ 11 ============ -->
+<h2 class="step" id="s11"><span class="num">11</span> ที่ยังไม่เรียบร้อย</h2>
+<p class="lead">
+  สิบเรื่องที่เจอระหว่างเดินจริง ทั้งหมดเขียนส่ง BE ไว้ในเอกสารตอบงานแล้ว ส่วนใหญ่เป็นเรื่องสิทธิ์
+</p>
+
+<div class="story">
+  <span class="beat">SHOP ตัน 2 จุด — ทั้งคู่เป็นเรื่องสิทธิ์ฝั่งหลังบ้าน</span>
+  <p>
+    <b>เซ็นสัญญาเองจนจบไม่ได้</b> — ขั้นใส่ชื่อพยานไม่เปิดให้บัญชีร้าน ร้านจริงค้างที่หน้ารอเซ็นทุกครั้ง ·
+    <b>ให้ลูกค้าเซ็นใบรับคืนไม่ได้</b> — กดแล้วขึ้นไม่มีสิทธิ์ ทั้งที่รับคืนที่ร้านบังคับต้องมีลายเซ็น
+  </p>
+  <span class="said">
+    ที่เหลือ FE กลบให้แล้ว (ตัวเลือกที่ไม่ควรขึ้นก็ไม่ขึ้น · รหัสกลายเป็นคำไทย) ·
+    ยังไม่ได้ทดสอบ 2 ขั้น เพราะ DEV ไม่เหลือสัญญาที่ใช้งานอยู่ และยังไม่มีร้านที่สอง
+  </span>
+</div>
+
+<div class="screen nopic">
+  <div class="bar"><b>ขวางร้านจริง ๆ สองข้อ</b></div>
+  <div class="body">
+    <ul class="sees">
+      <li><b>ร้านเซ็นสัญญาเองจนจบไม่ได้</b> — คำสั่งใส่ชื่อพยานและคำสั่งสร้างพยานยังไม่เปิดให้บัญชีร้าน
+        ร้านจริงจะค้างอยู่ที่รอเซ็น</li>
+      <li><b>ร้านให้ลูกค้าเซ็นใบรับคืนเครื่องไม่ได้</b> — หน้าจอเซ็นอ่านข้อมูลจากที่ที่บัญชีร้านเข้าไม่ถึง
+        กดเซ็นแล้วขึ้นว่าไม่มีสิทธิ์ ทั้งที่การรับคืนที่ร้านต้องมีลายเซ็นลูกค้า</li>
+    </ul>
+  </div>
+</div>
+
+<div class="screen nopic">
+  <div class="bar"><b>เรื่องที่หน้าจอกลบให้แล้ว แต่ควรแก้ที่ต้นทาง</b></div>
+  <div class="body">
+    <ul class="sees">
+      <li>หน้าปิดสัญญาก่อนกำหนดยังเสนอเงินสดสำหรับสัญญาของร้าน ทั้งที่จ่ายจริงไม่ได้ หน้าจอตัดออกให้แล้ว</li>
+      <li>ฝ่ายสินเชื่อเปิดคิวสลิปได้ แต่ได้คิวว่างแทนที่จะถูกปฏิเสธ หน้าจอซ่อนเมนูตามสิทธิ์แทน</li>
+      <li>สร้างสาขาโดยเว้นที่อยู่ว่าง ทำให้ระบบตอบข้อความดิบของฐานข้อมูล หน้าจอเลี่ยงด้วยการไม่ส่งช่องนั้น</li>
+      <li>อัลบั้มรูปบอกเหตุผลการล็อกผิด เมื่อใบขอรับเงินถูกยกเลิกหรือจ่ายแล้ว หน้าจอเดาเหตุผลจากสถานะเอาเอง</li>
+    </ul>
+  </div>
+</div>
+
+<div class="screen nopic">
+  <div class="bar"><b>ค้างเป็นคำถาม ไม่ใช่ข้อผิดพลาด</b></div>
+  <div class="body">
+    <ul class="sees">
+      <li>ฝ่ายการเงินเปิดใบคืนเครื่องใหม่จากหน้าคิวไม่ได้ ต้องไปที่หน้าสัญญา ถ้าอยากให้เปิดจากคิวได้ ต้องเพิ่มปุ่ม</li>
+      <li>ตัวเลขบนเมนูใหม่ยังไม่มี รอฝั่งหลังบ้านส่งตัวนับมาให้</li>
+      <li>แนบสลิปหลักฐานการโอนบนใบจ่ายเงินยังทำไม่ได้ รอเปิดชนิดไฟล์ใหม่ที่ฝั่งเก็บไฟล์</li>
+    </ul>
+  </div>
+</div>
+
+<div class="screen nopic">
+  <div class="bar"><b>สองขั้นที่ยังไม่ได้ทดสอบ</b></div>
+  <div class="body">
+    <ul class="sees">
+      <li>ลูกค้าส่งสลิปจริงแล้วฝ่ายการเงินอนุมัติ — ตอนทดสอบไม่มีสัญญาร้านที่ใช้งานอยู่เหลือ</li>
+      <li>ร้านอีกร้านหนึ่งต้องมองไม่เห็นใบคืนเครื่องของร้านนี้ — บน DEV ยังไม่มีบัญชีร้านที่สอง</li>
+    </ul>
+  </div>
+</div>
+
+<div id="rolemode">
+
+<!-- ===== SHOP ===== -->
+<section class="roleblock shop">
+  <h2><span class="tag">SHOP</span> ร้านคู่ค้า</h2>
+  <p class="rolelead">
+    สาขาชนิดคู่ค้าของบริษัทกองทุน · ล็อกอิน <code>db_dealpartner</code> · เห็นเฉพาะข้อมูลสาขาตัวเอง
+    · เมนูทั้งหมดอยู่ใต้หัวข้อ "สัญญา"
+  </p>
+
+  <div class="pg">
+    <h3>รออนุมัติ <code>/admin/contracts/pending-approval</code> <span class="when">หลังยื่นขออนุมัติ</span></h3>
+    <div class="in">
+      <p class="does"><b>ใช้ทำอะไร</b> ดูว่าใบที่ยื่นไปถึงไหนแล้ว</p>
+      <ul>
+        <li>สถานะ: ยื่นแล้ว · อนุมัติแล้ว · ส่งกลับ · ถอนแล้ว</li>
+        <li>ยื่นซ้ำได้ ใบเก่ากลายเป็นประวัติ ใบล่าสุดคือใบที่มีผล</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="pg">
+    <h3>รอยื่นปิดงาน <code>/admin/contracts/settlement-close</code> <span class="when">หลังสัญญาใช้งาน</span></h3>
+    <div class="in">
+      <p class="does"><b>ใช้ทำอะไร</b> อัปโหลดรูปส่งมอบ แล้วกดยื่นขอเงินจาก FUND</p>
+      <ul>
+        <li>หัวจอบอกยอดที่ยังไม่ได้รับรวมทุกสัญญา</li>
+        <li>เปิดสัญญาขึ้นมาจะเห็นการ์ดเงิน + รายการตรวจ + ปุ่มยื่นปิดงาน</li>
+        <li>ใบที่ถูกส่งกลับมาแก้ก็มารออยู่ที่นี่ พร้อมเหตุผล</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="pg">
+    <h3>การ์ดใบขอรับเงิน <code>บนหน้าสัญญา</code> <span class="when">ตลอดอายุสัญญา</span></h3>
+    <div class="in">
+      <p class="does"><b>ใช้ทำอะไร</b> ดูว่าสัญญานี้ FUND ติดอยู่เท่าไหร่ และติดอยู่ที่ขั้นไหน</p>
+      <figure class="shot">
+        <div class="pic">
+          <img src="shots/shop-settlement-card.png" alt="การ์ดใบขอรับเงิน">
+          <button class="hs" data-n="1" style="left:53.7%;top:26.4%;width:44%;height:5.4%">
+            <span class="tip"><b>เลขใบ + สถานะ</b> ป้ายขวาบอกว่าอยู่ขั้นไหน รอยื่น · รอตรวจ · จ่ายแล้ว</span>
+          </button>
+          <button class="hs" data-n="2" style="left:54.3%;top:33.5%;width:42.8%;height:10.5%">
+            <span class="tip"><b>FUND ต้องจ่าย</b> ค่าเครื่อง + ค่าคอมร้าน</span>
+          </button>
+          <button class="hs" data-n="3" style="left:54.3%;top:44.2%;width:42.8%;height:11.2%">
+            <span class="tip"><b>SHOP เก็บไว้แล้ว</b> เงินดาวน์ + ค่าทำสัญญา ถูกหักออก</span>
+          </button>
+          <button class="hs up" data-n="4" style="left:54.3%;top:56%;width:42.8%;height:4.6%">
+            <span class="tip"><b>ยอดสุทธิ</b> ตัวเลขที่จะไปอยู่บนใบจ่ายเงิน</span>
+          </button>
+          <button class="hs up" data-n="5" style="left:54%;top:64.2%;width:20%;height:3.6%">
+            <span class="tip"><b>ประวัติ</b> ยื่น ถอน ส่งกลับ ครบทุกครั้ง</span>
+          </button>
+        </div>
+      </figure>
+    </div>
+  </div>
+
+  <div class="pg">
+    <h3>รอรับเงิน <code>/admin/contracts/settlement-payment</code> <span class="when">หลังยื่นปิดงาน</span></h3>
+    <div class="in">
+      <p class="does"><b>ใช้ทำอะไร</b> รอ FUND ตรวจและจ่าย · ถอนการยื่นได้จากที่นี่</p>
+      <figure class="shot">
+        <div class="pic">
+          <img src="shots/shop-paid.png" alt="เมนูรอรับเงิน">
+          <button class="hs" data-n="1" style="left:15.5%;top:20.5%;width:12.5%;height:17.5%">
+            <span class="tip"><b>เมนูทั้งห้าของ SHOP</b> รอยื่นปิดงาน · รอรับเงิน · รับเงินแล้ว · รายงานค่าคอม · ใบคืนเครื่อง</span>
+          </button>
+          <button class="hs" data-n="2" style="left:28.4%;top:5.5%;width:29.5%;height:6.5%">
+            <span class="tip"><b>สองยอด</b> ที่ยังไม่ได้รับ และที่รับแล้ว พร้อมจำนวนสัญญา</span>
+          </button>
+        </div>
+      </figure>
+    </div>
+  </div>
+
+  <div class="pg">
+    <h3>รับเงินแล้ว <code>/admin/contracts/partner-payouts</code> <span class="when">หลัง FUND โอน</span></h3>
+    <div class="in">
+      <p class="does"><b>ใช้ทำอะไร</b> ดูใบจ่ายเงินที่โอนเข้ามาแล้ว รวมใบที่ถูกกลับรายการ</p>
+      <figure class="shot">
+        <div class="pic">
+          <img src="shots/shop-received.png" alt="เมนูรับเงินแล้ว">
+          <button class="hs" data-n="1" style="left:28.4%;top:18.5%;width:29.5%;height:8%">
+            <span class="tip"><b>ใบที่จ่ายแล้ว</b> วันที่โอน + ยอด กดดูว่ามาจากสัญญาไหนบ้าง</span>
+          </button>
+          <button class="hs" data-n="2" style="left:28.4%;top:28.5%;width:29.5%;height:10%">
+            <span class="tip"><b>ใบที่ถูกกลับรายการ</b> ยอดขีดฆ่า + เหตุผลเป็นคำไทย</span>
+          </button>
+        </div>
+      </figure>
+    </div>
+  </div>
+
+  <div class="pg">
+    <h3>รายงานค่าคอม <code>/admin/contracts/partner-commission</code> <span class="when">ดูย้อนหลังได้เสมอ</span></h3>
+    <div class="in">
+      <p class="does"><b>ใช้ทำอะไร</b> ค่าคอมรายสัญญาและรวมรายเดือน</p>
+      <figure class="shot">
+        <div class="pic">
+          <img src="shots/shop-commission.png" alt="รายงานค่าคอม">
+          <button class="hs" data-n="1" style="left:28.4%;top:5.5%;width:20%;height:6.5%">
+            <span class="tip"><b>รวมรายเดือน</b> ค่าคอมทั้งเดือน จำนวนสัญญา ยอดสุทธิ</span>
+          </button>
+          <button class="hs" data-n="2" style="left:57.5%;top:19%;width:18%;height:14%">
+            <span class="tip"><b>อัตรา ณ วันที่สัญญาใช้งาน</b> ไม่ใช่อัตราปัจจุบัน ปัดลงเป็นบาทเต็ม</span>
+          </button>
+          <button class="hs" data-n="3" style="left:76.5%;top:19%;width:10%;height:8%">
+            <span class="tip"><b>ปรับยอด</b> ติดลบเมื่อสัญญานั้นถูกซื้อคืน</span>
+          </button>
+        </div>
+      </figure>
+    </div>
+  </div>
+
+  <div class="pg">
+    <h3>ใบคืนเครื่อง <code>/admin/contracts/returns</code> <span class="when">เมื่อลูกค้าคืนเครื่อง</span></h3>
+    <div class="in">
+      <p class="does"><b>ใช้ทำอะไร</b> ดูใบคืนของสาขาตัวเอง · <b>เปิดใบใหม่ต้องไปที่ท้ายหน้าสัญญา</b></p>
+      <figure class="shot">
+        <div class="pic">
+          <img src="shots/shop-returns-all.png" alt="เมนูใบคืนเครื่องของร้าน">
+          <button class="hs" data-n="1" style="left:28.4%;top:5.5%;width:29.5%;height:5%">
+            <span class="tip"><b>SHOP มีแค่ 3 แท็บ</b> รอลูกค้าเซ็น · รับเครื่องแล้วรอกองทุน · ทั้งหมด ที่เหลือเป็นงาน FUND</span>
+          </button>
+          <button class="hs" data-n="2" style="left:28.4%;top:15.5%;width:29.5%;height:19%">
+            <span class="tip"><b>ปิดใบแล้วทั้งคู่</b> แต่คนละแบบจบ — ป้ายไม่ได้แยกให้ ต้องเปิดดูข้างใน</span>
+          </button>
+          <button class="hs" data-n="3" style="left:28.4%;top:34.5%;width:29.5%;height:9.5%">
+            <span class="tip"><b>ใบที่ยกเลิก</b> ยกเลิกได้เฉพาะก่อนรับเครื่อง</span>
+          </button>
+        </div>
+      </figure>
+    </div>
+  </div>
+
+  <div class="pg">
+    <h3>ท้ายหน้าสัญญา <code>/admin/contracts/search/:id</code> <span class="when">ทุกขั้น</span></h3>
+    <div class="in">
+      <p class="does"><b>ใช้ทำอะไร</b> ปุ่มทั้งหมดของสัญญา — และเป็นที่เดียวที่เปิดใบคืนเครื่องได้</p>
+      <ul>
+        <li>สัญญาใช้งานอยู่: ปุ่มยกเลิก/ถอดเครื่องถูกปิด เหลือ <b>คืนเครื่อง / ยุติสัญญา</b></li>
+        <li>ยื่นปิดงานแล้ว: อัลบั้มรูปส่งมอบขึ้นคำว่าล็อก</li>
+        <li>จ่ายเงินแล้ว: ปุ่มบอกว่าให้ใช้ขั้นตอนคืนเครื่องแทน</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FUND ===== -->
+<section class="roleblock fund">
+  <h2><span class="tag">FUND</span> ฝ่ายการเงินกองทุน</h2>
+  <p class="rolelead">
+    ระดับบริษัทของบริษัทกองทุน · ล็อกอิน <code>ui_fund_finance_a</code> · เห็นทุกร้านในบริษัทตัวเอง
+    · เป็นคนตรวจ จ่าย และปิดใบคืนเครื่อง
+  </p>
+
+  <div class="pg">
+    <h3>ใบขอรับเงินร้าน <code>/admin/partner-settlements</code> <span class="when">หลัง SHOP ยื่น</span></h3>
+    <div class="in">
+      <p class="does"><b>ใช้ทำอะไร</b> ไล่ดูรูปส่งมอบ แล้วติ๊กตรวจแล้ว หรือส่งกลับให้แก้</p>
+      <figure class="shot">
+        <div class="pic">
+          <img src="shots/fund-settlement-queue.png" alt="คิวใบขอรับเงิน">
+          <button class="hs" data-n="1" style="left:15.5%;top:5.5%;width:36.5%;height:5%">
+            <span class="tip"><b>แท็บ = ลำดับขั้น</b> ร้านค้างยื่น → รอตรวจ → ตรวจแล้วรอออกใบจ่าย → อยู่ในใบจ่าย</span>
+          </button>
+          <button class="hs" data-n="2" style="left:15.5%;top:10.8%;width:16%;height:4.5%">
+            <span class="tip"><b>กรองตามร้าน</b> ใบจ่ายเงินหนึ่งใบรวมได้เฉพาะร้านเดียวกัน</span>
+          </button>
+          <button class="hs" data-n="3" style="left:1.3%;top:29.5%;width:12.5%;height:4.8%">
+            <span class="tip"><b>เมนูฝั่ง FUND</b> ใบขอรับเงิน · ยอดค้างต่อร้าน · ใบจ่ายเงิน · ใบคืนเครื่อง · ตรวจสลิป</span>
+          </button>
+        </div>
+      </figure>
+    </div>
+  </div>
+
+  <div class="pg">
+    <h3>ยอดค้างต่อร้าน <code>/admin/partner-balance</code> <span class="when">ดูภาพรวม</span></h3>
+    <div class="in">
+      <p class="does"><b>ใช้ทำอะไร</b> ดูว่าค้างร้านไหนเท่าไหร่ และค้างเพราะใครยังไม่ทำอะไร</p>
+      <figure class="shot">
+        <div class="pic">
+          <img src="shots/fund-balance.png" alt="ยอดค้างต่อร้าน">
+          <button class="hs" data-n="1" style="left:46.5%;top:15.5%;width:16%;height:5.5%">
+            <span class="tip"><b>รออยู่ที่ใคร</b> แยกว่าค้างที่ SHOP ยังไม่ยื่น หรือค้างที่ FUND ยังไม่ตรวจ</span>
+          </button>
+          <button class="hs" data-n="2" style="left:71.5%;top:15.5%;width:12%;height:6.5%">
+            <span class="tip"><b>จ่ายแล้วสะสม</b> ยอดรวมที่โอนให้ร้านนี้ไปแล้ว</span>
+          </button>
+        </div>
+      </figure>
+    </div>
+  </div>
+
+  <div class="pg">
+    <h3>ใบจ่ายเงินร้าน <code>/admin/partner-payouts</code> <span class="when">รอบจ่าย</span></h3>
+    <div class="in">
+      <p class="does"><b>ใช้ทำอะไร</b> รวมใบที่ติ๊กแล้วของร้านเดียวกัน ออกใบ โอนจริง แล้วกดจ่ายแล้ว</p>
+      <figure class="shot">
+        <div class="pic">
+          <img src="shots/fund-payout-list.png" alt="รายการใบจ่ายเงิน">
+          <button class="hs" data-n="1" style="left:15.5%;top:5.5%;width:26%;height:5%">
+            <span class="tip"><b>สี่แท็บ</b> จัดใบ (รายร้าน) · กำลังจัดใบ (ร่าง) · จ่ายแล้ว · กลับรายการแล้ว</span>
+          </button>
+          <button class="hs" data-n="2" style="left:15.5%;top:15.5%;width:29%;height:5%">
+            <span class="tip"><b>กรองตามวันที่โอน</b> ใช้หายอดที่โอนในช่วงหนึ่ง</span>
+          </button>
+          <button class="hs" data-n="3" style="left:15.5%;top:21.5%;width:84%;height:8%">
+            <span class="tip"><b>ยอดที่เห็นคือจ่ายจริง</b> หลังหักแถวปรับยอดแล้ว ไม่ใช่ยอดหน้าใบ</span>
+          </button>
+        </div>
+      </figure>
+    </div>
+  </div>
+
+  <div class="pg">
+    <h3>ใบจ่ายเงินหนึ่งใบ <code>/admin/partner-payouts/:id</code> <span class="when">หลังออกใบ</span></h3>
+    <div class="in">
+      <p class="does"><b>ใช้ทำอะไร</b> กดจ่ายแล้ว · เพิ่มแถวปรับยอด · กลับรายการทั้งใบ</p>
+      <figure class="shot">
+        <div class="pic">
+          <img src="shots/fund-payout-detail.png" alt="ใบจ่ายเงินที่จ่ายแล้ว">
+          <button class="hs" data-n="1" style="left:26%;top:12.5%;width:35%;height:9%">
+            <span class="tip"><b>บัญชีที่จดไว้บนใบ</b> บัญชีร้าน ณ ตอนออกใบ ร้านเปลี่ยนทีหลังใบเก่าไม่เปลี่ยนตาม</span>
+          </button>
+          <button class="hs" data-n="2" style="left:80%;top:12.5%;width:17%;height:11%">
+            <span class="tip"><b>สองยอดต่างกัน</b> ยอดหน้าใบ กับ จ่ายจริงรวมหลังปรับยอด</span>
+          </button>
+          <button class="hs" data-n="3" style="left:26%;top:35%;width:71%;height:19%">
+            <span class="tip"><b>ใบขอรับเงินในใบนี้</b> หลายสัญญา โอนครั้งเดียว</span>
+          </button>
+          <button class="hs" data-n="4" style="left:26%;top:56%;width:71%;height:14%">
+            <span class="tip"><b>แถวปรับยอด</b> เงินซื้อคืนมาเกาะบนใบเดิม ไม่สร้างเอกสารใหม่ · มีแถวนี้แล้วกลับรายการทั้งใบไม่ได้</span>
+          </button>
+          <button class="hs up" data-n="5" style="left:26%;top:72%;width:71%;height:18%">
+            <span class="tip"><b>เครื่องเปลี่ยนมือตอนกดจ่าย</b> SHOP → FUND พร้อมต้นทุน</span>
+          </button>
+        </div>
+      </figure>
+    </div>
+  </div>
+
+  <div class="pg">
+    <h3>ใบคืนเครื่อง <code>/admin/partner-returns</code> <span class="when">เมื่อมีใบคืนเปิดอยู่</span></h3>
+    <div class="in">
+      <p class="does"><b>ใช้ทำอะไร</b> ตั้งแบบจบ · บันทึกเงินซื้อคืน · สั่งส่งเข้าคลัง · ปิดใบ</p>
+      <figure class="shot">
+        <div class="pic">
+          <img src="shots/fund-returns-queue.png" alt="คิวใบคืนเครื่อง">
+          <button class="hs" data-n="1" style="left:15.5%;top:5.5%;width:35%;height:5%">
+            <span class="tip"><b>แท็บ = ขั้นถัดไป ไม่ใช่สถานะ</b> บอกว่าตอนนี้รออะไรอยู่ จึงรู้ว่าต้องทำอะไรต่อ</span>
+          </button>
+          <button class="hs" data-n="2" style="left:15.5%;top:10.8%;width:16%;height:4.5%">
+            <span class="tip"><b>กรองตามร้าน</b> เมื่อมีหลายร้าน</span>
+          </button>
+        </div>
+      </figure>
+    </div>
+  </div>
+
+  <div class="pg">
+    <h3>ใบคืนหนึ่งใบ — แบบร้านซื้อคืน <span class="when">จ่ายแล้ว + ในประกัน</span></h3>
+    <div class="in">
+      <figure class="shot">
+        <div class="pic">
+          <img src="shots/fund-return-buyback.png" alt="ใบคืนแบบร้านซื้อคืน">
+          <button class="hs" data-n="1" style="left:15.5%;top:15.5%;width:34%;height:22%">
+            <span class="tip"><b>แถวบอกใครเปิดใบ</b> ร้านเปิดใบ หรือ กองทุนเปิดใบ</span>
+          </button>
+          <button class="hs" data-n="2" style="left:51.5%;top:17%;width:47%;height:22%">
+            <span class="tip"><b>เครื่องกับจุดรับ</b> เครื่องอยู่สถานะไหน เป็นของใคร และลูกค้าคืนที่ไหน</span>
+          </button>
+          <button class="hs" data-n="3" style="left:51.5%;top:41%;width:47%;height:17%">
+            <span class="tip"><b>สองอย่างที่ตัดสินแบบจบ</b> จ่ายไปแล้วหรือยัง และยังอยู่ในประกันไหม</span>
+          </button>
+          <button class="hs up" data-n="4" style="left:51.5%;top:60%;width:47%;height:19%">
+            <span class="tip"><b>ยอดที่ SHOP ต้องโอนคืน</b> ยอดที่รับไป + ค่าคืนเครื่อง</span>
+          </button>
+        </div>
+      </figure>
+    </div>
+  </div>
+
+  <div class="pg">
+    <h3>ใบคืนหนึ่งใบ — แบบก่อนกองทุนจ่าย <span class="when">ยังไม่จ่าย</span></h3>
+    <div class="in">
+      <p class="does"><b>เทียบกับใบข้างบน</b> กรอบเดียวกัน คนละผลลัพธ์</p>
+      <figure class="shot">
+        <div class="pic">
+          <img src="shots/fund-return-none.png" alt="ใบคืนแบบก่อนกองทุนจ่าย">
+          <button class="hs" data-n="1" style="left:51.5%;top:41%;width:47%;height:17%">
+            <span class="tip"><b>ต่างตรงนี้</b> ใบขอรับเงินขึ้น "ยกเลิก" ยอด 0 ไม่มีลิงก์ใบจ่ายเงิน</span>
+          </button>
+          <button class="hs" data-n="2" style="left:51.5%;top:60%;width:47%;height:16%">
+            <span class="tip"><b>ไม่มีเงินเคลื่อน</b> จึงไม่มีบรรทัดยอดโอนคืน ปิดใบได้เลย</span>
+          </button>
+          <button class="hs" data-n="3" style="left:51.5%;top:17%;width:47%;height:22%">
+            <span class="tip"><b>เครื่องยังเป็นของ SHOP</b> ไม่เคยเปลี่ยนมือ กลับเข้าสต็อกขายต่อได้</span>
+          </button>
+        </div>
+      </figure>
+    </div>
+  </div>
+
+  <div class="pg">
+    <h3>แท็บประวัติของใบคืน <span class="when">ตรวจย้อนหลัง</span></h3>
+    <div class="in">
+      <p class="does"><b>ใช้ทำอะไร</b> ไทม์ไลน์เดียวรวมทุกเรื่องของใบนั้น — ใบ · ลายเซ็น · สต็อก · เจ้าของ · เงิน</p>
+      <figure class="shot">
+        <div class="pic">
+          <img src="shots/fund-return-timeline.png" alt="ไทม์ไลน์ใบคืนเครื่อง">
+          <button class="hs" data-n="1" style="left:51.5%;top:16%;width:47%;height:15%">
+            <span class="tip"><b>SHOP เปิดใบ แล้วออกใบให้ลูกค้าเซ็น</b> ชื่อคนทำอยู่ท้ายแถว</span>
+          </button>
+          <button class="hs" data-n="2" style="left:51.5%;top:33%;width:47%;height:25%">
+            <span class="tip"><b>เซ็นครบ = รับเครื่อง</b> เครื่องหลุดจากสัญญาเข้าถังกักตรวจทันที แถวสีเทาคือเรื่องสต็อก</span>
+          </button>
+          <button class="hs" data-n="3" style="left:51.5%;top:68%;width:47%;height:13%">
+            <span class="tip"><b>แถวเงิน</b> ลิงก์ไปใบจ่ายเงินที่ยอดซื้อคืนไปเกาะ</span>
+          </button>
+          <button class="hs up" data-n="4" style="left:51.5%;top:87%;width:47%;height:9%">
+            <span class="tip"><b>เครื่องเปลี่ยนเจ้าของ</b> ผลของแบบจบที่เลือก</span>
+          </button>
+        </div>
+      </figure>
+    </div>
+  </div>
+
+  <div class="pg">
+    <h3>คลังรับเครื่อง <code>/admin/partner-returns/warehouse</code> <span class="when">แบบส่งเข้าคลังเท่านั้น</span></h3>
+    <div class="in">
+      <p class="does"><b>ใช้ทำอะไร</b> รับเครื่องที่ SHOP ส่งมา · ยังรับไม่ครบ ปิดใบไม่ได้</p>
+    </div>
+  </div>
+
+  <div class="pg">
+    <h3>ตรวจสลิป <code>/admin/payment-submissions</code> <span class="when">ทุกงวดที่ลูกค้าโอน</span></h3>
+    <div class="in">
+      <p class="does"><b>ใช้ทำอะไร</b> อนุมัติสลิปค่างวดของลูกค้า — เส้นทางเดิม ไม่ใช่ของใหม่</p>
+      <ul>
+        <li>สิทธิ์บันทึก/ยืนยันการชำระต้องให้เป็นรายคน ไม่ได้ติดมากับตำแหน่ง</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ===== CREDIT ===== -->
+<section class="roleblock credit">
+  <h2><span class="tag">CREDIT</span> ฝ่ายสินเชื่อกองทุน</h2>
+  <p class="rolelead">
+    ล็อกอิน <code>ui_fund_credit_a</code> · มีหน้าเดียวในเรื่องนี้ · เปิดคิวของ FUND ได้แต่ได้ลิสต์ว่าง
+    ไม่ได้ถูกปฏิเสธ จึงต้องซ่อนเมนูด้วยสิทธิ์
+  </p>
+
+  <div class="pg">
+    <h3>ใบขออนุมัติร้าน <code>/admin/partner-cases</code> <span class="when">ก่อนสัญญาเปิดบิล</span></h3>
+    <div class="in">
+      <p class="does"><b>ใช้ทำอะไร</b> อนุมัติหรือส่งกลับใบที่ SHOP ยื่นมา</p>
+      <ul>
+        <li>ไม่มีพิน มีแค่หน้าต่างยืนยัน</li>
+        <li>อนุมัติแล้วมีอายุ 14 วัน</li>
+        <li>ส่งกลับ → สัญญาย้อนเป็นร่าง SHOP แก้แล้วยื่นใหม่ได้</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="pg">
+    <h3>สิ่งที่ CREDIT ทำไม่ได้ <span class="when">กันความเข้าใจผิด</span></h3>
+    <div class="in">
+      <ul>
+        <li>ตรวจใบขอรับเงิน หรือติ๊กตรวจแล้ว — ไม่ได้</li>
+        <li>ออกหรือจ่ายใบจ่ายเงิน — ไม่ได้</li>
+        <li>เปิดหรือปิดใบคืนเครื่อง — ไม่ได้</li>
+        <li>ตรวจสลิปค่างวด — ไม่ได้</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<footer class="end">
+  เรียบเรียงจากเอกสารฝั่งหลังบ้าน 139–146 บันทึกการทดสอบจริงของวันที่ 17–18 กันยายน 2026 และเอกสารตอบงานเจ็ดฉบับ
+</footer>
+
+</div>
+<script>
+  (function () {
+    var root = document.documentElement;
+    try {
+      var saved = localStorage.getItem('pf-theme');
+      if (saved) root.setAttribute('data-theme', saved);
+    } catch (e) {}
+    // easy / detailed switch
+    (function () {
+      var body = document.body;
+      var bEasy = document.getElementById('mEasy');
+      var bDetail = document.getElementById('mDetail');
+      var bRole = document.getElementById('mRole');
+      var note = document.getElementById('modenote');
+      var notes = {
+        easy: 'สรุปสั้นต่อขั้น + ภาพจอจริงที่ชี้ดูได้ · SHOP = ร้าน · FUND = การเงินกองทุน · CREDIT = สินเชื่อ',
+        detail: 'ทีละหน้าจอ พร้อมภาพจริงที่ชี้ดูได้ว่าตรงไหนคืออะไร',
+        role: 'ไล่ทีละบทบาท ว่าแต่ละคนเปิดหน้าไหนบ้าง ใช้ทำอะไร และเปิดตอนไหน'
+      };
+      function apply(m) {
+        body.setAttribute('data-mode', m);
+        bEasy.classList.toggle('sel', m === 'easy');
+        bDetail.classList.toggle('sel', m === 'detail');
+        bRole.classList.toggle('sel', m === 'role');
+        note.textContent = notes[m] || notes.easy;
+        try { localStorage.setItem('pf-mode', m); } catch (e) {}
+      }
+      bEasy.addEventListener('click', function () { apply('easy'); });
+      bDetail.addEventListener('click', function () { apply('detail'); });
+      bRole.addEventListener('click', function () { apply('role'); });
+      var saved = 'easy';
+      try { saved = localStorage.getItem('pf-mode') || 'easy'; } catch (e) {}
+      apply(saved);
+    })();
+
+    document.querySelectorAll('.pic').forEach(function (pic) {
+      var img = pic.querySelector('img');
+      var loupe = document.createElement('div');
+      loupe.className = 'loupe';
+      loupe.innerHTML = '<div class="crop"></div><div class="say"></div>';
+      pic.appendChild(loupe);
+      var crop = loupe.querySelector('.crop');
+      var say = loupe.querySelector('.say');
+
+      function show(hs) {
+        var pw = pic.clientWidth;
+        if (!pw) return;
+        var fx = parseFloat(hs.style.left) / 100;
+        var fy = parseFloat(hs.style.top) / 100;
+        var fw = parseFloat(hs.style.width) / 100;
+        var fh = parseFloat(hs.style.height) / 100;
+        var ph = img.clientHeight;
+
+        // magnify so the cut-out is readable, capped by the picture's width
+        var maxW = Math.min(pw * 0.92, 720);
+        var z = Math.min(3.2, Math.max(1.6, maxW / (fw * pw)));
+        var cw = fw * pw * z, ch = fh * ph * z;
+        var maxH = Math.max(120, ph * 0.72);
+        if (ch > maxH) { z *= maxH / ch; cw = fw * pw * z; ch = fh * ph * z; }
+
+        crop.style.width = Math.round(cw) + 'px';
+        crop.style.height = Math.round(ch) + 'px';
+        crop.style.backgroundImage = 'url("' + img.getAttribute('src') + '")';
+        crop.style.backgroundSize = Math.round(pw * z) + 'px ' + Math.round(ph * z) + 'px';
+        crop.style.backgroundPosition = '-' + Math.round(fx * pw * z) + 'px -' + Math.round(fy * ph * z) + 'px';
+
+        say.innerHTML = '<span class="n">' + hs.dataset.n + '</span>' + hs.querySelector('.tip').innerHTML;
+
+        // place it under the box, or above when there is more room there;
+        // the whole thing (crop + note) must stay inside the picture
+        var boxTop = fy * ph, boxBottom = (fy + fh) * ph;
+        var gap = 12, noteH = 58;
+        var roomBelow = ph - boxBottom - gap;
+        var roomAbove = boxTop - gap;
+        var below = roomBelow >= roomAbove;
+        var room = Math.max(90, (below ? roomBelow : roomAbove) - noteH);
+        if (ch > room) {
+          var k = room / ch;
+          cw = Math.round(cw * k); ch = Math.round(ch * k); z *= k;
+          crop.style.width = cw + 'px';
+          crop.style.height = ch + 'px';
+          crop.style.backgroundSize = Math.round(pw * z) + 'px ' + Math.round(ph * z) + 'px';
+          crop.style.backgroundPosition = '-' + Math.round(fx * pw * z) + 'px -' + Math.round(fy * ph * z) + 'px';
+        }
+        loupe.style.left = '0px';
+        loupe.style.right = '0px';
+        loupe.style.marginLeft = 'auto';
+        loupe.style.marginRight = 'auto';
+        if (below) {
+          loupe.style.top = Math.round(boxBottom + gap) + 'px';
+          loupe.style.bottom = 'auto';
+        } else {
+          loupe.style.bottom = Math.round(ph - boxTop + gap) + 'px';
+          loupe.style.top = 'auto';
+        }
+        loupe.classList.add('show');
+        pic.classList.add('on');
+      }
+      function hide() {
+        if (pic.querySelector('.hs.pin')) return;
+        loupe.classList.remove('show');
+        pic.classList.remove('on');
+      }
+
+      pic.querySelectorAll('.hs').forEach(function (hs) {
+        hs.addEventListener('mouseenter', function () { show(hs); });
+        hs.addEventListener('mouseleave', hide);
+        hs.addEventListener('click', function (e) {
+          e.preventDefault();
+          var was = hs.classList.contains('pin');
+          pic.querySelectorAll('.hs.pin').forEach(function (o) { o.classList.remove('pin'); });
+          if (was) { loupe.classList.remove('show'); pic.classList.remove('on'); }
+          else { hs.classList.add('pin'); show(hs); }
+        });
+      });
+    });
+    document.addEventListener('click', function (e) {
+      if (e.target.closest('.hs')) return;
+      document.querySelectorAll('.pic.on').forEach(function (p) {
+        p.querySelectorAll('.hs.pin').forEach(function (o) { o.classList.remove('pin'); });
+        p.classList.remove('on');
+        var l = p.querySelector('.loupe'); if (l) l.classList.remove('show');
+      });
+    });
+    document.getElementById('tb').addEventListener('click', function () {
+      var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      root.setAttribute('data-theme', next);
+      try { localStorage.setItem('pf-theme', next); } catch (e) {}
+    });
+  })();
+</script>
+</body>
+</html>
