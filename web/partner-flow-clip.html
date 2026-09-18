@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="th" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ร้านคู่ค้าขายเครื่องผ่อน — ดูเป็นคลิป</title>
+<style>
+  :root{
+    --bg:#0a0c10; --panel:#12151c; --panel-2:#171b24; --line:#242a36;
+    --text:#e8ecf4; --dim:#98a2b6; --faint:#6b7488;
+    --shop:#f0a742; --fund:#5fb0ff; --auto:#8b7bf0; --ok:#3ddc97; --warn:#ff6b6b;
+    --accent:#5fb0ff;
+    --shadow:0 24px 60px rgba(0,0,0,.6);
+    --mono:"SF Mono",Consolas,"DejaVu Sans Mono",monospace;
+    --font:"Segoe UI","Noto Sans Thai",system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--text); font-family:var(--font);
+    font-size:15px; line-height:1.6; -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+
+  /* ---------- shell ---------- */
+  .app{
+    display:grid;
+    grid-template-columns:268px minmax(0,1fr);
+    gap:0; min-height:100vh;
+  }
+
+  /* ---------- bookmark rail ---------- */
+  .rail{
+    background:var(--panel); border-right:1px solid var(--line);
+    position:sticky; top:0; height:100vh; overflow-y:auto;
+    padding:20px 0 24px; scrollbar-width:thin;
+  }
+  .rail::-webkit-scrollbar{width:8px}
+  .rail::-webkit-scrollbar-thumb{background:#2a3140;border-radius:8px}
+  .rail h1{
+    font-size:15px; margin:0 20px 4px; letter-spacing:.2px;
+  }
+  .rail .sub{
+    font-size:12.5px; color:var(--dim); margin:0 20px 18px; line-height:1.5;
+  }
+  .chapters{list-style:none;margin:0;padding:0}
+  .chapters .ch{
+    font-size:11px; letter-spacing:.9px; text-transform:uppercase;
+    color:var(--faint); margin:18px 20px 7px; font-weight:600;
+  }
+  .bm{
+    display:grid; grid-template-columns:30px 1fr; align-items:start; gap:9px;
+    width:100%; text-align:left; background:none; border:0; cursor:pointer;
+    color:var(--dim); font:inherit; font-size:13.2px; line-height:1.4;
+    padding:8px 18px 8px 16px; border-left:2px solid transparent;
+    transition:background .16s, color .16s, border-color .16s;
+  }
+  .bm:hover{background:var(--panel-2); color:var(--text)}
+  .bm .n{
+    font-family:var(--mono); font-size:11px; color:var(--faint);
+    background:var(--panel-2); border:1px solid var(--line); border-radius:5px;
+    text-align:center; padding:2px 0; margin-top:1px;
+  }
+  .bm[aria-current="true"]{
+    background:#161c28; color:var(--text); border-left-color:var(--accent);
+  }
+  .bm[aria-current="true"] .n{
+    background:var(--accent); border-color:var(--accent); color:#06121f; font-weight:700;
+  }
+  .bm .who{
+    display:inline-block; font-size:10.5px; padding:0 5px; border-radius:4px;
+    margin-left:6px; vertical-align:1px; font-weight:600;
+  }
+  .who.shop{background:rgba(240,167,66,.14); color:var(--shop)}
+  .who.fund{background:rgba(95,176,255,.14); color:var(--fund)}
+  .who.auto{background:rgba(139,123,240,.14); color:var(--auto)}
+
+  /* ---------- stage ---------- */
+  .stage{
+    display:flex; flex-direction:column; min-width:0; min-height:100vh;
+  }
+  .stagehead{
+    padding:22px 30px 0; display:flex; align-items:flex-start;
+    justify-content:space-between; gap:20px; flex-wrap:wrap;
+  }
+  .scenario{max-width:720px}
+  .scenario .kicker{
+    font-size:11px; letter-spacing:1.1px; text-transform:uppercase;
+    color:var(--faint); font-weight:600; margin-bottom:5px;
+  }
+  .scenario h2{
+    margin:0 0 6px; font-size:19px; font-weight:650; letter-spacing:.1px;
+  }
+  .scenario p{margin:0; color:var(--dim); font-size:13.5px; line-height:1.62}
+
+  .cast{display:flex; gap:7px; flex-wrap:wrap; margin-top:2px}
+  .cast span{
+    font-size:11.5px; padding:3px 9px; border-radius:20px;
+    border:1px solid var(--line); background:var(--panel); color:var(--dim);
+  }
+  .cast span b{font-weight:600}
+  .cast .s b{color:var(--shop)} .cast .f b{color:var(--fund)} .cast .c b{color:var(--auto)}
+
+  /* ---------- frame ---------- */
+  .framewrap{
+    padding:16px 30px 0; flex:1; min-width:0;
+  }
+  .frame{
+    position:relative; width:100%; border-radius:12px; overflow:hidden;
+    border:1px solid var(--line); background:#000; box-shadow:var(--shadow);
+    aspect-ratio:2524/1481;
+    width:min(100%, calc((100vh - 340px) * 2524 / 1481));
+    margin:0 auto;
+  }
+  .frame img{
+    position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
+    opacity:0; transition:opacity .42s ease;
+  }
+  .frame img.on{opacity:1}
+
+  /* dimmer + spotlight */
+  .dim{
+    position:absolute; inset:0; pointer-events:none;
+    background:rgba(4,6,10,.62); opacity:0;
+    transition:opacity .34s ease;
+    -webkit-mask-image:var(--mask); mask-image:var(--mask);
+    -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat;
+    -webkit-mask-size:100% 100%; mask-size:100% 100%;
+  }
+  .dim.on{opacity:1}
+
+  .spot{
+    position:absolute; pointer-events:none;
+    border:2px solid var(--accent); border-radius:8px;
+    box-shadow:0 0 0 1px rgba(10,14,22,.85), 0 0 26px rgba(95,176,255,.4);
+    opacity:0; transition:opacity .3s ease, left .55s cubic-bezier(.4,0,.2,1),
+      top .55s cubic-bezier(.4,0,.2,1), width .55s cubic-bezier(.4,0,.2,1),
+      height .55s cubic-bezier(.4,0,.2,1);
+  }
+  .spot.on{opacity:1}
+
+  .caption{
+    position:absolute; left:0; right:0; bottom:0; pointer-events:none;
+    padding:52px 22px 18px;
+    background:linear-gradient(to top,rgba(5,7,11,.96) 34%,rgba(5,7,11,.72) 62%,transparent);
+  }
+  .capinner{
+    max-width:min(760px,86%);
+    opacity:0; transform:translateY(9px);
+    transition:opacity .34s ease, transform .34s ease;
+  }
+  .capinner.on{opacity:1; transform:none}
+  .capwho{
+    display:inline-block; font-size:10.5px; font-weight:700; letter-spacing:.7px;
+    text-transform:uppercase; padding:2px 8px; border-radius:5px; margin-bottom:7px;
+  }
+  .capwho.shop{background:rgba(240,167,66,.18); color:var(--shop)}
+  .capwho.fund{background:rgba(95,176,255,.18); color:var(--fund)}
+  .capwho.auto{background:rgba(139,123,240,.18); color:var(--auto)}
+  .captext{
+    font-size:16px; line-height:1.55; font-weight:500; color:#fff;
+    text-shadow:0 2px 14px rgba(0,0,0,.9);
+  }
+  .capsub{
+    font-size:13px; color:#b9c3d6; margin-top:4px; line-height:1.5;
+    text-shadow:0 2px 12px rgba(0,0,0,.9);
+  }
+
+  .marker{
+    position:absolute; pointer-events:none;
+    width:22px; height:22px; margin:-11px 0 0 -11px;
+    border-radius:50%; background:var(--accent); color:#06121f;
+    font-size:12px; font-weight:800; font-family:var(--mono);
+    display:grid; place-items:center;
+    box-shadow:0 0 0 3px rgba(5,8,14,.9), 0 0 18px rgba(95,176,255,.55);
+    opacity:0; transition:opacity .3s ease, left .55s cubic-bezier(.4,0,.2,1),
+      top .55s cubic-bezier(.4,0,.2,1);
+  }
+  .marker.on{opacity:1}
+
+  /* ---------- transport ---------- */
+  .transport{
+    padding:14px 30px 26px; display:flex; flex-direction:column; gap:11px;
+  }
+  .scrub{
+    display:flex; gap:3px; align-items:stretch; width:100%;
+  }
+  .seg{
+    flex:1 1 0; min-width:0; height:100%; background:none; border:0; padding:0;
+    cursor:pointer; position:relative;
+  }
+  .seg .bar{
+    height:5px; border-radius:3px; background:#232a38; overflow:hidden;
+    transition:background .2s;
+  }
+  .seg:hover .bar{background:#31394b}
+  .seg .fill{
+    display:block; height:100%; width:0; border-radius:3px;
+    background:var(--accent);
+  }
+  .seg.done .fill{width:100%}
+  .seg.cur .fill{background:var(--accent)}
+  .seg .lab{
+    display:block; font-size:10px; color:var(--faint); margin-top:5px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:left;
+    padding-right:6px;
+  }
+  .seg.cur .lab{color:var(--text)}
+  .scrub{margin-bottom:6px}
+
+  .controls{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+  .btn{
+    background:var(--panel-2); border:1px solid var(--line); color:var(--text);
+    border-radius:8px; padding:7px 13px; font:inherit; font-size:13px;
+    cursor:pointer; display:inline-flex; align-items:center; gap:7px;
+    transition:background .15s, border-color .15s;
+  }
+  .btn:hover{background:#1e2430; border-color:#323a4a}
+  .btn.primary{background:var(--accent); border-color:var(--accent); color:#06121f; font-weight:650}
+  .btn.primary:hover{background:#7cc0ff}
+  .btn svg{display:block}
+  .pos{
+    font-family:var(--mono); font-size:12px; color:var(--dim);
+    margin-left:2px; white-space:nowrap;
+  }
+  .spd{display:flex; gap:0; border:1px solid var(--line); border-radius:8px; overflow:hidden}
+  .spd button{
+    background:var(--panel-2); border:0; color:var(--dim); font:inherit; font-size:12px;
+    padding:7px 10px; cursor:pointer; border-right:1px solid var(--line);
+  }
+  .spd button:last-child{border-right:0}
+  .spd button[aria-pressed="true"]{background:var(--accent); color:#06121f; font-weight:700}
+  .hint{font-size:11.5px; color:var(--faint); margin-left:auto}
+  kbd{
+    font-family:var(--mono); font-size:10.5px; background:var(--panel-2);
+    border:1px solid var(--line); border-bottom-width:2px; border-radius:4px;
+    padding:1px 5px; color:var(--dim);
+  }
+
+  /* ---------- notes under the stage ---------- */
+  .beats{
+    padding:0 30px 40px; display:grid; gap:9px;
+    grid-template-columns:repeat(auto-fit,minmax(215px,1fr));
+  }
+  .beat{
+    background:var(--panel); border:1px solid var(--line); border-radius:9px;
+    padding:11px 13px; font-size:12.8px; line-height:1.55; color:var(--dim);
+    cursor:pointer; text-align:left; font-family:inherit;
+    transition:border-color .16s, background .16s;
+  }
+  .beat:hover{border-color:#39435a; background:var(--panel-2)}
+  .beat[aria-current="true"]{border-color:var(--accent); background:#141b27}
+  .beat b{display:block; color:var(--text); font-weight:600; margin-bottom:2px; font-size:13px}
+  .beat .num{font-family:var(--mono); font-size:10.5px; color:var(--faint)}
+
+  @media (max-width:980px){
+    .app{grid-template-columns:1fr}
+    .rail{position:static; height:auto; max-height:none; border-right:0; border-bottom:1px solid var(--line)}
+    .stagehead,.framewrap,.transport,.beats{padding-left:18px; padding-right:18px}
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ============ bookmarks ============ -->
+  <aside class="rail">
+    <h1>ร้านคู่ค้าขายเครื่องผ่อน</h1>
+    <p class="sub">เดินทั้งเส้นเป็นคลิป · ทุกจอถ่ายจริงบน DEV 19 ก.ย. 2026</p>
+    <ol class="chapters" id="rail"></ol>
+  </aside>
+
+  <!-- ============ stage ============ -->
+  <main class="stage">
+
+    <div class="stagehead">
+      <div class="scenario">
+        <div class="kicker">เรื่องที่กำลังดู</div>
+        <h2>ร้าน DPX ขายไอโฟนให้ลูกค้าด้วยวิธีผ่อน แล้วรอกองทุนจ่ายเงินคืน</h2>
+        <p>
+          ลูกค้าชื่อ John Tester ซื้อ iPhone 7 ผ่อน 6 เดือน จ่ายดาวน์ที่ร้าน
+          ร้านออกเครื่องให้ก่อน กองทุนเป็นคนออกเงิน แล้วจ่ายค่าเครื่องบวกค่าคอมคืนร้านทีหลัง
+          คลิปนี้เดินตามเงินก้อนนี้ตั้งแต่ลูกค้าเดินเข้าร้าน จนกองทุนโอนเงินให้ร้านเสร็จ
+        </p>
+      </div>
+      <div class="cast">
+        <span class="s"><b>ร้าน</b> DEV Deal Partner X</span>
+        <span class="f"><b>กองทุน</b> ฝ่ายการเงิน</span>
+        <span class="c"><b>ระบบ</b> สร้างเอกสารเอง</span>
+      </div>
+    </div>
+
+    <div class="framewrap">
+      <div class="frame" id="frame">
+        <div class="dim" id="dim"></div>
+        <div class="spot" id="spot"></div>
+        <div class="marker" id="marker"></div>
+        <div class="caption">
+          <div class="capinner" id="capinner">
+            <span class="capwho" id="capwho"></span>
+            <div class="captext" id="captext"></div>
+            <div class="capsub" id="capsub"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="transport">
+      <div class="scrub" id="scrub"></div>
+      <div class="controls">
+        <button class="btn primary" id="play">
+          <svg width="13" height="13" viewBox="0 0 12 12" fill="currentColor"><path d="M2 1l8 5-8 5z"/></svg>
+          <span id="playlabel">เล่น</span>
+        </button>
+        <button class="btn" id="prev" title="ฉากก่อนหน้า">
+          <svg width="13" height="13" viewBox="0 0 12 12" fill="currentColor"><path d="M10 1L4 6l6 5zM3 1h1.4v10H3z"/></svg>
+          ก่อนหน้า
+        </button>
+        <button class="btn" id="next" title="ฉากถัดไป">
+          ถัดไป
+          <svg width="13" height="13" viewBox="0 0 12 12" fill="currentColor"><path d="M2 1l6 5-6 5zM7.6 1H9v10H7.6z"/></svg>
+        </button>
+        <span class="pos" id="pos"></span>
+        <div class="spd" role="group" aria-label="ความเร็ว">
+          <button data-spd="1.6" type="button">ช้า</button>
+          <button data-spd="1" type="button" aria-pressed="true">ปกติ</button>
+          <button data-spd="0.6" type="button">เร็ว</button>
+        </div>
+        <span class="hint"><kbd>space</kbd> เล่น/หยุด · <kbd>←</kbd> <kbd>→</kbd> เปลี่ยนฉาก</span>
+      </div>
+    </div>
+
+    <div class="beats" id="beats"></div>
+
+  </main>
+</div>
+
+<script>
+/* ============================================================
+   SCENES
+   pct coordinates are % of the frame — measured off the shots.
+   ============================================================ */
+const S = 'shots/sc-';
+
+const SCENES = [
+  {
+    ch: 'ลูกค้าเดินเข้าร้าน',
+    who: 'shop', short: 'ร้านยื่นขออนุมัติ',
+    img: S+'05b-shop-pending-approval-detail.png',
+    title: 'ร้านกรอกสัญญาแล้วส่งให้กองทุนอนุมัติก่อน',
+    sub: 'ร้านขายเองไม่ได้ทันที เพราะเงินไม่ใช่ของร้าน ต้องให้ฝ่ายสินเชื่อของกองทุนรับลูกค้ารายนี้ก่อน',
+    beats: [
+      { box:[59.3,14.8,39.5,13.5], text:'ใบขออนุมัติสินเชื่อยังอยู่สถานะ "ยื่นแล้ว รอตรวจ"', sub:'ร้านทำได้แค่รอ หรือถอนคำขอ' },
+      { box:[59.3,34.5,39.5,15.5], text:'ลูกค้า John Tester · เครื่อง iPhone 7 128GB', sub:'ร้านเป็นคนเลือกเครื่องและเป็นเจ้าของค่าคอม' },
+      { box:[59.3,58.9,38.9,27.6], text:'ตัวเลขที่ขอ: เก็บรวม 27,860 ดาวน์ 5,970 ผ่อน 10 เดือน', sub:'ยังชำระ 0 เพราะสัญญายังไม่เปิด' },
+    ],
+  },
+  {
+    ch: 'ลูกค้าเดินเข้าร้าน',
+    who: 'shop', short: 'สัญญาใช้งานแล้ว',
+    img: S+'01-shop-contract-list.png',
+    title: 'อนุมัติผ่าน ลูกค้าจ่ายดาวน์แล้วเซ็น สัญญาขึ้นสถานะใช้งาน',
+    sub: 'ตั้งแต่จุดนี้ลูกค้าได้เครื่องกลับบ้าน และเริ่มผ่อนกับกองทุน',
+    beats: [
+      { box:[28.6,15.5,17,4.2], text:'สัญญา CT-2609-000591-4 ขึ้นป้าย "ใช้งาน"', sub:'ลูกค้าถือเครื่องออกจากร้านได้แล้ว' },
+      { box:[45.8,15.9,6.2,4], text:'ค่างวด 4,890 · งวดที่ 1 จาก 6', sub:'ลูกค้าจะโอนเข้าบัญชีกองทุนโดยตรง ร้านไม่ยุ่ง' },
+    ],
+  },
+  {
+    ch: 'เงินของร้าน',
+    who: 'auto', short: 'ใบขอรับเงินเกิดเอง',
+    img: S+'02-shop-contract-detail.png',
+    title: 'พอสัญญาใช้งาน ระบบสร้างใบขอรับเงินให้เอง',
+    sub: 'ร้านไม่ต้องกดสร้าง นี่คือใบที่บอกว่ากองทุนติดเงินร้านอยู่เท่าไหร่ จากสัญญาใบนี้',
+    beats: [
+      { box:[54,18.5,44,5.2], text:'ใบขอรับเงิน PS-2609-000004-8 เกิดขึ้นเอง', sub:'หนึ่งสัญญาได้หนึ่งใบ ป้ายขวาบอกว่ายัง "รอยื่นปิดงาน"' },
+      { box:[54,24.8,44,10.6], text:'ค่าเครื่อง +19,900 และค่าคอมร้าน +2,706 (17%)', sub:'สองก้อนนี้คือสิ่งที่กองทุนต้องจ่ายร้าน' },
+      { box:[54,35.6,44,10.4], text:'หักเงินดาวน์ 3,980 และค่าทำสัญญา 100 ที่ร้านเก็บไปแล้ว', sub:'เงินสองก้อนนี้ลูกค้าจ่ายที่ร้าน ร้านถือไว้เลย จึงหักออก' },
+      { box:[54,47.6,44,4.6], text:'เหลือสุทธิที่ร้านจะได้รับ 18,526', sub:'ตัวเลขนี้จะตามไปทุกจอหลังจากนี้' },
+    ],
+  },
+  {
+    ch: 'เงินของร้าน',
+    who: 'shop', short: 'ด่านก่อนยื่นปิดงาน',
+    img: S+'06b-shop-settlement-close-detail.png',
+    title: 'ร้านจะขอเงินได้ ต้องพิสูจน์ว่าส่งมอบเครื่องจริง',
+    sub: 'นี่คือด่านที่กันไม่ให้ร้านรับเงินไปก่อนที่เครื่องจะถึงมือลูกค้า',
+    beats: [
+      { box:[28.8,5.6,22,5.4], text:'ยอดที่ยังไม่ได้รับ 18,526 · ที่รับแล้ว 56,802', sub:'ร้านเห็นยอดค้างของตัวเองทั้งหมดตรงนี้' },
+      { box:[60,55.4,30,3.8], text:'ผูกเครื่องกับสัญญาแล้ว — ผ่าน', sub:'เครื่องเครื่องไหนที่ขายไป ต้องระบุหมายเลขชัด' },
+      { box:[60,58.7,38,7.6], text:'รูปส่งมอบยังไม่ครบ — ยังไม่ผ่าน', sub:'ต้องมีรูปลูกค้าคู่บัตร รูปกำลังเซ็น และรูปถือบัตรพร้อมเครื่อง' },
+      { box:[91.8,68,6.5,3.6], text:'ปุ่มยื่นปิดงานจะกดได้ก็ต่อเมื่อครบทั้งสองข้อ', sub:'ครบเมื่อไหร่ ใบขอรับเงินถึงจะวิ่งไปหากองทุน' },
+    ],
+  },
+  {
+    ch: 'ฝั่งกองทุน',
+    who: 'fund', short: 'กองทุนเห็นงานค้าง',
+    img: S+'11-fund-dashboard.png',
+    title: 'ฝั่งกองทุนเห็นสัญญาใบเดียวกันโผล่ในงานที่ต้องทำ',
+    sub: 'คนละล็อกอิน คนละบริษัท แต่มองเห็นเคสเดียวกัน',
+    beats: [
+      { box:[20.5,40.9,23.9,16.3], text:'งานรอทำ: สัญญารอเซ็นเอกสาร 1 ใบ — CT-2609-000591-4 · John Tester', sub:'ชื่อลูกค้าคนเดิมกับที่ร้านเพิ่งขาย' },
+    ],
+  },
+  {
+    ch: 'ฝั่งกองทุน',
+    who: 'fund', short: 'ยอดค้างต่อร้าน',
+    img: S+'13-fund-balance.png',
+    title: 'กองทุนดูว่าค้างจ่ายร้านไหนอยู่เท่าไหร่',
+    sub: 'หน้านี้ตอบคำถามเดียว — เดือนนี้ต้องเตรียมเงินให้ร้านนี้เท่าไหร่',
+    beats: [
+      { box:[21.2,15.6,10,3.6], text:'ร้าน DEV Deal Partner X มีใบที่ยังเปิดอยู่ 1 ใบ', sub:'ใบเดียวกับที่เพิ่งเห็นฝั่งร้าน' },
+      { box:[62.2,15.6,4.4,3.6], text:'ยอดค้างจ่าย 18,526', sub:'ตรงกับยอดสุทธิบนใบขอรับเงินเป๊ะ' },
+      { box:[72.3,15.1,9.1,4.8], text:'จ่ายไปแล้ว 56,802 จาก 2 ใบก่อนหน้า', sub:'ประวัติการจ่ายของร้านนี้' },
+    ],
+  },
+  {
+    ch: 'จ่ายเงิน',
+    who: 'fund', short: 'ใบจ่ายเงินที่จ่ายแล้ว',
+    img: S+'14c-fund-payout-detail.png',
+    title: 'กองทุนรวมหลายใบเข้าใบจ่ายเงินเดียว แล้วโอนทีเดียว',
+    sub: 'ร้านไม่ได้รับเงินเป็นรายสัญญา แต่ได้เป็นก้อนตามรอบโอน',
+    beats: [
+      { box:[18,1,32,4.2], text:'ใบจ่ายเงิน PP-2609-000002-2 สถานะจ่ายแล้ว', sub:'หนึ่งใบจ่ายเงิน = หนึ่งครั้งที่โอนจริง' },
+      { box:[26.1,12.1,62.1,12.5], text:'บัญชีร้านที่จดไว้บนใบ KBANK · ยอดที่ต้องโอน 56,802', sub:'เลขบัญชีถูกจดลงบนใบตอนออกใบ ไม่ใช่ดึงสด' },
+      { box:[26.1,31.3,62.1,23.4], text:'ข้างในมีใบขอรับเงิน 2 ใบ รวมถึง John Tester 18,526', sub:'ใบที่เราตามมาทั้งคลิป อยู่ในนี้' },
+      { box:[26.1,58.5,62.1,12], text:'แถวปรับยอด: ร้านโอนคืน 39,276 จากการซื้อคืนเครื่อง', sub:'หนี้สองทางถูกหักกลบบนใบเดียว จึงจ่ายจริงแค่ 17,526' },
+    ],
+  },
+  {
+    ch: 'จ่ายเงิน',
+    who: 'shop', short: 'ร้านเห็นค่าคอมที่ได้',
+    img: S+'09-shop-commission.png',
+    title: 'ร้านเปิดรายงานค่าคอม เห็นว่าเงินเข้าจากใบไหน',
+    sub: 'ปลายทางของทั้งเรื่อง — ร้านรู้ว่าตัวเองได้เท่าไหร่ จากสัญญาไหน',
+    beats: [
+      { box:[29.1,6.3,7.9,6.1], text:'ค่าคอมเดือนนี้รวม 8,282 จาก 2 สัญญา', sub:'สุทธิที่ได้จริง 56,802' },
+      { box:[28.3,29.8,56,6.2], text:'แถวของ John Tester: ยอดจัด 15,920 อัตรา 17% ค่าคอม 2,706', sub:'สุทธิ 18,526 — เลขเดิมตั้งแต่ต้นคลิป' },
+      { box:[85.3,29.8,13.9,6.2], text:'อ้างถึงใบจ่ายเงิน PP-2609-000002-2', sub:'ย้อนกลับไปดูใบที่โอนได้ทันที' },
+    ],
+  },
+  {
+    ch: 'ปิดวัน',
+    who: 'fund', short: 'กองทุนปิดเงินรายวัน',
+    img: S+'15-fund-day-money.png',
+    title: 'ปลายวัน กองทุนนับเงินที่เข้าจริงเทียบกับที่ระบบรู้',
+    sub: 'ค่างวดที่ลูกค้าโอนเข้ามา มาโผล่ที่นี่',
+    beats: [
+      { box:[23.1,19.1,68.7,4.3], text:'เงินจากสัญญา: ค่างวดรับเข้า +4,890 จาก 1 รายการ', sub:'งวดแรกของ John Tester ที่เพิ่งจ่าย' },
+      { box:[24.3,35.3,66.5,17], text:'แยกตามบัญชี — ยอดระบบเข้า 4,890 เทียบกับยอดจริงที่กรอกเอง', sub:'ตรงกันคือปิดวันได้ ไม่ตรงคือมีอะไรหาย' },
+    ],
+  },
+];
+
+/* ============================================================
+   PLAYER
+   ============================================================ */
+const frame   = document.getElementById('frame');
+const dimEl   = document.getElementById('dim');
+const spotEl  = document.getElementById('spot');
+const markEl  = document.getElementById('marker');
+const capIn   = document.getElementById('capinner');
+const capWho  = document.getElementById('capwho');
+const capTxt  = document.getElementById('captext');
+const capSub  = document.getElementById('capsub');
+const railEl  = document.getElementById('rail');
+const scrubEl = document.getElementById('scrub');
+const beatsEl = document.getElementById('beats');
+const posEl   = document.getElementById('pos');
+const playBtn = document.getElementById('play');
+const playLab = document.getElementById('playlabel');
+
+const WHO_TH = { shop:'ร้าน', fund:'กองทุน', auto:'ระบบ' };
+
+let si = 0, bi = 0, playing = false, speed = 1, timer = null;
+
+/* --- preload images as layers --- */
+const layers = SCENES.map((sc, i) => {
+  const img = document.createElement('img');
+  img.src = sc.img; img.alt = sc.title; img.decoding = 'async';
+  img.loading = i < 3 ? 'eager' : 'lazy';
+  frame.insertBefore(img, dimEl);
+  return img;
+});
+
+/* --- rail --- */
+let lastCh = null;
+SCENES.forEach((sc, i) => {
+  if (sc.ch !== lastCh) {
+    const h = document.createElement('li');
+    h.className = 'ch'; h.textContent = sc.ch;
+    railEl.appendChild(h); lastCh = sc.ch;
+  }
+  const li = document.createElement('li');
+  const b = document.createElement('button');
+  b.className = 'bm'; b.type = 'button'; b.dataset.i = i;
+  b.innerHTML = '<span class="n">' + (i+1) + '</span><span>' + sc.short +
+    '<span class="who ' + sc.who + '">' + WHO_TH[sc.who] + '</span></span>';
+  b.addEventListener('click', () => { go(i, 0); pause(); });
+  li.appendChild(b); railEl.appendChild(li);
+});
+const bms = [...railEl.querySelectorAll('.bm')];
+
+/* --- scrubber --- */
+SCENES.forEach((sc, i) => {
+  const s = document.createElement('button');
+  s.className = 'seg'; s.type = 'button'; s.title = sc.short;
+  s.innerHTML = '<span class="bar"><span class="fill"></span></span><span class="lab">' + sc.short + '</span>';
+  s.addEventListener('click', () => { go(i, 0); pause(); });
+  scrubEl.appendChild(s);
+});
+const segs = [...scrubEl.querySelectorAll('.seg')];
+
+/* --- beat cards --- */
+function renderBeats() {
+  beatsEl.innerHTML = '';
+  SCENES[si].beats.forEach((bt, j) => {
+    const c = document.createElement('button');
+    c.className = 'beat'; c.type = 'button';
+    c.setAttribute('aria-current', j === bi ? 'true' : 'false');
+    c.innerHTML = '<span class="num">' + (j+1) + ' / ' + SCENES[si].beats.length +
+      '</span><b>' + bt.text + '</b>' + (bt.sub ? bt.sub : '');
+    c.addEventListener('click', () => { show(si, j); pause(); });
+    beatsEl.appendChild(c);
+  });
+}
+
+/* --- mask so only the spotlight stays bright --- */
+function setMask(box) {
+  if (!box) { dimEl.classList.remove('on'); return; }
+  const [x, y, w, h] = box;
+  const g = 'radial-gradient(ellipse ' + (w*0.78) + '% ' + (h*0.95) + '% at ' +
+            (x + w/2) + '% ' + (y + h/2) + '%, transparent 45%, #000 100%)';
+  dimEl.style.setProperty('--mask', g);
+  dimEl.classList.add('on');
+}
+
+function show(sceneIdx, beatIdx) {
+  const changedScene = sceneIdx !== si;
+  si = sceneIdx; bi = beatIdx;
+  const sc = SCENES[si], bt = sc.beats[bi];
+
+  layers.forEach((im, i) => im.classList.toggle('on', i === si));
+
+  bms.forEach((b, i) => b.setAttribute('aria-current', i === si ? 'true' : 'false'));
+  if (changedScene) bms[si].scrollIntoView({ block:'nearest' });
+
+  segs.forEach((s, i) => {
+    s.classList.toggle('done', i < si);
+    s.classList.toggle('cur', i === si);
+    s.querySelector('.fill').style.width =
+      i < si ? '100%' : i === si ? (((bi+1)/sc.beats.length)*100).toFixed(1)+'%' : '0%';
+  });
+
+  const [x, y, w, h] = bt.box;
+  spotEl.style.left = x + '%'; spotEl.style.top = y + '%';
+  spotEl.style.width = w + '%'; spotEl.style.height = h + '%';
+  spotEl.classList.add('on');
+  markEl.style.left = x + '%'; markEl.style.top = y + '%';
+  markEl.textContent = bi + 1; markEl.classList.add('on');
+  setMask(bt.box);
+
+  capIn.classList.remove('on');
+  capWho.className = 'capwho ' + sc.who;
+  capWho.textContent = WHO_TH[sc.who] + ' · ' + sc.short;
+  capTxt.textContent = bt.text;
+  capSub.textContent = bt.sub || '';
+  requestAnimationFrame(() => requestAnimationFrame(() => capIn.classList.add('on')));
+
+  posEl.textContent = 'ฉาก ' + (si+1) + '/' + SCENES.length + ' · จุดที่ ' + (bi+1) + '/' + sc.beats.length;
+
+  if (changedScene) renderBeats();
+  else [...beatsEl.children].forEach((c, j) =>
+    c.setAttribute('aria-current', j === bi ? 'true' : 'false'));
+}
+
+function go(sceneIdx, beatIdx) { show(sceneIdx, beatIdx); }
+
+function step(dir) {
+  let s = si, b = bi + dir;
+  if (b >= SCENES[s].beats.length) {
+    if (s + 1 >= SCENES.length) { pause(); return false; }
+    s++; b = 0;
+  } else if (b < 0) {
+    if (s === 0) { b = 0; }
+    else { s--; b = SCENES[s].beats.length - 1; }
+  }
+  show(s, b);
+  return true;
+}
+
+function tick() {
+  const words = (capTxt.textContent + ' ' + capSub.textContent).length;
+  const ms = Math.min(7600, Math.max(2900, 1500 + words * 42)) * speed;
+  timer = setTimeout(() => { if (playing && step(1)) tick(); }, ms);
+}
+function play() {
+  playing = true; playLab.textContent = 'หยุด';
+  playBtn.querySelector('svg').innerHTML = '<path d="M2 1h3v10H2zM7 1h3v10H7z"/>';
+  tick();
+}
+function pause() {
+  playing = false; clearTimeout(timer); playLab.textContent = 'เล่น';
+  playBtn.querySelector('svg').innerHTML = '<path d="M2 1l8 5-8 5z"/>';
+}
+
+playBtn.addEventListener('click', () => {
+  if (playing) pause();
+  else {
+    if (si === SCENES.length-1 && bi === SCENES[si].beats.length-1) show(0,0);
+    play();
+  }
+});
+document.getElementById('next').addEventListener('click', () => { pause(); step(1); });
+document.getElementById('prev').addEventListener('click', () => { pause(); step(-1); });
+
+document.querySelectorAll('.spd button').forEach(b => {
+  b.addEventListener('click', () => {
+    speed = parseFloat(b.dataset.spd);
+    document.querySelectorAll('.spd button').forEach(o =>
+      o.setAttribute('aria-pressed', o === b ? 'true' : 'false'));
+    if (playing) { clearTimeout(timer); tick(); }
+  });
+});
+
+document.addEventListener('keydown', e => {
+  if (e.target.matches('input,textarea')) return;
+  if (e.code === 'Space') { e.preventDefault(); playBtn.click(); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); pause(); step(1); }
+  else if (e.key === 'ArrowLeft')  { e.preventDefault(); pause(); step(-1); }
+});
+
+show(0, 0);
+</script>
+</body>
+</html>
