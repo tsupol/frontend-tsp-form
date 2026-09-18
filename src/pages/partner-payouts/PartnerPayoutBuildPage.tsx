@@ -6,7 +6,7 @@
 // back. The totals shown are the rows' own `net_amount`, which is what the
 // document will carry.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -32,6 +32,11 @@ export function PartnerPayoutBuildPage() {
   const candidates = usePayoutCandidates(branchId);
   const branches = usePayoutCandidateBranches();
   const branchRow = branches.rows.find(b => b.branch_id === branchId) ?? null;
+  // Issuing the payout empties this shop's queue row, so the name would vanish
+  // from the success view that is still on screen. Hold the last one we saw.
+  const lastBranchName = useRef('');
+  if (branchRow) lastBranchName.current = branchRow.branch_name;
+  const branchName = branchRow?.branch_name ?? lastBranchName.current;
 
   const [selected, setSelected] = useState<number[]>([]);
   const [ticking, setTicking] = useState<number | null>(null);
@@ -142,7 +147,7 @@ export function PartnerPayoutBuildPage() {
                 </button>
               </div>
               <div className="mobile-header-title mobile-header-title-truncate">
-                {branchRow?.branch_name ?? t('partnerPayout.buildTitle')}
+                {branchName || t('partnerPayout.buildTitle')}
               </div>
               <div className="mobile-header-end w-nav" />
             </MobileHeader>
@@ -157,7 +162,7 @@ export function PartnerPayoutBuildPage() {
                 onClick={() => navigate('/admin/partner-payouts')}
               />
               <h1 className="heading-2 shrink-0">{t('partnerPayout.buildTitle')}</h1>
-              <span className="text-sm text-subtle truncate">{branchRow?.branch_name ?? ''}</span>
+              <span className="text-sm text-subtle truncate">{branchName}</span>
             </div>
           )}
 
@@ -327,7 +332,7 @@ export function PartnerPayoutBuildPage() {
               <>
                 <div className="modal-content">
                   <div className="px-3 py-2.5 rounded-md bg-surface border border-line">
-                    <div className="font-medium text-sm">{branchRow?.branch_name ?? ''}</div>
+                    <div className="font-medium text-sm">{branchName}</div>
                     <div className="text-xs text-subtle mt-0.5">
                       {t('partnerPayout.settlementCount', { count: selected.length })} · {fmtCurrency(selectedTotal)}
                     </div>
@@ -362,7 +367,7 @@ export function PartnerPayoutBuildPage() {
                 headline={t('partnerPayout.createdHeadline')}
                 contractCode={result.payout_code}
                 detailRows={[
-                  { label: t('partnerPayout.shop'), value: branchRow?.branch_name ?? '' },
+                  { label: t('partnerPayout.shop'), value: branchName },
                   { label: t('partnerPayout.settlements'), value: String(result.settlement_count) },
                   { label: t('partnerPayout.netAmount'), value: fmtCurrency(result.net_amount), emphasis: true },
                 ]}
