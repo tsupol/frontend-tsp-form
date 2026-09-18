@@ -8498,5 +8498,41 @@
     "logAction_ADJUST_VOID": "ยกเลิกแถวปรับยอด",
     "notFound": "ไม่พบใบจ่ายเงินนี้ หรืออยู่นอกขอบเขตของคุณ",
     "backToList": "กลับไปหน้ารายการ"
+  },
+  "partnerReturn": {
+    "timeline": {
+      "empty": "ยังไม่มีเหตุการณ์บนใบนี้",
+      "openSigning": "เปิดใบรับคืน",
+      "openDevice": "เปิดเครื่อง",
+      "openPayout": "เปิดใบจ่ายเงิน",
+      "source": {
+        "RETURN": "ใบคืนเครื่อง",
+        "SIGNING": "ใบรับคืน",
+        "STOCK": "สต็อก",
+        "OWNER": "เจ้าของเครื่อง",
+        "MONEY": "เงิน"
+      },
+      "event": {
+        "OPEN": "เปิดใบคืนเครื่อง",
+        "RECEIVE": "รับเครื่องแล้ว",
+        "SIGNING_REISSUE": "ออกใบรับคืนใหม่",
+        "VOID": "ยกเลิกใบคืนเครื่อง",
+        "SET_RESOLUTION": "เลือกแบบจบ",
+        "BUYBACK_PAID": "บันทึกเงินซื้อคืนที่ร้านโอน",
+        "SHIP": "ส่งเครื่องไปคลัง",
+        "WAREHOUSE_RECEIVE": "คลังรับเครื่องแล้ว",
+        "CLOSE": "ปิดใบ — สัญญาจบ",
+        "RECEIPT_ISSUED": "ออกใบรับคืนให้ลูกค้าเซ็น",
+        "RECEIPT_SIGNED": "ลูกค้าเซ็นใบรับคืนแล้ว",
+        "RECEIPT_VOIDED": "ยกเลิกใบรับคืน",
+        "RETURN_FROM_CONTRACT": "เครื่องหลุดจากสัญญา",
+        "PARTNER_RETURN_SHIP": "เครื่องออกเดินทางไปคลัง",
+        "PARTNER_RETURN_RECEIVE": "เครื่องถึงคลังแล้ว",
+        "UNQUARANTINE": "ปล่อยเครื่องออกจากการกักตรวจ",
+        "OWNER_TRANSFERRED": "เครื่องเปลี่ยนเจ้าของ",
+        "BUYBACK_ADJUSTMENT": "เพิ่มยอดซื้อคืนในใบจ่ายเงิน",
+        "BUYBACK_ADJUSTMENT_VOIDED": "ยกเลิกยอดซื้อคืน"
+      }
+    }
   }
 }

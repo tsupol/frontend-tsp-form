@@ -8514,5 +8514,41 @@
     "logAction_ADJUST_VOID": "Adjustment cancelled",
     "notFound": "This payout does not exist, or it is outside what you can see.",
     "backToList": "Back to the list"
+  },
+  "partnerReturn": {
+    "timeline": {
+      "empty": "Nothing has happened on this document yet.",
+      "openSigning": "Open the receipt",
+      "openDevice": "Open the device",
+      "openPayout": "Open the transfer",
+      "source": {
+        "RETURN": "Return document",
+        "SIGNING": "Return receipt",
+        "STOCK": "Stock",
+        "OWNER": "Ownership",
+        "MONEY": "Money"
+      },
+      "event": {
+        "OPEN": "Return document opened",
+        "RECEIVE": "Device received",
+        "SIGNING_REISSUE": "New receipt issued",
+        "VOID": "Return document cancelled",
+        "SET_RESOLUTION": "How it ends was chosen",
+        "BUYBACK_PAID": "Shop's buyback transfer recorded",
+        "SHIP": "Device sent to the warehouse",
+        "WAREHOUSE_RECEIVE": "Warehouse received the device",
+        "CLOSE": "Document closed — contract ended",
+        "RECEIPT_ISSUED": "Receipt issued for the customer to sign",
+        "RECEIPT_SIGNED": "Customer signed the receipt",
+        "RECEIPT_VOIDED": "Receipt cancelled",
+        "RETURN_FROM_CONTRACT": "Device left the contract",
+        "PARTNER_RETURN_SHIP": "Device left for the warehouse",
+        "PARTNER_RETURN_RECEIVE": "Device arrived at the warehouse",
+        "UNQUARANTINE": "Device released from quarantine",
+        "OWNER_TRANSFERRED": "Device changed owner",
+        "BUYBACK_ADJUSTMENT": "Buyback amount added to the transfer",
+        "BUYBACK_ADJUSTMENT_VOIDED": "Buyback amount cancelled"
+      }
+    }
   }
 }
