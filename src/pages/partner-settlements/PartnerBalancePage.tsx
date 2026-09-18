@@ -6,9 +6,7 @@
 // what this user may see (UI_SUMMARY/143), so there is no company filter here.
 
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
-import { MobileHeader, DataTable, DataTableColumnHeader, Badge } from 'tsp-form';
-import type { ColumnDef } from '@tanstack/react-table';
+import { MobileHeader, DataTable, DataTableColumnHeader, Badge, type ColumnDef } from 'tsp-form';
 import { ArrowRightFromLine, Wallet } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
@@ -17,7 +15,6 @@ import type { PartnerBalanceRow } from './partnerSettlementTypes';
 
 export function PartnerBalancePage() {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const { rows, isLoading } = usePartnerBalance();
 
   const columns: ColumnDef<PartnerBalanceRow>[] = [
@@ -117,7 +114,6 @@ export function PartnerBalancePage() {
         <DataTable<PartnerBalanceRow>
           data={rows}
           columns={columns}
-          onRowClick={row => navigate(`/admin/partner-settlements?branch=${row.branch_id}`)}
           className="flex-1 min-h-0"
           noResults={
             <div className="p-8 text-center text-subtler">
