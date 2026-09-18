@@ -287,6 +287,19 @@ export function PartnerPayoutBuildPage() {
                                 <ExternalLink size={12} />
                               </button>
                             )}
+                            {/* The fix for an open return lives on the return
+                                queue, so send the user there rather than leaving
+                                them to find the document by its code. */}
+                            {r.payout_blocking_reason === 'return_open' && (
+                              <button
+                                type="button"
+                                onClick={() => navigate('/admin/partner-returns')}
+                                className="text-xs text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
+                              >
+                                {t('partnerPayout.openReturns')}
+                                <ExternalLink size={12} />
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>

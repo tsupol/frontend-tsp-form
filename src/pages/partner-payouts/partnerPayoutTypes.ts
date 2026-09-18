@@ -15,7 +15,9 @@ export type PayoutBlockingReason =
   | 'not_checked'
   | 'no_payout_account'
   | 'device_missing'
-  | 'device_owner_unexpected';
+  | 'device_owner_unexpected'
+  /** A device return (146) is open on the contract — it must close first. */
+  | 'return_open';
 
 /** Which way the money moved on an adjustment row. */
 export type PayoutAdjustDirection = 'TO_BRANCH' | 'FROM_BRANCH';
