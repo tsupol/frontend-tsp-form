@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ร้านคู่ค้าขายเครื่องผ่อน — ดูเป็นคลิป</title>
+<title>ร้านคู่ค้าขาย กองทุนจ่ายคืน — ดูเป็นคลิป</title>
 <style>
   :root{
     --bg:#0a0c10; --panel:#12151c; --panel-2:#171b24; --line:#242a36;
@@ -184,15 +184,29 @@
 
   /* ---------- frame ---------- */
   .framewrap{
-    padding:12px 30px; min-width:0; min-height:0; flex:1 1 auto;
-    display:flex; justify-content:center; align-items:center;
+    padding:14px 30px; min-width:0; min-height:0; flex:1 1 auto;
+    display:flex; justify-content:flex-start; align-items:stretch; gap:0;
   }
+  /* the notes sit left of the screen, divided by one vertical line */
+  .notes{
+    flex:0 0 clamp(210px, 18vw, 270px); min-width:0; min-height:0;
+    display:flex; flex-direction:column; gap:12px;
+    padding:2px 18px 2px 0; margin-right:18px; align-self:stretch;
+    overflow:hidden; position:relative;
+  }
+  /* the divider runs the whole height of the region, not just the notes */
+  .notes::after{
+    content:""; position:absolute; top:-15px; bottom:-15px; right:0;
+    width:1px; background:var(--line);
+  }
+  /* the screen centres itself inside the space left over */
+  .framewrap > .frame{align-self:center}
   .frame{
     position:relative; width:100%; border-radius:12px; overflow:hidden;
     border:1px solid var(--line); background:#000; box-shadow:var(--shadow);
-    aspect-ratio:2524/1481;
-    width:min(100%, calc(var(--bodyh, 60vh) * 2524 / 1481));
-    margin:0 auto;
+    aspect-ratio:1453/851;
+    width:var(--framew, 100%); height:auto;
+    margin:auto;
   }
   .frame img{
     position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
@@ -221,13 +235,9 @@
   }
   .spot.on{opacity:1}
 
-  .caption{
-    position:absolute; left:0; right:0; bottom:0; pointer-events:none;
-    padding:52px 22px 18px;
-    background:linear-gradient(to top,rgba(5,7,11,.96) 34%,rgba(5,7,11,.72) 62%,transparent);
-  }
   .capinner{
-    max-width:min(760px,86%);
+    flex:0 0 auto; margin-top:auto;
+    padding-top:12px; border-top:1px solid var(--line);
     opacity:0; transform:translateY(9px);
     transition:opacity .34s ease, transform .34s ease;
   }
@@ -240,12 +250,10 @@
   .capwho.fund{background:rgba(95,176,255,.18); color:var(--fund)}
   .capwho.auto{background:rgba(139,123,240,.18); color:var(--auto)}
   .captext{
-    font-size:16px; line-height:1.55; font-weight:500; color:#fff;
-    text-shadow:0 2px 14px rgba(0,0,0,.9);
+    font-size:15.5px; line-height:1.5; font-weight:600; color:#fff;
   }
   .capsub{
-    font-size:13px; color:#b9c3d6; margin-top:4px; line-height:1.5;
-    text-shadow:0 2px 12px rgba(0,0,0,.9);
+    font-size:13px; color:var(--dim); margin-top:5px; line-height:1.55;
   }
 
   .marker{
@@ -296,11 +304,16 @@
   /* ---------- notes under the stage ---------- */
   /* the points: one slim row each, not a wall of cards */
   .beats{
-    padding:6px 30px 4px; display:flex; gap:6px; align-items:stretch;
-    overflow:hidden;
+    flex:1 1 auto; min-height:0;
+    display:flex; flex-direction:column; gap:5px; align-items:stretch;
+    overflow-y:auto; overflow-x:hidden; padding-right:6px;
+    scrollbar-width:thin; scrollbar-color:#2f3746 transparent;
   }
+  .beats::-webkit-scrollbar{width:6px}
+  .beats::-webkit-scrollbar-thumb{background:#2f3746; border-radius:3px}
+  .beats::-webkit-scrollbar-track{background:transparent}
   .beat{
-    flex:1 1 0; min-width:0;
+    flex:0 0 auto; min-width:0;
     background:var(--panel); border:1px solid var(--line); border-radius:7px;
     padding:6px 10px; font-size:12px; line-height:1.4; color:var(--dim);
     cursor:pointer; text-align:left; font-family:inherit;
@@ -311,8 +324,10 @@
   .beat[aria-current="true"]{border-color:var(--accent); background:#141b27}
   .beat b{
     display:block; color:var(--text); font-weight:600; font-size:12.2px;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;
+    min-width:0;
   }
+  .beat{align-items:flex-start}
+  .beat .num{margin-top:1px}
   .beat[aria-current="true"] b{color:#fff}
   .beat .sub{display:none}
   .beat .num{
@@ -325,7 +340,14 @@
     .app{grid-template-columns:1fr}
     .railwrap{position:static; height:auto; border-right:0; border-bottom:1px solid var(--line)}
     .rail{position:static; height:auto; overflow:visible}
-    .stagehead,.framewrap,.transport,.beats{padding-left:18px; padding-right:18px}
+    .stagehead,.framewrap,.transport{padding-left:18px; padding-right:18px}
+    .framewrap{flex-direction:column}
+    .notes{
+      flex:0 0 auto; border-right:0; border-bottom:1px solid var(--line);
+      margin-right:0; margin-bottom:12px; padding:0 0 12px;
+      max-height:42vh;
+    }
+    .capinner{margin-top:12px}
   }
 </style>
 </head>
@@ -349,17 +371,17 @@
     <div class="stagehead">
       <div class="scenario">
         <div class="kicker">เรื่องที่กำลังดู</div>
-        <h2>ร้าน DPX ขายไอโฟนให้ลูกค้าด้วยวิธีผ่อน แล้วรอกองทุนจ่ายเงินคืน</h2>
+        <h2>ร้านคู่ค้าขายเครื่องผ่อน แล้วรอกองทุนจ่ายเงินคืน</h2>
         <p>
-          ลูกค้าชื่อ John Tester ซื้อ iPhone 7 ผ่อน 6 เดือน จ่ายดาวน์ที่ร้าน
-          ร้านออกเครื่องให้ก่อน กองทุนเป็นคนออกเงิน แล้วจ่ายค่าเครื่องบวกค่าคอมคืนร้านทีหลัง
-          คลิปนี้เดินตามเงินก้อนนี้ตั้งแต่ลูกค้าเดินเข้าร้าน จนกองทุนโอนเงินให้ร้านเสร็จ
-        </p>
+          ร้านคู่ค้าเป็นคนขายและเป็นเจ้าของเครื่อง แต่เงินที่ปล่อยกู้เป็นของกองทุน
+          ร้านจึงต้องออกเครื่องให้ลูกค้าก่อน แล้วรอกองทุนจ่ายค่าเครื่องบวกค่าคอมคืนทีหลัง
+          คลิปนี้เดินตามเงินก้อนนั้น ตั้งแต่เปิดสัญญา จนเงินเข้าร้านจริง
+</p>
       </div>
       <div class="cast">
-        <span class="s"><b>ร้าน</b> DEV Deal Partner X</span>
+        <span class="s"><b>ร้าน</b> ร้านคู่ค้า</span>
         <span class="f"><b>กองทุน</b> ฝ่ายการเงิน</span>
-        <span class="c"><b>ระบบ</b> สร้างเอกสารเอง</span>
+        <span class="c"><b>ระบบ</b> ออกใบให้เอง</span>
       </div>
       <button class="headtoggle" id="headtoggle" type="button" aria-expanded="true" title="ย่อ/ขยายหัวเรื่อง">
         <svg width="10" height="7" viewBox="0 0 10 7" fill="currentColor"><path d="M5 0L0 5.2 1.5 7 5 3.4 8.5 7 10 5.2z"/></svg>
@@ -369,24 +391,24 @@
 
     <div class="stagebody" id="stagebody">
     <div class="framewrap">
+      <div class="notes" id="notes">
+        <div class="beats" id="beats"></div>
+        <div class="capinner" id="capinner">
+          <span class="capwho" id="capwho"></span>
+          <div class="captext" id="captext"></div>
+          <div class="capsub" id="capsub"></div>
+        </div>
+      </div>
       <div class="frame" id="frame">
         <div class="dim" id="dim"></div>
         <div class="spot" id="spot"></div>
         <div class="marker" id="marker"></div>
-        <div class="caption">
-          <div class="capinner" id="capinner">
-            <span class="capwho" id="capwho"></span>
-            <div class="captext" id="captext"></div>
-            <div class="capsub" id="capsub"></div>
-          </div>
-        </div>
       </div>
     </div>
 
     </div><!-- /stagebody -->
 
     <div class="stagefoot">
-    <div class="beats" id="beats"></div>
     <div class="transport">
       <div class="controls">
         <button class="btn primary" id="play">
@@ -420,114 +442,94 @@
    SCENES
    pct coordinates are % of the frame — measured off the shots.
    ============================================================ */
-const S = 'shots/sc-';
+const S = 'shots/';
 
 const SCENES = [
   {
-    ch: 'ลูกค้าเดินเข้าร้าน',
-    who: 'shop', short: 'ร้านยื่นขออนุมัติ',
-    img: S+'05b-shop-pending-approval-detail.png',
-    title: 'ร้านกรอกสัญญาแล้วส่งให้กองทุนอนุมัติก่อน',
-    sub: 'ร้านขายเองไม่ได้ทันที เพราะเงินไม่ใช่ของร้าน ต้องให้ฝ่ายสินเชื่อของกองทุนรับลูกค้ารายนี้ก่อน',
+    ch: 'ร้านเปิดสัญญา',
+    who: 'shop', short: 'เปิดสัญญาให้ลูกค้า',
+    img: S+'nc-05-plan-table.png',
+    title: 'ร้านคู่ค้าเลือกเครื่องกับแผนผ่อนให้ลูกค้าตรงหน้าเคาน์เตอร์',
+    sub: 'เครื่องเป็นของร้าน ร้านเป็นคนเลือกแผน แต่เงินที่ปล่อยกู้เป็นของกองทุน',
     beats: [
-      { box:[59.3,14.8,39.5,13.5], text:'ใบขออนุมัติสินเชื่อยังอยู่สถานะ "ยื่นแล้ว รอตรวจ"', sub:'ร้านทำได้แค่รอ หรือถอนคำขอ' },
-      { box:[59.3,34.5,39.5,15.5], text:'ลูกค้า John Tester · เครื่อง iPhone 7 128GB', sub:'ร้านเป็นคนเลือกเครื่องและเป็นเจ้าของค่าคอม' },
-      { box:[59.3,58.9,38.9,27.6], text:'ตัวเลขที่ขอ: เก็บรวม 27,860 ดาวน์ 5,970 ผ่อน 10 เดือน', sub:'ยังชำระ 0 เพราะสัญญายังไม่เปิด' },
+      { box:[53,7,44,13], text:'หยิบเครื่องจากสต๊อกของร้านเอง', sub:'ร้านเป็นเจ้าของเครื่อง จึงเป็นเจ้าของค่าคอมด้วย' },
+      { box:[53,38,44,24], text:'เลือกจำนวนงวด ระบบคิดค่างวดและกำไรให้ทันที', sub:'ยิ่งผ่อนยาว ค่างวดยิ่งต่ำ แต่รวมแล้วจ่ายมากกว่า' },
     ],
   },
   {
-    ch: 'ลูกค้าเดินเข้าร้าน',
-    who: 'shop', short: 'สัญญาใช้งานแล้ว',
-    img: S+'01-shop-contract-list.png',
-    title: 'อนุมัติผ่าน ลูกค้าจ่ายดาวน์แล้วเซ็น สัญญาขึ้นสถานะใช้งาน',
-    sub: 'ตั้งแต่จุดนี้ลูกค้าได้เครื่องกลับบ้าน และเริ่มผ่อนกับกองทุน',
+    ch: 'สัญญาเกิดขึ้น',
+    who: 'auto', short: 'ได้สัญญาหนึ่งใบ',
+    img: S+'nc-12-new-contract-detail.png',
+    title: 'ได้สัญญาหนึ่งใบ ที่รวมลูกค้า เครื่อง และแผนไว้ด้วยกัน',
+    sub: 'ตัวเลขบนใบนี้จะตามไปทุกจอหลังจากนี้ ทั้งฝั่งร้านและฝั่งกองทุน',
     beats: [
-      { box:[28.6,15.5,17,4.2], text:'สัญญา CT-2609-000591-4 ขึ้นป้าย "ใช้งาน"', sub:'ลูกค้าถือเครื่องออกจากร้านได้แล้ว' },
-      { box:[45.8,15.9,6.2,4], text:'ค่างวด 4,890 · งวดที่ 1 จาก 6', sub:'ลูกค้าจะโอนเข้าบัญชีกองทุนโดยตรง ร้านไม่ยุ่ง' },
+      { box:[52,17,46,13], text:'ลูกค้า สาขา และเจ้าของค่าคอม อยู่บนใบเดียวกัน', sub:'เจ้าของค่าคอมคือคนที่จะได้เงินส่วนแบ่ง' },
+      { box:[52,32,46,24], text:'ราคาที่ตกลง เงินดาวน์ ค่างวด และจำนวนเดือน', sub:'กองทุนจะใช้ตัวเลขชุดนี้คิดว่าต้องจ่ายร้านเท่าไหร่' },
     ],
   },
   {
-    ch: 'เงินของร้าน',
-    who: 'auto', short: 'ใบขอรับเงินเกิดเอง',
-    img: S+'02-shop-contract-detail.png',
-    title: 'พอสัญญาใช้งาน ระบบสร้างใบขอรับเงินให้เอง',
-    sub: 'ร้านไม่ต้องกดสร้าง นี่คือใบที่บอกว่ากองทุนติดเงินร้านอยู่เท่าไหร่ จากสัญญาใบนี้',
+    ch: 'ร้านมีสิทธิ์ได้เงิน',
+    who: 'auto', short: 'ยอดที่รอรับ',
+    img: S+'sc-08-shop-partner-payouts.png',
+    title: 'ร้านเห็นยอดที่กองทุนยังไม่ได้จ่าย และที่จ่ายไปแล้ว',
+    sub: 'ร้านไม่ต้องทำเรื่องเบิก ระบบตั้งยอดให้ตามสัญญาที่เปิด',
     beats: [
-      { box:[54,18.5,44,5.2], text:'ใบขอรับเงิน PS-2609-000004-8 เกิดขึ้นเอง', sub:'หนึ่งสัญญาได้หนึ่งใบ ป้ายขวาบอกว่ายัง "รอยื่นปิดงาน"' },
-      { box:[54,24.8,44,10.6], text:'ค่าเครื่อง +19,900 และค่าคอมร้าน +2,706 (17%)', sub:'สองก้อนนี้คือสิ่งที่กองทุนต้องจ่ายร้าน' },
-      { box:[54,35.6,44,10.4], text:'หักเงินดาวน์ 3,980 และค่าทำสัญญา 100 ที่ร้านเก็บไปแล้ว', sub:'เงินสองก้อนนี้ลูกค้าจ่ายที่ร้าน ร้านถือไว้เลย จึงหักออก' },
-      { box:[54,47.6,44,4.6], text:'เหลือสุทธิที่ร้านจะได้รับ 18,526', sub:'ตัวเลขนี้จะตามไปทุกจอหลังจากนี้' },
+      { box:[28.5,5,10,6], text:'ยอดที่ยังไม่ได้รับ จากสัญญาที่ยังไม่ปิดงาน', sub:'นี่คือเงินที่ร้านรออยู่' },
+      { box:[34.5,5,10,6], text:'ยอดที่รับแล้ว จากสัญญาก่อนหน้า', sub:'ประวัติว่ากองทุนเคยจ่ายไปเท่าไหร่' },
+      { box:[28,15,29,6], text:'ใบจ่ายเงินที่จ่ายแล้ว รวมหลายสัญญาไว้ในใบเดียว', sub:'ยอดบนใบน้อยกว่ายอดเต็ม เพราะมีการหักกลบ' },
+      { box:[28,22,29,8], text:'ใบที่ถูกกลับรายการ เพราะจ่ายผิดพลาด', sub:'ยอดเดิมขีดฆ่า ไม่นับเป็นเงินที่ร้านได้' },
+    ],
+  },
+
+  {
+    ch: 'ผูกเครื่องกับสัญญา',
+    who: 'shop', short: 'ระบุเครื่องให้ชัด',
+    img: S+'sc-04-shop-device-tab.png',
+    title: 'เครื่องที่ขายไป ต้องระบุให้ชัดว่าเป็นเครื่องไหน',
+    sub: 'กองทุนออกเงินให้เครื่องเครื่องนี้ ไม่ใช่รุ่นนี้ จึงต้องรู้ว่าเป็นตัวไหน',
+    beats: [
+      { box:[54,18,44,10], text:'รหัสเครื่องและรุ่นที่ผูกกับสัญญาใบนี้', sub:'ป้ายมุมขวาบอกว่าเครื่องอยู่กับลูกค้าแล้ว' },
+      { box:[54,29.5,44,5.5], text:'หมายเลขเครื่องกับสภาพ ติดอยู่กับสัญญา', sub:'เครื่องหายหรือถูกเปลี่ยน ตามกลับได้จากเลขนี้' },
+      { box:[54,36,44,10], text:'ยังไม่ได้ผูก iCloud — กดผูกได้จากตรงนี้', sub:'เครื่องที่ผูกแล้ว ล็อกจากระยะไกลได้ถ้าลูกค้าหยุดจ่าย' },
+      { box:[54,42,26,6], text:'สั่งส่งซ่อม ถอดเครื่อง หรือรับฝากเครื่องได้จากจอเดียว', sub:'ทุกอย่างที่ทำกับเครื่องเครื่องนี้ อยู่ที่เดียวกัน' },
+    ],
+  },
+
+  {
+    ch: 'กองทุนเห็นยอดค้าง',
+    who: 'fund', short: 'ค้างจ่ายร้านเท่าไหร่',
+    img: S+'sc-13-fund-balance.png',
+    title: 'ฝั่งกองทุนเห็นว่าค้างจ่ายร้านไหนอยู่เท่าไหร่',
+    sub: 'ร้านคู่ค้าหลายร้านมารวมกันตรงนี้ กองทุนเลือกว่าจะจ่ายใครก่อน',
+    beats: [
+      { box:[18,13,14,6], text:'ร้านคู่ค้ารายนี้มีใบที่ยังเปิดค้างอยู่', sub:'ใบเดียวกับที่เพิ่งเห็นฝั่งร้าน' },
+      { box:[59,13,10,6], text:'ยอดค้างจ่าย ตรงกับยอดสุทธิบนใบขอรับเงิน', sub:'เลขสองฝั่งต้องตรงกันเสมอ' },
+      { box:[70,12,13,8], text:'ประวัติที่จ่ายไปแล้วของร้านนี้', sub:'ใช้ดูว่าร้านนี้ค้างสะสมหรือเปล่า' },
     ],
   },
   {
-    ch: 'เงินของร้าน',
-    who: 'shop', short: 'ด่านก่อนยื่นปิดงาน',
-    img: S+'06b-shop-settlement-close-detail.png',
-    title: 'ร้านจะขอเงินได้ ต้องพิสูจน์ว่าส่งมอบเครื่องจริง',
-    sub: 'นี่คือด่านที่กันไม่ให้ร้านรับเงินไปก่อนที่เครื่องจะถึงมือลูกค้า',
+    ch: 'กองทุนโอนเงิน',
+    who: 'fund', short: 'จ่ายทีเดียวหลายใบ',
+    img: S+'sc-14c-fund-payout-detail.png',
+    title: 'กองทุนรวมหลายใบเข้าใบจ่ายเดียว แล้วโอนทีเดียว',
+    sub: 'ร้านไม่ได้รับเงินทีละสัญญา แต่รับเป็นก้อนตามรอบที่กองทุนจ่าย',
     beats: [
-      { box:[28.8,5.6,22,5.4], text:'ยอดที่ยังไม่ได้รับ 18,526 · ที่รับแล้ว 56,802', sub:'ร้านเห็นยอดค้างของตัวเองทั้งหมดตรงนี้' },
-      { box:[60,55.4,30,3.8], text:'ผูกเครื่องกับสัญญาแล้ว — ผ่าน', sub:'เครื่องเครื่องไหนที่ขายไป ต้องระบุหมายเลขชัด' },
-      { box:[60,58.7,38,7.6], text:'รูปส่งมอบยังไม่ครบ — ยังไม่ผ่าน', sub:'ต้องมีรูปลูกค้าคู่บัตร รูปกำลังเซ็น และรูปถือบัตรพร้อมเครื่อง' },
-      { box:[91.8,68,6.5,3.6], text:'ปุ่มยื่นปิดงานจะกดได้ก็ต่อเมื่อครบทั้งสองข้อ', sub:'ครบเมื่อไหร่ ใบขอรับเงินถึงจะวิ่งไปหากองทุน' },
+      { box:[16,0,36,6], text:'ใบจ่ายเงินหนึ่งใบ คือการโอนจริงหนึ่งครั้ง', sub:'มีเลขใบของตัวเอง ไล่ย้อนได้' },
+      { box:[24,10,64,15], text:'บัญชีร้านถูกจดลงบนใบตอนออกใบ', sub:'ไม่ได้ดึงสดตอนโอน บัญชีจึงไม่เปลี่ยนกลางคัน' },
+      { box:[24,30,64,25], text:'ข้างในมีใบขอรับเงินหลายใบรวมกัน', sub:'ใบที่เราตามมาทั้งคลิป อยู่ในนี้' },
+      { box:[24,57,64,13], text:'แถวปรับยอด หักกลบหนี้ที่ร้านค้างกองทุน', sub:'หนี้สองทางถูกหักกันบนใบเดียว จึงโอนจริงน้อยกว่ายอดรวม' },
     ],
   },
   {
-    ch: 'ฝั่งกองทุน',
-    who: 'fund', short: 'กองทุนเห็นงานค้าง',
-    img: S+'11-fund-dashboard.png',
-    title: 'ฝั่งกองทุนเห็นสัญญาใบเดียวกันโผล่ในงานที่ต้องทำ',
-    sub: 'คนละล็อกอิน คนละบริษัท แต่มองเห็นเคสเดียวกัน',
-    beats: [
-      { box:[20.5,40.9,23.9,16.3], text:'งานรอทำ: สัญญารอเซ็นเอกสาร 1 ใบ — CT-2609-000591-4 · John Tester', sub:'ชื่อลูกค้าคนเดิมกับที่ร้านเพิ่งขาย' },
-    ],
-  },
-  {
-    ch: 'ฝั่งกองทุน',
-    who: 'fund', short: 'ยอดค้างต่อร้าน',
-    img: S+'13-fund-balance.png',
-    title: 'กองทุนดูว่าค้างจ่ายร้านไหนอยู่เท่าไหร่',
-    sub: 'หน้านี้ตอบคำถามเดียว — เดือนนี้ต้องเตรียมเงินให้ร้านนี้เท่าไหร่',
-    beats: [
-      { box:[21.2,15.6,10,3.6], text:'ร้าน DEV Deal Partner X มีใบที่ยังเปิดอยู่ 1 ใบ', sub:'ใบเดียวกับที่เพิ่งเห็นฝั่งร้าน' },
-      { box:[62.2,15.6,4.4,3.6], text:'ยอดค้างจ่าย 18,526', sub:'ตรงกับยอดสุทธิบนใบขอรับเงินเป๊ะ' },
-      { box:[72.3,15.1,9.1,4.8], text:'จ่ายไปแล้ว 56,802 จาก 2 ใบก่อนหน้า', sub:'ประวัติการจ่ายของร้านนี้' },
-    ],
-  },
-  {
-    ch: 'จ่ายเงิน',
-    who: 'fund', short: 'ใบจ่ายเงินที่จ่ายแล้ว',
-    img: S+'14c-fund-payout-detail.png',
-    title: 'กองทุนรวมหลายใบเข้าใบจ่ายเงินเดียว แล้วโอนทีเดียว',
-    sub: 'ร้านไม่ได้รับเงินเป็นรายสัญญา แต่ได้เป็นก้อนตามรอบโอน',
-    beats: [
-      { box:[18,1,32,4.2], text:'ใบจ่ายเงิน PP-2609-000002-2 สถานะจ่ายแล้ว', sub:'หนึ่งใบจ่ายเงิน = หนึ่งครั้งที่โอนจริง' },
-      { box:[26.1,12.1,62.1,12.5], text:'บัญชีร้านที่จดไว้บนใบ KBANK · ยอดที่ต้องโอน 56,802', sub:'เลขบัญชีถูกจดลงบนใบตอนออกใบ ไม่ใช่ดึงสด' },
-      { box:[26.1,31.3,62.1,23.4], text:'ข้างในมีใบขอรับเงิน 2 ใบ รวมถึง John Tester 18,526', sub:'ใบที่เราตามมาทั้งคลิป อยู่ในนี้' },
-      { box:[26.1,58.5,62.1,12], text:'แถวปรับยอด: ร้านโอนคืน 39,276 จากการซื้อคืนเครื่อง', sub:'หนี้สองทางถูกหักกลบบนใบเดียว จึงจ่ายจริงแค่ 17,526' },
-    ],
-  },
-  {
-    ch: 'จ่ายเงิน',
-    who: 'shop', short: 'ร้านเห็นค่าคอมที่ได้',
-    img: S+'09-shop-commission.png',
+    ch: 'ร้านเห็นเงินที่ได้',
+    who: 'shop', short: 'ค่าคอมเข้าแล้ว',
+    img: S+'sc-09-shop-commission.png',
     title: 'ร้านเปิดรายงานค่าคอม เห็นว่าเงินเข้าจากใบไหน',
-    sub: 'ปลายทางของทั้งเรื่อง — ร้านรู้ว่าตัวเองได้เท่าไหร่ จากสัญญาไหน',
+    sub: 'ปลายทางของทั้งเรื่อง คือร้านได้ค่าเครื่องคืนบวกค่าคอมจากการขาย',
     beats: [
-      { box:[29.1,6.3,7.9,6.1], text:'ค่าคอมเดือนนี้รวม 8,282 จาก 2 สัญญา', sub:'สุทธิที่ได้จริง 56,802' },
-      { box:[28.3,29.8,56,6.2], text:'แถวของ John Tester: ยอดจัด 15,920 อัตรา 17% ค่าคอม 2,706', sub:'สุทธิ 18,526 — เลขเดิมตั้งแต่ต้นคลิป' },
-      { box:[85.3,29.8,13.9,6.2], text:'อ้างถึงใบจ่ายเงิน PP-2609-000002-2', sub:'ย้อนกลับไปดูใบที่โอนได้ทันที' },
-    ],
-  },
-  {
-    ch: 'ปิดวัน',
-    who: 'fund', short: 'กองทุนปิดเงินรายวัน',
-    img: S+'15-fund-day-money.png',
-    title: 'ปลายวัน กองทุนนับเงินที่เข้าจริงเทียบกับที่ระบบรู้',
-    sub: 'ค่างวดที่ลูกค้าโอนเข้ามา มาโผล่ที่นี่',
-    beats: [
-      { box:[23.1,19.1,68.7,4.3], text:'เงินจากสัญญา: ค่างวดรับเข้า +4,890 จาก 1 รายการ', sub:'งวดแรกของ John Tester ที่เพิ่งจ่าย' },
-      { box:[24.3,35.3,66.5,17], text:'แยกตามบัญชี — ยอดระบบเข้า 4,890 เทียบกับยอดจริงที่กรอกเอง', sub:'ตรงกันคือปิดวันได้ ไม่ตรงคือมีอะไรหาย' },
+      { box:[27,4,12,9], text:'ค่าคอมรวมของเดือนนี้ จากหลายสัญญา', sub:'สุทธิที่ได้จริงหลังหักทุกอย่างแล้ว' },
+      { box:[27,28,58,9], text:'แถวของสัญญาที่เราตามมา พร้อมอัตราค่าคอม', sub:'เลขเดิมตั้งแต่ตอนเปิดสัญญา' },
+      { box:[84,28,15,9], text:'อ้างถึงใบจ่ายเงินที่โอนมา', sub:'กดย้อนกลับไปดูใบที่โอนได้ทันที' },
     ],
   },
 ];
@@ -544,7 +546,7 @@ const capWho  = document.getElementById('capwho');
 const capTxt  = document.getElementById('captext');
 const capSub  = document.getElementById('capsub');
 const railEl  = document.getElementById('rail');
-const beatsEl = document.getElementById('beats');
+let beatsEl = document.getElementById('beats');
 const posEl   = document.getElementById('pos');
 const playBtn = document.getElementById('play');
 const playLab = document.getElementById('playlabel');
@@ -596,14 +598,18 @@ function renderBeats() {
   });
 }
 
-/* --- mask so only the spotlight stays bright --- */
-function setMask(box) {
-  if (!box) { dimEl.classList.remove('on'); return; }
+/* --- no dimming: the screen stays fully readable --- */
+function setMask() { dimEl.classList.remove('on'); }
+
+/* --- pad a box so the outline never crowds the text inside it --- */
+const PAD_X = 1.1, PAD_Y = 1.6;   // percent of frame
+function padBox(box) {
   const [x, y, w, h] = box;
-  const g = 'radial-gradient(ellipse ' + (w*0.78) + '% ' + (h*0.95) + '% at ' +
-            (x + w/2) + '% ' + (y + h/2) + '%, transparent 45%, #000 100%)';
-  dimEl.style.setProperty('--mask', g);
-  dimEl.classList.add('on');
+  const nx = Math.max(0.4, x - PAD_X);
+  const ny = Math.max(0.4, y - PAD_Y);
+  const nw = Math.min(99.6 - nx, w + PAD_X * 2);
+  const nh = Math.min(99.6 - ny, h + PAD_Y * 2);
+  return [nx, ny, nw, nh];
 }
 
 function show(sceneIdx, beatIdx) {
@@ -626,13 +632,13 @@ function show(sceneIdx, beatIdx) {
   });
   if (changedScene) bms[si].scrollIntoView({ block:'nearest' });
 
-  const [x, y, w, h] = bt.box;
+  const [x, y, w, h] = padBox(bt.box);
   spotEl.style.left = x + '%'; spotEl.style.top = y + '%';
   spotEl.style.width = w + '%'; spotEl.style.height = h + '%';
   spotEl.classList.add('on');
   markEl.style.left = Math.max(x, 2.2) + '%'; markEl.style.top = y + '%';
   markEl.textContent = bi + 1; markEl.classList.add('on');
-  setMask(bt.box);
+  setMask();
 
   capIn.classList.remove('on');
   capWho.className = 'capwho ' + sc.who;
@@ -747,7 +753,7 @@ syncRailBar();
 const bodyEl = document.getElementById('stagebody');
 let userSetMini = false;
 
-const RATIO = 2524 / 1481;
+const RATIO = 1453 / 851;
 /* When the window is short, the scenario blurb yields before the screen does —
    the screen is the point of the page, the blurb is not. */
 function autoMini() {
@@ -756,23 +762,20 @@ function autoMini() {
 }
 function sizeFrame() {
   autoMini();
+  const frameEl = document.getElementById('frame');
+  const wrap = document.querySelector('.framewrap');
+  if (!frameEl || !wrap) return;
   const region = bodyEl.clientHeight;
-  // The cards keep a fixed share of the region rather than being measured —
-  // measuring them here would shrink the frame, reflow the cards, and loop.
-  // The cards take a share of the region, but never so much that the screen
-  // is squeezed below a readable size — they drop away when space runs out.
-  const beats = document.getElementById('beats');
-  let cards = 37; // one slim row of points, plus its band padding
-  if (region - cards < 170) cards = 0;
-  beats.style.display = cards ? '' : 'none';
-  beats.style.height = cards + 'px';
-  beats.style.overflow = 'hidden';
-  const pad = 24; // .framewrap padding, top and bottom
-  const availH = Math.max(120, region - cards - pad);
-  const availW = document.querySelector('.framewrap').clientWidth - 60;
-  // fit inside BOTH: never taller than the space, never wider than the column
-  const h = Math.min(availH, availW / RATIO);
-  document.documentElement.style.setProperty('--bodyh', h + 'px');
+  const pad = 28; // .framewrap padding, top and bottom
+  const availH = Math.max(120, region - pad);
+  // the notes column sits beside the screen now, so its width is already
+  // out of the wrap's inner width — no vertical band to subtract.
+  const notesEl = wrap.querySelector('.notes');
+  const notesW = notesEl ? notesEl.getBoundingClientRect().width + 18 : 0;
+  const availW = Math.max(160, wrap.clientWidth - notesW - 12);
+  // fit inside BOTH: never wider than the column, never taller than the space
+  const w = Math.min(availW, availH * RATIO);
+  document.documentElement.style.setProperty('--framew', w + 'px');
 }
 /* observe the region only — observing the cards too would feed back */
 new ResizeObserver(sizeFrame).observe(bodyEl);
