@@ -123,41 +123,36 @@
     display:grid; grid-template-rows:auto minmax(0,1fr) auto;
     min-width:0; height:100dvh; overflow:hidden; position:relative;
   }
+  /* the middle never scrolls — the screen shrinks to fit what is left */
   .stagebody{
-    min-height:0; overflow-y:auto; overflow-x:hidden;
-    scrollbar-width:none; -ms-overflow-style:none;
+    min-height:0; overflow:hidden;
     display:flex; flex-direction:column;
   }
-  .stagebody::-webkit-scrollbar{width:0; height:0}
-  .bodyscroll{
-    position:absolute; right:3px; width:5px;
-    pointer-events:none; opacity:0; transition:opacity .25s; z-index:6;
-  }
-  .stage:hover .bodyscroll, .bodyscroll.live{opacity:1}
-  .bodyscroll .thumb{
-    position:absolute; left:0; width:5px; border-radius:3px;
-    background:rgba(255,255,255,.3); pointer-events:auto;
-    transition:background .2s;
-  }
-  .bodyscroll .thumb:hover{background:rgba(255,255,255,.5)}
   .stagehead{
-    padding:22px 30px 0; display:flex; align-items:flex-start;
+    padding:18px 30px 16px; display:flex; align-items:flex-start;
     justify-content:space-between; gap:20px; flex-wrap:wrap;
-    position:relative;
+    position:relative; border-bottom:1px solid var(--line);
   }
+  /* the points sit in their own band under the screen */
+  .beats{border-top:1px solid var(--line)}
+  .transport{border-top:1px solid var(--line)}
+  /* a quiet chevron on the title line, not a boxed button */
   .headtoggle{
-    position:absolute; top:18px; right:30px;
-    background:var(--panel-2); border:1px solid var(--line); color:var(--dim);
-    border-radius:7px; padding:4px 9px; font:inherit; font-size:11.5px;
-    cursor:pointer; display:inline-flex; align-items:center; gap:6px;
+    position:absolute; top:14px; right:24px;
+    background:none; border:0; color:var(--faint);
+    width:28px; height:28px; border-radius:50%; padding:0;
+    cursor:pointer; display:inline-grid; place-items:center;
     transition:background .15s, color .15s;
   }
-  .headtoggle:hover{background:#1e2430; color:var(--text)}
+  .headtoggle:hover{background:var(--panel-2); color:var(--text)}
   .headtoggle svg{transition:transform .25s ease}
+  .headtoggle span{
+    position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%);
+  }
 
   /* --- collapsed: header shrinks to one line --- */
   .minibar{display:none}
-  body.mini .stagehead{padding:12px 30px 0}
+  body.mini .stagehead{padding:10px 30px 10px}
   body.mini .scenario p,
   body.mini .scenario .kicker,
   body.mini .cast{display:none}
@@ -166,7 +161,7 @@
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
     max-width:calc(100vw - 460px); margin:0;
   }
-  body.mini .headtoggle{top:9px}
+  body.mini .headtoggle{top:6px}
   body.mini .headtoggle svg{transform:rotate(180deg)}
   body.mini .framewrap{padding-top:10px}
   .scenario{max-width:720px}
@@ -189,8 +184,8 @@
 
   /* ---------- frame ---------- */
   .framewrap{
-    padding:16px 30px 0; min-width:0; flex:0 0 auto;
-    display:flex; justify-content:center;
+    padding:16px 30px 0; min-width:0; min-height:0; flex:1 1 auto;
+    display:flex; justify-content:center; align-items:flex-start;
   }
   .frame{
     position:relative; width:100%; border-radius:12px; overflow:hidden;
@@ -299,20 +294,32 @@
   }
 
   /* ---------- notes under the stage ---------- */
+  /* the points: one slim row each, not a wall of cards */
   .beats{
-    padding:14px 30px 22px; display:grid; gap:9px;
-    grid-template-columns:repeat(auto-fit,minmax(215px,1fr));
+    padding:8px 30px 10px; display:flex; gap:7px; align-items:stretch;
+    overflow:hidden;
   }
   .beat{
-    background:var(--panel); border:1px solid var(--line); border-radius:9px;
-    padding:11px 13px; font-size:12.8px; line-height:1.55; color:var(--dim);
+    flex:1 1 0; min-width:0;
+    background:var(--panel); border:1px solid var(--line); border-radius:7px;
+    padding:6px 10px; font-size:12px; line-height:1.4; color:var(--dim);
     cursor:pointer; text-align:left; font-family:inherit;
+    display:flex; align-items:center; gap:8px;
     transition:border-color .16s, background .16s;
   }
   .beat:hover{border-color:#39435a; background:var(--panel-2)}
   .beat[aria-current="true"]{border-color:var(--accent); background:#141b27}
-  .beat b{display:block; color:var(--text); font-weight:600; margin-bottom:2px; font-size:13px}
-  .beat .num{font-family:var(--mono); font-size:10.5px; color:var(--faint)}
+  .beat b{
+    display:block; color:var(--text); font-weight:600; font-size:12.2px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;
+  }
+  .beat[aria-current="true"] b{color:#fff}
+  .beat .sub{display:none}
+  .beat .num{
+    font-family:var(--mono); font-size:10px; color:var(--faint);
+    flex:0 0 auto; background:var(--panel-2); border-radius:4px; padding:1px 5px;
+  }
+  .beat[aria-current="true"] .num{background:var(--accent); color:#06121f; font-weight:700}
 
   @media (max-width:980px){
     .app{grid-template-columns:1fr}
@@ -340,7 +347,7 @@
   <main class="stage">
 
     <div class="stagehead">
-      <button class="headtoggle" id="headtoggle" type="button" aria-expanded="true">
+      <button class="headtoggle" id="headtoggle" type="button" aria-expanded="true" title="ย่อ/ขยายหัวเรื่อง">
         <svg width="10" height="7" viewBox="0 0 10 7" fill="currentColor"><path d="M5 0L0 5.2 1.5 7 5 3.4 8.5 7 10 5.2z"/></svg>
         <span id="headtogglelabel">ย่อหัวเรื่อง</span>
       </button>
@@ -378,8 +385,6 @@
 
     <div class="beats" id="beats"></div>
     </div><!-- /stagebody -->
-
-    <div class="bodyscroll" id="bodyscroll"><div class="thumb" id="bodythumb"></div></div>
 
     <div class="transport">
       <div class="controls">
@@ -582,8 +587,8 @@ function renderBeats() {
     const c = document.createElement('button');
     c.className = 'beat'; c.type = 'button';
     c.setAttribute('aria-current', j === bi ? 'true' : 'false');
-    c.innerHTML = '<span class="num">' + (j+1) + ' / ' + SCENES[si].beats.length +
-      '</span><b>' + bt.text + '</b>' + (bt.sub ? bt.sub : '');
+    c.innerHTML = '<span class="num">' + (j+1) + '</span><b>' + bt.text + '</b>';
+    c.title = bt.text + (bt.sub ? ' — ' + bt.sub : '');
     c.addEventListener('click', () => { show(si, j); pause(); });
     beatsEl.appendChild(c);
   });
@@ -736,57 +741,36 @@ railThumb.addEventListener('pointerdown', e => {
 });
 syncRailBar();
 
-/* --- the middle region: its own overlay bar, and it sizes the frame --- */
+/* --- the middle region sizes the screen to fit --- */
 const bodyEl = document.getElementById('stagebody');
-const bodyTrack = document.getElementById('bodyscroll');
-const bodyThumb = document.getElementById('bodythumb');
-let bodyFade = null;
+let userSetMini = false;
 
-function placeBodyTrack() {
-  const s = document.querySelector('.stage').getBoundingClientRect();
-  const b = bodyEl.getBoundingClientRect();
-  bodyTrack.style.top = (b.top - s.top + 6) + 'px';
-  bodyTrack.style.height = (b.height - 12) + 'px';
+const RATIO = 2524 / 1481;
+/* When the window is short, the scenario blurb yields before the screen does —
+   the screen is the point of the page, the blurb is not. */
+function autoMini() {
+  if (userSetMini) return;
+  document.body.classList.toggle('mini', window.innerHeight < 760);
 }
-function syncBodyBar() {
-  placeBodyTrack();
-  const { scrollHeight: sh, clientHeight: ch, scrollTop: st } = bodyEl;
-  if (sh <= ch + 1) { bodyTrack.style.display = 'none'; return; }
-  bodyTrack.style.display = '';
-  const trackH = bodyTrack.clientHeight;
-  const h = Math.max(28, trackH * (ch / sh));
-  bodyThumb.style.height = h + 'px';
-  bodyThumb.style.transform = 'translateY(' + ((trackH - h) * (st / (sh - ch))) + 'px)';
-}
-bodyEl.addEventListener('scroll', () => {
-  syncBodyBar();
-  bodyTrack.classList.add('live');
-  clearTimeout(bodyFade);
-  bodyFade = setTimeout(() => bodyTrack.classList.remove('live'), 900);
-}, { passive: true });
-bodyThumb.addEventListener('pointerdown', e => {
-  e.preventDefault();
-  const startY = e.clientY, startTop = bodyEl.scrollTop;
-  const { scrollHeight: sh, clientHeight: ch } = bodyEl;
-  const trackH = bodyTrack.clientHeight, thumbH = bodyThumb.offsetHeight;
-  const move = ev => { bodyEl.scrollTop = startTop + (ev.clientY - startY) * ((sh - ch) / (trackH - thumbH)); };
-  const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
-  window.addEventListener('pointermove', move);
-  window.addEventListener('pointerup', up);
-});
-
-/* The frame fills what the middle region has left once the beat cards
-   below it have taken their natural height. */
 function sizeFrame() {
+  autoMini();
   const region = bodyEl.clientHeight;
   // The cards keep a fixed share of the region rather than being measured —
   // measuring them here would shrink the frame, reflow the cards, and loop.
-  const cards = Math.round(Math.min(150, Math.max(96, region * 0.19)));
-  document.getElementById('beats').style.minHeight = cards + 'px';
+  // The cards take a share of the region, but never so much that the screen
+  // is squeezed below a readable size — they drop away when space runs out.
+  const beats = document.getElementById('beats');
+  let cards = 47; // one slim row of points, plus its band padding
+  if (region - cards < 170) cards = 0;
+  beats.style.display = cards ? '' : 'none';
+  beats.style.height = cards + 'px';
+  beats.style.overflow = 'hidden';
   const pad = 16; // .framewrap top padding
-  document.documentElement.style.setProperty(
-    '--bodyh', Math.max(240, region - cards - pad) + 'px');
-  syncBodyBar();
+  const availH = Math.max(120, region - cards - pad);
+  const availW = document.querySelector('.framewrap').clientWidth - 60;
+  // fit inside BOTH: never taller than the space, never wider than the column
+  const h = Math.min(availH, availW / RATIO);
+  document.documentElement.style.setProperty('--bodyh', h + 'px');
 }
 /* observe the region only — observing the cards too would feed back */
 new ResizeObserver(sizeFrame).observe(bodyEl);
@@ -799,10 +783,18 @@ function setMini(on) {
   document.body.classList.toggle('mini', on);
   headBtn.setAttribute('aria-expanded', on ? 'false' : 'true');
   headLab.textContent = on ? 'ขยายหัวเรื่อง' : 'ย่อหัวเรื่อง';
+  headBtn.title = on ? 'ขยายหัวเรื่อง' : 'ย่อหัวเรื่อง';
   try { localStorage.setItem('clipMini', on ? '1' : '0'); } catch (e) {}
 }
-headBtn.addEventListener('click', () => setMini(!document.body.classList.contains('mini')));
-try { if (localStorage.getItem('clipMini') === '1') setMini(true); } catch (e) {}
+headBtn.addEventListener('click', () => {
+  userSetMini = true;
+  setMini(!document.body.classList.contains('mini'));
+  sizeFrame();
+});
+try {
+  const saved = localStorage.getItem('clipMini');
+  if (saved !== null) { userSetMini = true; setMini(saved === '1'); }
+} catch (e) {}
 
 document.addEventListener('keydown', e => {
   if (e.target.matches('input,textarea')) return;
