@@ -193,7 +193,10 @@ export function SettlementCard({
         )}
 
         {/* The checklist. The items come from the backend — never hardcoded. */}
-        {caps && caps.checks.checks.length > 0 && (
+        {/* The checklist is what stands between the shop and submitting, so it
+            goes away once neither close-out button is on offer — after payment
+            it would describe a submission that can no longer happen. */}
+        {caps && caps.checks.checks.length > 0 && (submitAction || withdrawAction) && (
           <div className="mt-3">
             <div className="text-xs font-medium text-subtle uppercase tracking-wider">
               {t('settlement.checklist')}
