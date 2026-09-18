@@ -184,8 +184,8 @@
 
   /* ---------- frame ---------- */
   .framewrap{
-    padding:12px 30px 0; min-width:0; min-height:0; flex:1 1 auto;
-    display:flex; justify-content:center; align-items:flex-start;
+    padding:12px 30px; min-width:0; min-height:0; flex:1 1 auto;
+    display:flex; justify-content:center; align-items:center;
   }
   .frame{
     position:relative; width:100%; border-radius:12px; overflow:hidden;
@@ -767,7 +767,7 @@ function sizeFrame() {
   beats.style.display = cards ? '' : 'none';
   beats.style.height = cards + 'px';
   beats.style.overflow = 'hidden';
-  const pad = 16; // .framewrap top padding
+  const pad = 24; // .framewrap padding, top and bottom
   const availH = Math.max(120, region - cards - pad);
   const availW = document.querySelector('.framewrap').clientWidth - 60;
   // fit inside BOTH: never taller than the space, never wider than the column
