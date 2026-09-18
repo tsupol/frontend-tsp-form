@@ -6,6 +6,7 @@ import { AlertTriangle, Building2, ChevronRight, Warehouse, XCircle } from 'luci
 import { apiClient } from '../lib/api';
 import { ApiError } from '../lib/api';
 import { translateApiError } from '../lib/apiErrors';
+import { useCompanyTypes } from '../hooks/useCompanyTypes';
 
 // ============================================================================
 // Deal partner — company-level terms (work order §6c, migs 1218/1219).
@@ -41,6 +42,8 @@ interface CompanyConfigRow {
   company_name: string;
   holding_id: number;
   doc_fee_owner_type: DocFeeOwnerType;
+  /** mig 1257 — deal partner shops only exist under a fund company. */
+  company_type: string | null;
   override_owner_to_holding: boolean;
   effective_doc_fee_owner_type: DocFeeOwnerType;
   deal_partner_branch_count: number;
@@ -105,10 +108,25 @@ export function DealPartnerCompanySection({ canManage }: { canManage: boolean })
   const toggleGroup = (companyId: number, defaultOpen: boolean) =>
     setOpenGroups(prev => ({ ...prev, [companyId]: !(prev[companyId] ?? defaultOpen) }));
 
-  const { data: companyConfigs = [], isLoading: companiesLoading, error: companiesError } = useQuery({
+  const { canHoldMoney, isLoading: companyTypesLoading } = useCompanyTypes();
+
+  const { data: allCompanyConfigs = [], isLoading: companiesLoading, error: companiesError } = useQuery({
     queryKey: ['deal-partner-company-configs'],
     queryFn: () => apiClient.get<CompanyConfigRow[]>('/v_deal_partner_company_configs'),
   });
+
+  // Item ง of the company-type work order: a deal partner shop can only exist
+  // under a fund company, so these settings are meaningless for the operating
+  // ones — and on DEV they were four of five rows. Which types hold money is
+  // read from v_ref_company_types, never compared against the literal FINANCIER.
+  // While the ref view is still loading nothing is filtered out, so the section
+  // never flashes empty.
+  const companyConfigs = useMemo(
+    () => (companyTypesLoading
+      ? allCompanyConfigs
+      : allCompanyConfigs.filter(c => canHoldMoney(c.company_type))),
+    [allCompanyConfigs, canHoldMoney, companyTypesLoading],
+  );
 
   const { data: warehouses = [], isLoading: warehousesLoading, error: warehousesError } = useQuery({
     queryKey: ['deal-partner-warehouses'],
@@ -125,8 +143,14 @@ export function DealPartnerCompanySection({ canManage }: { canManage: boolean })
     const partnerCompanyIds = new Set(
       companyConfigs.filter(c => c.deal_partner_branch_count > 0).map(c => c.company_id),
     );
+    // v_deal_partner_warehouses is holding-wide. Now that a return warehouse
+    // belongs to the fund company that owns the shop (mig 1269), the operating
+    // companies' internal branches are noise here — drop them the same way the
+    // config list above is filtered.
+    const fundCompanyIds = new Set(companyConfigs.map(c => c.company_id));
     const groups = new Map<number, { companyName: string; rows: WarehouseRow[] }>();
     for (const row of warehouses) {
+      if (!fundCompanyIds.has(row.company_id)) continue;
       let group = groups.get(row.company_id);
       if (!group) {
         group = { companyName: row.company_name, rows: [] };

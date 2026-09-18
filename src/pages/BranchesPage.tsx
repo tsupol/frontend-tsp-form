@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   DataTable, MobileHeader,
-  Input, Badge, Modal, Button, Select, PopOver,
+  Input, Badge, Modal, Button, Select, PopOver, LabeledCheckbox,
   type SortingState,
 } from 'tsp-form';
 import { ArrowRightFromLine, ExternalLink, Plus, Pencil, Power, Search, SlidersHorizontal } from 'lucide-react';
@@ -11,6 +11,8 @@ import { apiClient, ApiError } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { PhoneInput } from '../components/PhoneInput';
 import { translateApiError } from '../lib/apiErrors';
+import { useCompanyTypes } from '../hooks/useCompanyTypes';
+import { ModalErrorBand } from '../components/ModalErrorBand';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -19,8 +21,11 @@ interface Branch {
   company_id: number;
   code: string;
   name: string;
-  branch_type: 'INTERNAL' | 'EXTERNAL' | 'DEAL_PARTNER';
+  /** Codes come from v_ref_company_types.allowed_branch_types — not a fixed union. */
+  branch_type: string;
   is_active: boolean;
+  /** mig 1257 — the type of the company this branch belongs to. */
+  company_type: string | null;
   address: string | null;
   phone: string | null;
   branch_lat: number | null;
@@ -35,8 +40,10 @@ interface BranchEditModel {
   company_id?: number;
   code?: string;
   name: string;
-  branch_type: 'INTERNAL' | 'EXTERNAL' | 'DEAL_PARTNER';
+  branch_type: string;
   address: string;
+  /** mig 1269 — sent as p_is_company_warehouse on create. Create-only. */
+  is_company_warehouse: boolean;
   phone: string;
   branch_lat: string;
   branch_lng: string;
@@ -47,7 +54,8 @@ interface BranchEditModel {
 }
 
 const EMPTY_EDIT: BranchEditModel = {
-  name: '', branch_type: 'INTERNAL', address: '', phone: '',
+  name: '', branch_type: '', address: '', phone: '',
+  is_company_warehouse: false,
   branch_lat: '', branch_lng: '', line_id: '',
   google_map_url: '', facebook_url: '',
 };
@@ -104,10 +112,15 @@ function buildUpdatePatch(
 interface Company {
   id: number;
   name: string;
+  company_type: string | null;
 }
 
-const BRANCH_TYPE_OPTIONS = ['INTERNAL', 'EXTERNAL', 'DEAL_PARTNER'] as const;
-const BRANCH_TYPE_COLORS = { INTERNAL: 'info', EXTERNAL: 'warning', DEAL_PARTNER: 'secondary' } as const;
+// Filter-bar options only: the branch types that exist anywhere in the system,
+// derived from the ref view so a new type appears without touching this file.
+// The CREATE/EDIT form never uses this list — it uses the selected company's
+// own allowed_branch_types (mig 1257).
+const BRANCH_TYPE_COLORS: Record<string, 'info' | 'warning' | 'secondary'> =
+  { INTERNAL: 'info', EXTERNAL: 'warning', DEAL_PARTNER: 'secondary' };
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -146,8 +159,50 @@ export function BranchesPage() {
 
   const { data: companies = [] } = useQuery({
     queryKey: ['branches-companies'],
-    queryFn: () => apiClient.get<Company[]>('/v_companies?order=name&select=id,name'),
+    queryFn: () => apiClient.get<Company[]>('/v_companies?order=name&select=id,name,company_type'),
   });
+
+  // v_branches does NOT expose is_company_warehouse (checked live on DEV,
+  // 2026-09-18: column does not exist). The flag lives on
+  // v_deal_partner_warehouses, so read the warehouse branch ids from there and
+  // badge the list rows with it.
+  const { data: warehouseRows = [] } = useQuery({
+    queryKey: ['branches-warehouses'],
+    queryFn: () => apiClient.get<{ branch_id: number; is_company_warehouse: boolean }[]>(
+      '/v_deal_partner_warehouses?select=branch_id,is_company_warehouse',
+    ),
+  });
+  const warehouseIds = useMemo(
+    () => new Set(warehouseRows.filter(r => r.is_company_warehouse).map(r => r.branch_id)),
+    [warehouseRows],
+  );
+
+  const { types: companyTypes, allowedBranchTypes, canHoldMoney, typeName } = useCompanyTypes();
+
+  // Every branch type any company type allows — the filter bar's option list.
+  // Derived from the ref view so the filter never disagrees with what can be
+  // created. Order follows the ref view's own sort_order.
+  const allBranchTypes = useMemo(() => {
+    const seen: string[] = [];
+    for (const ct of companyTypes) {
+      for (const bt of ct.allowed_branch_types) if (!seen.includes(bt)) seen.push(bt);
+    }
+    return seen;
+  }, [companyTypes]);
+
+  // The company the modal is pointed at decides which branch types are on offer
+  // and whether the warehouse tick is mandatory. On create that is the Select;
+  // on edit it is the branch's own company.
+  const modalCompany = companies.find(c => c.id === modalData.company_id);
+  const modalCompanyType = modalMode === 'edit'
+    ? (modalOrig?.company_type ?? modalCompany?.company_type ?? null)
+    : (modalCompany?.company_type ?? null);
+  const modalBranchTypes = allowedBranchTypes(modalCompanyType);
+  const modalIsFundCompany = canHoldMoney(modalCompanyType);
+  // The tick only exists for internal branches (WAREHOUSE_BRANCH_TYPE otherwise),
+  // and under a fund company an internal branch has to be the warehouse.
+  const warehouseApplies = modalMode === 'create' && modalData.branch_type === 'INTERNAL';
+  const warehouseRequired = warehouseApplies && modalIsFundCompany;
 
   const filtered = useMemo(() => {
     let result = branches;
@@ -182,9 +237,11 @@ export function BranchesPage() {
   const openCreate = () => {
     setModalMode('create');
     setModalOrig(null);
+    const firstCompany = companies[0];
     setModalData({
       ...EMPTY_EDIT,
-      company_id: companies[0]?.id,
+      company_id: firstCompany?.id,
+      branch_type: allowedBranchTypes(firstCompany?.company_type)[0] ?? '',
       code: '',
     });
     setModalError('');
@@ -200,6 +257,7 @@ export function BranchesPage() {
       code: b.code,
       name: b.name,
       branch_type: b.branch_type,
+      is_company_warehouse: false,
       address: b.address ?? '',
       phone: b.phone ?? '',
       branch_lat: b.branch_lat != null ? String(b.branch_lat) : '',
@@ -225,7 +283,13 @@ export function BranchesPage() {
           p_code: modalData.code,
           p_name: modalData.name,
           p_branch_type: modalData.branch_type,
-          p_address: modalData.address || null,
+          // An explicit null hits branches.address NOT NULL and returns a raw
+          // Postgres 23502 (verified on DEV 2026-09-18); omitting the param lets
+          // the RPC default it. So only send it when the user typed something.
+          ...(modalData.address ? { p_address: modalData.address } : {}),
+          // mig 1269 — only meaningful for an internal branch; sending true on
+          // any other type is refused with WAREHOUSE_BRANCH_TYPE.
+          p_is_company_warehouse: modalData.branch_type === 'INTERNAL' && modalData.is_company_warehouse,
         });
       } else if (modalOrig) {
         const patch = buildUpdatePatch(modalOrig, modalData);
@@ -331,7 +395,7 @@ export function BranchesPage() {
               <Select
                 value={filterType || null}
                 onChange={(val) => { setFilterType((val as string) ?? ''); setPageIndex(0); }}
-                options={BRANCH_TYPE_OPTIONS.map(bt => ({ value: bt, label: t(`org.branchType.${bt}`) }))}
+                options={allBranchTypes.map(bt => ({ value: bt, label: t(`org.branchType.${bt}`, { defaultValue: bt }) }))}
                 placeholder={t('branches.allTypes')}
                 size="sm"
                 showChevron
@@ -379,7 +443,7 @@ export function BranchesPage() {
                     />
                   )}
                   <Select
-                    options={BRANCH_TYPE_OPTIONS.map(bt => ({ value: bt, label: t(`org.branchType.${bt}`) }))}
+                    options={allBranchTypes.map(bt => ({ value: bt, label: t(`org.branchType.${bt}`, { defaultValue: bt }) }))}
                     value={filterType || null}
                     onChange={(val) => { setFilterType((val as string) ?? ''); setPageIndex(0); }}
                     placeholder={t('branches.allTypes')}
@@ -454,8 +518,11 @@ export function BranchesPage() {
                     <span className="text-sm font-medium truncate">{b.name}</span>
                     <span className="text-[11px] text-subtle font-mono">{b.code}</span>
                     <Badge size="sm" color={BRANCH_TYPE_COLORS[b.branch_type] ?? 'default'}>
-                      {t(`org.branchType.${b.branch_type}`)}
+                      {t(`org.branchType.${b.branch_type}`, { defaultValue: b.branch_type })}
                     </Badge>
+                    {warehouseIds.has(b.id) && (
+                      <Badge size="sm" color="success">{t('org.warehouseBadge')}</Badge>
+                    )}
                     {!b.is_active && (
                       <Badge size="sm" color="default">{t('common.inactive')}</Badge>
                     )}
@@ -499,10 +566,25 @@ export function BranchesPage() {
                 <label className="form-label">{t('settings.company')}</label>
                 <Select
                   value={String(modalData.company_id ?? '')}
-                  onChange={(val) => updateField('company_id', Number(val))}
+                  onChange={(val) => {
+                    const nextCompany = companies.find(c => c.id === Number(val));
+                    const nextAllowed = allowedBranchTypes(nextCompany?.company_type);
+                    // Switching company can make the chosen branch type illegal
+                    // (a shop under an operating company, an internal branch
+                    // under a fund). Re-seed instead of letting the RPC refuse.
+                    setModalData(d => ({
+                      ...d,
+                      company_id: Number(val),
+                      branch_type: nextAllowed.includes(d.branch_type) ? d.branch_type : (nextAllowed[0] ?? ''),
+                      is_company_warehouse: false,
+                    }));
+                  }}
                   options={companies.map(c => ({ value: String(c.id), label: c.name }))}
                   size="md"
                 />
+                {modalCompanyType && (
+                  <div className="text-xs text-subtle mt-1">{typeName(modalCompanyType)}</div>
+                )}
               </div>
             )}
             <div className="flex flex-col">
@@ -515,13 +597,52 @@ export function BranchesPage() {
             </div>
             <div className="flex flex-col">
               <label className="form-label">{t('org.branchTypeLabel')}</label>
+              {/* Options are this company's allowed_branch_types (mig 1257) —
+                  a deal partner shop simply does not appear under an operating
+                  company, so BRANCH_TYPE_NOT_ALLOWED_FOR_COMPANY_TYPE becomes
+                  unreachable from the form. */}
               <Select
-                value={modalData.branch_type}
-                onChange={(val) => updateField('branch_type', val as BranchEditModel['branch_type'])}
-                options={BRANCH_TYPE_OPTIONS.map(bt => ({ value: bt, label: t(`org.branchType.${bt}`) }))}
+                value={modalData.branch_type || null}
+                onChange={(val) => setModalData(d => ({
+                  ...d,
+                  branch_type: (val as string) ?? '',
+                  // The tick only belongs to an internal branch.
+                  is_company_warehouse: val === 'INTERNAL' ? d.is_company_warehouse : false,
+                }))}
+                options={modalBranchTypes.map(bt => ({ value: bt, label: t(`org.branchType.${bt}`, { defaultValue: bt }) }))}
                 size="md"
+                searchable={false}
               />
+              {modalBranchTypes.length === 0 && modalCompanyType && (
+                <div className="text-xs text-warning-fg mt-1">{t('org.noBranchTypeForCompany')}</div>
+              )}
             </div>
+
+            {/* Edit has no toggle — the flag moves through
+                fn_deal_partner_warehouse_set on the deal-partner settings page,
+                not fn_branch_update. Show it so the row is not a mystery. */}
+            {modalMode === 'edit' && modalData.id != null && warehouseIds.has(modalData.id) && (
+              <div className="flex flex-col">
+                <label className="form-label">{t('org.isCompanyWarehouse')}</label>
+                <Badge size="sm" color="success">{t('org.warehouseBadge')}</Badge>
+              </div>
+            )}
+
+            {/* Company warehouse (mig 1269) — internal branches only, and an
+                internal branch under a fund company HAS to be the warehouse. */}
+            {warehouseApplies && (
+              <div className="flex flex-col">
+                <LabeledCheckbox
+                  label={t('org.isCompanyWarehouse')}
+                  checked={modalData.is_company_warehouse}
+                  onChange={(e) => updateField('is_company_warehouse', e.target.checked)}
+                />
+                <div className="text-xs text-subtle mt-1">{t('org.isCompanyWarehouseHint')}</div>
+                {warehouseRequired && !modalData.is_company_warehouse && (
+                  <div className="text-xs text-warning-fg mt-1">{t('org.isCompanyWarehouseRequired')}</div>
+                )}
+              </div>
+            )}
             <div className="flex flex-col">
               <label className="form-label">{t('org.address')}</label>
               <Input value={modalData.address} onChange={(e) => updateField('address', e.target.value)} size="md" className="w-full" />
@@ -580,9 +701,9 @@ export function BranchesPage() {
               </>
             )}
 
-            {modalError && <div className="alert alert-danger"><div className="alert-description">{modalError}</div></div>}
           </div>
         </div>
+        <ModalErrorBand message={modalError} />
         <div className="modal-footer">
           {modalMode === 'edit' && modalData.is_active !== false && (
             <Button variant="ghost" color="danger" size="sm" startIcon={<Power size={14} />} onClick={handleDeactivate} disabled={modalSaving} className="mr-auto">
@@ -590,7 +711,13 @@ export function BranchesPage() {
             </Button>
           )}
           <Button variant="ghost" onClick={closeModal} disabled={modalSaving}>{t('common.cancel')}</Button>
-          <Button color="primary" onClick={handleSave} disabled={modalSaving}>{modalSaving ? t('common.saving') : t('common.save')}</Button>
+          <Button
+            color="primary"
+            onClick={handleSave}
+            disabled={modalSaving || !modalData.branch_type || (warehouseRequired && !modalData.is_company_warehouse)}
+          >
+            {modalSaving ? t('common.saving') : t('common.save')}
+          </Button>
         </div>
       </Modal>
     </>
