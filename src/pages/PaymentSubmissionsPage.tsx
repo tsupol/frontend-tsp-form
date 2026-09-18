@@ -47,8 +47,13 @@ export function PaymentSubmissionsPage() {
   const lockedBranchId = isBranchUser ? user?.branch_id ?? null : null;
   // RLS on v_payment_submissions is holding-wide (see UI_SUMMARY/64 §Visibility).
   // Company-tier users must filter by company themselves; otherwise they see
-  // submissions from every company in the holding.
-  const isCompanyTier = user?.role_code === 'COMPANY_ADMIN' || user?.role_code === 'ACCOUNTANT';
+  // submissions from every company in the holding. COMPANY_ACCOUNTANT belongs
+  // here too — it is the fund company's finance desk, the role that reviews
+  // slips for deal-partner contracts (doc 144 §1), and it was silently seeing
+  // every company's slips because this test named a role code ('ACCOUNTANT')
+  // that no user carries. COMPANY_TIER_ROLES is the same set the realtime
+  // channel below already trusted.
+  const isCompanyTier = user?.role_code != null && COMPANY_TIER_ROLES.has(user.role_code);
   const lockedCompanyId = isCompanyTier ? user?.company_id ?? null : null;
 
   const [statusFilter, setStatusFilter] = useState<SubmissionStatus | null>('PENDING_REVIEW');
@@ -70,10 +75,13 @@ export function PaymentSubmissionsPage() {
     user?.role_code === 'COMPANY_ADMIN' && user.company_id != null
       ? `&company_id=eq.${user.company_id}`
       : '';
+  // Both internal branches and deal-partner shops: a fund company's slips are
+  // filed against the shop's branch (doc 144 §1), so an INTERNAL-only picker
+  // could never narrow to the branch the slip actually belongs to.
   const { data: branchOptions = [] } = useQuery({
     queryKey: ['branches', 'submissions-filter', branchScopeParam],
     queryFn: () => apiClient.get<{ id: number; name: string }[]>(
-      `/v_branches?is_active=is.true&branch_type=eq.INTERNAL&select=id,name&order=name${branchScopeParam}`,
+      `/v_branches?is_active=is.true&branch_type=in.(INTERNAL,DEAL_PARTNER)&select=id,name&order=name${branchScopeParam}`,
     ),
     enabled: !isBranchUser,
     staleTime: 5 * 60 * 1000,

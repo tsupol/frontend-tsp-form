@@ -39,7 +39,7 @@ import {
   // Fanout child icons — Contracts
   Search, PiggyBank, Link2, FileEdit, FilePlus, CreditCard, Archive, Repeat2, PauseCircle,
   // Fanout child icons — Commission
-  UserCheck, ClipboardCheck, PackageCheck, Hourglass, Banknote, Percent,
+  UserCheck, ClipboardCheck, PackageCheck,
   // Fanout child icons — Accounting
   CalendarCheck, Receipt, ShieldAlert, Banknote, FileSpreadsheet, Coins, ArrowUpRight, ListChecks, ShoppingBag,
   // Fanout child icons — Branch expense

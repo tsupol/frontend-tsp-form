@@ -105,12 +105,19 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
   const isNoCharge = totalAmount <= 0;
 
   // ── Payment rows ─────────────────────────────────────────────────────
-  // NOTICE 1196: bills of a DEAL_PARTNER branch accept only PARTNER_COLLECT
-  // ("หน้าร้าน" — the money stays with the shop and is netted in the payout
-  // round), and no other branch may use it. The server enforces both; here we
-  // just offer the right option. TEMP: selected by code because
-  // v_ref_payment_methods does not expose held_by yet (filed with BE) —
-  // switch to filtering held_by === 'BRANCH' once the view carries it.
+  // NOTICE 1196: the CONTRACT_OPEN bill of a DEAL_PARTNER branch accepts only
+  // PARTNER_COLLECT ("หน้าร้าน" — the down payment and contract fee stay with
+  // the shop and are netted in the payout round), and no other branch may use
+  // it. The server enforces both; here we just offer the right option.
+  //
+  // Still true after doc 144 / mig 1266, and ONLY here. That migration split
+  // the rule by bill purpose: the opening bill is unchanged, but every later
+  // bill of a partner branch (installment, payoff, fee, addon, wallet) takes
+  // TRANSFER + wallets and never PARTNER_COLLECT or CASH, because that money
+  // goes to the fund's own account rather than the shop's till. This panel
+  // only ever opens CONTRACT_OPEN, so it keeps the fixed option; the later
+  // bills read the rule from v_purpose_allowed_methods via
+  // useAllowedPaymentMethods.
   const paymentMethodOptions = useMemo(() => {
     if (isDealPartner) {
       return [{ value: 'PARTNER_COLLECT', label: t('paymentMethod.PARTNER_COLLECT') }];

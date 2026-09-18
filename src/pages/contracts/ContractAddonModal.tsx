@@ -7,6 +7,7 @@ import { apiClient, ApiError } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { BranchPaymentAccountField } from '../../components/BranchPaymentAccountField';
+import { useAllowedPaymentMethods, useBranchIsPartner } from '../../hooks/useAllowedPaymentMethods';
 import { ProductPickerModal, type SellableVariant } from '../../components/ProductPickerModal';
 import { ActionDoneView, type ActionDoneDetailRow } from './ActionDoneView';
 import { translateApiError } from '../../lib/apiErrors';
@@ -54,12 +55,6 @@ interface ContractForAddon {
   company_id?: number | null;
   holding_id: number;
   customer_id?: number | null;
-}
-
-interface AllowedMethodRow {
-  method: PaymentMethod;
-  is_wallet: boolean;
-  is_active: boolean;
 }
 
 interface AddableChargeRow {
@@ -146,6 +141,28 @@ export function ContractAddonModal({ open, contract, onClose, onSuccess }: {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
 
+  // Data-driven payment methods, narrowed by the kind of branch the bill
+  // belongs to (doc 144 §2, mig 1266/1268). On a deal-partner branch an add-on
+  // is money the customer transfers to the fund, so CASH drops out and only
+  // TRANSFER remains; an internal branch is unchanged. Read, never hardcoded —
+  // the same view drives the wizard cart and the fee modal.
+  const { isPartnerBranch } = useBranchIsPartner(open ? contract.branch_id : null);
+  const { methods: methodRows, codes: allowedMethodCodes } = useAllowedPaymentMethods(
+    'CONTRACT_ADDON',
+    isPartnerBranch,
+    { enabled: open },
+  );
+
+  const methodOptions = useMemo(
+    () => methodRows.map(m => ({ value: m.method, label: t(`wizard.method_${m.method}`, { defaultValue: m.method }) })),
+    [methodRows, t],
+  );
+
+  // The row a fresh cart starts on. CASH is not offered at a partner branch, so
+  // seeding it there would hand the user a row the server refuses.
+  const defaultMethod = (allowedMethodCodes.includes('CASH') ? 'CASH' : allowedMethodCodes[0] ?? 'CASH') as PaymentMethod;
+
+
   const [view, setView] = useState<'form' | 'done'>('form');
   const [lines, setLines] = useState<CartLine[]>([]);
   const [payments, setPayments] = useState<PaymentRow[]>([{ method: 'CASH', amount: 0, bank_account_id: null }]);
@@ -169,7 +186,7 @@ export function ContractAddonModal({ open, contract, onClose, onSuccess }: {
   const resetForm = () => {
     setView('form');
     setLines([]);
-    setPayments([{ method: 'CASH', amount: 0, bank_account_id: null }]);
+    setPayments([{ method: defaultMethod, amount: 0, bank_account_id: null }]);
     setError('');
     setSubmitting(false);
     setResult(null);
@@ -189,21 +206,17 @@ export function ContractAddonModal({ open, contract, onClose, onSuccess }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // Data-driven payment methods — CONTRACT_ADDON has no wallet methods, but read
-  // them rather than hardcoding so a backend change flows through.
-  const { data: methodRows = [] } = useQuery({
-    queryKey: ['contract-addon-methods'],
-    queryFn: () => apiClient.get<AllowedMethodRow[]>(
-      '/v_purpose_allowed_methods?bill_purpose=eq.CONTRACT_ADDON&is_active=eq.true',
-    ),
-    enabled: open,
-    staleTime: 5 * 60 * 1000,
-  });
+  // The allowed set arrives after the form has already been reset (the query
+  // resolves a tick later), and it also changes if the modal is reopened on a
+  // different contract. Re-point any row still holding a method this branch
+  // cannot use, so the picker never shows a value that is not in its own list.
+  useEffect(() => {
+    if (allowedMethodCodes.length === 0) return;
+    setPayments(prev => (prev.every(p => allowedMethodCodes.includes(p.method))
+      ? prev
+      : prev.map(p => (allowedMethodCodes.includes(p.method) ? p : { ...p, method: defaultMethod, bank_account_id: null }))));
+  }, [allowedMethodCodes, defaultMethod]);
 
-  const methodOptions = useMemo(
-    () => methodRows.map(m => ({ value: m.method, label: t(`wizard.method_${m.method}`, { defaultValue: m.method }) })),
-    [methodRows, t],
-  );
 
   // Addable charge types come from the DB whitelist per bill purpose — same view
   // the Review & Pay cart and the fee modal read. Never hardcode the list: BE
@@ -370,7 +383,7 @@ export function ContractAddonModal({ open, contract, onClose, onSuccess }: {
 
   const addPaymentRow = () => {
     const remaining = Math.max(0, total - totalPaid);
-    setPayments(prev => [...prev, { method: 'CASH', amount: remaining, bank_account_id: null }]);
+    setPayments(prev => [...prev, { method: defaultMethod, amount: remaining, bank_account_id: null }]);
   };
 
   const removePaymentRow = (idx: number) => setPayments(prev => prev.filter((_, i) => i !== idx));

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -6,6 +6,7 @@ import { Button, Modal, Input, Select, TextArea, MaskedInput, Badge, Tooltip, Po
 import type { UploadedImage } from 'tsp-form';
 import { CheckCircle, XCircle, Pencil, Plus, Trash2, Loader2, ChevronsRight, ChevronDown, ExternalLink, Wrench, ArrowRight, Info, Receipt, Paperclip, MessageSquare, PenLine, AlertTriangle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { useAllowedPaymentMethods, useBranchIsPartner } from '../../hooks/useAllowedPaymentMethods';
 import { getRoleLabel } from '../../lib/roleLabel';
 import { fmtCurrency } from '../../lib/format';
 import { BranchPinInput } from '../../components/BranchPinInput';
@@ -3113,31 +3114,56 @@ function PayInstallmentModal({ open, contract, onClose }: {
     staleTime: 0,
   });
 
+  // Which channels this contract's branch accepts for an installment (doc 144
+  // §2, mig 1266/1268). A deal-partner shop does not collect instalments — the
+  // customer transfers to the fund's account — so CASH disappears there and
+  // TRANSFER + wallets remain; an internal branch is unchanged. The rule is
+  // read from v_purpose_allowed_methods, never hardcoded, and the server
+  // refuses a wrong channel with PARTNER_METHOD_REQUIRED regardless.
+  const { isPartnerBranch } = useBranchIsPartner(open ? contract.branch_id : null);
+  const { codes: purposeMethods, isLoading: purposeMethodsLoading } = useAllowedPaymentMethods(
+    'CONTRACT_PAYMENT',
+    isPartnerBranch,
+    { enabled: open },
+  );
+  const channelAllowed = useCallback(
+    (m: string) => purposeMethodsLoading || purposeMethods.length === 0 || purposeMethods.includes(m),
+    [purposeMethods, purposeMethodsLoading],
+  );
+
   const channelOptions = useMemo(() => {
-    const opts: { value: InstallmentChannel; label: string; disabled?: boolean }[] = [
-      { value: 'CASH', label: t('paymentMethod.CASH') },
-      { value: 'TRANSFER', label: t('paymentMethod.TRANSFER') },
-    ];
-    if (savingBalance > 0) {
+    const opts: { value: InstallmentChannel; label: string; disabled?: boolean }[] = [];
+    if (channelAllowed('CASH')) opts.push({ value: 'CASH', label: t('paymentMethod.CASH') });
+    if (channelAllowed('TRANSFER')) opts.push({ value: 'TRANSFER', label: t('paymentMethod.TRANSFER') });
+    if (savingBalance > 0 && channelAllowed('SAVING_WALLET')) {
       opts.push({
         value: 'SAVING_WALLET',
         label: `${t('paymentMethod.SAVING_WALLET')} (${fmtCurrency(savingBalance)})`,
       });
     }
-    if (creditBalance > 0) {
+    if (creditBalance > 0 && channelAllowed('CREDIT_WALLET')) {
       opts.push({
         value: 'CREDIT_WALLET',
         label: `${t('paymentMethod.CREDIT_WALLET')} (${fmtCurrency(creditBalance)})`,
       });
     }
-    if (insuranceBalance > 0 && unpaidCount === 1) {
+    if (insuranceBalance > 0 && unpaidCount === 1 && channelAllowed('INSURANCE_WALLET')) {
       opts.push({
         value: 'INSURANCE_WALLET',
         label: `${t('paymentMethod.INSURANCE_WALLET')} (${fmtCurrency(insuranceBalance)})`,
       });
     }
     return opts;
-  }, [t, savingBalance, creditBalance, insuranceBalance, unpaidCount]);
+  }, [t, savingBalance, creditBalance, insuranceBalance, unpaidCount, channelAllowed]);
+
+  // The picker starts on CASH; at a partner branch that value is not in its own
+  // option list, so move it to the first channel the branch does accept once
+  // the rule has loaded.
+  useEffect(() => {
+    if (channelOptions.length === 0) return;
+    if (channelOptions.some(o => o.value === channel)) return;
+    setChannel(channelOptions[0].value);
+  }, [channelOptions, channel]);
 
   const parsedAmount = Number(amount) || 0;
   const walletBalance = channel === 'SAVING_WALLET' ? savingBalance

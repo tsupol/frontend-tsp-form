@@ -14,6 +14,7 @@ import { ActionDoneView, type ActionDoneDetailRow } from './ActionDoneView';
 import { ContractFeeModal } from './ContractFeeModal';
 import { useContractInvalidate } from './useContractInvalidate';
 import { translateApiError } from '../../lib/apiErrors';
+import { useAllowedPaymentMethods, useBranchIsPartner } from '../../hooks/useAllowedPaymentMethods';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -454,6 +455,7 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
             <PayoffView
               preview={preview}
               previewLoading={previewLoading}
+              branchId={contract.branch_id ?? null}
               payments={payments}
               onPaymentsChange={setPayments}
               note={note}
@@ -1058,6 +1060,7 @@ const ALL_PAYOFF_METHODS = ['CASH', 'TRANSFER', 'CREDIT_WALLET', 'INSURANCE_WALL
 function PayoffView({
   preview,
   previewLoading,
+  branchId,
   payments,
   onPaymentsChange,
   note,
@@ -1069,6 +1072,8 @@ function PayoffView({
 }: {
   preview: PayoffPreview | undefined;
   previewLoading: boolean;
+  /** The contract's branch — decides whether the partner-branch method rule applies. */
+  branchId: number | null;
   payments: EarlyPayoffPayment[];
   onPaymentsChange: (payments: EarlyPayoffPayment[]) => void;
   note: string;
@@ -1113,8 +1118,27 @@ function PayoffView({
     if (fillAmount > 0) updatePayment(idx, { amount: fillAmount });
   };
 
-  // Methods: cash + transfer always; wallets always shown with balance + disabled when unusable
-  const allowed = new Set(preview?.allowed_methods ?? []);
+  // Methods: cash + transfer always; wallets always shown with balance + disabled when unusable.
+  //
+  // Two sources, intersected. fn_bill_early_payoff_preview.allowed_methods says
+  // what this contract's wallets and company features allow; on a deal-partner
+  // contract it still lists CASH (measured on DEV 2026-09-18, contract 96817),
+  // because the branch rule lives on the bill rather than the preview. Doc 144
+  // §2 / mig 1266 says a partner branch's CONTRACT_PAYOFF bill takes only
+  // TRANSFER and wallets — the customer pays the fund, not the shop — so the
+  // purpose rule from v_purpose_allowed_methods narrows the preview's list.
+  // fn_bill_payment_add would refuse CASH with PARTNER_METHOD_REQUIRED anyway;
+  // this stops it being offered in the first place.
+  const { isPartnerBranch } = useBranchIsPartner(branchId);
+  const { codes: purposeMethods, isLoading: purposeLoading } = useAllowedPaymentMethods(
+    'CONTRACT_PAYOFF',
+    isPartnerBranch,
+  );
+  const allowed = new Set(
+    (preview?.allowed_methods ?? []).filter(
+      m => purposeLoading || purposeMethods.length === 0 || purposeMethods.includes(m),
+    ),
+  );
   const baseLabel = (m: string) => t(`paymentMethod.${m}`, { defaultValue: m });
   const methodOptions = ALL_PAYOFF_METHODS.map(m => {
     const isWallet = m.endsWith('_WALLET');

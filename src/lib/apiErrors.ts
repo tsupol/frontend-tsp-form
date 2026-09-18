@@ -69,6 +69,27 @@ export function prepareErrorParams(
   if (typeof params.existing_bucket === 'string') {
     params.existing_bucket = getBucketLabel(params.existing_bucket, t as (k: string) => string);
   }
+  // BRANCH_TYPE_NOT_ALLOWED_FOR_COMPANY_TYPE ships the allowed types as an array
+  // of codes. i18next would interpolate that as "INTERNAL,EXTERNAL"; the sentence
+  // exists to tell the user which branch types they CAN pick, so translate each
+  // code and join it readably.
+  if (Array.isArray(params.allowed_branch_types)) {
+    params.allowed_branch_types_label = (params.allowed_branch_types as unknown[])
+      .filter((bt): bt is string => typeof bt === 'string')
+      .map((bt) => t(`org.branchType.${bt}`, { defaultValue: bt }))
+      .join(' · ');
+  }
+  // PARTNER_METHOD_REQUIRED (doc 144 §5) ships `allowed` — the payment methods
+  // this particular bill accepts, which now depends on the bill's purpose:
+  // PARTNER_COLLECT for the opening bill of a deal-partner shop, TRANSFER +
+  // wallets for every later bill. The message exists to name them, so translate
+  // each code into the label the picker itself uses.
+  if (Array.isArray(params.allowed)) {
+    const labels = (params.allowed as unknown[])
+      .filter((m): m is string => typeof m === 'string')
+      .map((m) => t(`paymentMethod.${m}`, { defaultValue: m }));
+    if (labels.length > 0) params.allowed_label = labels.join(' · ');
+  }
   for (const key of DATE_PARAM_KEYS) {
     const value = params[key];
     if (typeof value === 'string' && ISO_DATE_RE.test(value)) {

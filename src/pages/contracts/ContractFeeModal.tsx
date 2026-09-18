@@ -7,6 +7,7 @@ import { apiClient, ApiError } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { BranchPaymentAccountField } from '../../components/BranchPaymentAccountField';
+import { useAllowedPaymentMethods, useBranchIsPartner } from '../../hooks/useAllowedPaymentMethods';
 import { ActionDoneView, type ActionDoneDetailRow } from './ActionDoneView';
 import { translateApiError } from '../../lib/apiErrors';
 
@@ -46,12 +47,6 @@ interface AddableChargeRow {
   name_en: string;
   sort_order: number;
   is_user_addable: boolean;
-}
-
-interface AllowedMethodRow {
-  method: PaymentMethod;
-  is_wallet: boolean;
-  is_active: boolean;
 }
 
 type PaymentMethod = 'CASH' | 'TRANSFER' | 'SAVING_WALLET' | 'CREDIT_WALLET' | 'INSURANCE_WALLET';
@@ -95,6 +90,21 @@ export function ContractFeeModal({ open, contract, onClose, onSuccess }: {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
 
+  // Data-driven payment methods (doc 37 §13.4), narrowed by the kind of branch
+  // this bill belongs to (doc 144 §2, mig 1266/1268): a fee on a deal-partner
+  // contract is paid into the fund's account, so CASH is dropped and TRANSFER +
+  // the three wallets remain. An internal branch keeps every active row.
+  const { isPartnerBranch } = useBranchIsPartner(open ? contract?.branch_id ?? null : null);
+  const { methods: methodRows, codes: allowedMethodCodes } = useAllowedPaymentMethods(
+    'CONTRACT_FEE',
+    isPartnerBranch,
+    { enabled: open },
+  );
+
+  // Seed row for a fresh cart — CASH where it is offered, else the first method
+  // this branch actually accepts.
+  const defaultMethod = (allowedMethodCodes.includes('CASH') ? 'CASH' : allowedMethodCodes[0] ?? 'CASH') as PaymentMethod;
+
   const [view, setView] = useState<'form' | 'done'>('form');
   const [lines, setLines] = useState<CartLine[]>([]);
   const [payments, setPayments] = useState<PaymentRow[]>([{ method: 'CASH', amount: 0, bank_account_id: null }]);
@@ -112,7 +122,7 @@ export function ContractFeeModal({ open, contract, onClose, onSuccess }: {
   const resetForm = () => {
     setView('form');
     setLines([]);
-    setPayments([{ method: 'CASH', amount: 0, bank_account_id: null }]);
+    setPayments([{ method: defaultMethod, amount: 0, bank_account_id: null }]);
     setError('');
     setSubmitting(false);
     setResult(null);
@@ -128,6 +138,16 @@ export function ContractFeeModal({ open, contract, onClose, onSuccess }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  // The allowed set lands a tick after the reset above, and changes when the
+  // modal reopens on a different contract. Move any row off a method this
+  // branch cannot use, so the picker never displays a value outside its list.
+  useEffect(() => {
+    if (allowedMethodCodes.length === 0) return;
+    setPayments(prev => (prev.every(p => allowedMethodCodes.includes(p.method))
+      ? prev
+      : prev.map(p => (allowedMethodCodes.includes(p.method) ? p : { ...p, method: defaultMethod, bank_account_id: null }))));
+  }, [allowedMethodCodes, defaultMethod]);
+
   // Data-driven charge types (doc 37 §13.4) — only is_user_addable rows.
   const { data: chargeTypes = [] } = useQuery({
     queryKey: ['contract-fee-charge-types'],
@@ -138,15 +158,6 @@ export function ContractFeeModal({ open, contract, onClose, onSuccess }: {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Data-driven payment methods (doc 37 §13.4).
-  const { data: methodRows = [] } = useQuery({
-    queryKey: ['contract-fee-methods'],
-    queryFn: () => apiClient.get<AllowedMethodRow[]>(
-      '/v_purpose_allowed_methods?bill_purpose=eq.CONTRACT_FEE&is_active=eq.true',
-    ),
-    enabled: open,
-    staleTime: 5 * 60 * 1000,
-  });
 
   const chargeLabel = (row: { name_th: string; name_en: string; charge_type: string }) =>
     (i18n.language === 'th' ? row.name_th : row.name_en) || row.charge_type;
@@ -212,7 +223,7 @@ export function ContractFeeModal({ open, contract, onClose, onSuccess }: {
 
   const addPaymentRow = () => {
     const remaining = Math.max(0, total - totalPaid);
-    setPayments(prev => [...prev, { method: 'CASH', amount: remaining, bank_account_id: null }]);
+    setPayments(prev => [...prev, { method: defaultMethod, amount: remaining, bank_account_id: null }]);
   };
 
   const removePaymentRow = (idx: number) =>
