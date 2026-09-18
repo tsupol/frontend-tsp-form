@@ -185,7 +185,8 @@
   "CORE.VALIDATION.LEAF_BUILD_FAILED": "Upload failed. Please try again.",
   "MEDIA.NOT_FOUND.ENTITY_MEDIA_NOT_FOUND": "This account has no payment QR to remove.",
   "SALE.VALIDATION.TRANSFER_ACCOUNT_REQUIRED": "Select which account received the transfer.",
-  "SALE.VALIDATION.PARTNER_METHOD_REQUIRED": "Deal-partner bills can only be paid with \"Collected at store\".",
+  "SALE.VALIDATION.PARTNER_METHOD_REQUIRED": "This bill only accepts: {{allowed_label}}",
+  "SALE.VALIDATION.PARTNER_METHOD_REQUIRED_basic": "That payment method isn't accepted for this bill. The opening bill of a deal-partner shop is collected at the store; later bills are transferred to the fund's account.",
   "SALE.VALIDATION.PARTNER_METHOD_NOT_ALLOWED": "\"Collected at store\" is only available at deal-partner branches.",
   "SALE.VALIDATION.TRANSFER_ACCOUNT_NOT_A_CHANNEL_DEFAULT": "That account isn't one of the branch's channel accounts.",
   "sale.validation.invalid_charge_type": "Unknown charge type.",
@@ -794,6 +795,8 @@
   "AUTH.CUSTOMER.ACCOUNT_NOT_FOUND": "Customer account not found",
   "AUTH.CUSTOMER.MISSING_CONTACT_INFO": "Customer is missing an ID number or phone — please add them before resetting.",
   "AUTH.AUTH.MISSING_PERMISSION": "You do not have permission to perform this action",
+  "AUTH.VALIDATION.PERMISSION_NOT_GRANTABLE": "\"{{permission_code}}\" cannot be granted to one person — it comes with a role.",
+  "AUTH.VALIDATION.PERMISSION_NOT_GRANTABLE_basic": "This permission cannot be granted to one person — it comes with a role.",
   "AUTH.CUSTOMER.USER_NOT_FOUND": "Username not found",
   "AUTH.CUSTOMER.WRONG_PASSWORD": "Wrong password",
   "AUTH.CUSTOMER.ACCOUNT_LOCKED": "Account locked — too many failed attempts",
@@ -1122,5 +1125,15 @@
   "partner.state.settlement_action_not_allowed": "The close-out isn't in a state where you can do that — reload the page.",
   "partner.not_found.settlement": "This contract has no payment request yet.",
   "partner.validation.checked_flag_required": "Say whether the request is checked or not.",
-  "blockingReason.partner_settlement_locked": "Locked by the shop's payment request"
+  "blockingReason.partner_settlement_locked": "Locked by the shop's payment request",
+  "PARTNER.VALIDATION.CHECKED_FLAG_REQUIRED": "The reviewed flag was not sent. Reload the page and try again.",
+  "PARTNER.AUTH.NOT_IN_POOL": "You are not in this shop's reviewer group.",
+  "PARTNER.VALIDATION.REASON_REQUIRED": "Pick a reason, and write at least 3 characters when a note is required.",
+  "PARTNER.VALIDATION.REASON_CODE_INVALID": "That reason is no longer available. Reload the list and pick again.",
+  "blockingReason": {
+    "not_in_pool": "You are not in this shop's reviewer group.",
+    "not_ready": "The shop has not finished its close-out yet.",
+    "already_checked": "Already marked as reviewed.",
+    "not_checked": "Not marked as reviewed yet."
+  }
 }

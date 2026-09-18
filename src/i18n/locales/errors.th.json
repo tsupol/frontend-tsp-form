@@ -185,7 +185,8 @@
   "CORE.VALIDATION.LEAF_BUILD_FAILED": "อัปโหลดไม่สำเร็จ กรุณาลองใหม่",
   "MEDIA.NOT_FOUND.ENTITY_MEDIA_NOT_FOUND": "บัญชีนี้ยังไม่มี QR รับชำระให้ลบ",
   "SALE.VALIDATION.TRANSFER_ACCOUNT_REQUIRED": "กรุณาเลือกบัญชีที่รับเงินโอน",
-  "SALE.VALIDATION.PARTNER_METHOD_REQUIRED": "บิลของร้าน deal partner รับชำระได้เฉพาะช่องทาง \"หน้าร้าน\"",
+  "SALE.VALIDATION.PARTNER_METHOD_REQUIRED": "บิลนี้รับได้เฉพาะ: {{allowed_label}}",
+  "SALE.VALIDATION.PARTNER_METHOD_REQUIRED_basic": "ช่องทางนี้ใช้กับบิลนี้ไม่ได้ — บิลเปิดสัญญาของร้าน deal partner เก็บที่หน้าร้าน ส่วนบิลหลังจากนั้นโอนเข้าบัญชีกองทุน",
   "SALE.VALIDATION.PARTNER_METHOD_NOT_ALLOWED": "ช่องทาง \"หน้าร้าน\" ใช้ได้เฉพาะสาขา deal partner",
   "SALE.VALIDATION.TRANSFER_ACCOUNT_NOT_A_CHANNEL_DEFAULT": "บัญชีนี้ไม่ใช่บัญชีช่องทางของสาขา",
   "sale.validation.invalid_charge_type": "ประเภทค่าธรรมเนียมไม่ถูกต้อง",
@@ -794,6 +795,8 @@
   "AUTH.CUSTOMER.ACCOUNT_NOT_FOUND": "ไม่พบบัญชีลูกค้า",
   "AUTH.CUSTOMER.MISSING_CONTACT_INFO": "ลูกค้าไม่มีเลขบัตรหรือเบอร์โทร — กรุณาเพิ่มข้อมูลก่อนรีเซ็ต",
   "AUTH.AUTH.MISSING_PERMISSION": "คุณไม่มีสิทธิ์ทำรายการนี้",
+  "AUTH.VALIDATION.PERMISSION_NOT_GRANTABLE": "สิทธิ์ \"{{permission_code}}\" ให้เป็นรายคนไม่ได้ — ต้องมากับ role",
+  "AUTH.VALIDATION.PERMISSION_NOT_GRANTABLE_basic": "สิทธิ์นี้ให้เป็นรายคนไม่ได้ — ต้องมากับ role",
   "AUTH.CUSTOMER.USER_NOT_FOUND": "ไม่พบ username",
   "AUTH.CUSTOMER.WRONG_PASSWORD": "รหัสผ่านไม่ถูกต้อง",
   "AUTH.CUSTOMER.ACCOUNT_LOCKED": "บัญชีถูกล็อก — กรอกรหัสผิดเกินจำนวนครั้งที่กำหนด",
@@ -1122,5 +1125,15 @@
   "partner.state.settlement_action_not_allowed": "ใบขอรับเงินอยู่ในสถานะที่ทำรายการนี้ไม่ได้ กรุณาโหลดใหม่",
   "partner.not_found.settlement": "สัญญานี้ยังไม่มีใบขอรับเงิน",
   "partner.validation.checked_flag_required": "ต้องระบุว่าตรวจแล้วหรือยัง",
-  "blockingReason.partner_settlement_locked": "ถูกล็อกโดยใบขอรับเงินของร้าน"
+  "blockingReason.partner_settlement_locked": "ถูกล็อกโดยใบขอรับเงินของร้าน",
+  "PARTNER.VALIDATION.CHECKED_FLAG_REQUIRED": "ไม่ได้ส่งค่าติ๊กตรวจแล้ว โหลดหน้าใหม่แล้วลองใหม่",
+  "PARTNER.AUTH.NOT_IN_POOL": "คุณไม่ได้อยู่ในกลุ่มผู้ตรวจของร้านนี้",
+  "PARTNER.VALIDATION.REASON_REQUIRED": "ระบุเหตุผล และกรอกข้อความอย่างน้อย 3 ตัวอักษรเมื่อเหตุผลนั้นบังคับ",
+  "PARTNER.VALIDATION.REASON_CODE_INVALID": "เหตุผลนี้ถูกปิดใช้แล้ว โหลดตัวเลือกใหม่",
+  "blockingReason": {
+    "not_in_pool": "คุณไม่ได้อยู่ในกลุ่มผู้ตรวจของร้านนี้",
+    "not_ready": "ร้านยังทำปิดงานไม่ครบ",
+    "already_checked": "ติ๊กตรวจแล้ว",
+    "not_checked": "ยังไม่ได้ติ๊กตรวจ"
+  }
 }
