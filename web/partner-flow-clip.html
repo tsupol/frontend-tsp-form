@@ -129,14 +129,14 @@
     display:flex; flex-direction:column;
   }
   .stagehead{
-    padding:18px 30px 16px; display:flex; align-items:flex-start;
+    padding:14px 24px 14px 30px; display:flex; align-items:flex-start;
     justify-content:space-between; gap:20px; flex-wrap:wrap;
     position:relative; border-bottom:1px solid var(--line);
   }
   /* no rule between the points and the controls — they read as one foot */
-  /* a quiet chevron on the title line, not a boxed button */
+  /* a quiet chevron that sits in the row, not floating over it */
   .headtoggle{
-    position:absolute; top:14px; right:24px;
+    flex:0 0 auto; align-self:center; margin-left:auto;
     background:none; border:0; color:var(--faint);
     width:28px; height:28px; border-radius:50%; padding:0;
     cursor:pointer; display:inline-grid; place-items:center;
@@ -150,7 +150,7 @@
 
   /* --- collapsed: header shrinks to one line --- */
   .minibar{display:none}
-  body.mini .stagehead{padding:10px 30px 10px}
+  body.mini .stagehead{padding:8px 24px 8px 30px}
   body.mini .scenario p,
   body.mini .scenario .kicker,
   body.mini .cast{display:none}
@@ -159,7 +159,6 @@
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
     max-width:calc(100vw - 460px); margin:0;
   }
-  body.mini .headtoggle{top:6px}
   body.mini .headtoggle svg{transform:rotate(180deg)}
   body.mini .framewrap{padding-top:10px}
   .scenario{max-width:720px}
@@ -345,10 +344,6 @@
   <main class="stage">
 
     <div class="stagehead">
-      <button class="headtoggle" id="headtoggle" type="button" aria-expanded="true" title="ย่อ/ขยายหัวเรื่อง">
-        <svg width="10" height="7" viewBox="0 0 10 7" fill="currentColor"><path d="M5 0L0 5.2 1.5 7 5 3.4 8.5 7 10 5.2z"/></svg>
-        <span id="headtogglelabel">ย่อหัวเรื่อง</span>
-      </button>
       <div class="scenario">
         <div class="kicker">เรื่องที่กำลังดู</div>
         <h2>ร้าน DPX ขายไอโฟนให้ลูกค้าด้วยวิธีผ่อน แล้วรอกองทุนจ่ายเงินคืน</h2>
@@ -363,6 +358,10 @@
         <span class="f"><b>กองทุน</b> ฝ่ายการเงิน</span>
         <span class="c"><b>ระบบ</b> สร้างเอกสารเอง</span>
       </div>
+      <button class="headtoggle" id="headtoggle" type="button" aria-expanded="true" title="ย่อ/ขยายหัวเรื่อง">
+        <svg width="10" height="7" viewBox="0 0 10 7" fill="currentColor"><path d="M5 0L0 5.2 1.5 7 5 3.4 8.5 7 10 5.2z"/></svg>
+        <span id="headtogglelabel">ย่อหัวเรื่อง</span>
+      </button>
     </div>
 
     <div class="stagebody" id="stagebody">
