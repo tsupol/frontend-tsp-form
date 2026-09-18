@@ -102,7 +102,33 @@
   .stagehead{
     padding:22px 30px 0; display:flex; align-items:flex-start;
     justify-content:space-between; gap:20px; flex-wrap:wrap;
+    position:relative;
   }
+  .headtoggle{
+    position:absolute; top:18px; right:30px;
+    background:var(--panel-2); border:1px solid var(--line); color:var(--dim);
+    border-radius:7px; padding:4px 9px; font:inherit; font-size:11.5px;
+    cursor:pointer; display:inline-flex; align-items:center; gap:6px;
+    transition:background .15s, color .15s;
+  }
+  .headtoggle:hover{background:#1e2430; color:var(--text)}
+  .headtoggle svg{transition:transform .25s ease}
+
+  /* --- collapsed: header shrinks to one line --- */
+  .minibar{display:none}
+  body.mini .stagehead{padding:12px 30px 0}
+  body.mini .scenario p,
+  body.mini .scenario .kicker,
+  body.mini .cast{display:none}
+  body.mini .scenario h2{
+    font-size:14px; font-weight:600; color:var(--dim);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    max-width:calc(100vw - 460px); margin:0;
+  }
+  body.mini .headtoggle{top:9px}
+  body.mini .headtoggle svg{transform:rotate(180deg)}
+  body.mini .framewrap{padding-top:10px}
+  body.mini{--chrome:180px}
   .scenario{max-width:720px}
   .scenario .kicker{
     font-size:11px; letter-spacing:1.1px; text-transform:uppercase;
@@ -129,7 +155,7 @@
     position:relative; width:100%; border-radius:12px; overflow:hidden;
     border:1px solid var(--line); background:#000; box-shadow:var(--shadow);
     aspect-ratio:2524/1481;
-    width:min(100%, calc((100vh - 300px) * 2524 / 1481));
+    width:min(100%, calc((100vh - var(--chrome,300px)) * 2524 / 1481));
     margin:0 auto;
   }
   .frame img{
@@ -269,6 +295,10 @@
   <main class="stage">
 
     <div class="stagehead">
+      <button class="headtoggle" id="headtoggle" type="button" aria-expanded="true">
+        <svg width="10" height="7" viewBox="0 0 10 7" fill="currentColor"><path d="M5 0L0 5.2 1.5 7 5 3.4 8.5 7 10 5.2z"/></svg>
+        <span id="headtogglelabel">ย่อหัวเรื่อง</span>
+      </button>
       <div class="scenario">
         <div class="kicker">เรื่องที่กำลังดู</div>
         <h2>ร้าน DPX ขายไอโฟนให้ลูกค้าด้วยวิธีผ่อน แล้วรอกองทุนจ่ายเงินคืน</h2>
@@ -609,9 +639,22 @@ document.querySelectorAll('.spd button').forEach(b => {
   });
 });
 
+/* --- collapse the header to one line --- */
+const headBtn = document.getElementById('headtoggle');
+const headLab = document.getElementById('headtogglelabel');
+function setMini(on) {
+  document.body.classList.toggle('mini', on);
+  headBtn.setAttribute('aria-expanded', on ? 'false' : 'true');
+  headLab.textContent = on ? 'ขยายหัวเรื่อง' : 'ย่อหัวเรื่อง';
+  try { localStorage.setItem('clipMini', on ? '1' : '0'); } catch (e) {}
+}
+headBtn.addEventListener('click', () => setMini(!document.body.classList.contains('mini')));
+try { if (localStorage.getItem('clipMini') === '1') setMini(true); } catch (e) {}
+
 document.addEventListener('keydown', e => {
   if (e.target.matches('input,textarea')) return;
-  if (e.code === 'Space') { e.preventDefault(); playBtn.click(); }
+  if (e.key === 'h' || e.key === 'H') { setMini(!document.body.classList.contains('mini')); }
+  else if (e.code === 'Space') { e.preventDefault(); playBtn.click(); }
   else if (e.key === 'ArrowRight') { e.preventDefault(); pause(); step(1); }
   else if (e.key === 'ArrowLeft')  { e.preventDefault(); pause(); step(-1); }
 });
