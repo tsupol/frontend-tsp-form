@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Modal, Input, Select, TextArea, MaskedInput, Badge, Tooltip, PopOver, useSnackbarContext } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
-import { CheckCircle, XCircle, Pencil, Plus, Trash2, Loader2, ChevronsRight, ChevronDown, ExternalLink, Wrench, ArrowRight, Info, Receipt, Paperclip, MessageSquare, PenLine, AlertTriangle } from 'lucide-react';
+import { CheckCircle, XCircle, Pencil, Plus, Trash2, Loader2, ChevronsRight, ChevronDown, ExternalLink, Wrench, ArrowRight, Info, Receipt, Paperclip, MessageSquare, PenLine, AlertTriangle, PackageOpen } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAllowedPaymentMethods, useBranchIsPartner } from '../../hooks/useAllowedPaymentMethods';
 import { getRoleLabel } from '../../lib/roleLabel';
@@ -50,6 +50,7 @@ import { ResumeContractModal } from './ResumeContractModal';
 import { useContractInvalidate } from './useContractInvalidate';
 import { useCompanyFeatures } from '../../hooks/useCompanyFeatures';
 import { blockingReasonText, translateApiError } from '../../lib/apiErrors';
+import { ReturnOpenModal } from '../partner-return/ReturnOpenModal';
 import { buildSavingSeededPayments, savingApplied, unusedSaving } from './savingAutoFill';
 import { SavingRowNote, SavingUnusedWarning, SavingUnusedConfirmDialog } from './SavingAppliedNotice';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
@@ -809,6 +810,7 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { openChat } = useChatDock();
+  const { isDealPartner } = useAuth();
   const [activeAction, setActiveAction] = useState<ContractAction | null>(null);
   const { addSnackbar } = useSnackbarContext();
 
@@ -826,6 +828,26 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
     }),
     staleTime: 30 * 1000,
   });
+
+  // An active deal-partner contract ends only through a device-return document
+  // (146 §0). The evaluator says so itself: cancel / terminate / unbind / the
+  // open bill's void all come back blocked, with `blocking_params.code` naming
+  // the very error the RPC would answer. So the footer reads that code rather
+  // than second-guessing branch type or settlement status — a contract the
+  // backend has not locked keeps its ordinary buttons.
+  const returnLock = (actionsResp?.actions ?? [])
+    .map(a => a.blocking_params)
+    .find((p): p is Record<string, unknown> =>
+      !!p && (p as { code?: unknown }).code === 'PARTNER.STATE.USE_RETURN_DOCUMENT');
+  // A document already open — the button points at it instead of opening a
+  // second one (the backend would answer RETURN_ALREADY_OPEN).
+  const lockedReturnId = typeof returnLock?.return_id === 'number' ? returnLock.return_id : null;
+  const lockedReturnCode = typeof returnLock?.return_code === 'string' ? returnLock.return_code : null;
+  const [returnOpenModal, setReturnOpenModal] = useState(false);
+
+  const goToReturn = (returnId: number) => navigate(
+    isDealPartner ? `/admin/contracts/returns/${returnId}` : `/admin/partner-returns/${returnId}`,
+  );
 
   const isWizardState = WIZARD_STATES.has(contract.state);
   const isPendingPayment = contract.state === 'PENDING_PAYMENT';
@@ -917,6 +939,11 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
     .filter(a => FOOTER_ACTION_ALLOWLIST.has(a.action_code))
     .filter(a => a.blocking_reason !== 'permission_denied')
     .filter(a => a.is_permitted !== false)
+    // Buttons this document replaced: showing a dead "cancel contract" beside
+    // "return the device" only asks the user to try the wrong one first. The
+    // reason still reaches them — it is the sentence on the return button.
+    .filter(a => (a.blocking_params as { code?: unknown } | null | undefined)?.code
+      !== 'PARTNER.STATE.USE_RETURN_DOCUMENT')
     .slice()
     .sort((a, b) => a.sort_order - b.sort_order);
 
@@ -1092,6 +1119,34 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
 
         {showActionGrid && (
           <div className="flex flex-wrap items-center gap-2">
+            {/* The one way out of an active shop contract. Opens the document,
+                or jumps to the one already open. */}
+            {returnLock && (
+              <Tooltip
+                content={t(
+                  lockedReturnCode
+                    ? 'partnerReturn.footerButtonHintOpen'
+                    : 'partnerReturn.footerButtonHint',
+                  { code: lockedReturnCode ?? '' },
+                )}
+                placement="top"
+              >
+                <Button
+                  size="sm"
+                  color="primary"
+                  startIcon={<PackageOpen size={14} />}
+                  onClick={() => {
+                    if (lockedReturnId != null) goToReturn(lockedReturnId);
+                    else setReturnOpenModal(true);
+                  }}
+                  data-action="PARTNER_RETURN_OPEN"
+                >
+                  {lockedReturnCode
+                    ? t('partnerReturn.footerButtonOpen', { code: lockedReturnCode })
+                    : t('partnerReturn.footerButton')}
+                </Button>
+              </Tooltip>
+            )}
             {primaryActions.map(a => renderActionButton(a, true))}
             <Button
               variant="outline"
@@ -1151,6 +1206,14 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
           </PopOver>
         )}
       </div>
+
+      <ReturnOpenModal
+        open={returnOpenModal}
+        contractId={contract.id}
+        contractCode={contract.code_display ?? String(contract.id)}
+        onClose={() => setReturnOpenModal(false)}
+        onOpened={res => { onRefresh(); void res; }}
+      />
 
       <SavingDepositModal
         open={isSavingDeposit}

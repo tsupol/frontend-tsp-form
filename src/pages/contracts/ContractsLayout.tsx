@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Badge } from 'tsp-form';
-import { Search, PiggyBank, FilePlus, Link2, FileEdit, CreditCard, Archive, Repeat2, PauseCircle, ClipboardCheck, PackageCheck, Hourglass, Banknote, Percent } from 'lucide-react';
+import { Search, PiggyBank, FilePlus, Link2, FileEdit, CreditCard, Archive, Repeat2, PauseCircle, ClipboardCheck, PackageCheck, PackageOpen, Hourglass, Banknote, Percent } from 'lucide-react';
 import { useNavCounts } from '../../hooks/useNavCounts';
 import { useAuth } from '../../contexts/AuthContext';
 import { shopMenuAllows } from '../../lib/shopMenu';
@@ -28,6 +28,8 @@ export function ContractsLayout({ children }: { children: ReactNode }) {
         { path: '/admin/contracts/settlement-payment', labelKey: 'nav.settlementPayment', icon: Hourglass, count: 0 },
         { path: '/admin/contracts/partner-payouts', labelKey: 'nav.partnerPayoutsShop', icon: Banknote, count: 0 },
         { path: '/admin/contracts/partner-commission', labelKey: 'nav.partnerCommission', icon: Percent, count: 0 },
+        // The shop's device-return documents (146 §2).
+        { path: '/admin/contracts/returns', labelKey: 'nav.partnerReturns', icon: PackageOpen, count: 0 },
       ]
       : []),
     { path: '/admin/contracts/pending-payment', labelKey: 'nav.pendingPayment', icon: CreditCard, count: pendingPaymentCount },

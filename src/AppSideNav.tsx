@@ -39,7 +39,7 @@ import {
   // Fanout child icons — Contracts
   Search, PiggyBank, Link2, FileEdit, FilePlus, CreditCard, Archive, Repeat2, PauseCircle,
   // Fanout child icons — Commission
-  UserCheck, ClipboardCheck, PackageCheck,
+  UserCheck, ClipboardCheck, PackageCheck, PackageOpen,
   // Fanout child icons — Accounting
   CalendarCheck, Receipt, ShieldAlert, Banknote, FileSpreadsheet, Coins, ArrowUpRight, ListChecks, ShoppingBag,
   // Fanout child icons — Branch expense
@@ -317,6 +317,8 @@ export const AppSideNav = () => {
             { key: 'settlement-payment', icon: <Hourglass size="1rem" />, label: t('nav.settlementPayment'), path: '/admin/contracts/settlement-payment' },
             { key: 'partner-payouts', icon: <Banknote size="1rem" />, label: t('nav.partnerPayoutsShop'), path: '/admin/contracts/partner-payouts' },
             { key: 'partner-commission', icon: <Percent size="1rem" />, label: t('nav.partnerCommission'), path: '/admin/contracts/partner-commission' },
+            // The shop's device-return documents (146 §2). Same no-badge rule.
+            { key: 'partner-returns', icon: <PackageOpen size="1rem" />, label: t('nav.partnerReturns'), path: '/admin/contracts/returns' },
           ]
           : []),
         { key: 'pending-payment', ...iconWithCount(<CreditCard size="1rem" />, pendingPaymentCount), label: t('nav.pendingPayment'), path: '/admin/contracts/pending-payment' },
@@ -418,6 +420,19 @@ export const AppSideNav = () => {
           icon: <Banknote size="1rem" />,
           label: t('nav.staffPartnerPayouts'),
           path: '/admin/partner-payouts',
+        }]
+      : []),
+    ...(canPayPartners
+      ? [{
+          key: 'staff-partner-returns',
+          icon: <PackageCheck size="1rem" />,
+          label: t('nav.staffPartnerReturns'),
+          path: '/admin/partner-returns',
+        }, {
+          key: 'staff-partner-return-warehouse',
+          icon: <Warehouse size="1rem" />,
+          label: t('nav.staffPartnerReturnWarehouse'),
+          path: '/admin/partner-returns/warehouse',
         }]
       : []),
     ...(canSeePartnerSettlements

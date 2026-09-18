@@ -57,6 +57,8 @@ import { PartnerPayoutBuildPage } from './pages/partner-payouts/PartnerPayoutBui
 import { PartnerPayoutDetailPage } from './pages/partner-payouts/PartnerPayoutDetailPage';
 import { PartnerSettlementQueuePage } from './pages/partner-settlements/PartnerSettlementQueuePage';
 import { PartnerBalancePage } from './pages/partner-settlements/PartnerBalancePage';
+import { PartnerReturnsPage } from './pages/partner-returns/PartnerReturnsPage';
+import { PartnerReturnWarehousePage } from './pages/partner-returns/PartnerReturnWarehousePage';
 import { ChatPage } from './pages/chat/ChatPage';
 import { NnfAppPage } from './pages/nnf-app/NnfAppPage';
 import { NnfMdmPage } from './pages/nnf-mdm/NnfMdmPage';
@@ -71,6 +73,7 @@ import { PendingApprovalPage } from './pages/contracts/PendingApprovalPage';
 import { SettlementMenuPage } from './pages/partner-settlement/SettlementMenuPage';
 import { ShopPayoutsPage } from './pages/partner-settlement/ShopPayoutsPage';
 import { PartnerCommissionPage } from './pages/partner-settlement/PartnerCommissionPage';
+import { ShopReturnsPage } from './pages/partner-return/ShopReturnsPage';
 import { PendingPairingPage } from './pages/contracts/PendingPairingPage';
 import { DepositedDevicesPage } from './pages/contracts/DepositedDevicesPage';
 import { LoanersOutPage } from './pages/contracts/LoanersOutPage';
@@ -784,6 +787,18 @@ function App() {
           </ProtectedRoute>
         }
       />
+      {/* The shop's device-return documents (146). The optional id keeps one
+          document linkable straight from the contract page. */}
+      <Route
+        path="/admin/contracts/returns/:returnId?"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <ContractsLayout><ShopReturnsPage /></ContractsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/admin/contracts/pending-pairing/:contractId?"
         element={
@@ -1009,6 +1024,29 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <PartnerPayoutDetailPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      {/* Shop device returns — the only way an ACTIVE shop contract ends.
+          The warehouse route is declared first so "warehouse" is never read as
+          a document id by the optional-param route below it. */}
+      <Route
+        path="/admin/partner-returns/warehouse"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <PartnerReturnWarehousePage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/partner-returns/:returnId?"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <PartnerReturnsPage />
             </AdminLayout>
           </ProtectedRoute>
         }

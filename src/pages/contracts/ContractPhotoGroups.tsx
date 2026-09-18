@@ -83,7 +83,15 @@ interface PhotoStatus {
   total_photos: number;
   /** false → every group with locks_with_settlement is frozen. */
   editable: boolean;
-  lock: { code?: string; settlement_status?: string; settlement_code?: string } | null;
+  /** `lock_kind` names which document froze the album: SETTLEMENT or RETURN. */
+  lock: {
+    code?: string;
+    lock_kind?: string;
+    settlement_status?: string;
+    settlement_code?: string;
+    return_code?: string;
+    return_status?: string;
+  } | null;
   slots: PhotoStatusSlot[];
 }
 
@@ -185,10 +193,18 @@ export function ContractPhotoGroups({ contractId, className }: {
 
   const photosIn = (slot: string) => photos.filter(p => p.usage_type === slot);
 
-  // A group is frozen when the settlement locked the album AND this group is
-  // one of the ones that lock. "General" survives every lock.
+  // A group is frozen when a document locked the album AND this group is one
+  // the document locks. There are two documents and each locks its own groups
+  // (141 §5, 146 §4), told apart by `lock.lock_kind`:
+  //   SETTLEMENT — the shop's payment request freezes the handover groups.
+  //   RETURN     — the device-return document, once the device is received,
+  //                freezes the two RETURN_* groups.
+  // "General" survives both. The slots view carries only the settlement flag,
+  // so the return case is matched by the slot's own name prefix, which is what
+  // `locks_with_return` is set on in the backend.
   const lockedGroup = useCallback((slot: string) => {
     if (status?.editable !== false) return false;
+    if (status.lock?.lock_kind === 'RETURN') return slot.startsWith('RETURN_');
     return status.slots.find(s => s.slot === slot)?.locks_with_settlement ?? false;
   }, [status]);
 
