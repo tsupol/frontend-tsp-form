@@ -87,6 +87,13 @@ export function PartnerPayoutDetailPage() {
   const rowActionOk = (code: string) =>
     (actions?.actions ?? []).some(a => a.action_code === code && a.is_available);
 
+  /** The row-level action itself, so a blocked one can say why instead of vanishing.
+   *  mig 1281 only lets an adjustment row be cancelled on the day it was recorded;
+   *  after that the evaluator answers `adjustment_not_today`, and the person needs
+   *  to read that rather than find the button gone. */
+  const rowAction = (code: string) =>
+    (actions?.actions ?? []).find(a => a.action_code === code);
+
   const runAction = (code: string) => {
     if (code === 'PAY') setPayOpen(true);
     else if (code === 'VOID') setVoidOpen(true);
@@ -360,16 +367,28 @@ export function PartnerPayoutDetailPage() {
                                 </div>
                               )}
                             </div>
-                            {a.is_active && rowActionOk('ADJUST_VOID') && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                startIcon={<Trash2 size={14} className="text-danger" />}
-                                onClick={() => setVoidAdjustTarget(a)}
-                              >
-                                {t('partnerPayout.adjustVoidAction')}
-                              </Button>
-                            )}
+                            {a.is_active && (() => {
+                              const av = rowAction('ADJUST_VOID');
+                              if (!av) return null;
+                              if (!av.is_available && HIDDEN_REASONS.has(av.blocking_reason ?? '')) return null;
+                              const btn = (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  startIcon={<Trash2 size={14} className="text-danger" />}
+                                  disabled={!av.is_available}
+                                  onClick={() => setVoidAdjustTarget(a)}
+                                >
+                                  {t('partnerPayout.adjustVoidAction')}
+                                </Button>
+                              );
+                              if (av.is_available) return btn;
+                              return (
+                                <Tooltip content={blockingReasonText(av, t)} placement="top">
+                                  <span>{btn}</span>
+                                </Tooltip>
+                              );
+                            })()}
                           </div>
                         ))}
                       </div>

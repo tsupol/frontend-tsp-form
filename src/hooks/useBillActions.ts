@@ -49,7 +49,11 @@ export type BillBlockingReason =
   // The shop's payment request locks the contract's opening bill once the shop
   // submits its close-out (mig 1250). `blocking_params.code` names the error the
   // RPC would answer, so the button says exactly what a failed call would.
-  | 'partner_settlement_locked';
+  | 'partner_settlement_locked'
+  // mig 1278: the shop's branch only manages its contract-opening bill. Every
+  // button on a fund-money bill (installment, penalty, early payoff, fee,
+  // wallet) is closed to the shop — the fund's finance desk owns those.
+  | 'partner_bill_not_managed';
 
 /** Facts behind a blocking reason, for interpolation into its message.
  *  Populated only for the mig-1213 previous-day reasons; `null` otherwise. */
@@ -70,6 +74,11 @@ export interface BillAction {
   blocking_reason: BillBlockingReason | null;
   blocking_params: BillBlockingParams | null;
   require_pin: boolean;
+  /** mig 1278: whether THIS caller must supply a branch PIN. `require_pin` is the
+   *  action's own setting and ignores who is asking; this one is per-caller — a
+   *  company admin cancelling a paid bill gets `false` and sends no PIN. Always
+   *  decide the PIN dialog from this field, never from `require_pin`. */
+  pin_required: boolean;
   creates_credit_note: boolean;
   target_status: string | null;
   sort_order: number;

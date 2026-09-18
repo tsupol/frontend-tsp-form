@@ -15,7 +15,7 @@ import { translateApiError } from '../../lib/apiErrors';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { fmtCurrency } from '../../lib/format';
-import { usePartnerPayoutInvalidate, usePayoutReverseReasons } from './usePartnerPayouts';
+import { usePartnerPayoutInvalidate, usePayoutReverseReasons, usePayoutSourceAccounts } from './usePartnerPayouts';
 import type { PartnerPayoutDetail, PayoutReverseResult } from './partnerPayoutTypes';
 
 const MIN_NOTE = 3;
@@ -34,6 +34,9 @@ export function PayoutReverseModal({ open, detail, onClose }: PayoutReverseModal
   const [view, setView] = useState<'form' | 'done'>('form');
   const [reasonCode, setReasonCode] = useState('');
   const [note, setNote] = useState('');
+  // Which fund account the money came back into (mig 1281, optional). Left blank,
+  // the row lands under "ไม่ระบุบัญชี" on the daily money summary (148).
+  const [accountId, setAccountId] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<PayoutReverseResult | null>(null);
@@ -45,12 +48,19 @@ export function PayoutReverseModal({ open, detail, onClose }: PayoutReverseModal
     setView('form');
     setReasonCode('');
     setNote('');
+    setAccountId('');
     setSaving(false);
     setError(null);
     setResult(null);
     setConfirmClose(false);
     setConfirmSend(false);
   }, [open]);
+
+  const accounts = usePayoutSourceAccounts(detail?.company_id ?? null);
+  const accountOptions = accounts.map(a => ({
+    value: String(a.id),
+    label: `${a.bank_name} · ${a.account_number_display ?? a.account_number ?? ''}`,
+  }));
 
   const reasonOptions = reasons.map(r => ({
     value: r.code,
@@ -63,7 +73,7 @@ export function PayoutReverseModal({ open, detail, onClose }: PayoutReverseModal
   const forceClose = () => { setConfirmClose(false); onClose(); };
   const handleClose = () => {
     if (view === 'done') { forceClose(); return; }
-    if (reasonCode || note.trim()) { setConfirmClose(true); return; }
+    if (reasonCode || note.trim() || accountId) { setConfirmClose(true); return; }
     forceClose();
   };
 
@@ -76,6 +86,7 @@ export function PayoutReverseModal({ open, detail, onClose }: PayoutReverseModal
         p_payout_id: detail.payout_id,
         p_reason_code: reasonCode,
         p_note: note.trim() || null,
+        p_bank_account_id: accountId ? Number(accountId) : null,
       });
       setConfirmSend(false);
       setResult(res);
@@ -130,6 +141,18 @@ export function PayoutReverseModal({ open, detail, onClose }: PayoutReverseModal
                     onChange={v => setReasonCode((v as string) ?? '')}
                     placeholder={t('partnerPayout.reverseReasonPlaceholder')}
                   />
+                </div>
+
+                <div className="flex flex-col">
+                  <label className="form-label">{t('partnerPayout.bankAccountBack')}</label>
+                  <Select
+                    options={accountOptions}
+                    value={accountId || null}
+                    onChange={v => setAccountId((v as string) ?? '')}
+                    placeholder={t('partnerPayout.bankAccountPlaceholder')}
+                    clearable
+                  />
+                  <span className="text-xs text-subtle mt-1">{t('partnerPayout.bankAccountHint')}</span>
                 </div>
 
                 <div className="flex flex-col">

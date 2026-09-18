@@ -32,7 +32,7 @@ import { SellOutRequestModal } from './SellOutRequestModal';
 import { OwnerBadge } from '../../components/OwnerBadge';
 import { ApiErrorAlert } from '../../components/ApiErrorAlert';
 import type { OwnerType } from '../../lib/ownerTypes';
-import { translateApiError } from '../../lib/apiErrors';
+import { translateApiError, blockingReasonText } from '../../lib/apiErrors';
 import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 import { SearchInput } from '../../components/SearchInput';
 
@@ -2871,7 +2871,7 @@ function AssetActionBar({
       lines.push(t(gateReasonKey[a.action_code], { ns: 'assetActions', defaultValue: 'You do not have permission for this action' }));
     }
     if (!a.is_available && a.blocking_reason) {
-      lines.push(t(`blockingReason.${a.blocking_reason}`, { ns: 'apiErrors', defaultValue: a.blocking_reason }));
+      lines.push(blockingReasonText(a, t));
     }
     const tooltipContent: React.ReactNode = lines.length === 1
       ? lines[0]

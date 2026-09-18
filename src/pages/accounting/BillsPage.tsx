@@ -459,6 +459,18 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState('');
 
+  // Whether THIS user must type a branch PIN to cancel/void the bill. mig 1278
+  // added `pin_required` (per-caller) next to the action's own `require_pin`
+  // setting: a company admin cancelling a paid bill on its own day gets false
+  // and sends no PIN. Read it off the evaluator, never hard-code it. The three
+  // lifecycle verbs are mutually exclusive, so whichever one is offered decides.
+  const voidPinRequired = (() => {
+    const verb = (['CANCEL_BILL', 'VOID_BILL', 'REVERSE_BILL'] as const)
+      .map(code => allActions.find(a => a.action_code === code && a.is_available))
+      .find(Boolean);
+    return verb?.pin_required ?? true;
+  })();
+
   // Void (cancel whole bill) state
   const [voidOpen, setVoidOpen] = useState(false);
   const [voidReason, setVoidReason] = useState('');
@@ -633,14 +645,15 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
   };
 
   const handleVoid = async () => {
-    if (!voidReasonCode || !voidReason.trim() || !voidPin) return;
+    if (!voidReasonCode || !voidReason.trim()) return;
+    if (voidPinRequired && !voidPin) return;
     setVoiding(true);
     setVoidError('');
     try {
       const result = await apiClient.rpc<Partial<StandardBillResponse>>('fn_bill_cancel', {
         p_bill_id: billId,
         p_reason: voidReason.trim(),
-        p_pin: voidPin,
+        p_pin: voidPinRequired ? voidPin : null,
         p_branch_id: detail.branch_id,
         p_reason_code: voidReasonCode || null,
       });
@@ -1076,7 +1089,9 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
                 className="w-full"
               />
             </div>
-            <BranchPinInput value={voidPin} onChange={setVoidPin} label={t('accounting.bills.pin')} required />
+            {voidPinRequired && (
+              <BranchPinInput value={voidPin} onChange={setVoidPin} label={t('accounting.bills.pin')} required />
+            )}
           </div>
         </div>
         <div className="modal-footer">
@@ -1084,7 +1099,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
           <Button
             color="danger"
             onClick={handleVoid}
-            disabled={!voidReasonCode || !voidReason.trim() || !voidPin || voiding}
+            disabled={!voidReasonCode || !voidReason.trim() || (voidPinRequired && !voidPin) || voiding}
           >
             {voiding ? t('common.loading') : t('accounting.bills.confirmVoid')}
           </Button>
@@ -1094,6 +1109,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
       {/* ── Void single payment modal ── */}
       <VoidPaymentModal
         payment={voidPayment}
+        pinRequired={allActions.find(a => a.action_code === 'VOID_PAYMENT')?.pin_required ?? true}
         onClose={() => setVoidPayment(null)}
         onVoided={() => {
           invalidateAfterBillChange();
@@ -1163,9 +1179,12 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
    re-entry. Follows the form→done + dirty-guard write-modal pattern. */
 
 function VoidPaymentModal({
-  payment, onClose, onVoided,
+  payment, pinRequired, onClose, onVoided,
 }: {
   payment: BillPayment | null;
+  /** From fn_bill_available_actions VOID_PAYMENT.pin_required (per-caller, mig
+   *  1278) — never hard-code. False for a company admin; true for a branch manager. */
+  pinRequired: boolean;
   onClose: () => void;
   onVoided: () => void;
 }) {
@@ -1203,14 +1222,15 @@ function VoidPaymentModal({
   };
 
   const handleVoid = async () => {
-    if (!payment || !reasonCode || !reason.trim() || !pin) return;
+    if (!payment || !reasonCode || !reason.trim()) return;
+    if (pinRequired && !pin) return;
     setBusy(true);
     setError('');
     try {
       await apiClient.rpc('fn_bill_payment_void', {
         p_payment_id: payment.id,
         p_reason: reason.trim(),
-        p_pin: pin,
+        p_pin: pinRequired ? pin : null,
         p_reason_code: reasonCode || null,
       });
       onVoided();
@@ -1277,12 +1297,14 @@ function VoidPaymentModal({
                     className="w-full"
                   />
                 </div>
-                <BranchPinInput value={pin} onChange={setPin} label={t('accounting.bills.pin')} required />
+                {pinRequired && (
+                  <BranchPinInput value={pin} onChange={setPin} label={t('accounting.bills.pin')} required />
+                )}
               </div>
             </div>
             <div className="modal-footer">
               <Button onClick={handleClose} disabled={busy}>{t('common.cancel')}</Button>
-              <Button color="danger" onClick={handleVoid} disabled={!reasonCode || !reason.trim() || !pin || busy}>
+              <Button color="danger" onClick={handleVoid} disabled={!reasonCode || !reason.trim() || (pinRequired && !pin) || busy}>
                 {busy ? t('common.loading') : t('accounting.bills.confirmVoidPayment', { defaultValue: 'Void payment' })}
               </Button>
             </div>

@@ -13,7 +13,7 @@ import { translateApiError } from '../../lib/apiErrors';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../../lib/format';
-import { usePartnerPayoutInvalidate } from './usePartnerPayouts';
+import { usePartnerPayoutInvalidate, usePayoutSourceAccounts } from './usePartnerPayouts';
 import type { PartnerPayoutDetail, PayoutAdjustDirection, PayoutAdjustResult } from './partnerPayoutTypes';
 
 const MIN_REASON = 3;
@@ -50,6 +50,9 @@ export function PayoutAdjustModal({ open, detail, onClose }: PayoutAdjustModalPr
   const [typing, setTyping] = useState(false);
   const [settlementId, setSettlementId] = useState('');
   const [reference, setReference] = useState('');
+  // Which fund account the money moved through (mig 1281, optional). Left blank,
+  // the row lands under "ไม่ระบุบัญชี" on the daily money summary (148).
+  const [accountId, setAccountId] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<PayoutAdjustResult | null>(null);
@@ -65,6 +68,7 @@ export function PayoutAdjustModal({ open, detail, onClose }: PayoutAdjustModalPr
     setTyping(false);
     setSettlementId('');
     setReference('');
+    setAccountId('');
     setSaving(false);
     setError(null);
     setResult(null);
@@ -73,7 +77,7 @@ export function PayoutAdjustModal({ open, detail, onClose }: PayoutAdjustModalPr
 
   const amountNum = Number(amount);
   const futureDate = !!paidDate && paidDate > today;
-  const dirty = !!amount || !!reason.trim() || !!settlementId || !!reference.trim() || paidDate !== today;
+  const dirty = !!amount || !!reason.trim() || !!settlementId || !!reference.trim() || !!accountId || paidDate !== today;
   const canSubmit = amountNum > 0 && reason.trim().length >= MIN_REASON && !!paidDate && !futureDate;
 
   const forceClose = () => { setConfirmClose(false); onClose(); };
@@ -82,6 +86,12 @@ export function PayoutAdjustModal({ open, detail, onClose }: PayoutAdjustModalPr
     if (dirty) { setConfirmClose(true); return; }
     forceClose();
   };
+
+  const accounts = usePayoutSourceAccounts(detail?.company_id ?? null);
+  const accountOptions = accounts.map(a => ({
+    value: String(a.id),
+    label: `${a.bank_name} · ${a.account_number_display ?? a.account_number ?? ''}`,
+  }));
 
   const settlementOptions = (detail?.settlements ?? []).map(s => ({
     value: String(s.settlement_id),
@@ -101,6 +111,7 @@ export function PayoutAdjustModal({ open, detail, onClose }: PayoutAdjustModalPr
         p_paid_date: paidDate,
         p_settlement_id: settlementId ? Number(settlementId) : null,
         p_reference: reference.trim() || null,
+        p_bank_account_id: accountId ? Number(accountId) : null,
       });
       setResult(res);
       setView('done');
@@ -203,6 +214,18 @@ export function PayoutAdjustModal({ open, detail, onClose }: PayoutAdjustModalPr
                     placeholder={t('partnerPayout.linkedSettlementPlaceholder')}
                     clearable
                   />
+                </div>
+
+                <div className="flex flex-col">
+                  <label className="form-label">{t('partnerPayout.bankAccount')}</label>
+                  <Select
+                    options={accountOptions}
+                    value={accountId || null}
+                    onChange={v => setAccountId((v as string) ?? '')}
+                    placeholder={t('partnerPayout.bankAccountPlaceholder')}
+                    clearable
+                  />
+                  <span className="text-xs text-subtle mt-1">{t('partnerPayout.bankAccountHint')}</span>
                 </div>
 
                 <div className="flex flex-col">

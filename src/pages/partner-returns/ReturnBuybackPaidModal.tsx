@@ -11,7 +11,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Modal, Button, Input, InputDatePicker, TextArea } from 'tsp-form';
+import { Modal, Button, Input, InputDatePicker, Select, TextArea } from 'tsp-form';
 import { ExternalLink, Info, Keyboard } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
@@ -20,6 +20,7 @@ import { DateTime } from '../../components/DateTime';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../../lib/format';
 import { usePartnerReturnInvalidate } from './usePartnerReturns';
+import { usePayoutSourceAccounts } from '../partner-payouts/usePartnerPayouts';
 import type {
   PartnerReturnActionsResponse,
   PartnerReturnDetail,
@@ -57,6 +58,9 @@ export function ReturnBuybackPaidModal({ open, detail, actions, onClose }: Props
   const [typing, setTyping] = useState(false);
   const [reference, setReference] = useState('');
   const [note, setNote] = useState('');
+  // Which fund account received the shop's transfer (mig 1281, optional). Left
+  // blank, the row lands under "ไม่ระบุบัญชี" on the daily money summary (148).
+  const [accountId, setAccountId] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ReturnBuybackPaidResult | null>(null);
@@ -69,13 +73,14 @@ export function ReturnBuybackPaidModal({ open, detail, actions, onClose }: Props
     setTyping(false);
     setReference('');
     setNote('');
+    setAccountId('');
     setSaving(false);
     setError(null);
     setResult(null);
     setConfirmClose(false);
   }, [open]);
 
-  const dirty = paidDate !== today || !!reference.trim() || !!note.trim();
+  const dirty = paidDate !== today || !!reference.trim() || !!note.trim() || !!accountId;
   const futureDate = !!paidDate && paidDate > today;
   const canSubmit = !!paidDate && !futureDate;
 
@@ -88,6 +93,12 @@ export function ReturnBuybackPaidModal({ open, detail, actions, onClose }: Props
 
   const amount = (actions?.buyback_amount ?? 0) + (actions?.buyback_fee ?? 0);
 
+  const accounts = usePayoutSourceAccounts(detail?.company_id ?? null);
+  const accountOptions = accounts.map(a => ({
+    value: String(a.id),
+    label: `${a.bank_name} · ${a.account_number_display ?? a.account_number ?? ''}`,
+  }));
+
   const handleSave = async () => {
     if (!detail || !canSubmit) return;
     setSaving(true);
@@ -98,6 +109,7 @@ export function ReturnBuybackPaidModal({ open, detail, actions, onClose }: Props
         p_paid_date: paidDate,
         p_reference: reference.trim() || null,
         p_note: note.trim() || null,
+        p_bank_account_id: accountId ? Number(accountId) : null,
       });
       setResult(res);
       setView('done');
@@ -182,6 +194,18 @@ export function ReturnBuybackPaidModal({ open, detail, actions, onClose }: Props
                     className="w-full"
                     placeholder={t('partnerReturn.referencePlaceholder')}
                   />
+                </div>
+
+                <div className="flex flex-col">
+                  <label className="form-label">{t('partnerReturn.bankAccount')}</label>
+                  <Select
+                    options={accountOptions}
+                    value={accountId || null}
+                    onChange={v => setAccountId((v as string) ?? '')}
+                    placeholder={t('partnerReturn.bankAccountPlaceholder')}
+                    clearable
+                  />
+                  <span className="text-xs text-subtle mt-1">{t('partnerReturn.bankAccountHint')}</span>
                 </div>
 
                 <div className="flex flex-col">
