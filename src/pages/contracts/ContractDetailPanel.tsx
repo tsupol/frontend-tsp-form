@@ -23,6 +23,7 @@ import { fmtCurrency } from '../../lib/format';
 import { getStateColor, getStateLabel, productName, formatInstallment } from './contractUtils';
 import { ContractActionButtons } from './ContractActions';
 import { PartnerCaseCard } from '../partner-cases/PartnerCaseCard';
+import { SettlementCard } from '../partner-settlement/SettlementCard';
 import { WalletsTab } from './wallet/WalletsTab';
 import { DeviceTab } from './DeviceTab';
 import { SigningTab } from './SigningTab';
@@ -901,6 +902,12 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
         commercialModel={contract.commercial_model}
         contractState={contract.state}
       />
+
+      {/* The shop's payment request — what the fund owes for this contract and
+          the close-out the shop submits to get it. Renders nothing until the
+          contract is active (no request exists before that) and nothing at all
+          for staff, who read the same request through their finance queue. */}
+      <SettlementCard contractId={contract.id} onOpenAlbum={onNavigateSigning} />
 
       {/* Paused reminder — device in for repair, debt clock frozen. Staff must not
           chase a paused customer. Days from paused_from (v_contract_detail.pause_days

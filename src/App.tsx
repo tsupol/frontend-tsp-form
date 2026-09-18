@@ -52,6 +52,11 @@ import { DunningTargetsPage } from './pages/legal/DunningTargetsPage';
 import { StaffCommissionPage } from './pages/commission/StaffCommissionPage';
 import { ApprovalsPage } from './pages/approvals/ApprovalsPage';
 import { PartnerCaseQueuePage } from './pages/partner-cases/PartnerCaseQueuePage';
+import { PartnerPayoutsPage } from './pages/partner-payouts/PartnerPayoutsPage';
+import { PartnerPayoutBuildPage } from './pages/partner-payouts/PartnerPayoutBuildPage';
+import { PartnerPayoutDetailPage } from './pages/partner-payouts/PartnerPayoutDetailPage';
+import { PartnerSettlementQueuePage } from './pages/partner-settlements/PartnerSettlementQueuePage';
+import { PartnerBalancePage } from './pages/partner-settlements/PartnerBalancePage';
 import { ChatPage } from './pages/chat/ChatPage';
 import { NnfAppPage } from './pages/nnf-app/NnfAppPage';
 import { NnfMdmPage } from './pages/nnf-mdm/NnfMdmPage';
@@ -63,6 +68,9 @@ import { ContractSearchPage } from './pages/contracts/ContractSearchPage';
 import { SavingContractsPage } from './pages/contracts/SavingContractsPage';
 import { DraftContractsPage } from './pages/contracts/DraftContractsPage';
 import { PendingApprovalPage } from './pages/contracts/PendingApprovalPage';
+import { SettlementMenuPage } from './pages/partner-settlement/SettlementMenuPage';
+import { ShopPayoutsPage } from './pages/partner-settlement/ShopPayoutsPage';
+import { PartnerCommissionPage } from './pages/partner-settlement/PartnerCommissionPage';
 import { PendingPairingPage } from './pages/contracts/PendingPairingPage';
 import { DepositedDevicesPage } from './pages/contracts/DepositedDevicesPage';
 import { LoanersOutPage } from './pages/contracts/LoanersOutPage';
@@ -721,6 +729,61 @@ function App() {
           </ProtectedRoute>
         }
       />
+      {/* The shop's money: contracts it still has to close out, ones waiting on
+          the fund, the transfers it has received, and the commission report.
+          Shop-only — every one of these reads a `v_partner_my_*` view. */}
+      <Route
+        path="/admin/contracts/settlement-close/:contractId?"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <ContractsLayout>
+                <SettlementMenuPage
+                  menu="AWAITING_CLOSE"
+                  basePath="/admin/contracts/settlement-close"
+                  titleKey="nav.settlementClose"
+                />
+              </ContractsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/contracts/settlement-payment/:contractId?"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <ContractsLayout>
+                <SettlementMenuPage
+                  menu="AWAITING_PAYMENT"
+                  basePath="/admin/contracts/settlement-payment"
+                  titleKey="nav.settlementPayment"
+                />
+              </ContractsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/contracts/partner-payouts"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <ContractsLayout><ShopPayoutsPage /></ContractsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/contracts/partner-commission"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <ContractsLayout><PartnerCommissionPage /></ContractsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/admin/contracts/pending-pairing/:contractId?"
         element={
@@ -914,6 +977,60 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <PartnerCaseQueuePage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      {/* Shop payout documents — fund finance. The build route is per shop;
+          the detail route is the document itself. */}
+      <Route
+        path="/admin/partner-payouts"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <PartnerPayoutsPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/partner-payouts/new/:branchId"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <PartnerPayoutBuildPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/partner-payouts/:payoutId"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <PartnerPayoutDetailPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      {/* Fund finance's shop payment requests. The optional id makes one
+          settlement linkable from anywhere (a payout document, a contract). */}
+      <Route
+        path="/admin/partner-settlements/:settlementId?"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <PartnerSettlementQueuePage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/partner-balance"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <PartnerBalancePage />
             </AdminLayout>
           </ProtectedRoute>
         }

@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Badge } from 'tsp-form';
-import { Search, PiggyBank, FilePlus, Link2, FileEdit, CreditCard, Archive, Repeat2, PauseCircle, ClipboardCheck } from 'lucide-react';
+import { Search, PiggyBank, FilePlus, Link2, FileEdit, CreditCard, Archive, Repeat2, PauseCircle, ClipboardCheck, PackageCheck, Hourglass, Banknote, Percent } from 'lucide-react';
 import { useNavCounts } from '../../hooks/useNavCounts';
 import { useAuth } from '../../contexts/AuthContext';
 import { shopMenuAllows } from '../../lib/shopMenu';
@@ -20,7 +20,15 @@ export function ContractsLayout({ children }: { children: ReactNode }) {
     // have their own reviewer queue. No badge until BE adds a counter key
     // (NOTICE 2026-09-17 §3 — don't count the view on every menu open).
     ...(isDealPartner
-      ? [{ path: '/admin/contracts/pending-approval', labelKey: 'nav.pendingApproval', icon: ClipboardCheck, count: 0 }]
+      ? [
+        { path: '/admin/contracts/pending-approval', labelKey: 'nav.pendingApproval', icon: ClipboardCheck, count: 0 },
+        // The shop's money (140 §2, 145 §8). No badges: BE asked us not to
+        // count these views on every menu open — counters come later.
+        { path: '/admin/contracts/settlement-close', labelKey: 'nav.settlementClose', icon: PackageCheck, count: 0 },
+        { path: '/admin/contracts/settlement-payment', labelKey: 'nav.settlementPayment', icon: Hourglass, count: 0 },
+        { path: '/admin/contracts/partner-payouts', labelKey: 'nav.partnerPayoutsShop', icon: Banknote, count: 0 },
+        { path: '/admin/contracts/partner-commission', labelKey: 'nav.partnerCommission', icon: Percent, count: 0 },
+      ]
       : []),
     { path: '/admin/contracts/pending-payment', labelKey: 'nav.pendingPayment', icon: CreditCard, count: pendingPaymentCount },
     { path: '/admin/contracts/pending-pairing', labelKey: 'nav.pendingPairing', icon: Link2, count: pendingPairingCount },

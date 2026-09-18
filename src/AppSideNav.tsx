@@ -39,7 +39,7 @@ import {
   // Fanout child icons — Contracts
   Search, PiggyBank, Link2, FileEdit, FilePlus, CreditCard, Archive, Repeat2, PauseCircle,
   // Fanout child icons — Commission
-  UserCheck, ClipboardCheck,
+  UserCheck, ClipboardCheck, PackageCheck, Hourglass, Banknote, Percent,
   // Fanout child icons — Accounting
   CalendarCheck, Receipt, ShieldAlert, Banknote, FileSpreadsheet, Coins, ArrowUpRight, ListChecks, ShoppingBag,
   // Fanout child icons — Branch expense
@@ -70,6 +70,7 @@ import { useNavGuard } from './contexts/NavGuardContext';
 import { isLocalDev } from './lib/devEnv';
 import { useNavCounts, NAV_COUNT_CAP } from './hooks/useNavCounts';
 import { useMyCommercialModels } from './hooks/useMyCommercialModels';
+import { useMyPermissions } from './hooks/useMyPermissions';
 import { useChatDock } from './contexts/ChatDockContext';
 import { NotificationMenuItem } from './components/NotificationMenu';
 import { SystemSignalSection, SystemSignalDialog, type SignalRow } from './components/SystemSignalSection';
@@ -204,16 +205,33 @@ export const AppSideNav = () => {
   const { user, can, isDealPartner } = useAuth();
   const role = user?.role_code ?? '';
   const { showFin1, showFin2 } = useMyCommercialModels();
+  const { hasPermission } = useMyPermissions();
   const canApprove = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
   // Deal-partner credit review — the credit desk plus the admins above it.
   // Visibility only; every RPC re-checks PARTNER.CREDIT_APPROVE and pool
   // membership server-side.
   const canReviewPartnerCases = ['COMPANY_CREDIT', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
+  // Shop payouts — the fund's finance desk plus the admins above it. Visibility
+  // only; every payout RPC re-checks PARTNER.PAYOUT_APPROVE and pool membership.
+  const canPayPartners = ['COMPANY_FINANCE', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
+  // Fund finance works the shop payment requests, so the accountant role joins
+  // the credit/admin set the deal-partner group already used (C1a screen S5).
+  const canSeePartnerSettlements = ['COMPANY_ACCOUNTANT', 'COMPANY_CREDIT', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
   // Repo/legal access is grant-based at the DB, but nav visibility is by role:
   // repo staff + admins see the section (DB returns empty rows for anyone without a grant).
   const isRepoRole = ['COMPANY_REPO', 'HOLDING_REPO', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
   const isRepoAdmin = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
   const canChat = can('CONTRACT.CHAT');
+  // Slip review queue. Read from v_my_permissions, not can() / role: the fund
+  // company's finance desk gets PAYMENT.SUBMISSION_REVIEW by role but its
+  // money permissions as per-user grants, and my_capabilities never sees a
+  // grant (doc 144 §4). While the permission list is still loading the entry
+  // stays hidden rather than flashing in and out. A branch collector in a
+  // pool reviews slips too and holds the permission by role, so one test
+  // covers both. Verified on DEV: db_fund_credit_a has no such permission and
+  // the queue returns zero rows for them — an entry they can only ever find
+  // empty.
+  const canReviewSlips = hasPermission('PAYMENT.SUBMISSION_REVIEW');
   const { visible: dockVisible, toggleDock } = useChatDock();
 
   const {
@@ -292,7 +310,14 @@ export const AppSideNav = () => {
         // shop session so staff never see a page whose view they can't read.
         // No badge until BE adds a counter key (NOTICE 2026-09-17 §3).
         ...(isDealPartner
-          ? [{ key: 'pending-approval', icon: <ClipboardCheck size="1rem" />, label: t('nav.pendingApproval'), path: '/admin/contracts/pending-approval' }]
+          ? [
+            { key: 'pending-approval', icon: <ClipboardCheck size="1rem" />, label: t('nav.pendingApproval'), path: '/admin/contracts/pending-approval' },
+            // The shop's money (140 §2, 145 §8). Same no-badge rule.
+            { key: 'settlement-close', icon: <PackageCheck size="1rem" />, label: t('nav.settlementClose'), path: '/admin/contracts/settlement-close' },
+            { key: 'settlement-payment', icon: <Hourglass size="1rem" />, label: t('nav.settlementPayment'), path: '/admin/contracts/settlement-payment' },
+            { key: 'partner-payouts', icon: <Banknote size="1rem" />, label: t('nav.partnerPayoutsShop'), path: '/admin/contracts/partner-payouts' },
+            { key: 'partner-commission', icon: <Percent size="1rem" />, label: t('nav.partnerCommission'), path: '/admin/contracts/partner-commission' },
+          ]
           : []),
         { key: 'pending-payment', ...iconWithCount(<CreditCard size="1rem" />, pendingPaymentCount), label: t('nav.pendingPayment'), path: '/admin/contracts/pending-payment' },
         { key: 'pending-pairing', ...iconWithCount(<Link2 size="1rem" />, pendingPairingCount), label: t('nav.pendingPairing'), path: '/admin/contracts/pending-pairing' },
@@ -311,12 +336,14 @@ export const AppSideNav = () => {
       key: 'customers', icon: <UserSearch size="1rem" />, label: t('nav.customers'),
       path: '/admin/customers',
     },
-    {
-      key: 'payment-submissions',
-      ...iconWithCount(<Receipt size="1rem" />, pendingSlips, pendingSlipBranches),
-      label: t('nav.paymentSubmissions'),
-      path: '/admin/payment-submissions',
-    },
+    ...(canReviewSlips
+      ? [{
+          key: 'payment-submissions',
+          ...iconWithCount(<Receipt size="1rem" />, pendingSlips, pendingSlipBranches),
+          label: t('nav.paymentSubmissions'),
+          path: '/admin/payment-submissions',
+        }]
+      : []),
     ...(canChat
       ? [(() => {
           const base = iconWithCount(<MessageSquare size="1rem" />, unreadChatCount);
@@ -383,6 +410,27 @@ export const AppSideNav = () => {
           icon: <Store size="1rem" />,
           label: t('nav.partnerCases'),
           path: '/admin/partner-cases',
+        }]
+      : []),
+    ...(canPayPartners
+      ? [{
+          key: 'staff-partner-payouts',
+          icon: <Banknote size="1rem" />,
+          label: t('nav.staffPartnerPayouts'),
+          path: '/admin/partner-payouts',
+        }]
+      : []),
+    ...(canSeePartnerSettlements
+      ? [{
+          key: 'partner-settlements',
+          icon: <Receipt size="1rem" />,
+          label: t('nav.partnerSettlements'),
+          path: '/admin/partner-settlements',
+        }, {
+          key: 'partner-balance',
+          icon: <Wallet size="1rem" />,
+          label: t('nav.partnerBalance'),
+          path: '/admin/partner-balance',
         }]
       : []),
     {
