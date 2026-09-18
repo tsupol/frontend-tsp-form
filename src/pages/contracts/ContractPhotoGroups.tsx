@@ -470,6 +470,24 @@ export function ContractPhotoGroups({ contractId, className }: {
 
 // ── Checklist banner ─────────────────────────────────────────────────────────
 
+/**
+ * Which "why is this frozen" sentence to show.
+ *
+ * The backend keeps answering `lock_kind: SETTLEMENT` after the settlement
+ * leaves the shop's hands, so the status decides what the shop can actually do
+ * about it: only a submitted close-out can be withdrawn. Once the fund has paid
+ * (`PAID` / `IN_PAYOUT`) or a device return voided the request (`VOID`), telling
+ * the shop to withdraw is an instruction it cannot follow.
+ */
+function lockedNoticeKey(settlementStatus?: string): string {
+  switch (settlementStatus) {
+    case 'VOID': return 'contractPhotos.lockedNoticeVoid';
+    case 'PAID':
+    case 'IN_PAYOUT': return 'contractPhotos.lockedNoticePaid';
+    default: return 'contractPhotos.lockedNotice';
+  }
+}
+
 /** Says whether the required groups are satisfied, and why the album is frozen. */
 function ChecklistBanner({ status, isThai }: { status: PhotoStatus; isThai: boolean }) {
   const { t } = useTranslation();
@@ -484,7 +502,7 @@ function ChecklistBanner({ status, isThai }: { status: PhotoStatus; isThai: bool
         <div className="alert alert-warning">
           <Lock size={16} />
           <span>
-            {t('contractPhotos.lockedNotice')}
+            {t(lockedNoticeKey(status.lock?.settlement_status))}
             {status.lock?.settlement_code ? ` (${status.lock.settlement_code})` : ''}
           </span>
         </div>
@@ -494,7 +512,7 @@ function ChecklistBanner({ status, isThai }: { status: PhotoStatus; isThai: bool
           <CheckCircle2 size={16} />
           <span>{t('contractPhotos.checklistComplete')}</span>
         </div>
-      ) : missingLabels.length > 0 ? (
+      ) : status.editable !== false && missingLabels.length > 0 ? (
         <div className="alert alert-info">
           <AlertCircle size={16} />
           <span>{t('contractPhotos.checklistMissing', { groups: missingLabels.join(' · ') })}</span>

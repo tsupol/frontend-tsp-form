@@ -1191,7 +1191,12 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
         <span>{t('contract.createdAt')}: <DateTime value={contract.created_at} /></span>
         {contract.activated_at && <span>{t('contract.activatedAt')}: <DateTime value={contract.activated_at} /></span>}
         {contract.closed_at && <span>{t('contract.closedAt')}: <DateTime value={contract.closed_at} /></span>}
-        {contract.close_reason && <span>{t('contract.closeReason')}: {contract.close_reason}</span>}
+        {contract.close_reason && (
+          <span>
+            {t('contract.closeReason')}:{' '}
+            {t(`contract.closeReason_${contract.close_reason}`, { defaultValue: contract.close_reason })}
+          </span>
+        )}
         {contract.last_note && <span>{t('contract.lastNote')}: {contract.last_note}</span>}
       </div>
 

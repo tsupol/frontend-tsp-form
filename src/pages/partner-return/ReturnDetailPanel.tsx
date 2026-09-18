@@ -190,7 +190,7 @@ export function ReturnDetailPanel({ returnId, isMobile, onBack }: {
                 {detail.device_bucket && (
                   <span className="text-subtle">
                     {' · '}
-                    {t(`asset.bucket.${detail.device_bucket}`, { defaultValue: detail.device_bucket })}
+                    {t(`partnerReturn.bucket_${detail.device_bucket}`, { defaultValue: detail.device_bucket })}
                   </span>
                 )}
               </Row>
