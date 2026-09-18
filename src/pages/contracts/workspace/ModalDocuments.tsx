@@ -6,7 +6,11 @@ import type { UploadedImage } from 'tsp-form';
 import { CheckCircle, XCircle, CreditCard } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
 import { beMediaUploadFromImage } from '../../../lib/beMedia';
+import { toStoragePath } from '../../../lib/mediaPath';
+import { translateApiError } from '../../../lib/apiErrors';
 import { useUploadSpec } from '../../../hooks/useMediaUrl';
+import { useAuth } from '../../../contexts/AuthContext';
+import { uploadContractPhoto } from '../uploadContractPhoto';
 import { useWorkspace } from './WorkspaceContext';
 import { IdPhotoUpload } from './IdPhotoUpload';
 
@@ -15,9 +19,14 @@ interface Props {
   onClose: () => void;
 }
 
+/** The "general" photo group of the contract album (UI_SUMMARY/141 §1) — the
+ *  old flat album, where a photo with no handover role belongs. */
+const GENERAL_PHOTO_SLOT = 'ATTACHMENT';
+
 export function ModalDocuments({ open, onClose }: Props) {
   const { t } = useTranslation();
   const { data: workspace, updateData } = useWorkspace();
+  const { user } = useAuth();
   const contractId = workspace.contractId;
   const customerId = workspace.customerId;
 
@@ -96,23 +105,46 @@ export function ModalDocuments({ open, onClose }: Props) {
     }
   };
 
+  /**
+   * Contract photos from the wizard go into the SAME album the contract detail
+   * page shows, through the same call (UI_SUMMARY/141 §3).
+   *
+   * This step used to upload through be-media and let be-media record the row
+   * itself. That path has no slot for a photo group, and BE confirmed on
+   * 2026-09-18 it never will — the group lives in core.entity_media, which only
+   * fn_media_attach writes. Photos added the old way arrived with no group at
+   * all, so they did not count towards the "handover photos complete" gate a
+   * deal-partner shop must pass to close out its settlement.
+   *
+   * The group used here is ATTACHMENT — "general", the old flat album (doc 141
+   * §1). It is the right one: the wizard runs before handover, so these are
+   * ordinary contract photos, not one of the four handover groups. A user who
+   * wants one filed as handover evidence drags it there on the contract's photo
+   * tab, which is a single RPC and no re-upload.
+   */
   const handleEvidenceUpload = async (images: UploadedImage[]) => {
     if (!contractId || images.length === 0) return;
+    if (user?.holding_id == null) { setError(t('common.error')); return; }
     setUploading('evidence');
     setError('');
     try {
-      for (let i = 0; i < images.length; i++) {
-        const results = await beMediaUploadFromImage({
-          type: 'contract_evidence',
-          image: images[i],
-          params: { contract_id: contractId, idx: evidenceCount + i },
-        });
-
-        await apiClient.rpc('fn_media_upload', {
+      for (const image of images) {
+        const up = await uploadContractPhoto(contractId, image);
+        await apiClient.rpc('fn_media_attach', {
+          p_holding_id: user.holding_id,
+          p_storage_path: toStoragePath(up.primaryKey),
+          p_variants_json: up.variantsJson,
+          p_media_type: 'IMAGE',
+          p_access_level: 'CONFIDENTIAL',
+          p_mime_type: up.contentType,
+          p_file_size_bytes: up.fileSize,
+          p_original_filename: up.fileName,
           p_entity_type: 'CONTRACT',
           p_entity_id: contractId,
-          p_usage_type: 'EVIDENCE',
-          p_storage_path: toPaths(results),
+          p_usage_type: GENERAL_PHOTO_SLOT,
+          // null appends to the end of the group (mig 1252).
+          p_sort_order: null,
+          p_caption: null,
         });
       }
 
@@ -120,7 +152,7 @@ export function ModalDocuments({ open, onClose }: Props) {
       setEvidenceCount(newCount);
       updateData({ evidenceCount: newCount });
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(translateApiError(err, t));
     } finally {
       setUploading('');
     }

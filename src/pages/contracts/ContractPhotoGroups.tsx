@@ -39,15 +39,12 @@ import {
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
-import {
-  beMediaUploadFromImage,
-  CONTRACT_EVIDENCE_TYPE,
-  CONTRACT_EVIDENCE_RESIZE,
-} from '../../lib/beMedia';
+import { CONTRACT_EVIDENCE_RESIZE } from '../../lib/beMedia';
 import { normalizeKey, toStoragePath } from '../../lib/mediaPath';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { MediaLightboxKeyGallery } from '../../components/MediaLightbox';
 import { translateApiError } from '../../lib/apiErrors';
+import { uploadContractPhoto } from './uploadContractPhoto';
 
 const ENTITY_TYPE = 'CONTRACT';
 
@@ -686,36 +683,6 @@ function PhotoDragGhost({ photo }: { photo: ContractPhoto }) {
       )}
     </div>
   );
-}
-
-// ── upload helper ────────────────────────────────────────────────────────────
-
-/**
- * Resize → be-media (sm + md) → the storage keys.
- *
- * `idx` is a timestamp, not a position: two photos added at once would collide
- * on an identical count, and be-media derives the object name from what we send
- * until it starts minting the leaf itself.
- */
-async function uploadContractPhoto(contractId: number, image: UploadedImage) {
-  const results = await beMediaUploadFromImage({
-    type: CONTRACT_EVIDENCE_TYPE,
-    image,
-    params: { contract_id: contractId, idx: Date.now() },
-  });
-  const primary = results.md ?? results.sm ?? Object.values(results)[0];
-  if (!primary) throw new Error('Upload returned no key');
-  const variantsJson: Record<string, string> = {};
-  for (const [size, r] of Object.entries(results)) {
-    if (r?.key) variantsJson[size] = toStoragePath(r.key);
-  }
-  return {
-    primaryKey: primary.key,
-    variantsJson,
-    contentType: primary.content_type,
-    fileSize: image.variants?.md?.file.size ?? image.file?.size ?? null,
-    fileName: image.originalFile?.name ?? null,
-  };
 }
 
 // ── Add modal ────────────────────────────────────────────────────────────────
