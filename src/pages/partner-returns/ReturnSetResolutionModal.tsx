@@ -7,7 +7,7 @@
 // shows every option with a live sentence saying what it will do — the choice
 // is consequential and the labels alone do not carry it.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Button, Select, TextArea } from 'tsp-form';
 import { Info } from 'lucide-react';
@@ -46,18 +46,28 @@ export function ReturnSetResolutionModal({ open, detail, actions, onClose }: Pro
   const [result, setResult] = useState<ReturnSetResolutionResult | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
 
+  // Seed the picker from whatever is known at the moment the modal opens, and
+  // from nothing else. Saving refetches the document, which changes
+  // `detail.resolution` and the suggestion — if those were in the dependency
+  // list the reset would re-run on success and throw the user back to an empty
+  // form instead of the "done" view. The seed is read through a ref so the
+  // effect can stay keyed on `open` alone.
+  const seed = useRef('');
+  seed.current = detail?.resolution ?? suggested ?? '';
+  const [initial, setInitial] = useState('');
+
   useEffect(() => {
     if (!open) return;
     setView('form');
-    setResolution(detail?.resolution ?? suggested ?? '');
+    setResolution(seed.current);
+    setInitial(seed.current);
     setNote('');
     setSaving(false);
     setError(null);
     setResult(null);
     setConfirmClose(false);
-  }, [open, detail?.resolution, suggested]);
+  }, [open]);
 
-  const initial = detail?.resolution ?? suggested ?? '';
   const dirty = resolution !== initial || !!note.trim();
   const canSubmit = !!resolution;
 

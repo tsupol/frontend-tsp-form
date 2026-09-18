@@ -16,6 +16,7 @@ import { ExternalLink, Info, Keyboard } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
+import { DateTime } from '../../components/DateTime';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../../lib/format';
 import { usePartnerReturnInvalidate } from './usePartnerReturns';
@@ -204,7 +205,10 @@ export function ReturnBuybackPaidModal({ open, detail, actions, onClose }: Props
             headline={t('partnerReturn.buybackPaidHeadline')}
             contractCode={result.return_code}
             detailRows={[
-              { label: t('partnerReturn.paidDate'), value: paidDate },
+              {
+                label: t('partnerReturn.paidDate'),
+                value: <DateTime value={paidDate} showTime={false} />,
+              },
               ...(result.payout_code
                 ? [{ label: t('partnerReturn.payoutDocument'), value: result.payout_code }]
                 : []),

@@ -22,6 +22,7 @@ import { usePartnerReturnInvalidate } from './usePartnerReturns';
 import type {
   PartnerReturnCloseBlock,
   PartnerReturnDetail,
+  PartnerReturnStatus,
   ReturnCloseResult,
 } from './partnerReturnTypes';
 
@@ -62,14 +63,23 @@ export function ReturnCloseModal({ open, detail, closeBlock, onClose }: Props) {
   const [result, setResult] = useState<ReturnCloseResult | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
 
+  // The status the document had before this close. Captured on open, because
+  // succeeding refetches the document as CLOSED — reading it live would make the
+  // success badge say "closed → closed" instead of naming what it came from.
+  const [fromStatus, setFromStatus] = useState<PartnerReturnStatus>('RECEIVED');
+  const statusNow = detail?.status ?? 'RECEIVED';
+
   useEffect(() => {
     if (!open) return;
     setView('form');
+    setFromStatus(statusNow);
     setNote('');
     setSaving(false);
     setError(null);
     setResult(null);
     setConfirmClose(false);
+    // `statusNow` is read once at open on purpose — see above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const forceClose = () => { setConfirmClose(false); onClose(); };
@@ -188,7 +198,7 @@ export function ReturnCloseModal({ open, detail, closeBlock, onClose }: Props) {
             headline={t('partnerReturn.closedHeadline')}
             contractCode={result.return_code}
             stateTransition={{
-              from: t(`partnerReturn.status_${detail?.status ?? 'RECEIVED'}`),
+              from: t(`partnerReturn.status_${fromStatus}`),
               to: t('partnerReturn.status_CLOSED'),
               toColor: 'success',
             }}

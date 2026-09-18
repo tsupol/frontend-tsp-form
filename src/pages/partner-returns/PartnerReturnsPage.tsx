@@ -56,6 +56,20 @@ export function PartnerReturnsPage() {
   const all = usePartnerReturnList({ pageIndex, pageSize });
   const statusRef = useReturnStatusRef();
 
+  // Follow the open document into the rail. Arriving by link, or watching a
+  // document walk off the tab it was on (closing it empties the queue row),
+  // otherwise leaves the rail saying "nothing here" next to a document that is
+  // plainly there. Only moves the tab when the current one cannot show it.
+  useEffect(() => {
+    if (selectedId == null || queue.isLoading) return;
+    const row = queue.rows.find(r => r.return_id === selectedId);
+    setTab(current => {
+      if (current === '') return current;
+      if (!row) return '';
+      return row.next_step === current ? current : row.next_step;
+    });
+  }, [selectedId, queue.rows, queue.isLoading]);
+
   const isAllTab = tab === '';
 
   // Shops that actually have something in the queue — a filter that can only
