@@ -51,6 +51,7 @@ import { useContractInvalidate } from './useContractInvalidate';
 import { useCompanyFeatures } from '../../hooks/useCompanyFeatures';
 import { blockingReasonText, translateApiError } from '../../lib/apiErrors';
 import { ReturnOpenModal } from '../partner-return/ReturnOpenModal';
+import { useContractOpenReturn } from '../partner-return/usePartnerReturn';
 import { buildSavingSeededPayments, savingApplied, unusedSaving } from './savingAutoFill';
 import { SavingRowNote, SavingUnusedWarning, SavingUnusedConfirmDialog } from './SavingAppliedNotice';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
@@ -524,6 +525,14 @@ const closeReasonOptions = (action: string | undefined, t: ReturnType<typeof use
 
 const REFUND_CHANNEL_VALUES = ['CASH', 'TRANSFER'] as const;
 
+// The error codes that mean "this shop contract ends only through a device-return
+// document" (146 §0). Two of them, because a payment request that is already PAID
+// / submitted / in a payout round answers its own older code first.
+const RETURN_LOCK_CODES: ReadonlySet<string> = new Set([
+  'PARTNER.STATE.USE_RETURN_DOCUMENT',
+  'PARTNER.STATE.ALREADY_PAID_TO_BRANCH',
+]);
+
 // ── Action Buttons ───────────────────────────────────────────────────────────
 
 interface BackendContractAction {
@@ -835,14 +844,38 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   // the very error the RPC would answer. So the footer reads that code rather
   // than second-guessing branch type or settlement status — a contract the
   // backend has not locked keeps its ordinary buttons.
-  const returnLock = (actionsResp?.actions ?? [])
-    .map(a => a.blocking_params)
-    .find((p): p is Record<string, unknown> =>
-      !!p && (p as { code?: unknown }).code === 'PARTNER.STATE.USE_RETURN_DOCUMENT');
+  //
+  // Two codes mean the same thing here. `USE_RETURN_DOCUMENT` is the one mig
+  // 1273 added, but a payment request that is PAID / CLOSE_SUBMITTED / in a
+  // payout round still answers its own older code first (measured on DEV
+  // 2026-09-18, contract 96817: `ALREADY_PAID_TO_BRANCH`). Both leave the shop
+  // with exactly one way out, so both raise the same button.
+  //
+  // The older code is not state-aware — it fires on a PAID request whatever the
+  // contract is doing — while a return document can only be opened on an ACTIVE
+  // contract (146 §5). So the state is checked here as well; on a contract that
+  // already ended, the locked buttons simply read as locked.
+  const returnLock = contract.state === 'ACTIVE'
+    ? (actionsResp?.actions ?? [])
+      .map(a => a.blocking_params)
+      .find((p): p is Record<string, unknown> =>
+        !!p && RETURN_LOCK_CODES.has((p as { code?: unknown }).code as string))
+    : undefined;
   // A document already open — the button points at it instead of opening a
   // second one (the backend would answer RETURN_ALREADY_OPEN).
-  const lockedReturnId = typeof returnLock?.return_id === 'number' ? returnLock.return_id : null;
-  const lockedReturnCode = typeof returnLock?.return_code === 'string' ? returnLock.return_code : null;
+  //
+  // The lock names it only when the newer code is the one that came back; the
+  // older `ALREADY_PAID_TO_BRANCH` ships settlement facts and nothing about a
+  // return (measured on DEV with PR-2609-000002-2 open against contract 96817).
+  // So the document is looked up directly whenever the footer is locked — one
+  // small read, and only while this contract is locked at all.
+  const { openReturn } = useContractOpenReturn(contract.id, !!returnLock);
+  const lockedReturnId = typeof returnLock?.return_id === 'number'
+    ? returnLock.return_id
+    : openReturn?.return_id ?? null;
+  const lockedReturnCode = typeof returnLock?.return_code === 'string'
+    ? returnLock.return_code
+    : openReturn?.return_code ?? null;
   const [returnOpenModal, setReturnOpenModal] = useState(false);
 
   const goToReturn = (returnId: number) => navigate(
@@ -942,8 +975,9 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
     // Buttons this document replaced: showing a dead "cancel contract" beside
     // "return the device" only asks the user to try the wrong one first. The
     // reason still reaches them — it is the sentence on the return button.
-    .filter(a => (a.blocking_params as { code?: unknown } | null | undefined)?.code
-      !== 'PARTNER.STATE.USE_RETURN_DOCUMENT')
+    .filter(a => !returnLock
+      || !RETURN_LOCK_CODES.has(
+        (a.blocking_params as { code?: unknown } | null | undefined)?.code as string))
     .slice()
     .sort((a, b) => a.sort_order - b.sort_order);
 

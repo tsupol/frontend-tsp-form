@@ -81,9 +81,13 @@ export function ReturnActionModal({
     setSaving(true);
     setError(null);
     try {
+      // Each RPC takes exactly the arguments it declares: reissue takes only
+      // the document id (sending `p_note` to it is a 404 PGRST202, measured on
+      // DEV 2026-09-18), void needs a reason, shipping accepts a note.
       await apiClient.rpc(RPC_NAME[action], {
         p_return_id: returnId,
-        ...(needsReason ? { p_reason: text.trim() } : { p_note: text.trim() || null }),
+        ...(action === 'VOID' ? { p_reason: text.trim() } : {}),
+        ...(action === 'SHIP' ? { p_note: text.trim() || null } : {}),
       });
       setView('done');
       invalidate(contractId);
@@ -116,6 +120,9 @@ export function ReturnActionModal({
                 <span>{t(`partnerReturn.actionHint_${action}`)}</span>
               </div>
 
+              {/* Reissue takes nothing but the document id, so it asks for
+                  nothing — it is a plain confirm. */}
+              {action !== 'SIGNING_REISSUE' && (
               <div className="form-grid mt-4">
                 <div className="flex flex-col">
                   <label className="form-label">
@@ -137,6 +144,7 @@ export function ReturnActionModal({
                   )}
                 </div>
               </div>
+              )}
             </div>
 
             <ModalErrorBand message={error} onDismiss={() => setError(null)} />

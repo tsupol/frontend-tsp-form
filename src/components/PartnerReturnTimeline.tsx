@@ -104,6 +104,7 @@ export function PartnerReturnTimeline({ rows, contractId }: {
         const link = linkFor(row, contractId);
         const eventLabel = t(`partnerReturn.timeline.event.${row.event}`, { defaultValue: row.event });
         const sourceLabel = t(`partnerReturn.timeline.source.${row.source}`, { defaultValue: row.source });
+        const showFrom = !!row.from_value && row.from_value !== row.to_value;
 
         return (
           <li key={`${row.at}-${row.source}-${row.event}-${row.ref_id ?? i}`} className="flex gap-3">
@@ -121,10 +122,14 @@ export function PartnerReturnTimeline({ rows, contractId }: {
                 <span className="text-xs text-subtler">{sourceLabel}</span>
               </div>
 
-              {(row.from_value || row.to_value) && (
+              {/* "from → to" only when it says something. A step that leaves the
+                  document where it was (issuing a fresh receipt keeps it OPEN)
+                  reports the same value twice — drawing "OPEN → OPEN" would read
+                  as a change that did not happen. */}
+              {(showFrom || row.to_value) && (
                 <div className="flex items-center gap-1.5 mt-0.5 text-xs text-subtle flex-wrap">
-                  {row.from_value && <span>{row.from_value}</span>}
-                  {row.from_value && row.to_value && <ArrowRight size={12} />}
+                  {showFrom && <span>{row.from_value}</span>}
+                  {showFrom && row.to_value && <ArrowRight size={12} />}
                   {row.to_value && <span className="font-medium text-fg">{row.to_value}</span>}
                 </div>
               )}
