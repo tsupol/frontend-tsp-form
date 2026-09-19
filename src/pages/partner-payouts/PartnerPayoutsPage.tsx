@@ -11,11 +11,12 @@
 // queue is the exception and still routes away — building a payout is a task
 // with its own ticklist and totals, not something to read at half width.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  PageNav, PageNavPanel, DataTable, MobileHeader, Badge, Button, InputDatePicker,
+  PageNav, PageNavPanel, DataTable, MobileHeader, Badge, Button, InputDateRangePicker,
+  createDateRangePresets,
 } from 'tsp-form';
 import {
   ArrowLeft, ArrowRightFromLine, AlertTriangle, ChevronRight, FileText, Keyboard, Receipt, Store,
@@ -68,8 +69,10 @@ export function PartnerPayoutsPage() {
   const [pageSize, setPageSize] = useState(15);
   const [paidFrom, setPaidFrom] = useState('');
   const [paidTo, setPaidTo] = useState('');
-  const [fromTyping, setFromTyping] = useState(false);
-  const [toTyping, setToTyping] = useState(false);
+  const [rangeTyping, setRangeTyping] = useState(false);
+  // A preset stores a rule, not dates — keep its key so the window recomputes
+  // from today rather than freezing on the day it was picked.
+  const [presetKey, setPresetKey] = useState<string | null>(null);
 
   useEffect(() => { setPageIndex(0); }, [tab, paidFrom, paidTo]);
 
@@ -97,15 +100,18 @@ export function PartnerPayoutsPage() {
   const tabLabel = (key: TabKey) =>
     key === 'BUILD' ? t('partnerPayout.tabBuild') : statusLabel(key);
 
-  const datePickerProps = {
-    dateFormat: makeDatePickerFormat(i18n.language),
-    locale: i18n.language,
-    calendar: 'gregorian' as const,
-    typingMask: '##/##/####',
-    typingPlaceholder: 'DD/MM/YYYY',
-    parseTypedDate,
-    size: 'sm' as const,
-  };
+  const rangePresets = useMemo(
+    () => createDateRangePresets({
+      today: t('common.dateRangePresets.today'),
+      yesterday: t('common.dateRangePresets.yesterday'),
+      'last-7-days': t('common.dateRangePresets.last7Days'),
+      'last-30-days': t('common.dateRangePresets.last30Days'),
+      'this-month': t('common.dateRangePresets.thisMonth'),
+      'last-month': t('common.dateRangePresets.lastMonth'),
+      'this-year': t('common.dateRangePresets.thisYear'),
+    }),
+    [t],
+  );
 
   return (
     <PageNav
@@ -169,40 +175,54 @@ export function PartnerPayoutsPage() {
                 ))}
               </div>
 
-              {/* Paid needs a date window — the list otherwise grows forever. */}
+              {/* Paid needs a date window — the list otherwise grows forever.
+               *  One range control, not two date fields: it keeps the two ends
+               *  in order by itself (two independent fields happily accepted a
+               *  "to" earlier than the "from" and then showed an empty list with
+               *  no hint why), and its quick ranges are what this desk actually
+               *  reaches for. */}
               {tab === 'PAID' && (
                 <div className="flex-none flex items-center gap-2 p-2 border-b border-line">
                   <span className="text-sm text-subtle shrink-0">{t('partnerPayout.paidDate')}</span>
-                  <div className="w-40 shrink-0">
-                    <InputDatePicker
-                      {...datePickerProps}
-                      value={parseLocalDate(paidFrom)}
-                      onChange={v => setPaidFrom(toLocalDateStr(v))}
-                      typingMode={fromTyping}
-                      onTypingModeChange={setFromTyping}
-                      endIcon={<Keyboard size={16} />}
-                      onEndIconClick={() => setFromTyping(v => !v)}
-                      placeholder={t('partnerPayout.paidFrom')}
-                    />
-                  </div>
-                  <span className="text-sm text-subtle shrink-0">–</span>
-                  <div className="w-40 shrink-0">
-                    <InputDatePicker
-                      {...datePickerProps}
-                      value={parseLocalDate(paidTo)}
-                      onChange={v => setPaidTo(toLocalDateStr(v))}
-                      typingMode={toTyping}
-                      onTypingModeChange={setToTyping}
-                      endIcon={<Keyboard size={16} />}
-                      onEndIconClick={() => setToTyping(v => !v)}
-                      placeholder={t('partnerPayout.paidTo')}
+                  <div className="flex-1 min-w-0 max-w-96">
+                    <InputDateRangePicker
+                      fromDate={parseLocalDate(paidFrom)}
+                      toDate={parseLocalDate(paidTo)}
+                      onFromDateChange={d => { setPaidFrom(toLocalDateStr(d)); setPresetKey(null); }}
+                      onToDateChange={d => { setPaidTo(toLocalDateStr(d)); setPresetKey(null); }}
+                      presets={rangePresets}
+                      presetKey={presetKey}
+                      onPresetKeyChange={setPresetKey}
+                      presetsLabel={t('common.dateRangePresets.presetsLabel')}
+                      moreLabel={t('common.dateRangePresets.more')}
+                      // The calendar's own footer ships English labels.
+                      datePickerProps={{
+                        labels: {
+                          clear: t('common.clear', { defaultValue: 'Clear' }),
+                          today: t('common.dateRangePresets.today'),
+                        },
+                      }}
+                      dateFormat={makeDatePickerFormat(i18n.language)}
+                      size="sm"
+                      locale={i18n.language}
+                      calendar="gregorian"
+                      endIcon={<Keyboard size={14} />}
+                      onEndIconClick={() => setRangeTyping(v => !v)}
+                      typingMode={rangeTyping}
+                      onTypingModeChange={setRangeTyping}
+                      typingMask="##/##/#### - ##/##/####"
+                      typingPlaceholder="DD/MM/YYYY - DD/MM/YYYY"
+                      parseTypedDates={raw => ({
+                        from: parseTypedDate(raw.slice(0, 8)),
+                        to: raw.length >= 16 ? parseTypedDate(raw.slice(8, 16)) : null,
+                      })}
                     />
                   </div>
                   {(paidFrom || paidTo) && (
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => { setPaidFrom(''); setPaidTo(''); }}
+                      onClick={() => { setPaidFrom(''); setPaidTo(''); setPresetKey(null); }}
                     >
                       {t('common.clear', { defaultValue: 'Clear' })}
                     </Button>

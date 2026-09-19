@@ -239,7 +239,18 @@
     "notSet": "Not set",
     "days": "days",
     "download": "Download",
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "dateRangePresets": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "last7Days": "Last 7 days",
+      "last30Days": "Last 30 days",
+      "thisMonth": "This month",
+      "lastMonth": "Last month",
+      "thisYear": "This year",
+      "presetsLabel": "Quick ranges",
+      "more": "More"
+    }
   },
   "dashboard": {
     "pushBannerTitle": "Push notifications are off",

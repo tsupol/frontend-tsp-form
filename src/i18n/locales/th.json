@@ -237,7 +237,18 @@
     "notSet": "ยังไม่ตั้งค่า",
     "days": "วัน",
     "download": "ดาวน์โหลด",
-    "refresh": "รีเฟรช"
+    "refresh": "รีเฟรช",
+    "dateRangePresets": {
+      "today": "วันนี้",
+      "yesterday": "เมื่อวาน",
+      "last7Days": "7 วันล่าสุด",
+      "last30Days": "30 วันล่าสุด",
+      "thisMonth": "เดือนนี้",
+      "lastMonth": "เดือนที่แล้ว",
+      "thisYear": "ปีนี้",
+      "presetsLabel": "ช่วงที่ใช้บ่อย",
+      "more": "เพิ่มเติม"
+    }
   },
   "dashboard": {
     "pushBannerTitle": "ยังไม่ได้เปิดการแจ้งเตือน",
