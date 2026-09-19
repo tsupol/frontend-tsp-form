@@ -54,7 +54,6 @@ import { ApprovalsPage } from './pages/approvals/ApprovalsPage';
 import { PartnerCaseQueuePage } from './pages/partner-cases/PartnerCaseQueuePage';
 import { PartnerPayoutsPage } from './pages/partner-payouts/PartnerPayoutsPage';
 import { PartnerPayoutBuildPage } from './pages/partner-payouts/PartnerPayoutBuildPage';
-import { PartnerPayoutDetailPage } from './pages/partner-payouts/PartnerPayoutDetailPage';
 import { PartnerSettlementQueuePage } from './pages/partner-settlements/PartnerSettlementQueuePage';
 import { PartnerBalancePage } from './pages/partner-settlements/PartnerBalancePage';
 import { FundDayMoneyPage } from './pages/fund-day/FundDayMoneyPage';
@@ -1020,12 +1019,14 @@ function App() {
           </ProtectedRoute>
         }
       />
+      {/* Same page as the list: the document opens in its right-hand panel, so
+          the rail stays on screen and the URL still addresses one document. */}
       <Route
         path="/admin/partner-payouts/:payoutId"
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <PartnerPayoutDetailPage />
+              <PartnerPayoutsPage />
             </AdminLayout>
           </ProtectedRoute>
         }

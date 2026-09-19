@@ -8538,7 +8538,8 @@
     "tabRequestedHint": "Payout lines only",
     "tabReturnedHint": "Return lines only",
     "tabNetHint": "Every line",
-    "noRowsInTab": "Nothing in this view"
+    "noRowsInTab": "Nothing in this view",
+    "selectToView": "Select a payout to see it"
   },
   "partnerReturn": {
     "timeline": {

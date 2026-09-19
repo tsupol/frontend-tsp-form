@@ -6,18 +6,21 @@
 // status, since a paid payout leaves the queue entirely and would otherwise be
 // unfindable.
 //
-// Single-panel PageNav: picking a shop or a document is a route change, not a
-// side panel, because both destinations are full working pages.
+// Two-panel: the document tabs open their document in the right-hand panel, so
+// finance can step down a list of payouts without losing the list. The build
+// queue is the exception and still routes away — building a payout is a task
+// with its own ticklist and totals, not something to read at half width.
 
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   PageNav, PageNavPanel, DataTable, MobileHeader, Badge, Button, InputDatePicker,
 } from 'tsp-form';
 import {
-  ArrowRightFromLine, AlertTriangle, ChevronRight, FileText, Keyboard, Store,
+  ArrowLeft, ArrowRightFromLine, AlertTriangle, ChevronRight, FileText, Keyboard, Receipt, Store,
 } from 'lucide-react';
+import { PayoutDetailPanel } from './PayoutDetailPanel';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../../lib/format';
 import {
@@ -53,8 +56,14 @@ function parseTypedDate(raw: string): Date | null {
 export function PartnerPayoutsPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  // Selection lives in the URL, not in state: a payout link has to open its
+  // document, and the log and the build page both send people straight to one.
+  const { payoutId: payoutIdParam } = useParams<{ payoutId: string }>();
+  const selectedId = payoutIdParam ? Number(payoutIdParam) : null;
 
-  const [tab, setTab] = useState<TabKey>('BUILD');
+  // A document opened by link is never in the build queue, so start on the
+  // documents rather than a tab the selection cannot appear in.
+  const [tab, setTab] = useState<TabKey>(selectedId ? 'DRAFT' : 'BUILD');
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
   const [paidFrom, setPaidFrom] = useState('');
@@ -73,6 +82,11 @@ export function PartnerPayoutsPage() {
     pageIndex,
     pageSize,
   });
+
+  // Only for the mobile header's title: the panel fetches its own document, so
+  // a selection not on the current page simply shows no code rather than
+  // forcing a lookup the page does not otherwise need.
+  const selectedRow = list.rows.find(r => r.payout_id === selectedId) ?? null;
 
   const statusLabel = (code: PartnerPayoutStatus) => {
     const row = statusRef.find(s => s.code === code);
@@ -94,22 +108,31 @@ export function PartnerPayoutsPage() {
   };
 
   return (
-    <PageNav panels={['list']} className="h-dvh overflow-hidden">
-      {({ isMobile }) => (
+    <PageNav
+      panels={['list', 'detail']}
+      defaultPanel={selectedId ? 'detail' : undefined}
+      className="h-dvh overflow-hidden"
+    >
+      {({ isMobile, isRoot, goTo, goBack }) => (
         <>
           {isMobile && (
             <MobileHeader className="mobile-header-bordered">
               <div className="mobile-header-start">
                 <button
                   className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
-                  aria-label={t('nav.openMenu', { defaultValue: 'Open menu' })}
-                  onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}
+                  aria-label={isRoot
+                    ? t('nav.openMenu', { defaultValue: 'Open menu' })
+                    : t('common.back', { defaultValue: 'Back' })}
+                  onClick={() => {
+                    if (isRoot) window.dispatchEvent(new CustomEvent('sidemenu:open'));
+                    else { goBack(); navigate('/admin/partner-payouts'); }
+                  }}
                 >
-                  <ArrowRightFromLine size={18} />
+                  {isRoot ? <ArrowRightFromLine size={18} /> : <ArrowLeft size={20} />}
                 </button>
               </div>
               <div className="mobile-header-title mobile-header-title-truncate">
-                {t('partnerPayout.pageTitle')}
+                {isRoot ? t('partnerPayout.pageTitle') : (selectedRow?.payout_code ?? t('partnerPayout.pageTitle'))}
               </div>
               <div className="mobile-header-end w-nav" />
             </MobileHeader>
@@ -127,7 +150,10 @@ export function PartnerPayoutsPage() {
           )}
 
           <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
-            <PageNavPanel id="list" className="flex-1 min-w-0 min-h-0 flex flex-col">
+            <PageNavPanel
+              id="list"
+              className={isMobile ? '' : 'w-1/2 xl:w-5/12 border-r border-line flex flex-col min-h-0'}
+            >
               <div className="flex-none border-b border-line flex px-2 overflow-x-auto hidden-scroll">
                 {TABS.map(key => (
                   <button
@@ -244,7 +270,13 @@ export function PartnerPayoutsPage() {
               ) : (
                 <DataTable<PartnerPayout>
                   data={list.rows}
+                  getRowProps={row => ({
+                    'data-state': row.original.payout_id === selectedId ? 'selected' : undefined,
+                  })}
                   enableKeyboardNav={!isMobile}
+                  // The panel refetches per selection, so arrowing with the
+                  // default follow mode would fire a request per keypress.
+                  keyboardActivateMode="manual"
                   onRowActivate={row => navigate(`/admin/partner-payouts/${row.original.payout_id}`)}
                   renderRow={row => {
                     const r = row.original;
@@ -252,7 +284,10 @@ export function PartnerPayoutsPage() {
                       <button
                         type="button"
                         className="w-full text-left px-4 py-2.5 transition-colors cursor-pointer"
-                        onClick={() => navigate(`/admin/partner-payouts/${r.payout_id}`)}
+                        onClick={() => {
+                          navigate(`/admin/partner-payouts/${r.payout_id}`);
+                          if (isMobile) goTo('detail');
+                        }}
                       >
                         <div className="flex items-center gap-2">
                           <FileText size={14} className="text-subtle shrink-0" />
@@ -295,6 +330,20 @@ export function PartnerPayoutsPage() {
                     <div className="p-8 text-center text-subtler">{t('partnerPayout.listEmpty')}</div>
                   }
                 />
+              )}
+            </PageNavPanel>
+
+            <PageNavPanel
+              id="detail"
+              className={isMobile ? '' : 'flex-1 min-w-0 min-h-0 flex flex-col'}
+            >
+              {selectedId ? (
+                <PayoutDetailPanel payoutId={selectedId} isMobile={isMobile} />
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center gap-2 text-subtler">
+                  <Receipt size={40} />
+                  <div className="text-sm">{t('partnerPayout.selectToView')}</div>
+                </div>
               )}
             </PageNavPanel>
           </div>

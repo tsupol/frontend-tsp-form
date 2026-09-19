@@ -8522,7 +8522,8 @@
     "tabRequestedHint": "เฉพาะรายการขอจ่าย",
     "tabReturnedHint": "เฉพาะรายการคืน",
     "tabNetHint": "ทุกรายการ",
-    "noRowsInTab": "ไม่มีรายการในมุมนี้"
+    "noRowsInTab": "ไม่มีรายการในมุมนี้",
+    "selectToView": "เลือกใบจ่ายเงินเพื่อดูรายละเอียด"
   },
   "partnerReturn": {
     "timeline": {

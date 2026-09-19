@@ -1,4 +1,4 @@
-// One payout document.
+// One payout document, as the right-hand panel of the payouts page.
 //
 // Buttons come from `fn_partner_payout_available_actions` and nothing else: the
 // document's status alone cannot tell whether this user is in the shop's payout
@@ -6,12 +6,15 @@
 // that mean "not yours / not now" hide the button; reasons that are a state of
 // the document itself (empty, negative, has adjustments) show it disabled with
 // the reason on its tooltip, because that is something the user can act on.
+//
+// The panel owns no routing and no page chrome — the host decides where it sits
+// and what the header around it says, so the same component serves the desktop
+// two-panel layout and the mobile detail stack.
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useParams } from 'react-router-dom';
-import { PageNav, PageNavPanel, MobileHeader, Badge, Button, Tooltip } from 'tsp-form';
-import { ArrowLeft, FileQuestion, Plus, Smartphone, Trash2, Wrench } from 'lucide-react';
+import { Badge, Button, Tooltip } from 'tsp-form';
+import { FileQuestion, Plus, Smartphone, Trash2, Wrench } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
 import { blockingReasonText } from '../../lib/apiErrors';
@@ -46,11 +49,14 @@ const WIRED_ACTIONS = new Set(['PAY', 'VOID', 'REVERSE', 'ADJUST']);
 /** Actions driven from a row rather than the footer. */
 const ROW_ACTIONS = new Set(['ADD_SETTLEMENT', 'REMOVE_SETTLEMENT', 'REMOVE_LINE', 'ADJUST_VOID']);
 
-export function PartnerPayoutDetailPage() {
+interface PayoutDetailPanelProps {
+  payoutId: number | null;
+  /** Mobile stacks the panels, so the rail is not on screen beside it. */
+  isMobile: boolean;
+}
+
+export function PayoutDetailPanel({ payoutId, isMobile }: PayoutDetailPanelProps) {
   const { t, i18n } = useTranslation();
-  const navigate = useNavigate();
-  const { payoutId: payoutIdParam } = useParams<{ payoutId: string }>();
-  const payoutId = payoutIdParam ? Number(payoutIdParam) : null;
 
   const { detail, isLoading, isFetched } = usePartnerPayoutDetail(payoutId);
   const { actions } = usePartnerPayoutActions(payoutId);
@@ -182,61 +188,34 @@ export function PartnerPayoutDetailPage() {
   };
 
   return (
-    <PageNav panels={['list']} className="h-dvh overflow-hidden">
-      {({ isMobile }) => (
-        <>
-          {isMobile && (
-            <MobileHeader className="mobile-header-bordered">
-              <div className="mobile-header-start">
-                <button
-                  className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
-                  onClick={() => navigate('/admin/partner-payouts')}
-                >
-                  <ArrowLeft size={20} />
-                </button>
-              </div>
-              <div className="mobile-header-title mobile-header-title-truncate">
-                {detail?.payout_code ?? t('partnerPayout.pageTitle')}
-              </div>
-              <div className="mobile-header-end w-nav" />
-            </MobileHeader>
+    <>
+      {/* Desktop keeps a header of its own: the rail beside it shows a list of
+       *  codes, so the panel has to say which one is open. Mobile gets the code
+       *  from the page's own header and would only repeat it here. */}
+      {!isMobile && (
+        <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
+          <span className="font-medium truncate">{detail?.payout_code ?? ''}</span>
+          {detail && (
+            <Badge color={payoutStatusColor(detail.status)} size="sm">
+              {statusLabel(detail.status)}
+            </Badge>
           )}
+        </div>
+      )}
 
-          {!isMobile && (
-            <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                startIcon={<ArrowLeft size={16} />}
-                onClick={() => navigate('/admin/partner-payouts')}
-              />
-              <h1 className="heading-2 shrink-0">{detail?.payout_code ?? ''}</h1>
-              {detail && (
-                <Badge color={payoutStatusColor(detail.status)} size="sm">
-                  {statusLabel(detail.status)}
-                </Badge>
-              )}
-            </div>
-          )}
+      <div className="flex-1 overflow-auto better-scroll px-4 py-3">
+        {isLoading && !detail && (
+          <div className="p-8 text-center text-subtler">{t('common.loading', { defaultValue: 'Loading…' })}</div>
+        )}
 
-          <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
-            <PageNavPanel id="list" className="flex-1 min-w-0 min-h-0 flex flex-col">
-              <div className="flex-1 overflow-auto better-scroll px-4 py-3">
-                {isLoading && !detail && (
-                  <div className="p-8 text-center text-subtler">{t('common.loading', { defaultValue: 'Loading…' })}</div>
-                )}
+        {notFound && (
+          <div className="p-8 flex flex-col items-center gap-3 text-center">
+            <FileQuestion size={40} className="text-subtler" />
+            <div className="text-subtler">{t('partnerPayout.notFound')}</div>
+          </div>
+        )}
 
-                {notFound && (
-                  <div className="p-8 flex flex-col items-center gap-3 text-center">
-                    <FileQuestion size={40} className="text-subtler" />
-                    <div className="text-subtler">{t('partnerPayout.notFound')}</div>
-                    <Button variant="outline" size="sm" onClick={() => navigate('/admin/partner-payouts')}>
-                      {t('partnerPayout.backToList')}
-                    </Button>
-                  </div>
-                )}
-
-                {detail && (
+        {detail && (
                   <div className="max-w-4xl mx-auto flex flex-col gap-4">
                     {/* Header card — the shop, the account on the document, the money. */}
                     <div className="rounded-md border border-line overflow-hidden">
@@ -555,45 +534,41 @@ export function PartnerPayoutDetailPage() {
                         ))}
                       </div>
                     )}
-                  </div>
-                )}
-              </div>
-
-              {footerActions.length > 0 && (
-                <div className="flex-none border-t border-line px-4 py-3 flex items-center gap-2 flex-wrap">
-                  {footerActions.map(renderActionButton)}
-                </div>
-              )}
-            </PageNavPanel>
           </div>
+        )}
+      </div>
 
-          <PayoutPayModal open={payOpen} detail={detail} onClose={() => setPayOpen(false)} />
-          <PayoutVoidModal open={voidOpen} detail={detail} onClose={() => setVoidOpen(false)} />
-          <PayoutReverseModal open={reverseOpen} detail={detail} onClose={() => setReverseOpen(false)} />
-          <PayoutAdjustModal open={adjustOpen} detail={detail} onClose={() => setAdjustOpen(false)} />
-          <PayoutAddSettlementModal
-            open={addOpen}
-            payoutId={payoutId}
-            payoutCode={detail?.payout_code ?? ''}
-            branchId={detail?.branch_id ?? null}
-            onClose={() => setAddOpen(false)}
-          />
-          <PayoutRemoveSettlementModal
-            open={!!removeTarget}
-            payoutId={payoutId}
-            payoutCode={detail?.payout_code ?? ''}
-            settlement={removeTarget}
-            onClose={() => setRemoveTarget(null)}
-          />
-          <PayoutAdjustVoidModal
-            open={!!voidAdjustTarget}
-            payoutId={payoutId}
-            payoutCode={detail?.payout_code ?? ''}
-            adjustment={voidAdjustTarget}
-            onClose={() => setVoidAdjustTarget(null)}
-          />
-        </>
+      {footerActions.length > 0 && (
+        <div className="flex-none border-t border-line px-4 py-3 flex items-center gap-2 flex-wrap">
+          {footerActions.map(renderActionButton)}
+        </div>
       )}
-    </PageNav>
+
+      <PayoutPayModal open={payOpen} detail={detail} onClose={() => setPayOpen(false)} />
+      <PayoutVoidModal open={voidOpen} detail={detail} onClose={() => setVoidOpen(false)} />
+      <PayoutReverseModal open={reverseOpen} detail={detail} onClose={() => setReverseOpen(false)} />
+      <PayoutAdjustModal open={adjustOpen} detail={detail} onClose={() => setAdjustOpen(false)} />
+      <PayoutAddSettlementModal
+        open={addOpen}
+        payoutId={payoutId}
+        payoutCode={detail?.payout_code ?? ''}
+        branchId={detail?.branch_id ?? null}
+        onClose={() => setAddOpen(false)}
+      />
+      <PayoutRemoveSettlementModal
+        open={!!removeTarget}
+        payoutId={payoutId}
+        payoutCode={detail?.payout_code ?? ''}
+        settlement={removeTarget}
+        onClose={() => setRemoveTarget(null)}
+      />
+      <PayoutAdjustVoidModal
+        open={!!voidAdjustTarget}
+        payoutId={payoutId}
+        payoutCode={detail?.payout_code ?? ''}
+        adjustment={voidAdjustTarget}
+        onClose={() => setVoidAdjustTarget(null)}
+      />
+    </>
   );
 }
