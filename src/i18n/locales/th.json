@@ -8512,7 +8512,17 @@
     "logAction_ADJUST_VOID": "ยกเลิกแถวปรับยอด",
     "notFound": "ไม่พบใบจ่ายเงินนี้ หรืออยู่นอกขอบเขตของคุณ",
     "backToList": "กลับไปหน้ารายการ",
-    "openReturns": "เปิดใบคืนเครื่อง"
+    "openReturns": "เปิดใบคืนเครื่อง",
+    "summaryRequested": "ขอจ่าย",
+    "summaryReturned": "คืน",
+    "summaryNet": "จ่าย(คืน) สุทธิ",
+    "tabRequested": "ขอจ่าย",
+    "tabReturned": "คืน",
+    "tabNet": "สุทธิ",
+    "tabRequestedHint": "เฉพาะรายการขอจ่าย",
+    "tabReturnedHint": "เฉพาะรายการคืน",
+    "tabNetHint": "ทุกรายการ",
+    "noRowsInTab": "ไม่มีรายการในมุมนี้"
   },
   "partnerReturn": {
     "timeline": {

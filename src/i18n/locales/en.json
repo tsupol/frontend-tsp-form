@@ -8528,7 +8528,17 @@
     "logAction_ADJUST_VOID": "Adjustment cancelled",
     "notFound": "This payout does not exist, or it is outside what you can see.",
     "backToList": "Back to the list",
-    "openReturns": "Open device returns"
+    "openReturns": "Open device returns",
+    "summaryRequested": "Requested",
+    "summaryReturned": "Returned",
+    "summaryNet": "Net paid (returned)",
+    "tabRequested": "Requested",
+    "tabReturned": "Returned",
+    "tabNet": "Net",
+    "tabRequestedHint": "Payout lines only",
+    "tabReturnedHint": "Return lines only",
+    "tabNetHint": "Every line",
+    "noRowsInTab": "Nothing in this view"
   },
   "partnerReturn": {
     "timeline": {

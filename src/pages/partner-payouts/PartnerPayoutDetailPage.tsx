@@ -78,6 +78,48 @@ export function PartnerPayoutDetailPage() {
   const settlements = detail?.settlements ?? [];
   const adjustments = detail?.adjustments ?? [];
 
+  /** Which side of the document a person is looking at.
+   *  The owner reads the two directions as separate lists that happen to share a
+   *  document, so the tabs split them rather than only netting them together. */
+  const [moneyTab, setMoneyTab] = useState<'requested' | 'returned' | 'net'>('net');
+
+  /** Live adjustments only — a cancelled row is history, not money. */
+  const liveAdjustments = adjustments.filter(a => a.is_active);
+
+  /** "ขอจ่าย" — what the shop asked for. Each settlement already nets the down
+   *  payment and doc fee it kept, so the figure here is the settlement's own net,
+   *  not its gross: that is how the owner's sheet reads the column (his 56,802 is
+   *  the two settlements netted, with only the buyback sitting under "คืน").
+   *  A top-up transferred afterwards belongs on this side too. */
+  const requestedTotal =
+    settlements.reduce((sum, s) => sum + s.net_amount, 0) +
+    liveAdjustments.filter(a => a.direction === 'TO_BRANCH').reduce((sum, a) => sum + a.amount, 0);
+  const requestedCount =
+    settlements.length + liveAdjustments.filter(a => a.direction === 'TO_BRANCH').length;
+
+  /** "คืน" — money coming back from the shop after the fact: a device buyback,
+   *  an overpayment returned. Not the down payment, which never left the shop. */
+  const returnedTotal = liveAdjustments
+    .filter(a => a.direction === 'FROM_BRANCH')
+    .reduce((sum, a) => sum + a.amount, 0);
+  const returnedCount = liveAdjustments.filter(a => a.direction === 'FROM_BRANCH').length;
+
+  /** Negative = money leaves the fund, matching the owner's spreadsheet. */
+  const signedNet = returnedTotal - requestedTotal;
+
+  /** Rows for the tab in view. A settlement is a request for money, so the
+   *  "returned" tab drops them entirely and shows only what came back. */
+  const visibleSettlements = moneyTab === 'returned' ? [] : settlements;
+
+  /** Adjustments split by direction; the returned tab is where a buyback lands.
+   *  A single-direction tab shows live rows only — a cancelled row is history,
+   *  and padding a "what came back" list with struck-through entries is exactly
+   *  the noise these tabs exist to remove. The net tab keeps the full record. */
+  const visibleAdjustments =
+    moneyTab === 'requested' ? liveAdjustments.filter(a => a.direction === 'TO_BRANCH')
+    : moneyTab === 'returned' ? liveAdjustments.filter(a => a.direction === 'FROM_BRANCH')
+    : adjustments;
+
   const footerActions = (actions?.actions ?? [])
     .filter(a => !ROW_ACTIONS.has(a.action_code))
     .filter(a => a.is_available || !HIDDEN_REASONS.has(a.blocking_reason ?? ''))
@@ -235,6 +277,36 @@ export function PartnerPayoutDetailPage() {
                         </div>
                       </div>
 
+                      {/* The overview the owner asks to read first: what we owe the
+                       *  shop, what the shop owes back, and the one number that is
+                       *  actually transferred. Signed the way the owner's own sheet
+                       *  reads it — negative means money leaves the fund — so the
+                       *  net here does not silently disagree with his spreadsheet. */}
+                      <div className="px-3 py-2.5 border-t border-line grid grid-cols-3 gap-3">
+                        <div>
+                          <div className="text-xs text-subtle">
+                            {t('partnerPayout.summaryRequested')} ({requestedCount})
+                          </div>
+                          <div className="font-semibold text-sm tabular-nums">{fmtCurrency(requestedTotal)}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-subtle">
+                            {t('partnerPayout.summaryReturned')} ({returnedCount})
+                          </div>
+                          <div className="font-semibold text-sm tabular-nums">{fmtCurrency(returnedTotal)}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-subtle">{t('partnerPayout.summaryNet')}</div>
+                          <div
+                            className={`font-semibold text-sm tabular-nums ${
+                              signedNet < 0 ? 'text-danger-fg' : signedNet > 0 ? 'text-success-fg' : ''
+                            }`}
+                          >
+                            {fmtCurrency(signedNet)}
+                          </div>
+                        </div>
+                      </div>
+
                       {(detail.paid_date || detail.reference || detail.source_account_display) && (
                         <div className="px-3 py-2.5 border-t border-line text-sm flex flex-wrap gap-x-4 gap-y-1">
                           {detail.paid_date && (
@@ -291,7 +363,7 @@ export function PartnerPayoutDetailPage() {
                     <div className="rounded-md border border-line overflow-hidden">
                       <div className="px-3 py-2 bg-surface flex items-center gap-2">
                         <span className="text-sm font-medium">
-                          {t('partnerPayout.settlementsOnDocument', { count: settlements.length })}
+                          {t('partnerPayout.settlementsOnDocument', { count: visibleSettlements.length })}
                         </span>
                         <span className="flex-1" />
                         {rowActionOk('ADD_SETTLEMENT') && (
@@ -306,11 +378,43 @@ export function PartnerPayoutDetailPage() {
                         )}
                       </div>
 
+                      {/* Split the two directions apart. Netting them on one line is
+                       *  what made the document hard to read; each tab shows one side
+                       *  on its own, and "net" keeps the combined view. */}
+                      <div className="px-3 border-t border-line flex gap-1">
+                        {([
+                          ['requested', 'tabRequested', 'tabRequestedHint'],
+                          ['returned', 'tabReturned', 'tabReturnedHint'],
+                          ['net', 'tabNet', 'tabNetHint'],
+                        ] as const).map(([key, label, hint]) => (
+                          <Tooltip key={key} content={t(`partnerPayout.${hint}`)} placement="bottom">
+                            <button
+                              type="button"
+                              onClick={() => setMoneyTab(key)}
+                              className={`px-3 py-2 text-sm border-b-2 bg-transparent cursor-pointer transition-colors ${
+                                moneyTab === key
+                                  ? 'border-primary text-primary-fg font-medium'
+                                  : 'border-transparent text-subtle hover:text-fg'
+                              }`}
+                            >
+                              {t(`partnerPayout.${label}`)}
+                            </button>
+                          </Tooltip>
+                        ))}
+                      </div>
+
                       {settlements.length === 0 ? (
                         <div className="p-6 text-center text-subtler text-sm">
                           {t('partnerPayout.noSettlementsYet')}
                         </div>
-                      ) : settlements.map(s => (
+                      ) : visibleSettlements.length === 0 ? (
+                        /* On a single-direction tab an empty side is the normal
+                         * case, not a fault — keep it to one quiet line so the
+                         * money that IS on this side stays the eye's target. */
+                        <div className="px-3 py-2 text-subtler text-sm border-t border-line">
+                          {t('partnerPayout.noRowsInTab')}
+                        </div>
+                      ) : visibleSettlements.map(s => (
                         <div key={s.settlement_id} className="px-3 py-2.5 border-t border-line flex items-start gap-3">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
@@ -341,12 +445,12 @@ export function PartnerPayoutDetailPage() {
                     </div>
 
                     {/* Adjustments — only ever exist on a paid document. */}
-                    {adjustments.length > 0 && (
+                    {visibleAdjustments.length > 0 && (
                       <div className="rounded-md border border-line overflow-hidden">
                         <div className="px-3 py-2 bg-surface text-sm font-medium">
                           {t('partnerPayout.adjustments')}
                         </div>
-                        {adjustments.map(a => (
+                        {visibleAdjustments.map(a => (
                           <div key={a.adjustment_id} className="px-3 py-2.5 border-t border-line flex items-start gap-3">
                             <div className={`flex-1 min-w-0 ${a.is_active ? '' : 'line-through text-subtler'}`}>
                               <div className="flex items-center gap-2">
