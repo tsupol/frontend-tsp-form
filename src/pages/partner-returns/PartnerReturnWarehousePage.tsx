@@ -16,19 +16,27 @@ import { PageNav, PageNavPanel, DataTable, MobileHeader, Badge, Button, LabeledC
 import { ArrowRightFromLine, ExternalLink, PackageCheck } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { useAuth } from '../../contexts/AuthContext';
+import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { usePartnerReturnWarehouseQueue, usePartnerReturnDetail } from './usePartnerReturns';
 import { ReturnWarehouseReceiveModal } from './ReturnWarehouseReceiveModal';
 import type { PartnerReturnQueueRow } from './partnerReturnTypes';
 
-/** Roles that may act for any warehouse rather than only the one they sit at. */
-const ALL_WAREHOUSE_ROLES = ['COMPANY_FINANCE', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'];
+/** Roles that may act for any warehouse rather than only the one they sit at.
+ *  The fund's finance desk belongs here too, but it is not a role — the desk
+ *  is recognised by holding PARTNER.PAYOUT_APPROVE (see the hook below), which
+ *  reaches a user by role or by a per-user grant. Listing it as a role left the
+ *  desk defaulting to "only my warehouse" with no branch of its own, and so
+ *  looking at an empty queue. */
+const ALL_WAREHOUSE_ROLES = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'];
 
 export function PartnerReturnWarehousePage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { user, isDealPartner } = useAuth();
+  const { hasPermission } = useMyPermissions();
 
-  const seesEveryWarehouse = ALL_WAREHOUSE_ROLES.includes(user?.role_code ?? '');
+  const seesEveryWarehouse =
+    ALL_WAREHOUSE_ROLES.includes(user?.role_code ?? '') || hasPermission('PARTNER.PAYOUT_APPROVE');
   const myBranchId = user?.branch_id ?? null;
 
   const [onlyMine, setOnlyMine] = useState(!seesEveryWarehouse);

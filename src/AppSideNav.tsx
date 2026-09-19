@@ -213,9 +213,15 @@ export const AppSideNav = () => {
   // Visibility only; every RPC re-checks PARTNER.CREDIT_APPROVE and pool
   // membership server-side.
   const canReviewPartnerCases = ['COMPANY_CREDIT', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
-  // Shop payouts — the fund's finance desk plus the admins above it. Visibility
-  // only; every payout RPC re-checks PARTNER.PAYOUT_APPROVE and pool membership.
-  const canPayPartners = ['COMPANY_FINANCE', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
+  // Shop payouts — read the permission, never role_code. The role list this
+  // used to carry named COMPANY_FINANCE, which is not a role that exists, and
+  // omitted COMPANY_ACCOUNTANT, which is what the fund's finance desk actually
+  // is: the desk that issues and pays these documents could not see its own
+  // menu entry, so the payout screens fell through to the dashboard row.
+  // PARTNER.PAYOUT_APPROVE reaches a user by role or by a per-user grant, and
+  // only v_my_permissions sees both. Visibility only; every payout RPC
+  // re-checks the permission and pool membership server-side.
+  const canPayPartners = hasPermission('PARTNER.PAYOUT_APPROVE');
   // Fund finance works the shop payment requests, so the accountant role joins
   // the credit/admin set the deal-partner group already used (C1a screen S5).
   const canSeePartnerSettlements = ['COMPANY_ACCOUNTANT', 'COMPANY_CREDIT', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
