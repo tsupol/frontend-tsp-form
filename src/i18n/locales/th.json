@@ -5887,7 +5887,9 @@
     "downOutOfBand": "ต้องอยู่ในกรอบ holding {{min}}–{{max}}%",
     "downMaxBelowMin": "ค่าสูงสุดต้องไม่น้อยกว่าค่าต่ำสุด",
     "downResetDefault": "ค่า default ของ holding",
-    "downLoading": "กำลังโหลดช่วงดาวน์…"
+    "downLoading": "กำลังโหลดช่วงดาวน์…",
+    "searchPlaceholder": "ค้นหาชื่อสาขาหรือรหัส",
+    "pricebookAlwaysOn": "PRICEBOOK (ขายปลีก / เงินสด) เปิดใช้งานเสมอ ปิดไม่ได้"
   },
   "lessors": {
     "title": "ผู้ให้เช่า",

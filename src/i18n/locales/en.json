@@ -5893,7 +5893,9 @@
     "downOutOfBand": "Must be within the holding band {{min}}–{{max}}%",
     "downMaxBelowMin": "Max must not be below min",
     "downResetDefault": "Holding default",
-    "downLoading": "Loading range…"
+    "downLoading": "Loading range…",
+    "searchPlaceholder": "Search branch name or code",
+    "pricebookAlwaysOn": "PRICEBOOK (retail / cash) is always on and cannot be turned off"
   },
   "lessors": {
     "title": "Lessors",
