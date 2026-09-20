@@ -183,13 +183,13 @@ export function PartnerPayoutsPage() {
                *  reaches for. */}
               {tab === 'PAID' && (
                 <div className="flex-none flex items-center gap-2 p-2 border-b border-line">
-                  <span className="text-sm text-subtle shrink-0">{t('partnerPayout.paidDate')}</span>
                   <div className="flex-1 min-w-0 max-w-96">
                     <InputDateRangePicker
                       fromDate={parseLocalDate(paidFrom)}
                       toDate={parseLocalDate(paidTo)}
                       onFromDateChange={d => { setPaidFrom(toLocalDateStr(d)); setPresetKey(null); }}
                       onToDateChange={d => { setPaidTo(toLocalDateStr(d)); setPresetKey(null); }}
+                      placeholder={t('partnerPayout.paidDate')}
                       presets={rangePresets}
                       presetKey={presetKey}
                       onPresetKeyChange={setPresetKey}
