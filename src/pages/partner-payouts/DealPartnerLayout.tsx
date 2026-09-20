@@ -11,24 +11,34 @@
 import { type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Store, Receipt, Banknote, Wallet, PackageCheck, Warehouse } from 'lucide-react';
+import { Store, Receipt, Banknote, Wallet, PackageCheck, Warehouse, type LucideIcon } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useMyPermissions } from '../../hooks/useMyPermissions';
 
 /** The warehouse queue lives under the returns path, so plain prefix matching
  *  would light both rows at once. `notUnder` keeps the parent row dark while a
  *  descendant of it is the real destination. */
-const NAV_ITEMS = [
-  { path: '/admin/partner-cases', labelKey: 'nav.partnerCases', icon: Store, permission: 'PARTNER.CREDIT_APPROVE' },
+interface DealPartnerNavItem {
+  path: string;
+  labelKey: string;
+  icon: LucideIcon;
+  /** Any one of these is enough to see the row. */
+  anyOf: string[];
+  /** Keep this row dark while a descendant path is the real destination. */
+  notUnder?: string;
+}
+
+const NAV_ITEMS: DealPartnerNavItem[] = [
+  { path: '/admin/partner-cases', labelKey: 'nav.partnerCases', icon: Store, anyOf: ['PARTNER.CREDIT_APPROVE'] },
   // Read screens, scoped by company at the database rather than by a permission
   // of their own: the credit desk holds only the credit-approval permission yet
   // both of these return its company's rows. Gating them on the payout
   // permission hid screens the user could open, and disagreed with the side nav.
   { path: '/admin/partner-settlements', labelKey: 'nav.partnerSettlements', icon: Receipt, anyOf: ['PARTNER.PAYOUT_APPROVE', 'PARTNER.CREDIT_APPROVE'] },
-  { path: '/admin/partner-payouts', labelKey: 'nav.staffPartnerPayouts', icon: Banknote, permission: 'PARTNER.PAYOUT_APPROVE' },
+  { path: '/admin/partner-payouts', labelKey: 'nav.staffPartnerPayouts', icon: Banknote, anyOf: ['PARTNER.PAYOUT_APPROVE'] },
   { path: '/admin/partner-balance', labelKey: 'nav.partnerBalance', icon: Wallet, anyOf: ['PARTNER.PAYOUT_APPROVE', 'PARTNER.CREDIT_APPROVE'] },
-  { path: '/admin/partner-returns', labelKey: 'nav.staffPartnerReturns', icon: PackageCheck, permission: 'PARTNER.PAYOUT_APPROVE', notUnder: '/admin/partner-returns/warehouse' },
-  { path: '/admin/partner-returns/warehouse', labelKey: 'nav.staffPartnerReturnWarehouse', icon: Warehouse, permission: 'PARTNER.PAYOUT_APPROVE' },
+  { path: '/admin/partner-returns', labelKey: 'nav.staffPartnerReturns', icon: PackageCheck, anyOf: ['PARTNER.PAYOUT_APPROVE'], notUnder: '/admin/partner-returns/warehouse' },
+  { path: '/admin/partner-returns/warehouse', labelKey: 'nav.staffPartnerReturnWarehouse', icon: Warehouse, anyOf: ['PARTNER.PAYOUT_APPROVE'] },
 ];
 
 export function DealPartnerLayout({ children }: { children: ReactNode }) {
@@ -37,9 +47,7 @@ export function DealPartnerLayout({ children }: { children: ReactNode }) {
   const navGuard = useNavGuard();
   const { hasPermission } = useMyPermissions();
 
-  const items = NAV_ITEMS.filter(i =>
-    'anyOf' in i ? i.anyOf.some(p => hasPermission(p)) : hasPermission(i.permission),
-  );
+  const items = NAV_ITEMS.filter(i => i.anyOf.some(p => hasPermission(p)));
 
   return (
     <div className="flex h-dvh overflow-hidden">
