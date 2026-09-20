@@ -551,7 +551,9 @@
     "staffPartnerReturnWarehouse": "รอรับเครื่องคืน",
     "partnerReturns": "ใบคืนเครื่อง",
     "fundDayMoney": "สรุปเงินรายวัน",
-    "fundDayRecon": "ประวัติการกระทบยอด"
+    "fundDayRecon": "ประวัติการกระทบยอด",
+    "dealPartner": "ร้าน deal partner",
+    "groupDealPartnerWork": "งานร้าน deal partner"
   },
   "ownerType": {
     "HOLDING": "Holding",

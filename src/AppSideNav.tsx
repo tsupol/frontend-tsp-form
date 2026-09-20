@@ -422,48 +422,76 @@ export const AppSideNav = () => {
           path: '/admin/approvals',
         }]
       : []),
-    ...(canReviewPartnerCases
-      ? [{
-          key: 'partner-cases',
-          icon: <Store size="1rem" />,
-          label: t('nav.partnerCases'),
-          path: '/admin/partner-cases',
-        }]
-      : []),
-    ...(canPayPartners
-      ? [{
-          key: 'staff-partner-payouts',
-          icon: <Banknote size="1rem" />,
-          label: t('nav.staffPartnerPayouts'),
-          path: '/admin/partner-payouts',
-        }]
-      : []),
-    ...(canPayPartners
-      ? [{
-          key: 'staff-partner-returns',
-          icon: <PackageCheck size="1rem" />,
-          label: t('nav.staffPartnerReturns'),
-          path: '/admin/partner-returns',
-        }, {
-          key: 'staff-partner-return-warehouse',
-          icon: <Warehouse size="1rem" />,
-          label: t('nav.staffPartnerReturnWarehouse'),
-          path: '/admin/partner-returns/warehouse',
-        }]
-      : []),
-    ...(canSeePartnerSettlements
-      ? [{
-          key: 'partner-settlements',
-          icon: <Receipt size="1rem" />,
-          label: t('nav.partnerSettlements'),
-          path: '/admin/partner-settlements',
-        }, {
-          key: 'partner-balance',
-          icon: <Wallet size="1rem" />,
-          label: t('nav.partnerBalance'),
-          path: '/admin/partner-balance',
-        }]
-      : []),
+    // Deal-partner work, gathered under one parent. Six sibling rows at the top
+    // level read as six unrelated features; they are one relationship with a
+    // shop, seen at different stages — the credit request, the money owed, the
+    // payment, the device coming back. Each child keeps its own permission
+    // gate, so the parent shows only what this user could already reach, and
+    // disappears entirely when that is nothing.
+    ...(() => {
+      const dealPartnerChildren = [
+        ...(canReviewPartnerCases || canSeePartnerSettlements || canPayPartners
+          ? [{ type: 'group' as const, key: 'grp-deal-partner', label: t('nav.groupDealPartnerWork') }]
+          : []),
+        ...(canReviewPartnerCases
+          ? [{
+              key: 'partner-cases',
+              icon: <Store size="1rem" />,
+              label: t('nav.partnerCases'),
+              path: '/admin/partner-cases',
+            }]
+          : []),
+        ...(canSeePartnerSettlements
+          ? [{
+              key: 'partner-settlements',
+              icon: <Receipt size="1rem" />,
+              label: t('nav.partnerSettlements'),
+              path: '/admin/partner-settlements',
+            }]
+          : []),
+        ...(canPayPartners
+          ? [{
+              key: 'staff-partner-payouts',
+              icon: <Banknote size="1rem" />,
+              label: t('nav.staffPartnerPayouts'),
+              path: '/admin/partner-payouts',
+            }]
+          : []),
+        ...(canSeePartnerSettlements
+          ? [{
+              key: 'partner-balance',
+              icon: <Wallet size="1rem" />,
+              label: t('nav.partnerBalance'),
+              path: '/admin/partner-balance',
+            }]
+          : []),
+        ...(canPayPartners
+          ? [{
+              key: 'staff-partner-returns',
+              icon: <PackageCheck size="1rem" />,
+              label: t('nav.staffPartnerReturns'),
+              path: '/admin/partner-returns',
+            }, {
+              key: 'staff-partner-return-warehouse',
+              icon: <Warehouse size="1rem" />,
+              label: t('nav.staffPartnerReturnWarehouse'),
+              path: '/admin/partner-returns/warehouse',
+            }]
+          : []),
+      ];
+      // The heading row is not a destination, so look past it for the first
+      // real child — that is where the parent points, so clicking it lands
+      // somewhere this user can actually go.
+      const firstPath = dealPartnerChildren.find(c => 'path' in c && c.path)?.path;
+      if (!firstPath) return [];
+      return [{
+        key: 'deal-partner',
+        icon: <Handshake size="1rem" />,
+        label: t('nav.dealPartner'),
+        path: firstPath,
+        children: dealPartnerChildren,
+      }];
+    })(),
     ...(canSeeFundDayMoney
       ? [{
           key: 'fund-day-money',

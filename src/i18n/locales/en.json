@@ -553,7 +553,9 @@
     "staffPartnerReturnWarehouse": "Returns to receive",
     "partnerReturns": "Device returns",
     "fundDayMoney": "Daily money summary",
-    "fundDayRecon": "Reconciliation history"
+    "fundDayRecon": "Reconciliation history",
+    "dealPartner": "Deal partners",
+    "groupDealPartnerWork": "Deal partner work"
   },
   "ownerType": {
     "HOLDING": "Holding",
