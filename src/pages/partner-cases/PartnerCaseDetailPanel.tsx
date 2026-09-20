@@ -258,8 +258,13 @@ export function PartnerCaseDetailPanel({
 
         {/* The money, exactly as submitted */}
         <Section icon={<Wallet size={14} />} title={t('partnerCase.moneyTitle')}>
+          {/* No agreed price here. It is a derived figure — the down payment
+           *  plus every instalment — and on a shop contract there is no price
+           *  negotiated with the fund for it to represent: the shop prices the
+           *  phone through the plan below, and the fund pays device cost plus
+           *  commission regardless. Showing it (and the discount derived from
+           *  it) implied a negotiation that does not happen. */}
           <div className="grid grid-cols-2 gap-3">
-            <Field label={t('partnerCase.agreedPrice')} value={fmtCurrency(agreed?.agreed_price ?? detail.agreed_price)} />
             <Field label={t('partnerCase.uplift')} value={fmtCurrency(agreed?.uplift_amount ?? detail.uplift_amount)} />
             <Field label={t('partnerCase.downPayment')} value={fmtCurrency(agreed?.down_payment ?? detail.down_payment)} />
             <Field
