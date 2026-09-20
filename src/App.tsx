@@ -54,6 +54,7 @@ import { ApprovalsPage } from './pages/approvals/ApprovalsPage';
 import { PartnerCaseQueuePage } from './pages/partner-cases/PartnerCaseQueuePage';
 import { PartnerPayoutsPage } from './pages/partner-payouts/PartnerPayoutsPage';
 import { PartnerPayoutBuildPage } from './pages/partner-payouts/PartnerPayoutBuildPage';
+import { DealPartnerLayout } from './pages/partner-payouts/DealPartnerLayout';
 import { PartnerSettlementQueuePage } from './pages/partner-settlements/PartnerSettlementQueuePage';
 import { PartnerBalancePage } from './pages/partner-settlements/PartnerBalancePage';
 import { FundDayMoneyPage } from './pages/fund-day/FundDayMoneyPage';
@@ -992,7 +993,9 @@ function App() {
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <PartnerCaseQueuePage />
+              <DealPartnerLayout>
+                <PartnerCaseQueuePage />
+              </DealPartnerLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
@@ -1004,7 +1007,9 @@ function App() {
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <PartnerPayoutsPage />
+              <DealPartnerLayout>
+                <PartnerPayoutsPage />
+              </DealPartnerLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
@@ -1014,7 +1019,9 @@ function App() {
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <PartnerPayoutBuildPage />
+              <DealPartnerLayout>
+                <PartnerPayoutBuildPage />
+              </DealPartnerLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
@@ -1026,7 +1033,9 @@ function App() {
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <PartnerPayoutsPage />
+              <DealPartnerLayout>
+                <PartnerPayoutsPage />
+              </DealPartnerLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
@@ -1039,7 +1048,9 @@ function App() {
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <PartnerReturnWarehousePage />
+              <DealPartnerLayout>
+                <PartnerReturnWarehousePage />
+              </DealPartnerLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
@@ -1049,7 +1060,9 @@ function App() {
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <PartnerReturnsPage />
+              <DealPartnerLayout>
+                <PartnerReturnsPage />
+              </DealPartnerLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
@@ -1061,7 +1074,9 @@ function App() {
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <PartnerSettlementQueuePage />
+              <DealPartnerLayout>
+                <PartnerSettlementQueuePage />
+              </DealPartnerLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
@@ -1071,7 +1086,9 @@ function App() {
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <PartnerBalancePage />
+              <DealPartnerLayout>
+                <PartnerBalancePage />
+              </DealPartnerLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
