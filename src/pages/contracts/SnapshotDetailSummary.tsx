@@ -20,7 +20,7 @@
 
 import { useTranslation } from 'react-i18next';
 import { Minus } from 'lucide-react';
-import { fmtCurrency, formatAssetCode, formatCid, formatTel } from '../../lib/format';
+import { fmtCurrency, formatEntityCode, formatCid, formatTel } from '../../lib/format';
 
 // ─── Payload shapes (loose — payloads are FULL or DELTA) ────────────────
 
@@ -81,7 +81,7 @@ function partyName(p: PartyEntry): string {
 
 function assetLabel(a: AssetEntry | null | undefined): string | null {
   if (!a) return null;
-  if (a.asset_code) return formatAssetCode(a.asset_code);
+  if (a.asset_code) return formatEntityCode(a.asset_code);
   if (a.device_id != null) return `#${a.device_id}`;
   return null;
 }

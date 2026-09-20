@@ -299,13 +299,16 @@ export function formatCid(cid: string | null | undefined): string {
 }
 
 /**
- * Format an asset code for display: XX-XXXX-XXXXXX-X
- * e.g. AT26050000152 → AT-2605-000015-2. Prefix is the leading non-digits;
- * the digit body splits 4-6-1. The backend's `asset_code_display` field
- * already carries this format — prefer it when present and only fall back to
- * this for raw `asset_code`.
+ * Format an entity code for display: XX-XXXX-XXXXXX-X
+ * e.g. AT26050000152 → AT-2605-000015-2, CT26090005039 → CT-2609-000503-9.
+ * Prefix is the leading non-digits; the digit body splits 4-6-1. Assets and
+ * contracts share this shape.
+ *
+ * Most views carry a ready-made `*_code_display` field — **prefer it whenever
+ * present** and reach for this only where a view returns the raw code alone
+ * (the payout document's settlement rows, for one).
  */
-export function formatAssetCode(code: string | null | undefined): string {
+export function formatEntityCode(code: string | null | undefined): string {
   if (!code) return '—';
   const m = code.match(/^([A-Za-z]*)(\d+)$/);
   if (!m) return code;

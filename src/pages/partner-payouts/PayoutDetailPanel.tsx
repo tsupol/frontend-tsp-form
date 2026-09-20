@@ -14,9 +14,10 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Badge, Button, Tooltip } from 'tsp-form';
-import { FileQuestion, Plus, Smartphone, Trash2, Wrench } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ExternalLink, FileQuestion, Plus, Smartphone, Trash2, Wrench } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
-import { fmtCurrency } from '../../lib/format';
+import { fmtCurrency, formatEntityCode } from '../../lib/format';
 import { blockingReasonText } from '../../lib/apiErrors';
 import {
   usePartnerPayoutActions,
@@ -57,6 +58,7 @@ interface PayoutDetailPanelProps {
 
 export function PayoutDetailPanel({ payoutId, isMobile }: PayoutDetailPanelProps) {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
 
   const { detail, isLoading, isFetched } = usePartnerPayoutDetail(payoutId);
   const { actions } = usePartnerPayoutActions(payoutId);
@@ -401,8 +403,21 @@ export function PayoutDetailPanel({ payoutId, isMobile }: PayoutDetailPanelProps
                               <span className="flex-1" />
                               <span className="text-sm tabular-nums shrink-0">{fmtCurrency(s.net_amount)}</span>
                             </div>
-                            <div className="text-sm mt-0.5 truncate">
-                              {s.contract_code} · {s.customer_name ?? '—'}
+                            {/* The contract is where finance goes to check what
+                             *  was actually sold, so the code is the link — no
+                             *  separate action button for it. The payout view
+                             *  sends the raw code, so format it here. */}
+                            <div className="text-sm mt-0.5 flex items-center gap-1 min-w-0">
+                              <button
+                                type="button"
+                                onClick={() => navigate(`/admin/contracts/search/${s.contract_id}`)}
+                                className="text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer shrink-0"
+                              >
+                                {formatEntityCode(s.contract_code)}
+                                <ExternalLink size={12} />
+                              </button>
+                              <span className="text-subtle shrink-0">·</span>
+                              <span className="truncate">{s.customer_name ?? '—'}</span>
                             </div>
                             <div className="text-xs text-subtle mt-0.5">
                               {t('partnerPayout.toBranch')} {fmtCurrency(s.total_to_branch)} ·{' '}
@@ -498,7 +513,7 @@ export function PayoutDetailPanel({ payoutId, isMobile }: PayoutDetailPanelProps
                               <span className="text-sm tabular-nums shrink-0">{fmtCurrency(d.cost_basis_after)}</span>
                             </div>
                             <div className="text-xs text-subtle mt-0.5">
-                              {d.contract_code ?? '—'} · {t(`partnerPayout.owner_${d.from_owner_type}`, { defaultValue: d.from_owner_type ?? '—' })}
+                              {d.contract_code ? formatEntityCode(d.contract_code) : '—'} · {t(`partnerPayout.owner_${d.from_owner_type}`, { defaultValue: d.from_owner_type ?? '—' })}
                               {' → '}
                               {t(`partnerPayout.owner_${d.to_owner_type}`, { defaultValue: d.to_owner_type })}
                               {' · '}

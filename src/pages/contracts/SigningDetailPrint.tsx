@@ -11,7 +11,7 @@
 // See `.claude/in-app-print-pattern.md` for the shared browser-print pattern.
 
 import { useTranslation } from 'react-i18next';
-import { formatAssetCode, formatCid, formatDateTime, formatTel } from '../../lib/format';
+import { formatEntityCode, formatCid, formatDateTime, formatTel } from '../../lib/format';
 
 export interface PrintParty {
   role: string;
@@ -78,7 +78,7 @@ export function SigningDetailPrint({ data }: { data: SigningDetailPrintData }) {
       {data.asset_code && (
         <>
           <hr className="sdp-rule" />
-          <Line label={t('signing.previewAssetTitle')} value={formatAssetCode(data.asset_code)} mono />
+          <Line label={t('signing.previewAssetTitle')} value={formatEntityCode(data.asset_code)} mono />
         </>
       )}
 
