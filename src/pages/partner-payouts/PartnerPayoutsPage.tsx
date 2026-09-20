@@ -158,7 +158,7 @@ export function PartnerPayoutsPage() {
           <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
             <PageNavPanel
               id="list"
-              className={isMobile ? '' : 'w-1/2 xl:w-5/12 border-r border-line flex flex-col min-h-0'}
+              className={isMobile ? '' : 'w-2/5 xl:w-1/3 border-r border-line flex flex-col min-h-0'}
             >
               <div className="flex-none border-b border-line flex px-2 overflow-x-auto hidden-scroll">
                 {TABS.map(key => (
