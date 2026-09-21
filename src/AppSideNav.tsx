@@ -451,10 +451,10 @@ export const AppSideNav = () => {
           : []),
         ...(canPayPartners
           ? [{
-              key: 'staff-partner-payouts',
+              key: 'fund-bills',
               icon: <Banknote size="1rem" />,
-              label: t('nav.staffPartnerPayouts'),
-              path: '/admin/partner-payouts',
+              label: t('nav.fundBills'),
+              path: '/admin/fund-bills',
             }]
           : []),
         ...(canSeePartnerSettlements

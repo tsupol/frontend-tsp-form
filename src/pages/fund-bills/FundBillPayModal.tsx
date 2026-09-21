@@ -1,4 +1,9 @@
-// "จ่ายแล้ว" — recorded after the money has actually left the bank.
+// "บันทึกจ่ายเงิน" — recorded after the money has actually left the bank.
+//
+// One press writes both transfer rows: the shop's real transfer, and the fund
+// company's own commission, which is recorded as paid without touching a bank
+// account. The success view says both numbers, because someone reconciling a
+// statement will only ever find the first one there.
 //
 // The date is the day of the real transfer, not today by necessity, and the
 // backend refuses a future one. Source account and reference are optional
@@ -17,8 +22,8 @@ import { translateApiError } from '../../lib/apiErrors';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../../lib/format';
-import { usePartnerPayoutInvalidate, usePayoutSourceAccounts } from './usePartnerPayouts';
-import type { PartnerPayoutDetail, PayoutPayResult } from './partnerPayoutTypes';
+import { useFundBillInvalidate, useFundSourceAccounts } from './useFundBills';
+import type { FundBill, FundBillPayResult } from './fundBillTypes';
 
 function parseTypedDate(raw: string): Date | null {
   if (raw.length !== 8) return null;
@@ -32,16 +37,16 @@ function parseTypedDate(raw: string): Date | null {
   return d;
 }
 
-interface PayoutPayModalProps {
+interface FundBillPayModalProps {
   open: boolean;
-  detail: PartnerPayoutDetail | null;
+  bill: FundBill | null;
   onClose: () => void;
 }
 
-export function PayoutPayModal({ open, detail, onClose }: PayoutPayModalProps) {
+export function FundBillPayModal({ open, bill, onClose }: FundBillPayModalProps) {
   const { t, i18n } = useTranslation();
-  const invalidate = usePartnerPayoutInvalidate();
-  const accounts = usePayoutSourceAccounts(detail?.company_id ?? null);
+  const invalidate = useFundBillInvalidate();
+  const accounts = useFundSourceAccounts(bill?.company_id ?? null);
 
   const today = toLocalDateStr(new Date());
 
@@ -53,7 +58,7 @@ export function PayoutPayModal({ open, detail, onClose }: PayoutPayModalProps) {
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<PayoutPayResult | null>(null);
+  const [result, setResult] = useState<FundBillPayResult | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
 
   useEffect(() => {
@@ -87,12 +92,12 @@ export function PayoutPayModal({ open, detail, onClose }: PayoutPayModalProps) {
   }));
 
   const handlePay = async () => {
-    if (!detail || !canSubmit) return;
+    if (!bill || !canSubmit) return;
     setSaving(true);
     setError(null);
     try {
-      const res = await apiClient.rpc<PayoutPayResult>('fn_partner_payout_pay', {
-        p_payout_id: detail.payout_id,
+      const res = await apiClient.rpc<FundBillPayResult>('fn_fund_bill_pay', {
+        p_bill_id: bill.bill_id,
         p_paid_date: paidDate,
         p_source_bank_account_id: accountId ? Number(accountId) : null,
         p_reference: reference.trim() || null,
@@ -100,7 +105,7 @@ export function PayoutPayModal({ open, detail, onClose }: PayoutPayModalProps) {
       });
       setResult(res);
       setView('done');
-      invalidate(detail.payout_id);
+      invalidate(bill.bill_id);
     } catch (err) {
       setError(err instanceof ApiError ? translateApiError(err, t) : String(err));
     } finally {
@@ -117,10 +122,10 @@ export function PayoutPayModal({ open, detail, onClose }: PayoutPayModalProps) {
         onClose={handleClose}
         maxWidth="32rem"
         width="100%"
-        ariaLabel={t('partnerPayout.payAction')}
+        ariaLabel={t('fundBill.payAction')}
       >
         <div className="modal-header">
-          <h2 className="modal-title">{t('partnerPayout.payAction')}</h2>
+          <h2 className="modal-title">{t('fundBill.payAction')}</h2>
           <button type="button" className="modal-close-btn" onClick={handleClose}>&times;</button>
         </div>
 
@@ -128,21 +133,22 @@ export function PayoutPayModal({ open, detail, onClose }: PayoutPayModalProps) {
           <>
             <div className="modal-content">
               <div className="px-3 py-2.5 rounded-md bg-surface border border-line">
-                <div className="font-medium text-sm">{detail?.payout_code ?? ''}</div>
+                <div className="font-medium text-sm">{bill?.bill_code ?? ''}</div>
                 <div className="text-xs text-subtle mt-0.5">
-                  {detail?.branch_name}
-                  {detail && <> · {fmtCurrency(detail.net_amount)}</>}
+                  {bill?.branch_name}
+                  {bill && <> · {fmtCurrency(bill.net_amount)}</>}
                 </div>
-                {detail?.payout_account_no && (
-                  <div className="text-xs text-subtle mt-0.5">
-                    {detail.payout_bank_code} · {detail.payout_account_no} · {detail.payout_account_name}
-                  </div>
-                )}
+              </div>
+
+              {/* The bank will only ever show the shop's transfer. Saying so here
+               *  stops the company's own line being hunted for on a statement. */}
+              <div className="mt-3 alert alert-info">
+                <span>{t('fundBill.payTwoRowsHint')}</span>
               </div>
 
               <div className="form-grid mt-4">
                 <div className="flex flex-col">
-                  <label className="form-label">{t('partnerPayout.paidDateRequired')}</label>
+                  <label className="form-label">{t('fundBill.paidDateRequired')}</label>
                   <InputDatePicker
                     value={parseLocalDate(paidDate)}
                     onChange={v => setPaidDate(toLocalDateStr(v))}
@@ -159,33 +165,33 @@ export function PayoutPayModal({ open, detail, onClose }: PayoutPayModalProps) {
                     error={futureDate}
                   />
                   {futureDate && (
-                    <span className="text-xs text-danger-fg mt-1">{t('partnerPayout.paidDateFuture')}</span>
+                    <span className="text-xs text-danger-fg mt-1">{t('fundBill.paidDateFuture')}</span>
                   )}
                 </div>
 
                 <div className="flex flex-col">
-                  <label className="form-label">{t('partnerPayout.sourceAccount')}</label>
+                  <label className="form-label">{t('fundBill.sourceAccount')}</label>
                   <Select
                     options={accountOptions}
                     value={accountId || null}
                     onChange={v => setAccountId((v as string) ?? '')}
-                    placeholder={t('partnerPayout.sourceAccountPlaceholder')}
+                    placeholder={t('fundBill.sourceAccountPlaceholder')}
                     clearable
                   />
                 </div>
 
                 <div className="flex flex-col">
-                  <label className="form-label">{t('partnerPayout.reference')}</label>
+                  <label className="form-label">{t('fundBill.reference')}</label>
                   <Input
                     value={reference}
                     onChange={e => setReference(e.target.value)}
                     className="w-full"
-                    placeholder={t('partnerPayout.referencePlaceholder')}
+                    placeholder={t('fundBill.referencePlaceholder')}
                   />
                 </div>
 
                 <div className="flex flex-col">
-                  <label className="form-label">{t('partnerPayout.note')}</label>
+                  <label className="form-label">{t('fundBill.note')}</label>
                   <TextArea value={note} onChange={e => setNote(e.target.value)} rows={2} />
                 </div>
               </div>
@@ -196,35 +202,35 @@ export function PayoutPayModal({ open, detail, onClose }: PayoutPayModalProps) {
             <div className="modal-footer">
               <Button variant="ghost" onClick={handleClose} disabled={saving}>{t('common.cancel')}</Button>
               <Button color="primary" onClick={handlePay} disabled={saving || !canSubmit}>
-                {t('partnerPayout.payAction')}
+                {t('fundBill.payAction')}
               </Button>
             </div>
           </>
         ) : result && (
           <ActionDoneView
-            headline={t('partnerPayout.paidHeadline')}
-            contractCode={result.payout_code}
+            headline={t('fundBill.paidHeadline')}
+            contractCode={result.bill_code}
             stateTransition={{
-              from: t('partnerPayout.status_DRAFT'),
-              to: t('partnerPayout.status_PAID'),
+              from: t('fundBill.status_ISSUED'),
+              to: t('fundBill.status_PAID'),
               toColor: 'success',
             }}
             detailRows={[
-              { label: t('partnerPayout.paidDate'), value: result.paid_date },
-              { label: t('partnerPayout.settlements'), value: String(result.settlement_count) },
+              { label: t('fundBill.paidDate'), value: result.paid_date },
+              { label: t('fundBill.branchTransferred'), value: fmtCurrency(result.branch_net), emphasis: true },
+              { label: t('fundBill.companyRecorded'), value: fmtCurrency(result.company_net) },
               ...(result.source_account_display
-                ? [{ label: t('partnerPayout.sourceAccount'), value: result.source_account_display }]
+                ? [{ label: t('fundBill.sourceAccount'), value: result.source_account_display }]
                 : []),
               ...(result.reference
-                ? [{ label: t('partnerPayout.reference'), value: result.reference }]
+                ? [{ label: t('fundBill.reference'), value: result.reference }]
                 : []),
-              { label: t('partnerPayout.netAmount'), value: fmtCurrency(result.net_amount), emphasis: true },
             ]}
             extras={devices.length > 0 ? (
               <div className="rounded-md border border-line overflow-hidden">
                 <div className="px-3 py-2 bg-surface text-sm font-medium flex items-center gap-2">
                   <Smartphone size={14} className="text-subtle" />
-                  {t('partnerPayout.devicesMovedToHolding', { count: devices.length })}
+                  {t('fundBill.devicesMovedToHolding', { count: devices.length })}
                 </div>
                 {devices.map(d => (
                   <div key={d.transfer_id} className="px-3 py-2 border-t border-line flex items-center justify-between text-sm">

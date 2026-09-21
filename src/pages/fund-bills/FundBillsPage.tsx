@@ -1,15 +1,14 @@
-// Finance's shop-payout desk.
+// Finance's fund-money desk.
 //
-// Four tabs, and the first is not a list of documents at all: it is the work
-// queue — one row per shop with settlements waiting — because a payout is built
-// per shop, not found. The other three are the documents themselves, split by
-// status, since a paid payout leaves the queue entirely and would otherwise be
-// unfindable.
+// The first tab is not a list of documents at all: it is the work queue — one row
+// per shop with requests waiting — because a payout is built per shop, not found.
+// The rest are the documents themselves, split by status, since a paid document
+// leaves the queue entirely and would otherwise be unfindable.
 //
 // Two-panel: the document tabs open their document in the right-hand panel, so
-// finance can step down a list of payouts without losing the list. The build
-// queue is the exception and still routes away — building a payout is a task
-// with its own ticklist and totals, not something to read at half width.
+// finance can step down a list without losing the list. The build queue is the
+// exception and still routes away — building a document is a task with its own
+// ticklist and totals, not something to read at half width.
 
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -19,27 +18,25 @@ import {
   createDateRangePresets,
 } from 'tsp-form';
 import {
-  ArrowLeft, ArrowRightFromLine, AlertTriangle, ChevronRight, FileText, Keyboard, Receipt, Store,
+  ArrowLeft, ArrowRightFromLine, ChevronRight, FileText, Keyboard, Receipt, Store,
 } from 'lucide-react';
-import { PayoutDetailPanel } from './PayoutDetailPanel';
+import { FundBillDetailPanel } from './FundBillDetailPanel';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../../lib/format';
+import { useFundBillCandidateBranches, useFundBillList } from './useFundBills';
 import {
-  usePayoutCandidateBranches,
-  usePartnerPayoutList,
-  usePayoutStatusRef,
-} from './usePartnerPayouts';
-import {
-  payoutStatusColor,
-  type PartnerPayout,
-  type PartnerPayoutStatus,
-  type PayoutCandidateBranch,
-} from './partnerPayoutTypes';
+  fundBillStatusColor,
+  type FundBill,
+  type FundBillStatus,
+} from './fundBillTypes';
+import type { FundBillCandidateBranch } from './useFundBills';
 
-/** The build-a-payout queue, then the documents by status. */
-type TabKey = 'BUILD' | PartnerPayoutStatus;
+/** The build queue, then the documents by status. */
+type TabKey = 'BUILD' | FundBillStatus;
 
-const TABS: TabKey[] = ['BUILD', 'DRAFT', 'PAID', 'REVERSED'];
+/** `PARTIAL` is a real status but nothing in this flow produces one today, so it
+ *  is not given a tab of its own — a document in it would still open by link. */
+const TABS: TabKey[] = ['BUILD', 'DRAFT', 'ISSUED', 'PAID', 'VOIDED'];
 
 /** Turn a typed `DD/MM/YYYY` (Buddhist years included) into a Date. */
 function parseTypedDate(raw: string): Date | null {
@@ -54,34 +51,33 @@ function parseTypedDate(raw: string): Date | null {
   return d;
 }
 
-export function PartnerPayoutsPage() {
+export function FundBillsPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  // Selection lives in the URL, not in state: a payout link has to open its
+  // Selection lives in the URL, not in state: a document link has to open its
   // document, and the log and the build page both send people straight to one.
-  const { payoutId: payoutIdParam } = useParams<{ payoutId: string }>();
-  const selectedId = payoutIdParam ? Number(payoutIdParam) : null;
+  const { billId: billIdParam } = useParams<{ billId: string }>();
+  const selectedId = billIdParam ? Number(billIdParam) : null;
 
   // A document opened by link is never in the build queue, so start on the
   // documents rather than a tab the selection cannot appear in.
   const [tab, setTab] = useState<TabKey>(selectedId ? 'DRAFT' : 'BUILD');
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
-  const [paidFrom, setPaidFrom] = useState('');
-  const [paidTo, setPaidTo] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [rangeTyping, setRangeTyping] = useState(false);
   // A preset stores a rule, not dates — keep its key so the window recomputes
   // from today rather than freezing on the day it was picked.
   const [presetKey, setPresetKey] = useState<string | null>(null);
 
-  useEffect(() => { setPageIndex(0); }, [tab, paidFrom, paidTo]);
+  useEffect(() => { setPageIndex(0); }, [tab, dateFrom, dateTo]);
 
-  const statusRef = usePayoutStatusRef();
-  const branches = usePayoutCandidateBranches();
-  const list = usePartnerPayoutList({
+  const branches = useFundBillCandidateBranches();
+  const list = useFundBillList({
     status: tab === 'BUILD' ? 'DRAFT' : tab,
-    paidFrom: tab === 'PAID' ? paidFrom : undefined,
-    paidTo: tab === 'PAID' ? paidTo : undefined,
+    dateFrom: tab === 'PAID' ? dateFrom : undefined,
+    dateTo: tab === 'PAID' ? dateTo : undefined,
     pageIndex,
     pageSize,
   });
@@ -89,16 +85,13 @@ export function PartnerPayoutsPage() {
   // Only for the mobile header's title: the panel fetches its own document, so
   // a selection not on the current page simply shows no code rather than
   // forcing a lookup the page does not otherwise need.
-  const selectedRow = list.rows.find(r => r.payout_id === selectedId) ?? null;
+  const selectedRow = list.rows.find(r => r.bill_id === selectedId) ?? null;
 
-  const statusLabel = (code: PartnerPayoutStatus) => {
-    const row = statusRef.find(s => s.code === code);
-    if (!row) return t(`partnerPayout.status_${code}`, { defaultValue: code });
-    return i18n.language === 'th' ? row.name_th : row.name_en;
-  };
+  const statusLabel = (code: FundBillStatus) =>
+    t(`fundBill.status_${code}`, { defaultValue: code });
 
   const tabLabel = (key: TabKey) =>
-    key === 'BUILD' ? t('partnerPayout.tabBuild') : statusLabel(key);
+    key === 'BUILD' ? t('fundBill.tabBuild') : statusLabel(key);
 
   const rangePresets = useMemo(
     () => createDateRangePresets({
@@ -131,14 +124,14 @@ export function PartnerPayoutsPage() {
                     : t('common.back', { defaultValue: 'Back' })}
                   onClick={() => {
                     if (isRoot) window.dispatchEvent(new CustomEvent('sidemenu:open'));
-                    else { goBack(); navigate('/admin/partner-payouts'); }
+                    else { goBack(); navigate('/admin/fund-bills'); }
                   }}
                 >
                   {isRoot ? <ArrowRightFromLine size={18} /> : <ArrowLeft size={20} />}
                 </button>
               </div>
               <div className="mobile-header-title mobile-header-title-truncate">
-                {isRoot ? t('partnerPayout.pageTitle') : (selectedRow?.payout_code ?? t('partnerPayout.pageTitle'))}
+                {isRoot ? t('fundBill.pageTitle') : (selectedRow?.bill_code ?? t('fundBill.pageTitle'))}
               </div>
               <div className="mobile-header-end w-nav" />
             </MobileHeader>
@@ -146,11 +139,11 @@ export function PartnerPayoutsPage() {
 
           {!isMobile && (
             <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
-              <h1 className="heading-2 shrink-0">{t('partnerPayout.pageTitle')}</h1>
+              <h1 className="heading-2 shrink-0">{t('fundBill.pageTitle')}</h1>
               <span className="text-sm text-subtle">
                 {tab === 'BUILD'
-                  ? t('partnerPayout.shopsWaitingCount', { count: branches.rows.length })
-                  : t('partnerPayout.documentCount', { count: list.totalCount })}
+                  ? t('fundBill.shopsWaitingCount', { count: branches.rows.length })
+                  : t('fundBill.documentCount', { count: list.totalCount })}
               </span>
             </div>
           )}
@@ -177,19 +170,17 @@ export function PartnerPayoutsPage() {
 
               {/* Paid needs a date window — the list otherwise grows forever.
                *  One range control, not two date fields: it keeps the two ends
-               *  in order by itself (two independent fields happily accepted a
-               *  "to" earlier than the "from" and then showed an empty list with
-               *  no hint why), and its quick ranges are what this desk actually
-               *  reaches for. */}
+               *  in order by itself, and its quick ranges are what this desk
+               *  actually reaches for. */}
               {tab === 'PAID' && (
                 <div className="flex-none flex items-center gap-2 p-2 border-b border-line">
                   <div className="flex-1 min-w-0 max-w-96">
                     <InputDateRangePicker
-                      fromDate={parseLocalDate(paidFrom)}
-                      toDate={parseLocalDate(paidTo)}
-                      onFromDateChange={d => { setPaidFrom(toLocalDateStr(d)); setPresetKey(null); }}
-                      onToDateChange={d => { setPaidTo(toLocalDateStr(d)); setPresetKey(null); }}
-                      placeholder={t('partnerPayout.paidDate')}
+                      fromDate={parseLocalDate(dateFrom)}
+                      toDate={parseLocalDate(dateTo)}
+                      onFromDateChange={d => { setDateFrom(toLocalDateStr(d)); setPresetKey(null); }}
+                      onToDateChange={d => { setDateTo(toLocalDateStr(d)); setPresetKey(null); }}
+                      placeholder={t('fundBill.billDate')}
                       presets={rangePresets}
                       presetKey={presetKey}
                       onPresetKeyChange={setPresetKey}
@@ -218,11 +209,11 @@ export function PartnerPayoutsPage() {
                       })}
                     />
                   </div>
-                  {(paidFrom || paidTo) && (
+                  {(dateFrom || dateTo) && (
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => { setPaidFrom(''); setPaidTo(''); setPresetKey(null); }}
+                      onClick={() => { setDateFrom(''); setDateTo(''); setPresetKey(null); }}
                     >
                       {t('common.clear', { defaultValue: 'Clear' })}
                     </Button>
@@ -231,52 +222,39 @@ export function PartnerPayoutsPage() {
               )}
 
               {tab === 'BUILD' ? (
-                <DataTable<PayoutCandidateBranch>
+                <DataTable<FundBillCandidateBranch>
                   data={branches.rows}
                   enableKeyboardNav={!isMobile}
-                  onRowActivate={row => navigate(`/admin/partner-payouts/new/${row.original.branch_id}`)}
+                  onRowActivate={row => navigate(`/admin/fund-bills/new/${row.original.branch_id}`)}
                   renderRow={row => {
                     const r = row.original;
                     return (
                       <button
                         type="button"
                         className="w-full text-left px-4 py-2.5 transition-colors cursor-pointer"
-                        onClick={() => navigate(`/admin/partner-payouts/new/${r.branch_id}`)}
+                        onClick={() => navigate(`/admin/fund-bills/new/${r.branch_id}`)}
                       >
                         <div className="flex items-center gap-2">
                           <Store size={14} className="text-subtle shrink-0" />
                           <span className="font-medium text-sm truncate">{r.branch_name}</span>
-                          {r.draft_payout_count > 0 && (
-                            <Badge color="info" size="sm">
-                              {t('partnerPayout.draftWaiting', { count: r.draft_payout_count })}
-                            </Badge>
-                          )}
                           <span className="flex-1" />
                           <ChevronRight size={16} className="text-subtler shrink-0" />
                         </div>
 
                         <div className="flex items-center gap-3 mt-1 text-xs text-subtle flex-wrap">
-                          <span>{t('partnerPayout.waitingCount', { count: r.settlement_count })}</span>
-                          <span>{t('partnerPayout.checkedCount', { count: r.checked_count })}</span>
-                          <span className={r.payable_count > 0 ? 'text-success-fg font-medium' : ''}>
-                            {t('partnerPayout.payableCount', { count: r.payable_count })}
+                          <span className="text-success-fg font-medium">
+                            {t('fundBill.readyCount', { count: r.settlement_count })}
                           </span>
                           <span className="flex-1" />
                           <span className="tabular-nums text-fg font-medium">
-                            {fmtCurrency(r.payable_net_amount)}
+                            {fmtCurrency(r.net_amount)}
                           </span>
                         </div>
 
-                        {!r.has_payout_account && (
-                          <div className="mt-1.5 flex items-center gap-1.5 text-xs text-warning-fg">
-                            <AlertTriangle size={13} className="shrink-0" />
-                            <span>{t('partnerPayout.noPayoutAccountWarn')}</span>
-                          </div>
-                        )}
-
-                        {r.oldest_submitted_at && (
+                        {r.oldest_checked_at && (
                           <div className="text-xs text-subtler mt-0.5">
-                            {t('partnerPayout.oldestSubmitted')}: <DateTime value={r.oldest_submitted_at} showTime={false} />
+                            {t('fundBill.oldestChecked')}:{' '}
+                            <DateTime value={r.oldest_checked_at} showTime={false} />
                           </div>
                         )}
                       </button>
@@ -284,20 +262,20 @@ export function PartnerPayoutsPage() {
                   }}
                   className="flex-1 min-h-0 panel-datatable"
                   noResults={
-                    <div className="p-8 text-center text-subtler">{t('partnerPayout.buildEmpty')}</div>
+                    <div className="p-8 text-center text-subtler">{t('fundBill.buildEmpty')}</div>
                   }
                 />
               ) : (
-                <DataTable<PartnerPayout>
+                <DataTable<FundBill>
                   data={list.rows}
                   getRowProps={row => ({
-                    'data-state': row.original.payout_id === selectedId ? 'selected' : undefined,
+                    'data-state': row.original.bill_id === selectedId ? 'selected' : undefined,
                   })}
                   enableKeyboardNav={!isMobile}
                   // The panel refetches per selection, so arrowing with the
                   // default follow mode would fire a request per keypress.
                   keyboardActivateMode="manual"
-                  onRowActivate={row => navigate(`/admin/partner-payouts/${row.original.payout_id}`)}
+                  onRowActivate={row => navigate(`/admin/fund-bills/${row.original.bill_id}`)}
                   renderRow={row => {
                     const r = row.original;
                     return (
@@ -305,35 +283,40 @@ export function PartnerPayoutsPage() {
                         type="button"
                         className="w-full text-left px-4 py-2.5 transition-colors cursor-pointer"
                         onClick={() => {
-                          navigate(`/admin/partner-payouts/${r.payout_id}`);
+                          navigate(`/admin/fund-bills/${r.bill_id}`);
                           if (isMobile) goTo('detail');
                         }}
                       >
                         <div className="flex items-center gap-2">
                           <FileText size={14} className="text-subtle shrink-0" />
-                          <span className="font-medium text-sm truncate">{r.payout_code}</span>
-                          <Badge color={payoutStatusColor(r.status)} size="sm">
+                          <span className="font-medium text-sm truncate">{r.bill_code}</span>
+                          <Badge color={fundBillStatusColor(r.status)} size="sm">
                             {statusLabel(r.status)}
                           </Badge>
+                          {/* A reversed document keeps its status and amounts —
+                           *  this flag is the only thing that says it was undone. */}
+                          {r.is_reversed && (
+                            <Badge color="warning" size="sm">{t('fundBill.reversedShort')}</Badge>
+                          )}
                           <span className="flex-1" />
                           <span className="text-sm tabular-nums font-medium shrink-0">
-                            {fmtCurrency(r.status === 'PAID' ? r.adjusted_net : r.net_amount)}
+                            {fmtCurrency(r.returned_net !== 0 ? r.net_after_returns : r.net_amount)}
                           </span>
                         </div>
-                        <div className="text-sm mt-0.5 truncate">{r.branch_name}</div>
+                        <div className="text-sm mt-0.5 truncate">
+                          {r.branch_name ?? r.company_name ?? '—'}
+                        </div>
                         <div className="flex items-center gap-2 mt-0.5 text-xs text-subtle">
                           <span className="truncate flex-1 min-w-0">
-                            {t('partnerPayout.settlementCount', { count: r.settlement_count })}
-                            {r.adjustment_count > 0 && (
-                              <> · {t('partnerPayout.adjustmentCount', { count: r.adjustment_count })}</>
+                            {i18n.language === 'th' && r.purpose_name
+                              ? r.purpose_name
+                              : t(`fundBill.purpose_${r.bill_purpose}`, { defaultValue: r.bill_purpose })}
+                            {r.contract_count > 0 && (
+                              <> · {t('fundBill.contractCount', { count: r.contract_count })}</>
                             )}
                           </span>
                           <span className="shrink-0">
-                            {r.status === 'PAID' && r.paid_date
-                              ? <DateTime value={r.paid_date} showTime={false} />
-                              : r.status === 'REVERSED' && r.reversed_at
-                                ? <DateTime value={r.reversed_at} showTime />
-                                : <DateTime value={r.created_at} showTime />}
+                            <DateTime value={r.bill_date} showTime={false} />
                           </span>
                         </div>
                       </button>
@@ -347,7 +330,7 @@ export function PartnerPayoutsPage() {
                   onPageChange={({ pageIndex: pi, pageSize: ps }) => { setPageIndex(pi); setPageSize(ps); }}
                   className={`flex-1 min-h-0 panel-datatable ${list.isFetching ? 'opacity-60' : ''} transition-opacity`}
                   noResults={
-                    <div className="p-8 text-center text-subtler">{t('partnerPayout.listEmpty')}</div>
+                    <div className="p-8 text-center text-subtler">{t('fundBill.listEmpty')}</div>
                   }
                 />
               )}
@@ -358,11 +341,11 @@ export function PartnerPayoutsPage() {
               className={isMobile ? '' : 'flex-1 min-w-0 min-h-0 flex flex-col'}
             >
               {selectedId ? (
-                <PayoutDetailPanel payoutId={selectedId} isMobile={isMobile} />
+                <FundBillDetailPanel billId={selectedId} isMobile={isMobile} />
               ) : (
                 <div className="flex-1 flex flex-col items-center justify-center gap-2 text-subtler">
                   <Receipt size={40} />
-                  <div className="text-sm">{t('partnerPayout.selectToView')}</div>
+                  <div className="text-sm">{t('fundBill.selectToView')}</div>
                 </div>
               )}
             </PageNavPanel>

@@ -20,7 +20,7 @@ import { DateTime } from '../../components/DateTime';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../../lib/format';
 import { usePartnerReturnInvalidate } from './usePartnerReturns';
-import { usePayoutSourceAccounts } from '../partner-payouts/usePartnerPayouts';
+import { useFundSourceAccounts } from '../fund-bills/useFundBills';
 import type {
   PartnerReturnActionsResponse,
   PartnerReturnDetail,
@@ -93,7 +93,7 @@ export function ReturnBuybackPaidModal({ open, detail, actions, onClose }: Props
 
   const amount = (actions?.buyback_amount ?? 0) + (actions?.buyback_fee ?? 0);
 
-  const accounts = usePayoutSourceAccounts(detail?.company_id ?? null);
+  const accounts = useFundSourceAccounts(detail?.company_id ?? null);
   const accountOptions = accounts.map(a => ({
     value: String(a.id),
     label: `${a.bank_name} · ${a.account_number_display ?? a.account_number ?? ''}`,

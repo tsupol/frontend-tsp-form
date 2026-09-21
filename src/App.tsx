@@ -52,9 +52,9 @@ import { DunningTargetsPage } from './pages/legal/DunningTargetsPage';
 import { StaffCommissionPage } from './pages/commission/StaffCommissionPage';
 import { ApprovalsPage } from './pages/approvals/ApprovalsPage';
 import { PartnerCaseQueuePage } from './pages/partner-cases/PartnerCaseQueuePage';
-import { PartnerPayoutsPage } from './pages/partner-payouts/PartnerPayoutsPage';
-import { PartnerPayoutBuildPage } from './pages/partner-payouts/PartnerPayoutBuildPage';
-import { DealPartnerLayout } from './pages/partner-payouts/DealPartnerLayout';
+import { FundBillsPage } from './pages/fund-bills/FundBillsPage';
+import { FundBillBuildPage } from './pages/fund-bills/FundBillBuildPage';
+import { DealPartnerLayout } from './pages/fund-bills/DealPartnerLayout';
 import { PartnerSettlementQueuePage } from './pages/partner-settlements/PartnerSettlementQueuePage';
 import { PartnerBalancePage } from './pages/partner-settlements/PartnerBalancePage';
 import { FundDayMoneyPage } from './pages/fund-day/FundDayMoneyPage';
@@ -1000,27 +1000,27 @@ function App() {
           </ProtectedRoute>
         }
       />
-      {/* Shop payout documents — fund finance. The build route is per shop;
+      {/* Fund-money documents — fund finance. The build route is per shop;
           the detail route is the document itself. */}
       <Route
-        path="/admin/partner-payouts"
+        path="/admin/fund-bills"
         element={
           <ProtectedRoute>
             <AdminLayout>
               <DealPartnerLayout>
-                <PartnerPayoutsPage />
+                <FundBillsPage />
               </DealPartnerLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
       />
       <Route
-        path="/admin/partner-payouts/new/:branchId"
+        path="/admin/fund-bills/new/:branchId"
         element={
           <ProtectedRoute>
             <AdminLayout>
               <DealPartnerLayout>
-                <PartnerPayoutBuildPage />
+                <FundBillBuildPage />
               </DealPartnerLayout>
             </AdminLayout>
           </ProtectedRoute>
@@ -1029,12 +1029,12 @@ function App() {
       {/* Same page as the list: the document opens in its right-hand panel, so
           the rail stays on screen and the URL still addresses one document. */}
       <Route
-        path="/admin/partner-payouts/:payoutId"
+        path="/admin/fund-bills/:billId"
         element={
           <ProtectedRoute>
             <AdminLayout>
               <DealPartnerLayout>
-                <PartnerPayoutsPage />
+                <FundBillsPage />
               </DealPartnerLayout>
             </AdminLayout>
           </ProtectedRoute>

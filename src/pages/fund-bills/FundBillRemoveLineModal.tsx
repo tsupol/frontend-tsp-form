@@ -1,7 +1,9 @@
-// Take one settlement back off a draft payout.
+// "ถอดบรรทัดแก้มือ" — removes one hand-entered discount or surcharge.
 //
-// The settlement returns to the waiting queue and keeps its "checked" tick, so
-// putting it back on a later draft needs no re-checking.
+// Only a hand-entered line can go: a line that came from a settlement is part
+// of what the shop asked for, and removing it would make the document disagree
+// with the request behind it. To drop one of those you take the whole
+// settlement off instead, which is a different button on a different row.
 
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -11,32 +13,35 @@ import { translateApiError } from '../../lib/apiErrors';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { fmtCurrency } from '../../lib/format';
-import { usePartnerPayoutInvalidate } from './usePartnerPayouts';
-import type {
-  PayoutSettlementMoveResult,
-  PayoutSettlementRow,
-} from './partnerPayoutTypes';
+import { useFundBillInvalidate } from './useFundBills';
+import type { FundBillLine, FundBillRemoveLineResult } from './fundBillTypes';
 
-interface PayoutRemoveSettlementModalProps {
+interface FundBillRemoveLineModalProps {
   open: boolean;
-  payoutId: number | null;
-  payoutCode: string;
-  settlement: PayoutSettlementRow | null;
+  billId: number | null;
+  billCode: string;
+  line: FundBillLine | null;
   onClose: () => void;
 }
 
-export function PayoutRemoveSettlementModal({
-  open, payoutId, payoutCode, settlement, onClose,
-}: PayoutRemoveSettlementModalProps) {
-  const { t } = useTranslation();
-  const invalidate = usePartnerPayoutInvalidate();
+export function FundBillRemoveLineModal({
+  open, billId, billCode, line, onClose,
+}: FundBillRemoveLineModalProps) {
+  const { t, i18n } = useTranslation();
+  const invalidate = useFundBillInvalidate();
 
   const [view, setView] = useState<'form' | 'done'>('form');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<PayoutSettlementMoveResult | null>(null);
+  const [result, setResult] = useState<FundBillRemoveLineResult | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
+
+  // The parent clears its selection as it closes, so the body has to keep
+  // rendering the last line through the close transition or the panel
+  // collapses mid-animation.
+  const [shown, setShown] = useState<FundBillLine | null>(line);
+  useEffect(() => { if (line) setShown(line); }, [line]);
 
   useEffect(() => {
     if (!open) return;
@@ -55,19 +60,25 @@ export function PayoutRemoveSettlementModal({
     forceClose();
   };
 
-  const handleRemove = async () => {
-    if (!payoutId || !settlement) return;
+  const lineLabel = shown
+    ? (i18n.language === 'th' && shown.line_type_name
+      ? shown.line_type_name
+      : t(`fundBill.lineType_${shown.line_type}`, { defaultValue: shown.line_type }))
+    : '';
+
+  const handleSubmit = async () => {
+    if (billId == null || !shown) return;
     setSaving(true);
     setError(null);
     try {
-      const res = await apiClient.rpc<PayoutSettlementMoveResult>('fn_partner_payout_remove_settlement', {
-        p_payout_id: payoutId,
-        p_settlement_id: settlement.settlement_id,
+      const res = await apiClient.rpc<FundBillRemoveLineResult>('fn_fund_bill_remove_line', {
+        p_bill_id: billId,
+        p_line_id: shown.line_id,
         p_note: note.trim() || null,
       });
       setResult(res);
       setView('done');
-      invalidate(payoutId);
+      invalidate(billId);
     } catch (err) {
       setError(err instanceof ApiError ? translateApiError(err, t) : String(err));
     } finally {
@@ -82,10 +93,10 @@ export function PayoutRemoveSettlementModal({
         onClose={handleClose}
         maxWidth="28rem"
         width="100%"
-        ariaLabel={t('partnerPayout.removeSettlement')}
+        ariaLabel={t('fundBill.removeLineAction')}
       >
         <div className="modal-header">
-          <h2 className="modal-title">{t('partnerPayout.removeSettlement')}</h2>
+          <h2 className="modal-title">{t('fundBill.removeLineAction')}</h2>
           <button type="button" className="modal-close-btn" onClick={handleClose}>&times;</button>
         </div>
 
@@ -93,20 +104,19 @@ export function PayoutRemoveSettlementModal({
           <>
             <div className="modal-content">
               <div className="px-3 py-2.5 rounded-md bg-surface border border-line">
-                <div className="font-medium text-sm">{settlement?.settlement_code ?? ''}</div>
+                <div className="font-medium text-sm">{billCode}</div>
                 <div className="text-xs text-subtle mt-0.5">
-                  {settlement?.contract_code} · {settlement?.customer_name ?? '—'}
-                  {settlement && <> · {fmtCurrency(settlement.net_amount)}</>}
+                  {lineLabel}
+                  {shown && <> · {fmtCurrency(shown.amount)}</>}
                 </div>
-              </div>
-
-              <div className="alert alert-info mt-3">
-                <span>{t('partnerPayout.removeSettlementHint')}</span>
+                {shown?.reason_code && (
+                  <div className="text-xs text-subtle mt-0.5">{shown.reason_code}</div>
+                )}
               </div>
 
               <div className="form-grid mt-4">
                 <div className="flex flex-col">
-                  <label className="form-label">{t('partnerPayout.note')}</label>
+                  <label className="form-label">{t('fundBill.note')}</label>
                   <TextArea value={note} onChange={e => setNote(e.target.value)} rows={2} />
                 </div>
               </div>
@@ -116,20 +126,18 @@ export function PayoutRemoveSettlementModal({
 
             <div className="modal-footer">
               <Button variant="ghost" onClick={handleClose} disabled={saving}>{t('common.cancel')}</Button>
-              <Button color="danger" onClick={handleRemove} disabled={saving}>
-                {t('partnerPayout.removeSettlement')}
+              <Button color="danger" onClick={handleSubmit} disabled={saving}>
+                {t('fundBill.removeLineAction')}
               </Button>
             </div>
           </>
         ) : result && (
           <ActionDoneView
-            headline={t('partnerPayout.removedHeadline')}
-            contractCode={payoutCode}
-            tone="warning"
+            headline={t('fundBill.lineRemovedHeadline')}
+            contractCode={billCode}
             detailRows={[
-              { label: t('partnerPayout.settlementCode'), value: result.settlement_code },
-              { label: t('partnerPayout.settlements'), value: String(result.settlement_count) },
-              { label: t('partnerPayout.netAmount'), value: fmtCurrency(result.net_amount), emphasis: true },
+              { label: t('fundBill.lineTypeLabel'), value: lineLabel },
+              { label: t('fundBill.netAmount'), value: fmtCurrency(result.net_amount), emphasis: true },
             ]}
             onClose={forceClose}
           />

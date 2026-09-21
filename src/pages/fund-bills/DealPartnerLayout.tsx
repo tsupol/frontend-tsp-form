@@ -35,7 +35,7 @@ const NAV_ITEMS: DealPartnerNavItem[] = [
   // both of these return its company's rows. Gating them on the payout
   // permission hid screens the user could open, and disagreed with the side nav.
   { path: '/admin/partner-settlements', labelKey: 'nav.partnerSettlements', icon: Receipt, anyOf: ['PARTNER.PAYOUT_APPROVE', 'PARTNER.CREDIT_APPROVE'] },
-  { path: '/admin/partner-payouts', labelKey: 'nav.staffPartnerPayouts', icon: Banknote, anyOf: ['PARTNER.PAYOUT_APPROVE'] },
+  { path: '/admin/fund-bills', labelKey: 'nav.fundBills', icon: Banknote, anyOf: ['PARTNER.PAYOUT_APPROVE'] },
   { path: '/admin/partner-balance', labelKey: 'nav.partnerBalance', icon: Wallet, anyOf: ['PARTNER.PAYOUT_APPROVE', 'PARTNER.CREDIT_APPROVE'] },
   { path: '/admin/partner-returns', labelKey: 'nav.staffPartnerReturns', icon: PackageCheck, anyOf: ['PARTNER.PAYOUT_APPROVE'], notUnder: '/admin/partner-returns/warehouse' },
   { path: '/admin/partner-returns/warehouse', labelKey: 'nav.staffPartnerReturnWarehouse', icon: Warehouse, anyOf: ['PARTNER.PAYOUT_APPROVE'] },
