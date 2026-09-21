@@ -503,6 +503,13 @@ export const AppSideNav = () => {
           icon: <History size="1rem" />,
           label: t('nav.fundDayRecon'),
           path: '/admin/fund-day-recon',
+        }, {
+          // The books are read-only for anyone who can see the daily money; the
+          // three movement buttons on the page carry their own permissions.
+          key: 'fund-book',
+          icon: <Wallet size="1rem" />,
+          label: t('nav.fundBook'),
+          path: '/admin/fund-book',
         }]
       : []),
     {

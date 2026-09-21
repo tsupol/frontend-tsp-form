@@ -59,6 +59,7 @@ import { PartnerSettlementQueuePage } from './pages/partner-settlements/PartnerS
 import { PartnerBalancePage } from './pages/partner-settlements/PartnerBalancePage';
 import { FundDayMoneyPage } from './pages/fund-day/FundDayMoneyPage';
 import { FundDayReconPage } from './pages/fund-day/FundDayReconPage';
+import { FundBookPage } from './pages/fund-book/FundBookPage';
 import { PartnerReturnsPage } from './pages/partner-returns/PartnerReturnsPage';
 import { PartnerReturnWarehousePage } from './pages/partner-returns/PartnerReturnWarehousePage';
 import { ChatPage } from './pages/chat/ChatPage';
@@ -1113,6 +1114,18 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <FundDayReconPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      {/* The fund's two money books (UI_SUMMARY/149 §5-§6): whose money is where,
+          how much has to be put in, and the movements behind both figures. */}
+      <Route
+        path="/admin/fund-book"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <FundBookPage />
             </AdminLayout>
           </ProtectedRoute>
         }
