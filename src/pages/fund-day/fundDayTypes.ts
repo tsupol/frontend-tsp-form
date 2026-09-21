@@ -10,8 +10,15 @@
 /** `+` = money in, `-` = money out. */
 export type FundDirection = 'IN' | 'OUT';
 
-/** Where a line came from. Drives its label and which document it links back to. */
-export type FundSource = 'BILL' | 'PAYOUT' | 'PAYOUT_REVERSAL' | 'ADJUSTMENT';
+/**
+ * Where a line came from. Drives its label and which document it links back to.
+ *
+ * The three payout-era values collapsed into one when the fund-money document
+ * family landed (mig 1290/1291): a credit note reverses itself by running its
+ * own lines the other way, so there is no separate reversal source any more,
+ * and adjustments became documents of their own.
+ */
+export type FundSource = 'BILL' | 'FUND_BILL';
 
 /** The account with no bank account recorded. Shown, never reconcilable. */
 export const UNSPECIFIED_ACCOUNT = 'UNSPECIFIED';
@@ -92,14 +99,22 @@ interface FundLineBase {
 }
 
 export interface FundMoneyLine extends FundLineBase {
+  /**
+   * `CONTRACT_MONEY` needs a contract behind it; `ASSET_MONEY` does not — that
+   * is money from selling a device, e.g. the fund selling one it took back
+   * (mig 1299). `FUND_CAPITAL` is money into or out of the fund itself.
+   */
   category_group: string;
   category_code: string;
+  /** Whose money the line is — holding's, or the fund company's own. */
+  owner_type: 'HOLDING' | 'COMPANY' | null;
   bill_type: string | null;
   line_id: number | null;
 }
 
 export interface FundBankLine extends FundLineBase {
-  tender_class: 'BANK' | 'WALLET';
+  /** `INTERNAL` = recorded but never touched a bank account (mig 1290). */
+  tender_class: 'BANK' | 'WALLET' | 'INTERNAL';
   method: string | null;
   account_key: string;
   bank_code: string | null;

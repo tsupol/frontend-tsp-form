@@ -309,13 +309,13 @@ export function PartnerReturnDetailPanel({ returnId, isMobile, onBack, queueRow 
                   {detail.settlement_net_amount != null ? fmtCurrency(detail.settlement_net_amount) : '—'}
                 </Fact>
                 <Fact label={t('partnerReturn.paidPayout')}>
-                  {detail.paid_payout_code ? (
+                  {detail.paid_bill_code ? (
                     <button
                       type="button"
-                      onClick={() => navigate(`/admin/partner-payouts/${detail.paid_payout_id}`)}
+                      onClick={() => navigate(`/admin/fund-bills/${detail.paid_bill_id}`)}
                       className="text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
                     >
-                      {detail.paid_payout_code}
+                      {detail.paid_bill_code}
                       <ExternalLink size={12} />
                     </button>
                   ) : t('partnerReturn.notPaidYet')}
@@ -362,7 +362,7 @@ export function PartnerReturnDetailPanel({ returnId, isMobile, onBack, queueRow 
                       <b className="tabular-nums">
                         {fmtCurrency((detail.buyback_amount ?? 0) + (detail.buyback_fee ?? 0))}
                       </b>
-                      {detail.buyback_adjustment_id != null && (
+                      {detail.buyback_bill_id != null && (
                         <Badge color="success" size="sm" className="ml-1">{t('partnerReturn.buybackPaidBadge')}</Badge>
                       )}
                     </Fact>

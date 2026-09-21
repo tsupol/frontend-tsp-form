@@ -68,7 +68,7 @@ export interface PartnerSettlement {
   close_submitted_by_name: string | null;
   close_returned_at: string | null;
   close_returned_reason: string | null;
-  payout_id: number | null;
+  fund_bill_id: number | null;
   paid_at: string | null;
   voided_at: string | null;
   voided_reason: string | null;
@@ -178,60 +178,69 @@ export interface SettlementCloseResult {
   net_amount: number;
 }
 
-// ── payout documents (145 §8) ────────────────────────────────────────────────
+// ── fund-money documents the shop can see (149 §8) ────────────────────
 
-/** `v_partner_my_payouts` — one transfer the shop received. */
-export interface PartnerPayout {
-  payout_id: number;
-  payout_code: string;
+/**
+ * `v_partner_my_fund_bills` — one paid document, the shop's side only.
+ *
+ * Every figure here is the shop's own: the fund company's commission lines are
+ * filtered out at line level, so `net_amount` is what was actually transferred
+ * to this shop and nothing else. Drafts never appear — the shop sees a document
+ * once the money has moved.
+ */
+export interface PartnerMyFundBill {
+  bill_id: number;
+  bill_code: string;
+  branch_id: number;
+  bill_purpose: string;
+  purpose_name: string | null;
   status: string;
-  is_terminal: boolean;
-  counts_as_cash_out: boolean;
-  payout_bank_code: string | null;
-  payout_account_no: string | null;
-  payout_account_name: string | null;
-  total_to_branch: number;
-  total_from_branch: number;
+  bill_date: string;
+  /** Owed to the shop, before what the shop already kept is deducted. */
+  to_branch: number;
+  from_branch: number;
   net_amount: number;
-  settlement_count: number;
-  adjusted_to_branch: number;
-  adjusted_from_branch: number;
-  /** What was actually transferred once post-payment adjustments are counted. */
-  adjusted_net: number;
-  adjustment_count: number;
+  /** Net of what came back afterwards — a device buyback, a clawback. */
+  returned_net: number;
+  net_after_returns: number;
+  contract_count: number;
   paid_date: string | null;
-  paid_at: string | null;
   reference: string | null;
-  reversed_at: string | null;
-  reverse_reason_code: string | null;
   created_at: string;
 }
 
-export interface PayoutSettlementRow {
-  settlement_id: number;
-  settlement_code: string;
-  contract_id: number;
-  contract_code: string;
-  customer_name: string | null;
-  settlement_status: string;
-  net_amount: number;
-  total_to_branch: number;
-  total_from_branch: number;
-  lines: Array<{ line_type: string; direction: string; amount: number }> | null;
-}
-
-export interface PayoutAdjustmentRow {
-  direction: 'TO_BRANCH' | 'FROM_BRANCH';
+/** `v_partner_my_fund_bill_lines` — the shop's own lines, nothing else. */
+export interface PartnerMyFundBillLine {
+  line_id: number;
+  bill_id: number;
+  bill_code: string;
+  line_type: string;
+  line_type_name: string | null;
+  direction: 'TO_PARTY' | 'FROM_PARTY';
   amount: number;
-  reason: string | null;
-  paid_date: string | null;
-  reference: string | null;
+  contract_id: number | null;
+  contract_code: string | null;
+  settlement_id: number | null;
+  settlement_code: string | null;
+  is_manual: boolean;
+  note: string | null;
 }
 
-/** `v_partner_my_payout_detail`. */
-export interface PartnerPayoutDetail extends PartnerPayout {
-  settlements: PayoutSettlementRow[] | null;
-  adjustments: PayoutAdjustmentRow[] | null;
+/** `v_partner_my_fund_bill_payments` — the shop's own transfer, with its slips. */
+export interface PartnerMyFundBillPayment {
+  payment_id: number;
+  bill_id: number;
+  bill_code: string;
+  method: string;
+  method_name: string | null;
+  amount: number;
+  dest_bank_code: string | null;
+  dest_account_no: string | null;
+  dest_account_name: string | null;
+  reference: string | null;
+  paid_date: string;
+  is_reversal: boolean;
+  evidence_count: number;
 }
 
 /** `v_partner_my_commission_report` — one row per contract the shop was paid for. */
@@ -287,8 +296,10 @@ export function payoutBadgeColor(
 ): 'default' | 'info' | 'success' | 'warning' | 'danger' {
   switch (status) {
     case 'PAID': return 'success';
-    case 'REVERSED': return 'danger';
+    case 'PARTIAL': return 'warning';
+    case 'ISSUED': return 'warning';
     case 'DRAFT': return 'info';
+    case 'VOIDED': return 'default';
     default: return 'default';
   }
 }

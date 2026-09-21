@@ -39,8 +39,8 @@ export interface PartnerReturn {
   settlement_status_at_open: string | null;
   guarantee_until: string | null;
   in_guarantee_at_open: boolean | null;
-  paid_payout_id: number | null;
-  paid_payout_code: string | null;
+  paid_bill_id: number | null;
+  paid_bill_code: string | null;
   settlement_net_amount: number | null;
   received_at: string | null;
   received_date: string | null;
@@ -52,7 +52,7 @@ export interface PartnerReturn {
   resolution_set_at: string | null;
   buyback_amount: number | null;
   buyback_fee: number | null;
-  buyback_adjustment_id: number | null;
+  buyback_bill_id: number | null;
   transfer_order_id: number | null;
   warehouse_received_at: string | null;
   closed_at: string | null;
@@ -103,13 +103,13 @@ export interface PartnerReturnActionsResponse {
   in_guarantee_at_open: boolean | null;
   guarantee_until: string | null;
   settlement_status_at_open: string | null;
-  paid_payout_id: number | null;
+  paid_bill_id: number | null;
   received_at: string | null;
   close_block: Record<string, unknown> | null;
   resolution_default: string | null;
   buyback_amount: number | null;
   buyback_fee: number | null;
-  buyback_adjustment_id: number | null;
+  buyback_bill_id: number | null;
   transfer_shipped_at: string | null;
   warehouse_received_at: string | null;
   actions: PartnerReturnAction[];
@@ -129,7 +129,7 @@ export interface PartnerReturnOpenResult {
   device_id: number | null;
   guarantee_until: string | null;
   in_guarantee: boolean | null;
-  paid_payout_id: number | null;
+  paid_bill_id: number | null;
   received_at: string | null;
   requires_customer_signing: boolean;
   signing_id: number | null;

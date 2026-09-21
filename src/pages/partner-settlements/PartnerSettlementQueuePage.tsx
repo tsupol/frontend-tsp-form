@@ -189,7 +189,7 @@ export function PartnerSettlementQueuePage() {
                       tab={tab}
                       statusLabel={statusLabel}
                       onPick={() => pick(row.original)}
-                      onOpenPayout={() => navigate(`/admin/partner-payouts/${row.original.payout_id}`)}
+                      onOpenPayout={() => navigate(`/admin/fund-bills/${row.original.fund_bill_id}`)}
                       onOpenAccountSetup={() => navigate(PAYOUT_ACCOUNT_PATH)}
                     />
                   )}
@@ -312,7 +312,7 @@ function QueueRow({ row, tab, statusLabel, onPick, onOpenPayout, onOpenAccountSe
 
       {/* Two links that leave this page. They sit outside the row button so a
           click on them does not also select the row. */}
-      {(row.has_payout_account === false || (tab === 'IN_PAYOUT' && row.payout_id != null)) && (
+      {(row.has_payout_account === false || (tab === 'IN_PAYOUT' && row.fund_bill_id != null)) && (
         <div className="px-4 pb-2 -mt-1 flex items-center gap-3 flex-wrap">
           {row.has_payout_account === false && (
             <button
@@ -325,7 +325,7 @@ function QueueRow({ row, tab, statusLabel, onPick, onOpenPayout, onOpenAccountSe
               <ExternalLink size={12} />
             </button>
           )}
-          {tab === 'IN_PAYOUT' && row.payout_id != null && (
+          {tab === 'IN_PAYOUT' && row.fund_bill_id != null && (
             <button
               type="button"
               onClick={onOpenPayout}

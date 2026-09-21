@@ -32,6 +32,14 @@ interface AuthContextType {
   capabilities: Set<string>;
   /** Branch is a deal-partner shop → render the shop menu set (NOTICE 1193). */
   isDealPartner: boolean;
+  /**
+   * The branch belongs to a fund company. Those branches cannot take cash and
+   * have no day-close step (mig 1300), so cash options and day-close
+   * affordances are left out for them.
+   */
+  isFundBranch: boolean;
+  /** The backend says this branch does not close its day. */
+  skipsDayClose: boolean;
   can: (code: string) => boolean;
   login: (username: string, password: string) => Promise<LoginResult>;
   logout: () => Promise<void>;
@@ -287,6 +295,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           holding_id: result.holding_id,
           branch_type: authService.getBranchType(),
           db_role: authService.getDbRole(),
+          company_type: authService.getCompanyType(),
+          skips_day_close: authService.getSkipsDayClose(),
           branch_name: authService.getStoredBranchName() ?? prev.branch_name,
           company_name: authService.getStoredCompanyName() ?? prev.company_name,
         }
@@ -305,6 +315,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         needsHoldingSelect,
         capabilities,
         isDealPartner: user?.branch_type === 'DEAL_PARTNER',
+        // A branch-scoped session only: a company-level user has no branch to
+        // take cash at, so the flag would say nothing about them.
+        isFundBranch: user?.company_type === 'FINANCIER' && user?.branch_id != null,
+        skipsDayClose: user?.skips_day_close === true,
         can,
         login,
         logout,

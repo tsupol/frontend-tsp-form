@@ -18,8 +18,9 @@ import type {
   PartnerSettlement,
   PartnerSettlementDetail,
   PartnerBalance,
-  PartnerPayout,
-  PartnerPayoutDetail,
+  PartnerMyFundBill,
+  PartnerMyFundBillLine,
+  PartnerMyFundBillPayment,
   PartnerCommissionRow,
   PartnerCommissionMonth,
   SettlementActionsResponse,
@@ -231,22 +232,25 @@ export interface PayoutListOptions {
 }
 
 /**
- * Transfers the shop has received. Its own view only ever holds paid and
- * reversed ones — drafts are the finance team's business — so the menu shows
- * both and marks a reversed one for what it is.
+ * Documents the shop has been paid on.
+ *
+ * Its own view only ever holds paid ones — a draft is the finance team's
+ * business — and every figure on them is the shop's own side: the fund
+ * company's commission lines are filtered out at line level, so nothing here
+ * can leak them.
  */
-export function usePartnerMyPayouts({ search, pageIndex, pageSize }: PayoutListOptions) {
-  const params = ['order=paid_date.desc'];
+export function usePartnerMyFundBills({ search, pageIndex, pageSize }: PayoutListOptions) {
+  const params = ['order=bill_date.desc,bill_id.desc'];
   const term = search.trim();
   if (term) {
     const esc = term.replace(/[(),]/g, ' ');
-    params.push(`payout_code=ilike.*${esc}*`);
+    params.push(`bill_code=ilike.*${esc}*`);
   }
 
   const query = useQuery({
-    queryKey: ['partner-payouts', 'mine', term, pageIndex, pageSize],
-    queryFn: () => apiClient.getPaginated<PartnerPayout>(
-      `/v_partner_my_payouts?${params.join('&')}`,
+    queryKey: ['partner-fund-bills', 'mine', term, pageIndex, pageSize],
+    queryFn: () => apiClient.getPaginated<PartnerMyFundBill>(
+      `/v_partner_my_fund_bills?${params.join('&')}`,
       { page: pageIndex + 1, pageSize },
     ),
     placeholderData: keepPreviousData,
@@ -259,18 +263,30 @@ export function usePartnerMyPayouts({ search, pageIndex, pageSize }: PayoutListO
   };
 }
 
-/** One transfer opened: the contracts in it, their lines, and any adjustments. */
-export function usePartnerMyPayoutDetail(payoutId: number | null) {
+/** The shop's own lines on one document, grouped by contract on screen. */
+export function usePartnerMyFundBillLines(billId: number | null) {
   const query = useQuery({
-    queryKey: ['partner-payouts', 'detail', payoutId],
-    queryFn: () => apiClient
-      .get<PartnerPayoutDetail[]>(`/v_partner_my_payout_detail?payout_id=eq.${payoutId}`)
-      .then(rows => rows[0] ?? null),
-    enabled: payoutId != null,
+    queryKey: ['partner-fund-bills', 'lines', billId],
+    queryFn: () => apiClient.get<PartnerMyFundBillLine[]>(
+      `/v_partner_my_fund_bill_lines?bill_id=eq.${billId}&order=line_id`,
+    ),
+    enabled: billId != null,
     staleTime: 30 * 1000,
   });
+  return { ...query, rows: query.data ?? [] };
+}
 
-  return { ...query, detail: query.data ?? null };
+/** The transfer into the shop's account, with however many slips are attached. */
+export function usePartnerMyFundBillPayments(billId: number | null) {
+  const query = useQuery({
+    queryKey: ['partner-fund-bills', 'payments', billId],
+    queryFn: () => apiClient.get<PartnerMyFundBillPayment[]>(
+      `/v_partner_my_fund_bill_payments?bill_id=eq.${billId}&order=payment_id`,
+    ),
+    enabled: billId != null,
+    staleTime: 30 * 1000,
+  });
+  return { ...query, rows: query.data ?? [] };
 }
 
 /** Commission report — one row per contract the shop has been paid for. */

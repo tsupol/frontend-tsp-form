@@ -204,7 +204,7 @@ export const AppSideNav = () => {
   const location = useLocation();
   const { t } = useTranslation();
   const navGuard = useNavGuard();
-  const { user, can, isDealPartner } = useAuth();
+  const { user, can, isDealPartner, skipsDayClose } = useAuth();
   const role = user?.role_code ?? '';
   const { showFin1, showFin2 } = useMyCommercialModels();
   const { hasPermission } = useMyPermissions();
@@ -563,7 +563,9 @@ export const AppSideNav = () => {
       key: 'accounting',
       ...iconWithCount(<BookOpen size="1rem" />, unclosedCount),
       label: t('nav.accounting'),
-      path: '/admin/accounting/day-close',
+      // The parent row lands on the first screen of the section, and for a
+      // fund branch that is no longer day-close — it has none.
+      path: skipsDayClose ? '/admin/accounting/bills' : '/admin/accounting/day-close',
       children: [
         { type: 'group', key: 'grp-acct-daily', label: t('nav.groupDaily') },
         { key: 'bills', icon: <Receipt size="1rem" />, label: t('nav.bills'), path: '/admin/accounting/bills' },
@@ -574,12 +576,14 @@ export const AppSideNav = () => {
         { type: 'group', key: 'grp-acct-remit', label: t('nav.groupRemitDayClose') },
         { key: 'reconcile-item', icon: <ClipboardList size="1rem" />, label: t('nav.reconcileByItem'), path: '/admin/accounting/reconcile-item' },
         { key: 'reconcile-channel', icon: <Coins size="1rem" />, label: t('nav.reconcileByChannel'), path: '/admin/accounting/reconcile-channel' },
-        {
+        // A branch of a fund company has no day to close (mig 1300): its money
+        // goes straight to the fund's account, so there is no till to count.
+        ...(skipsDayClose ? [] : [{
           key: 'day-close',
           ...iconWithCount(<CalendarCheck size="1rem" />, unclosedCount),
           label: t('nav.dayClose'),
           path: '/admin/accounting/day-close',
-        },
+        }]),
         { type: 'group', key: 'grp-acct-reports', label: t('nav.groupReports') },
         { key: 'branch-balance', icon: <Scale size="1rem" />, label: t('nav.branchBalance'), path: '/admin/accounting/balance' },
         ...(['BRANCH_MANAGER', 'COMPANY_ADMIN', 'COMPANY_ACCOUNTANT', 'COMPANY_INVENTORY', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [

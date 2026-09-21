@@ -13,6 +13,14 @@ export interface BranchContext {
   db_role?: string | null;
   branch_name?: string | null;
   company_name?: string | null;
+  /**
+   * `FINANCIER` = a fund company. Its branches cannot take cash and have no
+   * day-close step (mig 1300), so screens need this to know which affordances
+   * to leave out.
+   */
+  company_type?: string | null;
+  /** The backend's own verdict on whether this branch closes its day. */
+  skips_day_close?: boolean | null;
 }
 
 export interface UserProfile {
@@ -52,6 +60,8 @@ export interface UserInfo {
   company_name: string | null;
   branch_type: BranchType | null;
   db_role: string | null;
+  company_type: string | null;
+  skips_day_close: boolean | null;
   firstname: string | null;
   lastname: string | null;
   nickname: string | null;
@@ -73,6 +83,8 @@ export interface LoginResponse {
   company_name: string | null;
   branch_type: BranchType | null;
   db_role: string | null;
+  company_type: string | null;
+  skips_day_close: boolean | null;
   access_token: string;
   token_type: string;
   expires_at: string;
@@ -184,6 +196,8 @@ export const authService = {
       company_name: this.getStoredCompanyName(),
       branch_type: this.getBranchType(),
       db_role: this.getDbRole(),
+      company_type: this.getCompanyType(),
+      skips_day_close: this.getSkipsDayClose(),
       firstname: p.firstname,
       lastname: p.lastname,
       nickname: p.nickname,
@@ -212,6 +226,13 @@ export const authService = {
     put('db_role', ctx.db_role);
     put('branch_name', ctx.branch_name);
     put('company_name', ctx.company_name);
+    put('company_type', ctx.company_type);
+    put(
+      'skips_day_close',
+      ctx.skips_day_close === undefined ? undefined
+        : ctx.skips_day_close === null ? null
+        : String(ctx.skips_day_close),
+    );
   },
 
   getBranchType(): BranchType | null {
@@ -221,6 +242,16 @@ export const authService = {
 
   getDbRole(): string | null {
     return localStorage.getItem('db_role');
+  },
+
+  getCompanyType(): string | null {
+    return localStorage.getItem('company_type');
+  },
+
+  /** Null when the session predates the field — callers treat that as "closes". */
+  getSkipsDayClose(): boolean | null {
+    const v = localStorage.getItem('skips_day_close');
+    return v === null ? null : v === 'true';
   },
 
   getStoredBranchName(): string | null {
@@ -241,6 +272,8 @@ export const authService = {
     localStorage.removeItem('db_role');
     localStorage.removeItem('branch_name');
     localStorage.removeItem('company_name');
+    localStorage.removeItem('company_type');
+    localStorage.removeItem('skips_day_close');
     this.clearUserScopedState();
   },
 

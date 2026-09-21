@@ -54,7 +54,7 @@ export interface PartnerSettlementQueueRow {
   close_submitted_by_name: string | null;
   close_returned_at: string | null;
   close_returned_reason: string | null;
-  payout_id: number | null;
+  fund_bill_id: number | null;
   paid_at: string | null;
   voided_at: string | null;
   voided_reason: string | null;

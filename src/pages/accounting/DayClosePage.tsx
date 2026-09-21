@@ -34,7 +34,7 @@ const TODAY_KEY = '__today__';
 export function DayClosePage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, skipsDayClose } = useAuth();
   const { branchId: urlBranchId, date: urlDate } = useParams<{ branchId?: string; date?: string }>();
   const today = todayISO();
   const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
@@ -262,6 +262,23 @@ export function DayClosePage() {
       : selectedIsToday
         ? `${t('nav.dayClose')} — ${t('accounting.dayClose.todayLabel')}`
         : t('nav.dayClose');
+
+  // A branch of a fund company has no day to close (mig 1300) — its money goes
+  // straight to the fund's account, so there is no till to count and the
+  // backend leaves it out of the day-close views entirely. The row is hidden in
+  // both menus; this catches a typed or bookmarked link, which would otherwise
+  // land on a screen that looks broken rather than inapplicable.
+  if (skipsDayClose) {
+    return (
+      <div className="flex h-dvh flex-col items-center justify-center gap-2 px-4 text-center">
+        <CalendarCheck size={40} className="text-subtler" />
+        <div className="text-subtle">{t('accounting.dayClose.notForFundBranch')}</div>
+        <Button variant="outline" size="sm" onClick={() => navigate('/admin/accounting/bills')}>
+          {t('nav.bills')}
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <>

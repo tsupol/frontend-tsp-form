@@ -121,7 +121,7 @@ export function ReturnBuybackPaidModal({ open, detail, actions, onClose }: Props
     }
   };
 
-  const payoutId = result?.payout_id ?? detail?.paid_payout_id ?? null;
+  const billId = result?.buyback_bill_id ?? detail?.buyback_bill_id ?? null;
 
   return (
     <>
@@ -158,7 +158,7 @@ export function ReturnBuybackPaidModal({ open, detail, actions, onClose }: Props
                 <Info size={16} className="shrink-0" />
                 <span>
                   {t('partnerReturn.buybackPaidHint', {
-                    code: detail?.paid_payout_code ?? '—',
+                    code: detail?.paid_bill_code ?? '—',
                   })}
                 </span>
               </div>
@@ -233,15 +233,16 @@ export function ReturnBuybackPaidModal({ open, detail, actions, onClose }: Props
                 label: t('partnerReturn.paidDate'),
                 value: <DateTime value={paidDate} showTime={false} />,
               },
-              ...(result.payout_code
-                ? [{ label: t('partnerReturn.payoutDocument'), value: result.payout_code }]
+              { label: t('partnerReturn.buybackDocument'), value: result.buyback_bill_code },
+              ...(result.settles_bill_code
+                ? [{ label: t('partnerReturn.payoutDocument'), value: result.settles_bill_code }]
                 : []),
               { label: t('partnerReturn.buybackTotal'), value: fmtCurrency(result.amount), emphasis: true },
             ]}
-            secondaryAction={payoutId != null ? {
+            secondaryAction={billId != null ? {
               label: t('partnerReturn.openPayout'),
               endIcon: <ExternalLink size={14} />,
-              onClick: () => { forceClose(); navigate(`/admin/partner-payouts/${payoutId}`); },
+              onClick: () => { forceClose(); navigate(`/admin/fund-bills/${billId}`); },
             } : undefined}
             onClose={forceClose}
           />

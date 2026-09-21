@@ -19,6 +19,13 @@ import { apiClient } from '../lib/api';
  * `v_purpose_allowed_methods.partner_branch_ok` (mig 1268) carries exactly that
  * flag, so the picker filters on it instead of encoding the table above. An
  * internal branch is unchanged: every active row for the purpose.
+ *
+ * A second rule landed with mig 1300: no branch of a fund company can take
+ * physical cash at all — the shops and the fund's own warehouse alike, because
+ * the money has to reach the fund's account and nobody at those branches counts
+ * a till. The backend refuses it outright, and there is no column for it on the
+ * methods view, so the caller says which kind of branch the bill sits at and
+ * cash is dropped here rather than offered and then rejected on submit.
  */
 export interface AllowedMethodRow {
   bill_purpose: string;
@@ -37,12 +44,17 @@ export interface AllowedMethodRow {
  *        finance staff sit at an internal branch and still pay partner bills.
  *        Pass `undefined` while the branch type is still loading; the hook then
  *        reports `isLoading` rather than briefly offering CASH.
+ * @param isFundBranch whether the bill's BRANCH belongs to a fund company —
+ *        again the branch on the bill, not the viewer's. True drops cash
+ *        entirely. `undefined` is treated the same as loading, for the same
+ *        reason: offering cash and withdrawing it reads as a glitch.
  */
 export function useAllowedPaymentMethods(
   billPurpose: string | null,
   isPartnerBranch: boolean | undefined,
-  options?: { enabled?: boolean },
+  options?: { enabled?: boolean; isFundBranch?: boolean | undefined },
 ) {
+  const isFundBranch = options?.isFundBranch;
   const enabled = (options?.enabled ?? true) && billPurpose != null;
 
   const { data: rows = [], isLoading: rowsLoading } = useQuery({
@@ -58,8 +70,11 @@ export function useAllowedPaymentMethods(
   const methods = useMemo(
     () => (isPartnerBranch === undefined
       ? []
-      : rows.filter(r => (isPartnerBranch ? r.partner_branch_ok : true))),
-    [rows, isPartnerBranch],
+      : rows
+        .filter(r => (isPartnerBranch ? r.partner_branch_ok : true))
+        // CASH is the only physical-cash method in the catalogue (mig 1300).
+        .filter(r => !(isFundBranch && r.method === 'CASH'))),
+    [rows, isPartnerBranch, isFundBranch],
   );
 
   const walletMethods = useMemo(
@@ -88,16 +103,20 @@ export function useAllowedPaymentMethods(
 export function useBranchIsPartner(branchId: number | null | undefined) {
   const { data, isLoading } = useQuery({
     queryKey: ['branch-type', branchId],
-    queryFn: () => apiClient.get<{ branch_type: string }[]>(
-      `/v_branches?id=eq.${branchId}&select=branch_type`,
-    ).then(rows => rows[0]?.branch_type ?? null),
+    queryFn: () => apiClient.get<{ branch_type: string; company_type: string | null }[]>(
+      `/v_branches?id=eq.${branchId}&select=branch_type,company_type`,
+    ).then(rows => rows[0] ?? null),
     enabled: branchId != null,
     staleTime: 30 * 60 * 1000,
   });
 
+  const unknown = branchId != null && (isLoading || data === undefined);
+
   return {
     /** undefined while unknown — callers pass it straight to useAllowedPaymentMethods. */
-    isPartnerBranch: branchId == null ? false : (isLoading || data === undefined ? undefined : data === 'DEAL_PARTNER'),
+    isPartnerBranch: branchId == null ? false : (unknown ? undefined : data?.branch_type === 'DEAL_PARTNER'),
+    /** The branch belongs to a fund company, so it can never take cash. */
+    isFundBranch: branchId == null ? false : (unknown ? undefined : data?.company_type === 'FINANCIER'),
     isLoading,
   };
 }

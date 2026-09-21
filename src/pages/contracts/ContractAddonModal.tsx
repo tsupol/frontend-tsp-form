@@ -146,11 +146,11 @@ export function ContractAddonModal({ open, contract, onClose, onSuccess }: {
   // is money the customer transfers to the fund, so CASH drops out and only
   // TRANSFER remains; an internal branch is unchanged. Read, never hardcoded —
   // the same view drives the wizard cart and the fee modal.
-  const { isPartnerBranch } = useBranchIsPartner(open ? (contract?.branch_id ?? null) : null);
+  const { isPartnerBranch, isFundBranch } = useBranchIsPartner(open ? (contract?.branch_id ?? null) : null);
   const { methods: methodRows, codes: allowedMethodCodes } = useAllowedPaymentMethods(
     'CONTRACT_ADDON',
     isPartnerBranch,
-    { enabled: open },
+    { enabled: open, isFundBranch },
   );
 
   const methodOptions = useMemo(

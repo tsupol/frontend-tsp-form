@@ -94,11 +94,11 @@ export function ContractFeeModal({ open, contract, onClose, onSuccess }: {
   // this bill belongs to (doc 144 §2, mig 1266/1268): a fee on a deal-partner
   // contract is paid into the fund's account, so CASH is dropped and TRANSFER +
   // the three wallets remain. An internal branch keeps every active row.
-  const { isPartnerBranch } = useBranchIsPartner(open ? contract?.branch_id ?? null : null);
+  const { isPartnerBranch, isFundBranch } = useBranchIsPartner(open ? contract?.branch_id ?? null : null);
   const { methods: methodRows, codes: allowedMethodCodes } = useAllowedPaymentMethods(
     'CONTRACT_FEE',
     isPartnerBranch,
-    { enabled: open },
+    { enabled: open, isFundBranch },
   );
 
   // Seed row for a fresh cart — CASH where it is offered, else the first method

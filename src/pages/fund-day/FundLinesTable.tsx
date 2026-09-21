@@ -20,11 +20,10 @@ interface FundLinesTableProps {
 /**
  * Where a line's source document lives. `ref_table` names the table the row
  * came from (doc 148 §3):
- *   sale.bill                       → the bill page
- *   sale.partner_payout             → that payout document
- *   sale.partner_payout_adjustment  → the payout the adjustment sits on, which
- *                                     is the one `doc_code` names (the
- *                                     adjustment's own id is not routable)
+ *   sale.bill       → the customer's bill page
+ *   sale.fund_bill  → the fund-money document, whatever its purpose: a payout,
+ *                     a credit note, a buyback, a clawback, a top-up. One page
+ *                     serves them all, so the purpose does not change the route.
  * Anything else has no page to open, so no link is offered.
  */
 function docPath(line: FundLine): string | null {
@@ -32,10 +31,8 @@ function docPath(line: FundLine): string | null {
   switch (line.ref_table) {
     case 'sale.bill':
       return `/admin/accounting/bills/${line.ref_id}`;
-    case 'sale.partner_payout':
-      return `/admin/partner-payouts/${line.ref_id}`;
-    case 'sale.partner_payout_adjustment':
-      return `/admin/partner-payouts/${line.ref_id}`;
+    case 'sale.fund_bill':
+      return `/admin/fund-bills/${line.ref_id}`;
     default:
       return null;
   }
@@ -105,6 +102,12 @@ export function FundLinesTable({ lines, loading }: FundLinesTableProps) {
                   <div>{t(`fundDay.source.${line.source}`, { defaultValue: line.source })}</div>
                   {bank?.tender_class === 'WALLET' && (
                     <div className="text-xs text-subtle">{t('fundDay.walletLine')}</div>
+                  )}
+                  {/* Recorded as paid, but no money left a bank account — the
+                   *  fund company's own commission. Without this line the row
+                   *  gets hunted for on a statement it will never be on. */}
+                  {bank?.tender_class === 'INTERNAL' && (
+                    <div className="text-xs text-subtle">{t('fundDay.tender.INTERNAL')}</div>
                   )}
                 </td>
                 <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">

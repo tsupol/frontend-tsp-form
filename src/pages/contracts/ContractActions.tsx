@@ -3217,11 +3217,11 @@ function PayInstallmentModal({ open, contract, onClose }: {
   // TRANSFER + wallets remain; an internal branch is unchanged. The rule is
   // read from v_purpose_allowed_methods, never hardcoded, and the server
   // refuses a wrong channel with PARTNER_METHOD_REQUIRED regardless.
-  const { isPartnerBranch } = useBranchIsPartner(open ? contract.branch_id : null);
+  const { isPartnerBranch, isFundBranch } = useBranchIsPartner(open ? contract.branch_id : null);
   const { codes: purposeMethods, isLoading: purposeMethodsLoading } = useAllowedPaymentMethods(
     'CONTRACT_PAYMENT',
     isPartnerBranch,
-    { enabled: open },
+    { enabled: open, isFundBranch },
   );
   const channelAllowed = useCallback(
     (m: string) => purposeMethodsLoading || purposeMethods.length === 0 || purposeMethods.includes(m),

@@ -84,8 +84,8 @@ export interface PartnerReturn {
   settlement_status_at_open: string | null;
   guarantee_until: string | null;
   in_guarantee_at_open: boolean | null;
-  paid_payout_id: number | null;
-  paid_payout_code: string | null;
+  paid_bill_id: number | null;
+  paid_bill_code: string | null;
   settlement_net_amount: number | null;
   received_at: string | null;
   received_date: string | null;
@@ -97,7 +97,7 @@ export interface PartnerReturn {
   resolution_set_at: string | null;
   buyback_amount: number | null;
   buyback_fee: number | null;
-  buyback_adjustment_id: number | null;
+  buyback_bill_id: number | null;
   warehouse_received_at: string | null;
   closed_at: string | null;
   closed_by: number | null;
@@ -207,13 +207,13 @@ export interface PartnerReturnActionsResponse {
   guarantee_until: string | null;
   settlement_status_at_open: string | null;
   settlement_id: number | null;
-  paid_payout_id: number | null;
+  paid_bill_id: number | null;
   received_at: string | null;
   close_block: PartnerReturnCloseBlock | null;
   resolution_default: PartnerReturnResolution | null;
   buyback_amount: number | null;
   buyback_fee: number | null;
-  buyback_adjustment_id: number | null;
+  buyback_bill_id: number | null;
   transfer_shipped_at: string | null;
   warehouse_received_at: string | null;
   actions: PartnerReturnAction[];
@@ -230,13 +230,14 @@ export interface ReturnSetResolutionResult {
   close_block: PartnerReturnCloseBlock | null;
 }
 
+/** The buyback is its own document now, and it names the payout it settles. */
 export interface ReturnBuybackPaidResult {
   return_id: number;
   return_code: string;
-  status: PartnerReturnStatus;
-  adjustment_id: number;
-  payout_id: number | null;
-  payout_code: string | null;
+  buyback_bill_id: number;
+  buyback_bill_code: string;
+  settles_bill_id: number | null;
+  settles_bill_code: string | null;
   amount: number;
   close_block: PartnerReturnCloseBlock | null;
 }

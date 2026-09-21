@@ -1,31 +1,38 @@
-// "Money received" — the transfers the fund has made to this shop (145 §8).
+// "Money received" — the documents the fund has paid this shop on (149 §8).
 //
-// One row per transfer, not per contract: the fund bundles several payment
-// requests into a single bank transfer, and this is that document. A transfer
-// that was reversed stays in the list, marked as reversed with the reason —
-// the money went back, and the shop needs to see that it did.
+// One row per document, not per contract: the fund bundles several payment
+// requests into a single bank transfer, and this is that document.
 //
-// Picking one opens it: the contracts inside, their lines, and any amount
-// adjusted after the transfer. `adjusted_net` is what was really paid once
-// those adjustments count; the plain `net_amount` is the document's own figure.
+// Everything on this screen is the shop's own side. The fund company also takes
+// a commission on the same document, but the backend filters those lines out at
+// line level for a shop session, so the total here is what landed in the shop's
+// account and never mixes the two. A document that was undone by a credit note
+// leaves this list, because the shop's view holds paid ones only.
+//
+// Picking one opens it: the contracts inside with their lines, and the transfer
+// itself. `net_after_returns` is what the shop is left with once a device
+// buyback or a clawback has come back out.
 
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router-dom';
 import { PageNav, PageNavPanel, DataTable, MobileHeader, Badge } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Banknote, Undo2 } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, Banknote } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { SearchInput } from '../../components/SearchInput';
-import { fmtCurrency } from '../../lib/format';
+import { fmtCurrency, formatEntityCode } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { PartnerBalanceHeader } from './PartnerBalanceHeader';
 import {
-  usePartnerMyPayouts,
-  usePartnerMyPayoutDetail,
-  useSettlementStatusRef,
-  useRefLabel,
+  usePartnerMyFundBills,
+  usePartnerMyFundBillLines,
+  usePartnerMyFundBillPayments,
 } from './usePartnerSettlement';
-import { payoutBadgeColor, type PartnerPayout } from './partnerSettlementTypes';
+import {
+  payoutBadgeColor,
+  type PartnerMyFundBill,
+  type PartnerMyFundBillLine,
+} from './partnerSettlementTypes';
 
 export function ShopPayoutsPage() {
   const { t } = useTranslation();
@@ -39,18 +46,18 @@ export function ShopPayoutsPage() {
 
   useEffect(() => { setPageIndex(0); }, [debouncedSearch]);
 
-  const { rows, totalCount, isFetching } = usePartnerMyPayouts({
+  const { rows, totalCount, isFetching } = usePartnerMyFundBills({
     search: debouncedSearch, pageIndex, pageSize,
   });
-  const { detail } = usePartnerMyPayoutDetail(selectedId);
+  const selected = rows.find(r => r.bill_id === selectedId) ?? null;
 
   if (!isDealPartner) return <Navigate to="/admin/contracts/search" replace />;
 
   return (
     <PageNav panels={['list', 'detail']} className="h-dvh overflow-hidden">
       {({ isMobile, isRoot, goTo, goBack }) => {
-        const pick = (row: PartnerPayout) => {
-          setSelectedId(row.payout_id);
+        const pick = (row: PartnerMyFundBill) => {
+          setSelectedId(row.bill_id);
           if (isMobile) goTo('detail');
         };
 
@@ -110,17 +117,16 @@ export function ShopPayoutsPage() {
                   />
                 </div>
 
-                <DataTable<PartnerPayout>
+                <DataTable<PartnerMyFundBill>
                   data={rows}
                   getRowProps={row => ({
-                    'data-state': row.original.payout_id === selectedId ? 'selected' : undefined,
+                    'data-state': row.original.bill_id === selectedId ? 'selected' : undefined,
                   })}
                   enableKeyboardNav={!isMobile}
                   keyboardActivateMode="manual"
-                  onRowActivate={row => setSelectedId(row.original.payout_id)}
+                  onRowActivate={row => setSelectedId(row.original.bill_id)}
                   renderRow={row => {
                     const r = row.original;
-                    const reversed = r.status === 'REVERSED';
                     return (
                       <button
                         type="button"
@@ -128,7 +134,7 @@ export function ShopPayoutsPage() {
                         onClick={() => pick(r)}
                       >
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm truncate">{r.payout_code}</span>
+                          <span className="font-medium text-sm truncate">{r.bill_code}</span>
                           <span className="flex-1" />
                           <Badge color={payoutBadgeColor(r.status)} size="sm">
                             {t(`settlement.payoutStatus_${r.status}`, { defaultValue: r.status })}
@@ -136,23 +142,17 @@ export function ShopPayoutsPage() {
                         </div>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className="text-sm text-subtle truncate flex-1 min-w-0">
-                            {t('settlement.contractsInPayout', { count: r.settlement_count })}
+                            {t('settlement.contractsInPayout', { count: r.contract_count })}
                           </span>
-                          <span
-                            className={`text-sm font-medium tabular-nums shrink-0 ${
-                              reversed ? 'line-through text-subtler' : ''
-                            }`}
-                          >
-                            {fmtCurrency(r.adjusted_net)}
+                          <span className="text-sm font-medium tabular-nums shrink-0">
+                            {fmtCurrency(r.net_after_returns)}
                           </span>
                         </div>
-                        {reversed && (
-                          <div className="text-xs text-danger-fg mt-0.5 flex items-center gap-1">
-                            <Undo2 size={12} className="shrink-0" />
-                            {t('settlement.payoutReversed')}
-                            {r.reverse_reason_code && (
-                              <>{': '}{t(`settlement.reverseReason_${r.reverse_reason_code}`, { defaultValue: r.reverse_reason_code })}</>
-                            )}
+                        {/* Money that came back afterwards — a device buyback, a
+                         *  clawback. Without this the two figures look wrong. */}
+                        {r.returned_net !== 0 && (
+                          <div className="text-xs text-warning-fg mt-0.5">
+                            {t('settlement.returnedAfterPayout')}: {fmtCurrency(r.returned_net)}
                           </div>
                         )}
                         <div className="text-xs text-subtle mt-0.5">
@@ -179,8 +179,8 @@ export function ShopPayoutsPage() {
                 id="detail"
                 className={isMobile ? '' : 'flex-1 min-w-0 flex flex-col'}
               >
-                {detail ? (
-                  <PayoutDetailPanel detail={detail} />
+                {selected ? (
+                  <ShopFundBillPanel bill={selected} />
                 ) : (
                   <div className="flex-1 flex flex-col items-center justify-center gap-2 text-subtler">
                     <Banknote size={32} />
@@ -196,117 +196,147 @@ export function ShopPayoutsPage() {
   );
 }
 
-function PayoutDetailPanel({ detail }: { detail: NonNullable<ReturnType<typeof usePartnerMyPayoutDetail>['detail']> }) {
-  const { t } = useTranslation();
-  const statusRef = useSettlementStatusRef();
-  const refLabel = useRefLabel();
+/** One contract's lines, as the panel groups them. */
+interface ContractGroup {
+  settlement_id: number | null;
+  settlement_code: string | null;
+  contract_id: number | null;
+  contract_code: string | null;
+  lines: PartnerMyFundBillLine[];
+  net: number;
+}
 
-  const adjustments = detail.adjustments ?? [];
-  const settlements = detail.settlements ?? [];
+function ShopFundBillPanel({ bill }: { bill: PartnerMyFundBill }) {
+  const { t, i18n } = useTranslation();
+  const lines = usePartnerMyFundBillLines(bill.bill_id);
+  const payments = usePartnerMyFundBillPayments(bill.bill_id);
+
+  const byContract: ContractGroup[] = [];
+  const manual: PartnerMyFundBillLine[] = [];
+  for (const line of lines.rows) {
+    const signed = line.direction === 'TO_PARTY' ? line.amount : -line.amount;
+    if (line.is_manual) { manual.push(line); continue; }
+    let group = byContract.find(g => g.settlement_id === line.settlement_id);
+    if (!group) {
+      group = {
+        settlement_id: line.settlement_id,
+        settlement_code: line.settlement_code,
+        contract_id: line.contract_id,
+        contract_code: line.contract_code,
+        lines: [],
+        net: 0,
+      };
+      byContract.push(group);
+    }
+    group.lines.push(line);
+    group.net += signed;
+  }
+
+  const lineLabel = (line: PartnerMyFundBillLine) =>
+    (i18n.language === 'th' && line.line_type_name)
+      ? line.line_type_name
+      : t(`settlement.lineType_${line.line_type}`, { defaultValue: line.line_type });
+
+  const renderLine = (line: PartnerMyFundBillLine) => (
+    <div key={line.line_id} className="flex items-center gap-2 px-3 py-1.5 border-t border-line">
+      <span className="text-sm truncate flex-1 min-w-0">{lineLabel(line)}</span>
+      {line.is_manual && <Badge color="warning" size="sm">{t('settlement.manualLine')}</Badge>}
+      <span
+        className={`text-sm tabular-nums shrink-0 ${
+          line.direction === 'FROM_PARTY' ? 'text-danger-fg' : ''
+        }`}
+      >
+        {line.direction === 'FROM_PARTY' ? '−' : ''}{fmtCurrency(line.amount)}
+      </span>
+    </div>
+  );
 
   return (
     <>
       <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
-        <span className="font-medium text-sm truncate">{detail.payout_code}</span>
-        <Badge color={payoutBadgeColor(detail.status)} size="sm">
-          {t(`settlement.payoutStatus_${detail.status}`, { defaultValue: detail.status })}
+        <span className="font-medium text-sm truncate">{bill.bill_code}</span>
+        <Badge color={payoutBadgeColor(bill.status)} size="sm">
+          {t(`settlement.payoutStatus_${bill.status}`, { defaultValue: bill.status })}
         </Badge>
       </div>
 
       <div className="flex-1 overflow-auto better-scroll px-4 py-3 flex flex-col gap-4">
-        {/* What was transferred, and where it landed. */}
+        {/* What was transferred, and what has come back since. */}
         <div className="rounded-md border border-line overflow-hidden">
-          <Row label={t('settlement.paidDate')} value={<DateTime value={detail.paid_date} showTime={false} />} />
-          <Row label={t('settlement.netAmount')} value={fmtCurrency(detail.net_amount)} />
-          {detail.adjustment_count > 0 && (
-            <Row
-              label={t('settlement.adjustedNet')}
-              value={fmtCurrency(detail.adjusted_net)}
-              emphasis
-            />
+          <Row label={t('settlement.paidDate')} value={<DateTime value={bill.paid_date} showTime={false} />} />
+          <Row label={t('settlement.netAmount')} value={fmtCurrency(bill.net_amount)} />
+          {bill.returned_net !== 0 && (
+            <>
+              <Row label={t('settlement.returnedAfterPayout')} value={fmtCurrency(bill.returned_net)} />
+              <Row
+                label={t('settlement.netAfterReturns')}
+                value={fmtCurrency(bill.net_after_returns)}
+                emphasis
+              />
+            </>
           )}
-          {detail.payout_account_no && (
-            <Row
-              label={t('settlement.payoutAccount')}
-              value={`${detail.payout_bank_code ?? ''} ${detail.payout_account_no}`.trim()}
-            />
-          )}
-          {detail.reference && <Row label={t('settlement.reference')} value={detail.reference} />}
+          {bill.reference && <Row label={t('settlement.reference')} value={bill.reference} />}
         </div>
 
-        {detail.status === 'REVERSED' && (
-          <div className="alert alert-danger">
-            <Undo2 size={16} className="shrink-0" />
-            <span>
-              {t('settlement.payoutReversedHint')}
-              {detail.reverse_reason_code && (
-                <>{' — '}{t(`settlement.reverseReason_${detail.reverse_reason_code}`, { defaultValue: detail.reverse_reason_code })}</>
-              )}
-            </span>
-          </div>
-        )}
-
-        {/* The contracts this transfer paid for. */}
+        {/* The contracts this document paid for. */}
         <div>
           <div className="text-xs font-medium text-subtle uppercase tracking-wider mb-1.5">
             {t('settlement.contractsInThisPayout')}
           </div>
           <div className="rounded-md border border-line overflow-hidden">
-            {settlements.map(s => (
-              <div key={s.settlement_id} className="px-3 py-2 border-b border-line last:border-b-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium truncate">{s.contract_code}</span>
+            {byContract.length === 0 && (
+              <div className="px-3 py-3 text-sm text-subtler">{t('settlement.noLinesYet')}</div>
+            )}
+            {byContract.map(group => (
+              <div key={group.settlement_id ?? 'none'} className="border-b border-line last:border-b-0">
+                <div className="flex items-center gap-2 px-3 py-2 bg-surface-shallow">
+                  <span className="text-sm font-medium truncate">
+                    {formatEntityCode(group.contract_code)}
+                  </span>
                   <span className="flex-1" />
-                  <Badge color="default" size="sm">
-                    {refLabel(statusRef, s.settlement_status)
-                      || t(`settlement.status_${s.settlement_status}`, { defaultValue: s.settlement_status })}
-                  </Badge>
-                  <span className="text-sm tabular-nums shrink-0">{fmtCurrency(s.net_amount)}</span>
+                  <span className="text-sm tabular-nums font-medium shrink-0">
+                    {fmtCurrency(group.net)}
+                  </span>
                 </div>
-                <div className="text-xs text-subtle mt-0.5 truncate">
-                  {s.customer_name ?? '—'} · {s.settlement_code}
-                </div>
-                {(s.lines ?? []).length > 0 && (
-                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
-                    {(s.lines ?? []).map((line, i) => (
-                      <span key={i} className="text-xs text-subtle tabular-nums">
-                        {t(`settlement.lineType_${line.line_type}`, { defaultValue: line.line_type })}
-                        {' '}
-                        {line.direction === 'FROM_BRANCH' ? '−' : '+'}{fmtCurrency(line.amount)}
-                      </span>
-                    ))}
-                  </div>
-                )}
+                <div className="px-3 pb-0.5 text-xs text-subtle">{group.settlement_code ?? '—'}</div>
+                {group.lines.map(renderLine)}
               </div>
             ))}
           </div>
         </div>
 
-        {/* Money moved after the transfer — extra sent, or sent back. */}
-        {adjustments.length > 0 && (
+        {manual.length > 0 && (
           <div>
             <div className="text-xs font-medium text-subtle uppercase tracking-wider mb-1.5">
-              {t('settlement.adjustments')}
+              {t('settlement.manualLines')}
             </div>
             <div className="rounded-md border border-line overflow-hidden">
-              {adjustments.map((a, i) => (
-                <div key={i} className="px-3 py-2 border-b border-line last:border-b-0">
+              {manual.map(renderLine)}
+            </div>
+          </div>
+        )}
+
+        {/* The transfer itself — the account it landed in, and the reference. */}
+        {payments.rows.length > 0 && (
+          <div>
+            <div className="text-xs font-medium text-subtle uppercase tracking-wider mb-1.5">
+              {t('settlement.transfers')}
+            </div>
+            <div className="rounded-md border border-line overflow-hidden">
+              {payments.rows.map(p => (
+                <div key={p.payment_id} className="px-3 py-2 border-b border-line last:border-b-0">
                   <div className="flex items-center gap-2">
                     <span className="text-sm truncate flex-1 min-w-0">
-                      {a.reason ?? t(`settlement.adjustDirection_${a.direction}`)}
+                      {i18n.language === 'th' && p.method_name
+                        ? p.method_name
+                        : t(`settlement.method_${p.method}`, { defaultValue: p.method })}
                     </span>
-                    <span
-                      className={`text-sm tabular-nums shrink-0 ${
-                        a.direction === 'FROM_BRANCH' ? 'text-danger-fg' : ''
-                      }`}
-                    >
-                      {a.direction === 'FROM_BRANCH' ? '−' : '+'}{fmtCurrency(a.amount)}
-                    </span>
+                    <span className="text-sm tabular-nums shrink-0">{fmtCurrency(p.amount)}</span>
                   </div>
                   <div className="text-xs text-subtle mt-0.5">
-                    {t(`settlement.adjustDirection_${a.direction}`)}
-                    {a.paid_date && <> · <DateTime value={a.paid_date} showTime={false} /></>}
-                    {a.reference && <> · {a.reference}</>}
+                    <DateTime value={p.paid_date} showTime={false} />
+                    {p.dest_account_no && <> · {p.dest_bank_code} {p.dest_account_no}</>}
+                    {p.reference && <> · {p.reference}</>}
                   </div>
                 </div>
               ))}

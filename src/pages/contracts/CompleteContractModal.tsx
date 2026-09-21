@@ -1129,10 +1129,11 @@ function PayoffView({
   // purpose rule from v_purpose_allowed_methods narrows the preview's list.
   // fn_bill_payment_add would refuse CASH with PARTNER_METHOD_REQUIRED anyway;
   // this stops it being offered in the first place.
-  const { isPartnerBranch } = useBranchIsPartner(branchId);
+  const { isPartnerBranch, isFundBranch } = useBranchIsPartner(branchId);
   const { codes: purposeMethods, isLoading: purposeLoading } = useAllowedPaymentMethods(
     'CONTRACT_PAYOFF',
     isPartnerBranch,
+    { isFundBranch },
   );
   const allowed = new Set(
     (preview?.allowed_methods ?? []).filter(

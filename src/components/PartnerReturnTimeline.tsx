@@ -72,13 +72,10 @@ function linkFor(
       return { to: `/admin/contracts/search/${contractId}?tab=signing`, labelKey: 'partnerReturn.timeline.openSigning' };
     case 'inventory_txns':
       return { to: `/admin/contracts/search/${contractId}?tab=device`, labelKey: 'partnerReturn.timeline.openDevice' };
-    case 'partner_payout_adjustment': {
-      // The adjustment row names its payout in `detail`; without it there is
-      // nothing to navigate to, so no link is drawn.
-      const payoutId = row.detail?.payout_id;
-      if (typeof payoutId !== 'number') return null;
-      return { to: `/admin/partner-payouts/${payoutId}`, labelKey: 'partnerReturn.timeline.openPayout' };
-    }
+    // The buyback is its own document now, so the row points straight at it —
+    // `ref_id` is that document, with nothing to dig out of `detail`.
+    case 'sale.fund_bill':
+      return { to: `/admin/fund-bills/${row.ref_id}`, labelKey: 'partnerReturn.timeline.openPayout' };
     default:
       return null;
   }
