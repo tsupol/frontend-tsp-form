@@ -60,6 +60,7 @@ import { PartnerBalancePage } from './pages/partner-settlements/PartnerBalancePa
 import { FundDayMoneyPage } from './pages/fund-day/FundDayMoneyPage';
 import { FundDayReconPage } from './pages/fund-day/FundDayReconPage';
 import { FundBookPage } from './pages/fund-book/FundBookPage';
+import { FundClawbackPage } from './pages/fund-clawback/FundClawbackPage';
 import { PartnerReturnsPage } from './pages/partner-returns/PartnerReturnsPage';
 import { PartnerReturnWarehousePage } from './pages/partner-returns/PartnerReturnWarehousePage';
 import { ChatPage } from './pages/chat/ChatPage';
@@ -1126,6 +1127,20 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <FundBookPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      {/* Commission owed back when a customer stops paying early (149 §9d). The
+          amounts are the queue's own — the screen never works one out. */}
+      <Route
+        path="/admin/fund-clawback"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <DealPartnerLayout>
+                <FundClawbackPage />
+              </DealPartnerLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

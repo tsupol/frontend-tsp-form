@@ -58,6 +58,7 @@ import {
   // Signatories (v2)
   Stamp,
   Wallet,
+  Undo2,
   UserX,
   Hourglass,
   KeySquare,
@@ -455,6 +456,11 @@ export const AppSideNav = () => {
               icon: <Banknote size="1rem" />,
               label: t('nav.fundBills'),
               path: '/admin/fund-bills',
+            }, {
+              key: 'fund-clawback',
+              icon: <Undo2 size="1rem" />,
+              label: t('nav.fundClawback'),
+              path: '/admin/fund-clawback',
             }]
           : []),
         ...(canSeePartnerSettlements

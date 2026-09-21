@@ -48,12 +48,13 @@ import { FundBillAddLineModal } from './FundBillAddLineModal';
 import { FundBillRemoveLineModal } from './FundBillRemoveLineModal';
 import { FundBillAddSettlementModal } from './FundBillAddSettlementModal';
 import { FundBillRemoveSettlementModal } from './FundBillRemoveSettlementModal';
+import { FundClawbackCollectModal } from '../fund-clawback/FundClawbackCollectModal';
 
 /** Reasons that mean the button has no business being on screen at all. */
 const HIDDEN_REASONS = new Set(['status_not_allowed', 'permission_denied', 'not_in_pool']);
 
 /** Actions with a modal here. Anything else the backend adds shows as not-wired. */
-const WIRED_ACTIONS = new Set(['PAY', 'VOID', 'CREDIT_NOTE', 'ADD_LINE']);
+const WIRED_ACTIONS = new Set(['PAY', 'VOID', 'CREDIT_NOTE', 'ADD_LINE', 'CLAWBACK_COLLECT']);
 
 /** Actions driven from a row rather than the footer. */
 const ROW_ACTIONS = new Set(['ADD_SETTLEMENT', 'REMOVE_SETTLEMENT', 'REMOVE_LINE']);
@@ -102,6 +103,7 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
   const [addSettlementOpen, setAddSettlementOpen] = useState(false);
   const [removeSettlement, setRemoveSettlement] = useState<ContractGroup | null>(null);
   const [removeLine, setRemoveLine] = useState<FundBillLine | null>(null);
+  const [collectOpen, setCollectOpen] = useState(false);
 
   /** The backend ships Thai names on every row; English falls back to the code. */
   const statusLabel = (code: FundBillStatus) =>
@@ -157,6 +159,7 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
     else if (code === 'VOID') setVoidOpen(true);
     else if (code === 'CREDIT_NOTE') setCreditNoteOpen(true);
     else if (code === 'ADD_LINE') setAddLineOpen(true);
+    else if (code === 'CLAWBACK_COLLECT') setCollectOpen(true);
   };
 
   const renderActionButton = (a: FundBillAction) => {
@@ -608,6 +611,11 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
         billCode={bill?.bill_code ?? ''}
         line={removeLine}
         onClose={() => setRemoveLine(null)}
+      />
+      <FundClawbackCollectModal
+        open={collectOpen}
+        bill={bill}
+        onClose={() => setCollectOpen(false)}
       />
     </>
   );
