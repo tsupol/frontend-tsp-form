@@ -372,6 +372,25 @@ export const CONTRACT_EVIDENCE_RESIZE: Record<ContractEvidenceSize, ResizeOption
   md: { maxWidth: 1280, maxHeight: 1280, mode: 'contain', format: 'webp', quality: 0.82 },
 };
 
+// ── fund_payment_evidence — hardcoded spec (sm=320 / lg=1280, PRIVATE) ─
+// Evidence attached to a MOVEMENT of a fund-money document, not to the document:
+// the transfer slip for a shop payout, the receipt for a fund expense. Same
+// upload type for both, because to the service they are the same thing — a photo
+// proving one movement happened. Private bucket; reads presign.
+//
+// be-media mints the index itself for this type, so nothing is passed for it: a
+// client-supplied position let a sixth photo overwrite the first (the same bug
+// the instalment slip hit).
+export const FUND_PAYMENT_EVIDENCE_TYPE = 'fund_payment_evidence';
+export const FUND_PAYMENT_EVIDENCE_SIZES = ['sm', 'lg'] as const;
+export type FundPaymentEvidenceSize = (typeof FUND_PAYMENT_EVIDENCE_SIZES)[number];
+export const FUND_PAYMENT_EVIDENCE_MAX = 10;
+
+export const FUND_PAYMENT_EVIDENCE_RESIZE: Record<FundPaymentEvidenceSize, ResizeOptions> = {
+  sm: { maxWidth: 320, maxHeight: 320, mode: 'contain', format: 'webp', quality: 0.82 },
+  lg: { maxWidth: 1280, maxHeight: 1280, mode: 'contain', format: 'webp', quality: 0.82 },
+};
+
 // ── buyback_condition_bridge — hardcoded spec (single md=1280, PRIVATE) ─
 // The canonical buyback condition-photo path (PO_LINE / BUYBACK_CONDITION).
 // Replaces the legacy PUBLIC `buyback_condition` type (sm/md, uploads/buyback/)
@@ -516,6 +535,11 @@ export const UPLOAD_SPECS: Record<string, BeMediaSpec> = {
   contract_payment_slip: {
     type: 'contract_payment_slip', privacy: 'private', resize_mode: 'contain', quality: 0.82,
     sizes: [{ label: 'lg', width: 1800 }], max_files: 5, path_params: ['contract_id'],
+  },
+  fund_payment_evidence: {
+    type: 'fund_payment_evidence', privacy: 'private', resize_mode: 'contain', quality: 0.82,
+    sizes: [{ label: 'sm', width: 320 }, { label: 'lg', width: 1280 }], max_files: 10,
+    path_params: ['payment_id'],
   },
   buyback_condition_bridge: {
     type: 'buyback_condition_bridge', privacy: 'private', resize_mode: 'contain', quality: 0.82,

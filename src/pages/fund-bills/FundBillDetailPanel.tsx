@@ -49,6 +49,7 @@ import { FundBillRemoveLineModal } from './FundBillRemoveLineModal';
 import { FundBillAddSettlementModal } from './FundBillAddSettlementModal';
 import { FundBillRemoveSettlementModal } from './FundBillRemoveSettlementModal';
 import { FundClawbackCollectModal } from '../fund-clawback/FundClawbackCollectModal';
+import { FundPaymentEvidence } from './FundPaymentEvidence';
 
 /** Reasons that mean the button has no business being on screen at all. */
 const HIDDEN_REASONS = new Set(['status_not_allowed', 'permission_denied', 'not_in_pool']);
@@ -514,6 +515,20 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
                       {p.reference && <span>{p.reference}</span>}
                       {p.held_by === 'NONE' && <span>{t('fundBill.noBankMovement')}</span>}
                     </div>
+
+                    {/* Evidence belongs to the movement, not the document. The
+                     *  company's own row never touches a bank account, so there
+                     *  is no slip to attach to it and the strip is left off.
+                     *  A cancelled row is read-only — the backend refuses an
+                     *  attach there. */}
+                    {p.held_by !== 'NONE' && (
+                      <div className="mt-2">
+                        <FundPaymentEvidence
+                          paymentId={p.payment_id}
+                          canEdit={!p.voided_at && bill.status !== 'VOIDED'}
+                        />
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
