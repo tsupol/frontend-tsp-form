@@ -20,11 +20,16 @@ export type FundBookType = 'FUND' | 'COMPANY';
 export interface FundBook {
   book_id: number;
   book_type: FundBookType;
+  /** The backend's own Thai label for the kind of book. */
+  book_type_name: string | null;
   /** The company's own name for the book; renameable. */
   title: string;
-  /** The business side: money in and out of trading. */
+  /**
+   * Money at work: what the capital did — paid out to shops, came back as
+   * instalments, spent on running the fund.
+   */
   activity_net: number;
-  /** Top-ups and withdrawals. */
+  /** Capital: what holding put in, less anything taken back out. */
   funding_net: number;
   /** Only the movements that actually touched a bank account. */
   bank_net: number;
@@ -53,8 +58,16 @@ export interface FundBookOverview {
 export interface FundBookLine {
   company_id: number;
   book_type: FundBookType;
-  /** `ACTIVITY` = trading · `FUNDING` = a top-up or withdrawal. */
-  stream: 'ACTIVITY' | 'FUNDING';
+  /**
+   * Which side of the book a movement belongs to.
+   *
+   * `FUNDING` is capital going in or coming back out; `ACTIVITY` is that capital
+   * at work. `BANK_ONLY` is neither: it is the company's own money that reached
+   * the fund's bank account — a customer paying a late fee, say — so it shows in
+   * the bank total but belongs to no book. Counting it in either box double-counts
+   * it, which is why the screen filters it out rather than bucketing it.
+   */
+  stream: 'ACTIVITY' | 'FUNDING' | 'BANK_ONLY';
   money_date: string;
   flow: 'IN' | 'OUT';
   amount: number;
@@ -64,6 +77,7 @@ export interface FundBookLine {
   bill_id: number | null;
   bill_code: string | null;
   bill_purpose: string | null;
+  /** The backend's Thai label for the purpose — read it, never hardcode. */
   purpose_name: string | null;
   /** `FUND_BILL` = the fund's own document · `CUSTOMER_BILL` = a customer's. */
   source: string | null;

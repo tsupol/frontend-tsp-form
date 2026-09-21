@@ -87,6 +87,59 @@ export function useFundExpenseCategories(companyId: number | null) {
   return query.data ?? [];
 }
 
+/** One line inside a box: a purpose, and what it came to. */
+export interface FundBookGroupRow {
+  stream: 'ACTIVITY' | 'FUNDING';
+  purpose_name: string;
+  signed_amount: number;
+}
+
+/**
+ * The lines behind each box, grouped by what they were for.
+ *
+ * There is no view for this grouping, so the movements are folded here. Two
+ * rules decide what lands where, and both come from the backend rather than
+ * from a guess on screen:
+ *
+ * - `BANK_ONLY` is dropped. That is the company's own money passing through the
+ *   fund's bank account; it belongs to neither book, and adding it to a box
+ *   double-counts it.
+ * - Everything else is grouped on its own `stream` and the Thai purpose label
+ *   the view already carries.
+ *
+ * The caller checks its own arithmetic: each box's rows must add up to the
+ * figure the overview reports, or the grouping is wrong.
+ */
+export function useFundBookGroups(companyId: number | null, bookType: FundBookType) {
+  const query = useQuery({
+    queryKey: ['fund-book', 'groups', companyId, bookType],
+    queryFn: () => apiClient.get<FundBookLine[]>(
+      `/v_fund_book_lines?company_id=eq.${companyId}&book_type=eq.${bookType}`
+      + '&select=stream,purpose_name,bill_purpose,signed_amount',
+    ),
+    enabled: companyId != null,
+    staleTime: 15 * 1000,
+  });
+
+  const rows = query.data ?? [];
+  const byKey = new Map<string, FundBookGroupRow>();
+  for (const line of rows) {
+    if (line.stream === 'BANK_ONLY') continue;
+    const label = line.purpose_name ?? line.bill_purpose ?? '—';
+    const key = `${line.stream}|${label}`;
+    const existing = byKey.get(key);
+    if (existing) existing.signed_amount += line.signed_amount;
+    else byKey.set(key, { stream: line.stream, purpose_name: label, signed_amount: line.signed_amount });
+  }
+  const groups = [...byKey.values()];
+
+  return {
+    ...query,
+    funding: groups.filter(g => g.stream === 'FUNDING'),
+    activity: groups.filter(g => g.stream === 'ACTIVITY'),
+  };
+}
+
 /** A movement changes a book and writes a document, so both listings move. */
 export function useFundBookInvalidate() {
   const queryClient = useQueryClient();

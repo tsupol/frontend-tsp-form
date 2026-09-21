@@ -31,7 +31,8 @@ import { DateTime } from '../../components/DateTime';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../../lib/format';
-import { useFundBookLines, useFundBookOverview } from './useFundBook';
+import { useFundBookGroups, useFundBookLines, useFundBookOverview } from './useFundBook';
+import type { FundBookGroupRow } from './useFundBook';
 import { FundMovementModal } from './FundMovementModal';
 import type { FundBook, FundBookLine, FundBookType, FundMovementPurpose } from './fundBookTypes';
 
@@ -68,6 +69,22 @@ export function FundBookPage() {
   const lines = useFundBookLines({
     companyId, bookType, dateFrom, dateTo, pageIndex, pageSize,
   });
+  const groups = useFundBookGroups(companyId, bookType);
+
+  /** The book the boxes below are describing. */
+  const shownBook = books.find(b => b.book_type === bookType) ?? null;
+
+  /**
+   * The screen's own check: each box's rows must add up to the figure the
+   * backend reports. A mismatch means the grouping is wrong — most likely the
+   * company's pass-through money crept into a box — and the screen says so
+   * rather than quietly showing two numbers that disagree.
+   */
+  const sumOf = (rows: FundBookGroupRow[]) => rows.reduce((t, r) => t + r.signed_amount, 0);
+  const fundingMismatch = shownBook != null
+    && Math.round(sumOf(groups.funding)) !== Math.round(shownBook.funding_net);
+  const activityMismatch = shownBook != null
+    && Math.round(sumOf(groups.activity)) !== Math.round(shownBook.activity_net);
 
   const rangePresets = useMemo(
     () => createDateRangePresets({
@@ -88,8 +105,20 @@ export function FundBookPage() {
   const canWithdraw = hasPermission('FUND.WITHDRAW');
   const canSpend = hasPermission('FUND.EXPENSE');
 
+  /**
+   * One book, as two boxes and a bottom line.
+   *
+   * Capital and money-at-work answer different questions and must never be one
+   * number: a book can be negative because the capital is out working, or
+   * because nobody has put capital in yet, and a single figure cannot tell those
+   * apart. The balance underneath is the two added together.
+   */
   const renderBookCard = (book: FundBook) => {
     const selected = book.book_type === bookType;
+    const label = (i18n.language === 'th' && book.book_type_name)
+      ? book.book_type_name
+      : book.title;
+
     return (
       <button
         key={book.book_id}
@@ -103,18 +132,37 @@ export function FundBookPage() {
           {book.book_type === 'FUND'
             ? <Wallet size={14} className="text-subtle shrink-0" />
             : <BookOpen size={14} className="text-subtle shrink-0" />}
-          <span className="text-sm font-medium truncate">{book.title}</span>
+          <span className="text-sm font-medium truncate">{label}</span>
         </div>
 
-        <div className="mt-1.5 text-xl font-semibold tabular-nums">
-          {fmtCurrency(book.balance)}
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <div className="rounded-md border border-line-subtle px-2 py-1.5">
+            <div className="text-xs text-subtle">{t('fundBook.capital')}</div>
+            <div className="text-base font-semibold tabular-nums">
+              {fmtCurrency(book.funding_net)}
+            </div>
+          </div>
+          <div className="rounded-md border border-line-subtle px-2 py-1.5">
+            <div className="text-xs text-subtle">{t('fundBook.atWork')}</div>
+            <div className="text-base font-semibold tabular-nums">
+              {fmtCurrency(book.activity_net)}
+            </div>
+          </div>
         </div>
-        {/* Not profit. Said on the card, because the number invites that reading. */}
+
+        {/* A negative balance is ordinary in lending — the money is out with
+         *  customers — so it is never coloured as an error. */}
+        <div className="mt-2 flex items-baseline gap-2">
+          <span className="text-xs text-subtle">{t('fundBook.balance')}</span>
+          <span className="text-lg font-semibold tabular-nums">{fmtCurrency(book.balance)}</span>
+        </div>
         <div className="text-xs text-subtler">{t('fundBook.cashFlowNotProfit')}</div>
 
         <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs">
+          {/* The two figures people act on. Read from the backend, because the
+           *  withdrawal ceiling it enforces is its own number. */}
           {book.need_topup > 0 && (
-            <span className="text-danger-fg font-medium">
+            <span className="font-medium">
               {t('fundBook.needTopup')}: {fmtCurrency(book.need_topup)}
             </span>
           )}
@@ -132,6 +180,19 @@ export function FundBookPage() {
       </button>
     );
   };
+
+  /** One line inside a box: what it was for, and what it came to. */
+  const renderGroupRow = (row: FundBookGroupRow) => (
+    <div
+      key={`${row.stream}-${row.purpose_name}`}
+      className="flex items-center gap-2 px-3 py-1.5 border-t border-line-subtle"
+    >
+      <span className="text-sm truncate flex-1 min-w-0">{row.purpose_name}</span>
+      <span className="text-sm tabular-nums shrink-0">
+        {row.signed_amount > 0 ? '+' : ''}{fmtCurrency(row.signed_amount)}
+      </span>
+    </div>
+  );
 
   const renderLine = (line: FundBookLine) => (
     <div className="px-4 py-2.5">
@@ -263,6 +324,69 @@ export function FundBookPage() {
                 )}
                 {books.map(renderBookCard)}
               </div>
+
+              {/* What is behind the two figures on the selected book. Grouped by
+               *  purpose, because "money at work −14,510" says nothing until it
+               *  breaks into what was paid out and what came back. */}
+              {shownBook && (
+                <div className="flex-none p-2 border-b border-line grid gap-2 sm:grid-cols-2">
+                  <div className="rounded-md border border-line overflow-hidden">
+                    <div className="px-3 py-2 bg-surface flex items-center gap-2">
+                      <span className="text-sm font-medium">{t('fundBook.capital')}</span>
+                      <span className="flex-1" />
+                      <span className="text-sm font-semibold tabular-nums">
+                        {fmtCurrency(shownBook.funding_net)}
+                      </span>
+                    </div>
+                    {groups.funding.length === 0 ? (
+                      <div className="px-3 py-2 text-xs text-subtler border-t border-line-subtle">
+                        {t('fundBook.noCapitalYet')}
+                      </div>
+                    ) : groups.funding.map(renderGroupRow)}
+                    {fundingMismatch && (
+                      <div className="px-3 py-2 border-t border-line">
+                        <div className="alert alert-danger">
+                          <span>{t('fundBook.groupMismatch')}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="rounded-md border border-line overflow-hidden">
+                    <div className="px-3 py-2 bg-surface flex items-center gap-2">
+                      <span className="text-sm font-medium">{t('fundBook.atWork')}</span>
+                      <span className="flex-1" />
+                      <span className="text-sm font-semibold tabular-nums">
+                        {fmtCurrency(shownBook.activity_net)}
+                      </span>
+                    </div>
+                    {groups.activity.length === 0 ? (
+                      <div className="px-3 py-2 text-xs text-subtler border-t border-line-subtle">
+                        {t('fundBook.noActivityYet')}
+                      </div>
+                    ) : groups.activity.map(renderGroupRow)}
+                    {activityMismatch && (
+                      <div className="px-3 py-2 border-t border-line">
+                        <div className="alert alert-danger">
+                          <span>{t('fundBook.groupMismatch')}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* The bank total differs from the balance by the company's money
+               *  that has not been taken out. Said once, here, rather than left
+               *  as two numbers that look like a fault. */}
+              {shownBook && shownBook.bank_net !== shownBook.balance && (
+                <div className="flex-none px-2 pb-2 text-xs text-subtle">
+                  {t('fundBook.bankVsBalance', {
+                    balance: fmtCurrency(shownBook.balance),
+                    bank: fmtCurrency(shownBook.bank_net),
+                  })}
+                </div>
+              )}
 
               {/* Mobile has no room for the header row, so the buttons sit here. */}
               {isMobile && (canTopUp || canWithdraw || canSpend) && (
