@@ -14,6 +14,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '../../contexts/AuthContext';
 import { Modal, Button, Switch, Badge, useSnackbarContext } from 'tsp-form';
 import { CheckCircle, XCircle, Info } from 'lucide-react';
 import { ApiError } from '../../lib/api';
@@ -21,7 +22,7 @@ import { translateApiError } from '../../lib/apiErrors';
 import { DateTime } from '../../components/DateTime';
 import {
   grantablePermissionsQuery, userGrantsQuery, grantPermission, revokePermission,
-  hasViaRole, type UserPermissionGrant,
+  hasViaRole, grantableBy, type UserPermissionGrant,
 } from './permissionGrants';
 
 export interface GrantTargetUser {
@@ -39,9 +40,15 @@ export function UserPermissionGrantsModal({ user, open, onClose }: {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
+  // Whose list this is: the viewer, not the person being granted to.
+  const { user: actor } = useAuth();
   const [pending, setPending] = useState<Set<string>>(new Set());
 
-  const { data: permissions = [] } = useQuery(grantablePermissionsQuery);
+  const { data: allPermissions = [] } = useQuery(grantablePermissionsQuery);
+  // A company admin may only hand out the company-level ones (mig 1305); the
+  // four that belong to the holding are left off rather than shown as toggles
+  // that would be refused.
+  const permissions = grantableBy(allPermissions, actor?.role_code);
   const { data: grants = [] } = useQuery(userGrantsQuery(open ? (user?.id ?? null) : null));
 
   const roleCovers = hasViaRole(user?.role_code);

@@ -1341,10 +1341,29 @@ export function UsersPage() {
   const [bulkAction, setBulkAction] = useState<{ action: 'deactivate' | 'activate'; users: VUser[] } | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
 
-  // Granting is a holding-admin act (§3); company admins are the recipients.
-  // Visibility only — the RPC enforces it regardless of what we render.
+  // Granting used to be a holding-admin act alone. Since mig 1305 a company
+  // admin grants within their own company, so they get the action for their own
+  // people — the call refuses anyone else's, naming the reason, and the list of
+  // permissions is filtered to the ones they may actually hand out.
+  // Visibility only — the RPC enforces all of it regardless of what we render.
   const { user: currentUser } = useAuth();
-  const canGrant = ['HOLDING_ADMIN', 'SYSTEM_DEV'].includes(currentUser?.role_code ?? '');
+  const isHoldingWide = ['HOLDING_ADMIN', 'SYSTEM_DEV'].includes(currentUser?.role_code ?? '');
+  const isCompanyAdmin = currentUser?.role_code === 'COMPANY_ADMIN';
+  const canGrant = isHoldingWide || isCompanyAdmin;
+
+  /**
+   * Whether this particular person can be granted to by the viewer.
+   *
+   * A company admin reaches only their own company's people: someone at another
+   * company, or at holding level with no company at all, is refused with an
+   * out-of-scope error. Hiding the action for those rows keeps the refusal off
+   * the screen entirely.
+   */
+  const canGrantTo = (row: VUser) => {
+    if (isHoldingWide) return true;
+    if (!isCompanyAdmin) return false;
+    return row.company_id != null && row.company_id === currentUser?.company_id;
+  };
 
   const activeFilterCount = [filterRole, filterHolding, filterCompany, filterBranch].filter(Boolean).length + (sorting.length > 0 ? 1 : 0);
 
@@ -1451,7 +1470,7 @@ export function UsersPage() {
     {
       id: 'actions',
       header: () => null,
-      cell: ({ row }) => <RowActions user={row.original} onEdit={setEditUser} onChangeRole={setChangeRoleUser} onPasswordManage={setPasswordUser} onGrants={canGrant ? setGrantsUser : null} onToggleActive={setToggleActiveUser} onDelete={setDeleteUser} />,
+      cell: ({ row }) => <RowActions user={row.original} onEdit={setEditUser} onChangeRole={setChangeRoleUser} onPasswordManage={setPasswordUser} onGrants={canGrant && canGrantTo(row.original) ? setGrantsUser : null} onToggleActive={setToggleActiveUser} onDelete={setDeleteUser} />,
       enableSorting: false,
       className: 'w-10',
     },
@@ -1795,7 +1814,7 @@ export function UsersPage() {
                         onEdit={setEditUser}
                         onChangeRole={setChangeRoleUser}
                         onPasswordManage={setPasswordUser}
-                        onGrants={canGrant ? setGrantsUser : null}
+                        onGrants={canGrant && canGrantTo(user) ? setGrantsUser : null}
                         onToggleActive={setToggleActiveUser}
                         onDelete={setDeleteUser}
                       />

@@ -782,8 +782,10 @@ export const AppSideNav = () => {
     },
     {
       key: 'users', icon: <Users size="1rem" />, label: t('nav.users'), path: '/admin/users',
-      // Grants are handed out BY holding admins, so only they get the overview.
-      children: ['HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
+      // Grants used to be a holding-admin job alone. Since mig 1305 a company
+      // admin hands them out too, within their own company and only for the
+      // permissions marked company-level — so they get the overview as well.
+      children: ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
         { key: 'users-list', icon: <Users size="1rem" />, label: t('nav.users'), path: '/admin/users' },
         { key: 'permission-grants', icon: <KeySquare size="1rem" />, label: t('nav.permissionGrants'), path: '/admin/users/permission-grants' },
       ] : undefined,

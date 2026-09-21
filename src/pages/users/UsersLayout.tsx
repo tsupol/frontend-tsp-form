@@ -5,11 +5,12 @@ import { Users, KeySquare } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useAuth } from '../../contexts/AuthContext';
 
-// ผู้ใช้งาน fan-out. Grants are handed out BY holding admins, so only they
-// see the overview — mirrors AppSideNav, keep both in sync (dual-nav rule).
+// ผู้ใช้งาน fan-out. A company admin hands out grants within their own company
+// since mig 1305, so the overview is theirs too — mirrors AppSideNav, keep both
+// in sync (dual-nav rule).
 const navItems = [
   { path: '/admin/users', labelKey: 'nav.users', icon: Users, roles: null },
-  { path: '/admin/users/permission-grants', labelKey: 'nav.permissionGrants', icon: KeySquare, roles: ['HOLDING_ADMIN', 'SYSTEM_DEV'] },
+  { path: '/admin/users/permission-grants', labelKey: 'nav.permissionGrants', icon: KeySquare, roles: ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'] },
 ];
 
 export function UsersLayout({ children }: { children: ReactNode }) {

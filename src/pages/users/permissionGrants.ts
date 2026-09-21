@@ -29,6 +29,15 @@ export interface GrantablePermission {
   permission_code: string;
   /** Thai, written by the DB (mig 1174) — display as-is, never re-word here. */
   description: string;
+  /**
+   * Whether a company admin may hand this one out (mig 1305).
+   *
+   * A company admin can now grant within their own company, but four of these
+   * belong to the holding — its prices and its contract terms — and stay with
+   * the holding admin. The screen filters on this rather than listing all
+   * fifteen and letting four of them fail on press.
+   */
+  company_grantable: boolean;
 }
 
 export interface UserPermissionGrant {
@@ -68,6 +77,25 @@ export const grantablePermissionsQuery = {
   // A handful of rows that change only with a migration.
   staleTime: 10 * 60 * 1000,
 };
+
+/** Roles whose reach is the whole holding, so nothing is filtered out for them. */
+const HOLDING_WIDE_ROLES = ['HOLDING_ADMIN', 'SYSTEM_DEV'];
+
+/**
+ * The permissions this viewer may actually hand out.
+ *
+ * A holding admin sees every one; a company admin sees only the company-level
+ * ones, because the rest are refused with an out-of-scope error naming the
+ * reason. Filtering here means the four they cannot grant never appear as a
+ * toggle that fails.
+ */
+export function grantableBy(
+  permissions: GrantablePermission[],
+  actorRole: string | null | undefined,
+): GrantablePermission[] {
+  if (HOLDING_WIDE_ROLES.includes(actorRole ?? '')) return permissions;
+  return permissions.filter(p => p.company_grantable);
+}
 
 /** Every grant for one user, newest first — active rows and revoked history. */
 export function userGrantsQuery(userId: number | null) {
