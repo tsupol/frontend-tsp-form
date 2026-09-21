@@ -8,6 +8,10 @@ import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-quer
 import { useCallback } from 'react';
 import { apiClient } from '../../lib/api';
 import type {
+  PartnerContractMoney,
+  PartnerContractMoneyEvent,
+} from './contractMoneyTypes';
+import type {
   AssetOwnerTransfer,
   FundBill,
   FundBillActionsResponse,
@@ -277,4 +281,40 @@ export function useFundBillInvalidate() {
       queryClient.invalidateQueries({ queryKey: ['fund-bills', 'actions', billId] });
     }
   }, [queryClient]);
+}
+
+/**
+ * One contract's money, gathered (149 §9e).
+ *
+ * A shop reads its own pair of these views, which carry nothing of the fund
+ * company's — so the caller says which side it is on rather than this hook
+ * guessing from the session.
+ */
+export function useContractMoney(contractId: number | null, opts?: { partnerSide?: boolean }) {
+  const partner = opts?.partnerSide ?? false;
+  const view = partner ? 'v_partner_my_contract_money' : 'v_partner_contract_money';
+
+  const summary = useQuery({
+    queryKey: ['fund-bills', 'contract-money', view, contractId],
+    queryFn: () => apiClient
+      .get<PartnerContractMoney[]>(`/${view}?contract_id=eq.${contractId}`)
+      .then(rows => rows[0] ?? null),
+    enabled: contractId != null,
+    staleTime: 30 * 1000,
+  });
+
+  const timeline = useQuery({
+    queryKey: ['fund-bills', 'contract-money-timeline', view, contractId],
+    queryFn: () => apiClient.get<PartnerContractMoneyEvent[]>(
+      `/${view}_timeline?contract_id=eq.${contractId}&order=at.desc`,
+    ),
+    enabled: contractId != null,
+    staleTime: 30 * 1000,
+  });
+
+  return {
+    money: summary.data ?? null,
+    events: timeline.data ?? [],
+    isLoading: summary.isLoading || timeline.isLoading,
+  };
 }

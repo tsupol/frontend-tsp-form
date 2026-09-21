@@ -24,6 +24,9 @@ import { getStateColor, getStateLabel, productName, formatInstallment } from './
 import { ContractActionButtons } from './ContractActions';
 import { PartnerCaseCard } from '../partner-cases/PartnerCaseCard';
 import { SettlementCard } from '../partner-settlement/SettlementCard';
+import { ContractMoneyPanel } from '../fund-bills/ContractMoneyPanel';
+import { useContractMoney } from '../fund-bills/useFundBills';
+import { useBranchIsPartner } from '../../hooks/useAllowedPaymentMethods';
 import { WalletsTab } from './wallet/WalletsTab';
 import { DeviceTab } from './DeviceTab';
 import { SigningTab } from './SigningTab';
@@ -260,9 +263,12 @@ type DetailTab = 'overview' | 'money' | 'device' | 'customers' | 'signing' | 'no
 
 const TABS: DetailTab[] = ['overview', 'money', 'device', 'customers', 'signing', 'notify', 'notes'];
 
-type MoneySection = 'installments' | 'txns' | 'wallets' | 'bills';
+type MoneySection = 'installments' | 'txns' | 'wallets' | 'bills' | 'shopMoney';
 
 const MONEY_SECTIONS: MoneySection[] = ['installments', 'wallets', 'bills', 'txns'];
+
+/** Only a deal-partner contract has money between the fund and a shop (149 §9e). */
+const PARTNER_MONEY_SECTION: MoneySection = 'shopMoney';
 
 // ── Scrollable Tabs ─────────────────────────────────────────────────────────
 
@@ -1294,12 +1300,22 @@ function MoneyTab({ contractId, contract, t, requestedSection, onSectionConsumed
     txns: txnCount ?? null,
     wallets: walletNonEmptyCount,
     bills: billCount ?? null,
+    // No badge: the count of documents is on the panel itself, and a number here
+    // would say nothing about whether any of it needs attention.
+    shopMoney: null,
   };
+
+  // The money between the fund and the shop only exists for a deal-partner
+  // contract, so the section is added rather than shown empty elsewhere.
+  const { isPartnerBranch } = useBranchIsPartner(contract.branch_id);
+  const sections = isPartnerBranch
+    ? [...MONEY_SECTIONS, PARTNER_MONEY_SECTION]
+    : MONEY_SECTIONS;
 
   return (
     <div className="flex flex-col h-full min-h-0">
       <ScrollableTabs
-        tabs={MONEY_SECTIONS}
+        tabs={sections}
         activeTab={section}
         onTabChange={setSection}
         renderLabel={(s) => {
@@ -1322,7 +1338,24 @@ function MoneyTab({ contractId, contract, t, requestedSection, onSectionConsumed
         {section === 'txns' && <TxnsTab contractId={contractId} t={t} />}
         {section === 'wallets' && <WalletsTab contract={contract} />}
         {section === 'bills' && <BillsTab contractId={contractId} contract={contract} t={t} />}
+        {section === 'shopMoney' && <ShopMoneySection contractId={contractId} />}
       </div>
+    </div>
+  );
+}
+
+/**
+ * The money between the fund and the shop for this one contract.
+ *
+ * Four or five documents created weeks apart, gathered by the backend into a
+ * summary row and a timeline. Staff-side views: this panel is inside the staff
+ * contract screen, and the shop reads its own pair elsewhere.
+ */
+function ShopMoneySection({ contractId }: { contractId: number }) {
+  const { money, events, isLoading } = useContractMoney(contractId);
+  return (
+    <div className="px-4 py-3">
+      <ContractMoneyPanel money={money} events={events} loading={isLoading} />
     </div>
   );
 }
