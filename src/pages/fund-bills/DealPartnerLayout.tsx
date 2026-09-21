@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { Store, Receipt, Banknote, Wallet, PackageCheck, Warehouse, Undo2, type LucideIcon } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useMyPermissions } from '../../hooks/useMyPermissions';
+import { useAuth } from '../../contexts/AuthContext';
 
 /** The warehouse queue lives under the returns path, so plain prefix matching
  *  would light both rows at once. `notUnder` keeps the parent row dark while a
@@ -47,8 +48,13 @@ export function DealPartnerLayout({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const navGuard = useNavGuard();
   const { hasPermission } = useMyPermissions();
+  // This whole section exists only for a fund company (owner 09-21). Elsewhere
+  // the rail is not drawn at all, rather than drawn and empty.
+  const { isFundCompany } = useAuth();
 
-  const items = NAV_ITEMS.filter(i => i.anyOf.some(p => hasPermission(p)));
+  const items = isFundCompany
+    ? NAV_ITEMS.filter(i => i.anyOf.some(p => hasPermission(p)))
+    : [];
 
   return (
     <div className="flex h-dvh overflow-hidden">

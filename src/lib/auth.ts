@@ -21,6 +21,11 @@ export interface BranchContext {
   company_type?: string | null;
   /** The backend's own verdict on whether this branch closes its day. */
   skips_day_close?: boolean | null;
+  /**
+   * A fund company's warehouse carries the same branch kind as an ordinary
+   * sales branch, so this flag is the only thing that tells them apart.
+   */
+  is_company_warehouse?: boolean | null;
 }
 
 export interface UserProfile {
@@ -62,6 +67,7 @@ export interface UserInfo {
   db_role: string | null;
   company_type: string | null;
   skips_day_close: boolean | null;
+  is_company_warehouse: boolean | null;
   firstname: string | null;
   lastname: string | null;
   nickname: string | null;
@@ -85,6 +91,7 @@ export interface LoginResponse {
   db_role: string | null;
   company_type: string | null;
   skips_day_close: boolean | null;
+  is_company_warehouse: boolean | null;
   access_token: string;
   token_type: string;
   expires_at: string;
@@ -198,6 +205,7 @@ export const authService = {
       db_role: this.getDbRole(),
       company_type: this.getCompanyType(),
       skips_day_close: this.getSkipsDayClose(),
+      is_company_warehouse: this.getIsCompanyWarehouse(),
       firstname: p.firstname,
       lastname: p.lastname,
       nickname: p.nickname,
@@ -228,6 +236,12 @@ export const authService = {
     put('company_name', ctx.company_name);
     put('company_type', ctx.company_type);
     put(
+      'is_company_warehouse',
+      ctx.is_company_warehouse === undefined ? undefined
+        : ctx.is_company_warehouse === null ? null
+        : String(ctx.is_company_warehouse),
+    );
+    put(
       'skips_day_close',
       ctx.skips_day_close === undefined ? undefined
         : ctx.skips_day_close === null ? null
@@ -246,6 +260,12 @@ export const authService = {
 
   getCompanyType(): string | null {
     return localStorage.getItem('company_type');
+  },
+
+  /** Null when the session predates the field, or the user has no branch. */
+  getIsCompanyWarehouse(): boolean | null {
+    const v = localStorage.getItem('is_company_warehouse');
+    return v === null ? null : v === 'true';
   },
 
   /** Null when the session predates the field — callers treat that as "closes". */
@@ -274,6 +294,7 @@ export const authService = {
     localStorage.removeItem('company_name');
     localStorage.removeItem('company_type');
     localStorage.removeItem('skips_day_close');
+    localStorage.removeItem('is_company_warehouse');
     this.clearUserScopedState();
   },
 

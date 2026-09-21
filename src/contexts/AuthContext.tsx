@@ -40,6 +40,17 @@ interface AuthContextType {
   isFundBranch: boolean;
   /** The backend says this branch does not close its day. */
   skipsDayClose: boolean;
+  /**
+   * The user belongs to a fund company — the whole shop-money flow exists only
+   * for these, and is absent for everyone else rather than shown and blocked.
+   * True for a company-level user too, who has no branch at all.
+   */
+  isFundCompany: boolean;
+  /**
+   * This branch is the fund's own warehouse. It carries the same branch kind as
+   * an ordinary sales branch, so nothing else tells them apart.
+   */
+  isFundWarehouse: boolean;
   can: (code: string) => boolean;
   login: (username: string, password: string) => Promise<LoginResult>;
   logout: () => Promise<void>;
@@ -297,6 +308,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           db_role: authService.getDbRole(),
           company_type: authService.getCompanyType(),
           skips_day_close: authService.getSkipsDayClose(),
+          is_company_warehouse: authService.getIsCompanyWarehouse(),
           branch_name: authService.getStoredBranchName() ?? prev.branch_name,
           company_name: authService.getStoredCompanyName() ?? prev.company_name,
         }
@@ -319,6 +331,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // take cash at, so the flag would say nothing about them.
         isFundBranch: user?.company_type === 'FINANCIER' && user?.branch_id != null,
         skipsDayClose: user?.skips_day_close === true,
+        isFundCompany: user?.company_type === 'FINANCIER',
+        isFundWarehouse: user?.is_company_warehouse === true,
         can,
         login,
         logout,

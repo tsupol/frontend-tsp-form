@@ -205,7 +205,7 @@ export const AppSideNav = () => {
   const location = useLocation();
   const { t } = useTranslation();
   const navGuard = useNavGuard();
-  const { user, can, isDealPartner, skipsDayClose } = useAuth();
+  const { user, can, isDealPartner, skipsDayClose, isFundCompany } = useAuth();
   const role = user?.role_code ?? '';
   const { showFin1, showFin2 } = useMyCommercialModels();
   const { hasPermission } = useMyPermissions();
@@ -213,7 +213,8 @@ export const AppSideNav = () => {
   // Deal-partner credit review — the credit desk plus the admins above it.
   // Visibility only; every RPC re-checks PARTNER.CREDIT_APPROVE and pool
   // membership server-side.
-  const canReviewPartnerCases = ['COMPANY_CREDIT', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
+  const canReviewPartnerCases = isFundCompany
+    && ['COMPANY_CREDIT', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
   // Shop payouts — read the permission, never role_code. The role list this
   // used to carry named COMPANY_FINANCE, which is not a role that exists, and
   // omitted COMPANY_ACCOUNTANT, which is what the fund's finance desk actually
@@ -222,10 +223,18 @@ export const AppSideNav = () => {
   // PARTNER.PAYOUT_APPROVE reaches a user by role or by a per-user grant, and
   // only v_my_permissions sees both. Visibility only; every payout RPC
   // re-checks the permission and pool membership server-side.
-  const canPayPartners = hasPermission('PARTNER.PAYOUT_APPROVE');
+  //
+  // Every entry in the shop-money flow is also gated on the company being a
+  // fund company. The owner's rule (09-21) is that an operating or external
+  // company must not see these at all — not shown-and-empty, not
+  // shown-and-blocked, absent. The permission alone is not enough: it can
+  // reach someone on the operating side, and the database refusing the write
+  // afterwards is a second line of defence, not the first.
+  const canPayPartners = isFundCompany && hasPermission('PARTNER.PAYOUT_APPROVE');
   // Fund finance works the shop payment requests, so the accountant role joins
   // the credit/admin set the deal-partner group already used (C1a screen S5).
-  const canSeePartnerSettlements = ['COMPANY_ACCOUNTANT', 'COMPANY_CREDIT', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
+  const canSeePartnerSettlements = isFundCompany
+    && ['COMPANY_ACCOUNTANT', 'COMPANY_CREDIT', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
   // Repo/legal access is grant-based at the DB, but nav visibility is by role:
   // repo staff + admins see the section (DB returns empty rows for anyone without a grant).
   const isRepoRole = ['COMPANY_REPO', 'HOLDING_REPO', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
@@ -248,7 +257,8 @@ export const AppSideNav = () => {
   // see these screens at all holds one of the two, and a shop or operating-side
   // user holds neither — the RPC answers FUND.NOT_FOUND.COMPANY for them, so
   // showing the entry would be showing a dead end.
-  const canSeeFundDayMoney = hasPermission('FUND.RECON_SAVE') || hasPermission('REPORT.DAILY.READ');
+  const canSeeFundDayMoney = isFundCompany
+    && (hasPermission('FUND.RECON_SAVE') || hasPermission('REPORT.DAILY.READ'));
   const { visible: dockVisible, toggleDock } = useChatDock();
 
   const {
@@ -722,7 +732,13 @@ export const AppSideNav = () => {
         ] : []),
         { key: 'fin2-rates', icon: <TrendingUp size="1rem" />, label: t('nav.fin2Rates'), path: '/admin/pricing/fin2-rates' },
         { key: 'discount-policies', icon: <Percent size="1rem" />, label: t('nav.discountPolicies'), path: '/admin/pricing/discount-policies' },
-        { key: 'deal-partner-rates', icon: <Handshake size="1rem" />, label: t('nav.dealPartnerRates'), path: '/admin/pricing/deal-partner-rates' },
+        // Deal-partner terms belong to the fund side only. The owner named this
+        // menu specifically: an operating company must not see it at all. The
+        // settings call now refuses a non-fund company too, but that is the
+        // second line, not the first.
+        ...(isFundCompany ? [
+          { key: 'deal-partner-rates', icon: <Handshake size="1rem" />, label: t('nav.dealPartnerRates'), path: '/admin/pricing/deal-partner-rates' },
+        ] : []),
       ],
     },
     {
