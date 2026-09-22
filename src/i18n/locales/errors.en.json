@@ -1238,5 +1238,7 @@
   "FUND.VALIDATION.PARTY_ID_REQUIRED": "The document needs to say who the money goes to.",
   "FUND.VALIDATION.PAYEE_NAME_REQUIRED": "An expense needs the name of whoever was paid.",
   "FUND.VALIDATION.SETTLES_BILL_REQUIRED": "This document has to say which payout it settles.",
-  "SALE.VALIDATION.FUND_BRANCH_NO_CASH": "A branch of a fund company cannot take cash — the money has to reach the fund’s account."
+  "SALE.VALIDATION.FUND_BRANCH_NO_CASH": "A branch of a fund company cannot take cash — the money has to reach the fund’s account.",
+  "fund.validation.manual_line_contract_required": "This document covers more than one contract — say which contract the line belongs to.",
+  "fund.validation.manual_line_contract_not_on_bill": "That contract is not on this document. Pick one of the contracts listed on it."
 }

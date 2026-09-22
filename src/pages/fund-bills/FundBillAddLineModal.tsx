@@ -8,16 +8,23 @@
 //
 // Only offered while the document is a draft; the evaluator stops offering the
 // button the moment it is issued.
+//
+// A hand-entered line must say which contract it belongs to, or the cost and
+// profit worked out per contract stop matching the books. The backend fills it
+// in when the document covers only one contract and refuses the line when it
+// covers several, so the picker appears only when there is an actual choice to
+// make — asking on a single-contract document would be a question with one
+// possible answer.
 
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Button, Input, MaskedInput, RadioGroup, TextArea } from 'tsp-form';
+import { Modal, Button, Input, MaskedInput, RadioGroup, Select, TextArea } from 'tsp-form';
 import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { fmtCurrency } from '../../lib/format';
-import { useFundBillInvalidate } from './useFundBills';
+import { useFundBillInvalidate, useFundBillLines } from './useFundBills';
 import type { FundBill, FundBillAddLineResult } from './fundBillTypes';
 
 /** A discount takes money back off the shop; a surcharge adds to it. */
@@ -42,6 +49,22 @@ export function FundBillAddLineModal({ open, bill, onClose }: FundBillAddLineMod
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<FundBillAddLineResult | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
+  const [contractId, setContractId] = useState<number | null>(null);
+
+  // The contracts already on this document. The lines are on screen behind the
+  // modal, so this needs no extra request.
+  const lines = useFundBillLines(bill?.bill_id ?? null);
+  const contractOptions = (() => {
+    const seen = new Map<number, string>();
+    for (const l of lines.rows) {
+      if (l.contract_id != null && !seen.has(l.contract_id)) {
+        seen.set(l.contract_id, l.contract_code ?? String(l.contract_id));
+      }
+    }
+    return [...seen.entries()].map(([id, code]) => ({ value: String(id), label: code }));
+  })();
+  /** One contract: the backend fills it in. Several: the person must choose. */
+  const mustPickContract = contractOptions.length > 1;
 
   useEffect(() => {
     if (!open) return;
@@ -54,11 +77,14 @@ export function FundBillAddLineModal({ open, bill, onClose }: FundBillAddLineMod
     setError(null);
     setResult(null);
     setConfirmClose(false);
+    setContractId(null);
   }, [open]);
 
   const amountValue = Number(amount);
-  const dirty = !!amount || !!reasonCode.trim() || !!note.trim();
-  const canSubmit = amountValue > 0 && reasonCode.trim().length >= 2;
+  const dirty = !!amount || !!reasonCode.trim() || !!note.trim() || contractId != null;
+  const canSubmit = amountValue > 0
+    && reasonCode.trim().length >= 2
+    && (!mustPickContract || contractId != null);
 
   const forceClose = () => { setConfirmClose(false); onClose(); };
   const handleClose = () => {
@@ -78,7 +104,7 @@ export function FundBillAddLineModal({ open, bill, onClose }: FundBillAddLineMod
         p_amount: amountValue,
         p_reason_code: reasonCode.trim(),
         p_note: note.trim() || null,
-        p_contract_id: null,
+        p_contract_id: contractId,
       });
       setResult(res);
       setView('done');
@@ -129,6 +155,21 @@ export function FundBillAddLineModal({ open, bill, onClose }: FundBillAddLineMod
                   />
                 </div>
 
+                {mustPickContract && (
+                  <div className="flex flex-col">
+                    <label className="form-label">{t('fundBill.manualContractRequired')}</label>
+                    <Select
+                      options={contractOptions}
+                      value={contractId != null ? String(contractId) : null}
+                      onChange={v => setContractId(v ? Number(v) : null)}
+                      placeholder={t('fundBill.manualContractPlaceholder')}
+                    />
+                    <div className="text-xs text-subtle mt-1">
+                      {t('fundBill.manualContractHint')}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex flex-col">
                   <label className="form-label">{t('fundBill.amountRequired')}</label>
                   <MaskedInput
@@ -174,6 +215,10 @@ export function FundBillAddLineModal({ open, bill, onClose }: FundBillAddLineMod
               { label: t('fundBill.lineTypeLabel'), value: t(`fundBill.lineType_${lineType}`) },
               { label: t('fundBill.amount'), value: fmtCurrency(amountValue) },
               { label: t('fundBill.manualReason'), value: reasonCode.trim() },
+              ...(contractId != null ? [{
+                label: t('fundBill.manualContract'),
+                value: contractOptions.find(o => o.value === String(contractId))?.label ?? '',
+              }] : []),
               { label: t('fundBill.netAmount'), value: fmtCurrency(result.net_amount), emphasis: true },
             ]}
             onClose={forceClose}

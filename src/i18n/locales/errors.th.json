@@ -1238,5 +1238,7 @@
   "FUND.VALIDATION.PARTY_ID_REQUIRED": "ต้องระบุว่าจ่ายเงินให้ใคร",
   "FUND.VALIDATION.PAYEE_NAME_REQUIRED": "ค่าใช้จ่ายต้องระบุชื่อผู้รับเงิน",
   "FUND.VALIDATION.SETTLES_BILL_REQUIRED": "ใบนี้ต้องระบุว่าเคลียร์ใบจ่ายใบไหน",
-  "SALE.VALIDATION.FUND_BRANCH_NO_CASH": "สาขาของบริษัทกองทุนรับเงินสดไม่ได้ — เงินต้องเข้าบัญชีของกองทุน"
+  "SALE.VALIDATION.FUND_BRANCH_NO_CASH": "สาขาของบริษัทกองทุนรับเงินสดไม่ได้ — เงินต้องเข้าบัญชีของกองทุน",
+  "fund.validation.manual_line_contract_required": "ใบนี้มีหลายสัญญา ต้องระบุว่าบรรทัดนี้เป็นของสัญญาไหน",
+  "fund.validation.manual_line_contract_not_on_bill": "สัญญานี้ไม่ได้อยู่บนใบนี้ เลือกจากสัญญาที่อยู่บนใบ"
 }
