@@ -127,8 +127,9 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
    */
   const documentLines = lines.rows;
 
-  /** What the fund actually transfers: every row on the document, netted. */
-  const documentNet = documentLines.reduce((sum, l) => sum + signedAmount(l), 0);
+  /** The document's own total, as the backend states it. Never summed here:
+   *  see the owner breakdown below for what re-deriving a money figure costs. */
+  const documentNet = bill?.net_amount ?? 0;
 
   /**
    * Whose money the document moved, taken from the payment rows.

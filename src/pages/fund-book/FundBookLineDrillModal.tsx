@@ -25,7 +25,7 @@ import { useNavigate } from 'react-router-dom';
 import { Building2, ExternalLink, Wallet } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency, formatEntityCode } from '../../lib/format';
-import { useFundBill, useFundBillLines } from '../fund-bills/useFundBills';
+import { useFundBill, useFundBillLines, useFundBillPayments } from '../fund-bills/useFundBills';
 import { fundBillStatusColor, type FundBillLine } from '../fund-bills/fundBillTypes';
 
 /** A line's contribution, from the document's end. Memo rows carry no money. */
@@ -34,11 +34,12 @@ function signedAmount(line: FundBillLine): number {
   return line.direction === 'TO_PARTY' ? line.amount : -line.amount;
 }
 
-/** One owner's rows and what they come to. */
+/** One owner's rows, and what the books say that owner's share came to. */
 interface OwnerGroup {
   owner: string;
   lines: FundBillLine[];
-  net: number;
+  /** From the payment rows, never summed from the lines — see below. */
+  net: number | null;
 }
 
 interface FundBookLineDrillModalProps {
@@ -54,6 +55,22 @@ export function FundBookLineDrillModal({ open, billId, onClose }: FundBookLineDr
 
   const { bill } = useFundBill(billId);
   const lines = useFundBillLines(billId);
+  // The per-owner shares live here, one row per owner, written when the
+  // document was paid. Summing the lines instead gives a wrong answer — a
+  // line's sign is written from the counterparty's end, so two rows owned by
+  // the same party can point opposite ways.
+  const payments = useFundBillPayments(billId);
+
+  /** What the books say each owner's share came to. Null before payment. */
+  const ownerNet = (() => {
+    const byOwner = new Map<string, number>();
+    for (const p of payments.rows) {
+      if (p.voided_at) continue;
+      const signed = p.owner_type === 'COMPANY' ? p.amount : -p.amount;
+      byOwner.set(p.owner_type, (byOwner.get(p.owner_type) ?? 0) + signed);
+    }
+    return byOwner;
+  })();
 
   /**
    * The rows in owner order, the fund's first.
@@ -65,15 +82,18 @@ export function FundBookLineDrillModal({ open, billId, onClose }: FundBookLineDr
   for (const line of lines.rows) {
     let group = groups.find(g => g.owner === line.owner_type);
     if (!group) {
-      group = { owner: line.owner_type, lines: [], net: 0 };
+      group = { owner: line.owner_type, lines: [], net: null };
       groups.push(group);
     }
     group.lines.push(line);
-    group.net += signedAmount(line);
   }
+  // Fill each group's figure from the books, not from the rows above.
+  for (const g of groups) g.net = ownerNet.get(g.owner) ?? null;
   groups.sort((a, b) => (a.owner === 'HOLDING' ? -1 : b.owner === 'HOLDING' ? 1 : 0));
 
-  const documentNet = groups.reduce((sum, g) => sum + g.net, 0);
+  /** The backend's own total for the document. The per-owner subtotals above are
+   *  a reading aid; this line is the figure of record and is never summed here. */
+  const documentNet = bill?.net_amount ?? 0;
 
   return (
     <Modal open={open} onClose={onClose} maxWidth="38rem" width="100%">
@@ -133,9 +153,11 @@ export function FundBookLineDrillModal({ open, billId, onClose }: FundBookLineDr
                     {t(`fundBill.ownerShare_${group.owner}`, { defaultValue: group.owner })}
                   </span>
                   <span className="flex-1" />
-                  <span className="text-sm font-semibold tabular-nums shrink-0">
-                    {group.net > 0 ? '+' : ''}{fmtCurrency(group.net)}
-                  </span>
+                  {group.net != null && (
+                    <span className="text-sm font-semibold tabular-nums shrink-0">
+                      {group.net > 0 ? '+' : ''}{fmtCurrency(group.net)}
+                    </span>
+                  )}
                 </div>
 
                 {group.lines.map(line => (
