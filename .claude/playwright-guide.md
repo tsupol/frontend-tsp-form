@@ -238,3 +238,33 @@ after `emulateMedia` + reload → `data-theme="dark"`.
 
 - **Multiple reset-key buttons share `aria-label="Reset password"`** with the modal's confirm button — a strict-mode violation. Scope to the dialog: `page.getByRole('dialog').getByRole('button', { name: 'X' })`.
 - **Disabled action-footer buttons carry the reason as `data-blocked-reason`** on the button; the visible reason is a hover-only portal tooltip, unreadable from the DOM. See `.claude/playwright-affordances.md`.
+
+## Contract signing CAN be driven — it is not a blocker
+
+Signing was long treated as "a person must do this". It can be driven end to end.
+Earlier sessions stopped here and handed the work back; that was wrong.
+
+**Where it happens:** the shop's contract page has a signing tab with a **QR** button.
+The QR dialog holds a link to a separate capture site (a different host from the app).
+Copy that link out of the dialog's input and open it in a second tab — that page is the
+customer-facing ceremony, and it drives fine.
+
+**On that page, in order:**
+1. **Witnesses** are picked from dropdowns (the branch's registered witnesses) and
+   confirmed one at a time. They sign by being assigned — no drawing.
+2. **The customer** signs last. Their row opens a document that **must be scrolled to the
+   very end before the pad unlocks** — scroll the inner document pane, not the window.
+3. Draw on the pad, press sign, then **confirm** on a second step.
+
+**The trap that cost the most time:** the page has several canvases — one per document
+page, plus the signature pad. The pad is the **last** one and is much shorter than the
+others. Drawing on a document canvas leaves the pad empty and the page correctly answers
+"please sign first". Pick the last canvas, scroll it into view, then draw.
+
+Draw something that reads as a handwritten name — a few connected strokes with direction
+changes. Not a smooth sine wave, and not a single dot.
+
+**Prerequisites** (fail earlier, not at the ceremony): the company needs a registered
+signing party and the branch needs two witnesses, each with a signature image, and they
+must be set as the branch's signatory defaults. A freshly created company has none of
+this — create it rather than reporting the walk-through as blocked.

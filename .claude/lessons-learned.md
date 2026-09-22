@@ -37,3 +37,24 @@ When building a list page, decide client-side vs server-side pagination by askin
 - **Small, bounded, stable** (branches, config, enums) → client-side is fine
 
 The mistake was thinking about the component layout ("it's a selector panel, not a full grid") instead of the data volume. Layout is presentation; pagination strategy is about data. Don't confuse the two.
+
+## 9. Never re-derive a money figure the backend already gives
+
+If the backend hands you a total, use it. Don't add up the rows yourself to get the
+same number — you will get a different one, and yours will be the wrong one.
+
+The payout screen needed "whose money moved" split by owner. The figures were already
+there twice: the pay call returns the shop's share and the company's share, and the two
+money books hold the same split. The screen instead summed the document's own lines,
+and shipped two wrong numbers that disagreed with both books.
+
+**Why summing lines is wrong here:** a line's sign is written from the *counterparty's*
+end. On a payout the fund company's commission reads as going toward the shop while its
+contract fee reads as deducted from the shop — yet both are the fund handing money to
+the company. Adding by that sign puts each on the wrong side.
+
+**The rule:** whose money a row is (`owner_type`) and which way it moves (`direction` /
+`flow`) are different axes, and a row's direction is only meaningful together with whose
+end it is written from. Before computing any money total, search the response you already
+have for the number — it is usually sitting there. Document direction and book direction
+disagreeing is documented, expected, and not a bug to "fix".
