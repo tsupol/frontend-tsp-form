@@ -4829,7 +4829,6 @@
     "bankAccountPlaceholder": "Not recorded",
     "bankNet": "Through the bank",
     "bankNetHint": "Only the movements that touched a bank account. The balance counts everything, so the two differ by what was recorded without a transfer.",
-    "bankVsBalance": "Book balance {{balance}} · actually left the bank {{bank}} — the difference is money recorded as paid without a transfer.",
     "canWithdraw": "Can take out",
     "capital": "Capital from holding",
     "cashFlowNotProfit": "Running cash flow, not profit",

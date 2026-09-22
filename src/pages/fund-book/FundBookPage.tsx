@@ -381,18 +381,6 @@ export function FundBookPage() {
                 </div>
               )}
 
-              {/* The bank total differs from the balance by the company's money
-               *  that has not been taken out. Said once, here, rather than left
-               *  as two numbers that look like a fault. */}
-              {shownBook && shownBook.bank_net !== shownBook.balance && (
-                <div className="flex-none px-2 pt-2 pb-3 text-xs text-subtle">
-                  {t('fundBook.bankVsBalance', {
-                    balance: fmtCurrency(shownBook.balance),
-                    bank: fmtCurrency(shownBook.bank_net),
-                  })}
-                </div>
-              )}
-
               {/* Mobile has no room for the header row, so the buttons sit here. */}
               {isMobile && (canTopUp || canWithdraw || canSpend) && (
                 <div className="flex-none p-2 border-b border-line flex gap-2 flex-wrap">
