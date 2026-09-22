@@ -26,7 +26,6 @@ import {
 import {
   ArrowDownCircle, ArrowRightFromLine, ArrowUpCircle, BookOpen, Keyboard, Receipt, Wallet,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { DateTime } from '../../components/DateTime';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMyPermissions } from '../../hooks/useMyPermissions';
@@ -34,6 +33,7 @@ import { fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr } fro
 import { useFundBookGroups, useFundBookLines, useFundBookOverview } from './useFundBook';
 import type { FundBookGroupRow } from './useFundBook';
 import { FundMovementModal } from './FundMovementModal';
+import { FundBookLineDrillModal } from './FundBookLineDrillModal';
 import type { FundBook, FundBookLine, FundBookType, FundMovementPurpose } from './fundBookTypes';
 
 function parseTypedDate(raw: string): Date | null {
@@ -50,7 +50,6 @@ function parseTypedDate(raw: string): Date | null {
 
 export function FundBookPage() {
   const { t, i18n } = useTranslation();
-  const navigate = useNavigate();
   const { user } = useAuth();
   const { hasPermission } = useMyPermissions();
   const companyId = user?.company_id ?? null;
@@ -63,6 +62,9 @@ export function FundBookPage() {
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [movement, setMovement] = useState<FundMovementPurpose | null>(null);
+  // The document whose insides are open. Held past the close so the modal has
+  // something to render while it animates out.
+  const [drillBillId, setDrillBillId] = useState<number | null>(null);
 
   const { overview, isLoading } = useFundBookOverview(companyId);
   const books = overview?.books ?? [];
@@ -197,10 +199,13 @@ export function FundBookPage() {
   const renderLine = (line: FundBookLine) => (
     <div className="px-4 py-2.5">
       <div className="flex items-center gap-2">
+        {/* The document opens here rather than on its own page: the question
+         *  being asked is "what is this number made of", and leaving the book
+         *  to answer it loses the place the reader was working from. */}
         {line.bill_code ? (
           <button
             type="button"
-            onClick={() => line.bill_id && navigate(`/admin/fund-bills/${line.bill_id}`)}
+            onClick={() => line.bill_id && setDrillBillId(line.bill_id)}
             className="text-sm font-medium text-primary-fg hover:underline bg-transparent border-none p-0 cursor-pointer truncate"
           >
             {line.bill_code}
@@ -482,6 +487,12 @@ export function FundBookPage() {
             companyId={companyId}
             books={books}
             onClose={() => setMovement(null)}
+          />
+
+          <FundBookLineDrillModal
+            open={drillBillId != null}
+            billId={drillBillId}
+            onClose={() => setDrillBillId(null)}
           />
         </>
       )}
