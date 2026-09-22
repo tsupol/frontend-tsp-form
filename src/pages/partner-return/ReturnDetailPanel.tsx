@@ -23,6 +23,7 @@ import {
   Send, Trash2, XCircle,
 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
+import { PartnerRemitAccounts } from '../../components/PartnerRemitAccounts';
 import { PartnerReturnTimeline } from '../../components/PartnerReturnTimeline';
 import { ContractPhotoGroups } from '../contracts/ContractPhotoGroups';
 import { blockingReasonText } from '../../lib/apiErrors';
@@ -163,6 +164,13 @@ export function ReturnDetailPanel({ returnId, isMobile, onBack }: {
                 <PenLine size={16} className="shrink-0" />
                 <span>{t('partnerReturn.waitingCustomerSignature')}</span>
               </div>
+            )}
+
+            {/* Where the money goes, while it is still owed. The shop used to
+             *  phone and ask, and the obvious guess — the account customers pay
+             *  instalments into — is the wrong one. */}
+            {detail.resolution === 'BUYBACK' && detail.buyback_bill_id == null && (
+              <PartnerRemitAccounts only="PARTNER_REMIT" />
             )}
 
             <div>
