@@ -8,9 +8,14 @@
 // reason on its tooltip, because that is something the user can act on.
 //
 // The lines carry two axes that must stay apart: whose money a line is, and who
-// it moves to. The shop's own rows and the fund company's own rows therefore sit
-// in separate blocks — a shop never sees the company's, and folding them into
-// one list would make the two totals impossible to read.
+// it moves to. Every row on a payout is a dealing with the shop, so they all sit
+// in one list — the shop is shown its whole document, contract fee included.
+//
+// Whose money a row is decides only which book it lands in, and that shows as a
+// breakdown under the list rather than as a second block. The contract fee is
+// the case that makes this matter: it is one deduction from the shop, recorded
+// as the fund company's income, so it appears once on the document and once in
+// the company's book. An earlier version drew it twice; that was wrong.
 //
 // The panel owns no routing and no page chrome — the host decides where it sits
 // and what the header around it says, so the same component serves the desktop
@@ -21,7 +26,7 @@ import { useTranslation } from 'react-i18next';
 import { Badge, Button, Tooltip } from 'tsp-form';
 import { useNavigate } from 'react-router-dom';
 import {
-  Building2, ExternalLink, FileQuestion, Plus, Smartphone, Store, Trash2, Wrench,
+  Building2, ExternalLink, FileQuestion, Plus, Smartphone, Store, Trash2, Wallet, Wrench,
 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency, formatEntityCode } from '../../lib/format';
@@ -112,22 +117,44 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
       ? bill.status_name
       : t(`fundBill.status_${code}`, { defaultValue: code });
 
-  /** Branch-facing lines: the shop's side of the document. */
-  const branchLines = lines.rows.filter(l => l.party_type === 'BRANCH');
-  /** Company-facing lines: the fund company's own commission and doc fee. */
-  const companyLines = lines.rows.filter(l => l.party_type === 'COMPANY');
-  /** Anything else the backend sends (holding top-ups, outside payees). */
-  const otherLines = lines.rows.filter(
-    l => l.party_type !== 'BRANCH' && l.party_type !== 'COMPANY',
-  );
+  /**
+   * Every row of the document, in one list.
+   *
+   * A payout used to be split by who each row moves to, which drew the contract
+   * fee twice — once as a deduction from the shop and once as the company's
+   * receipt. The backend now emits it once, so the split is gone and the rows
+   * read as what they are: one set of dealings with the shop.
+   */
+  const documentLines = lines.rows;
 
-  const branchNet = branchLines.reduce((sum, l) => sum + signedAmount(l), 0);
-  const companyNet = companyLines.reduce((sum, l) => sum + signedAmount(l), 0);
+  /** What the fund actually transfers: every row on the document, netted. */
+  const documentNet = documentLines.reduce((sum, l) => sum + signedAmount(l), 0);
 
-  /** Group the shop's contract lines by settlement; hand-entered lines belong
-   *  to no contract and are listed on their own so the two never blur. */
+  /**
+   * The same rows again, split by whose money they are.
+   *
+   * This is the answer to "why does the fund's book not match the bank" — rows
+   * belonging to the company move no money of their own, they are withheld from
+   * the one transfer. Shown as a breakdown, never as a separate box, because
+   * a box invites reading it as a second payment.
+   */
+  const ownerBreakdown = (() => {
+    const byOwner = new Map<string, number>();
+    for (const line of documentLines) {
+      byOwner.set(line.owner_type, (byOwner.get(line.owner_type) ?? 0) + signedAmount(line));
+    }
+    return [...byOwner.entries()]
+      .filter(([, net]) => net !== 0)
+      .map(([owner, net]) => ({ owner, net }));
+  })();
+
+  /** Only worth showing when the document carries more than one owner's money. */
+  const showOwnerBreakdown = ownerBreakdown.length > 1;
+
+  /** Group the contract lines by settlement; hand-entered lines belong to no
+   *  contract and are listed on their own so the two never blur. */
   const contractGroups: ContractGroup[] = [];
-  for (const line of branchLines) {
+  for (const line of documentLines) {
     if (line.is_manual) continue;
     let group = contractGroups.find(g => g.settlement_id === line.settlement_id);
     if (!group) {
@@ -144,7 +171,7 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
     group.lines.push(line);
     group.net += signedAmount(line);
   }
-  const manualLines = branchLines.filter(l => l.is_manual);
+  const manualLines = documentLines.filter(l => l.is_manual);
 
   const footerActions = (actions?.actions ?? [])
     .filter(a => !ROW_ACTIONS.has(a.action_code))
@@ -303,35 +330,22 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
                 </span>
               </div>
 
-              {/* The two sides of the document. The shop's net is what gets
-               *  transferred; the company's is recorded, never transferred —
-               *  keeping them on separate tiles is what stops the two being
-               *  read as one number. */}
-              <div className="px-3 py-2.5 border-t border-line grid gap-3 sm:grid-cols-3">
+              {/* One total, because the document is one dealing. The split by
+               *  whose money it is lives under the lines, where it explains the
+               *  books rather than implying a second payment. */}
+              <div className="px-3 py-2.5 border-t border-line flex items-end gap-4 flex-wrap">
                 <div>
-                  <div className="text-xs text-subtle flex items-center gap-1">
-                    <Store size={12} />{t('fundBill.branchNet')}
-                  </div>
-                  <div className="text-lg font-semibold tabular-nums">{fmtCurrency(branchNet)}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-subtle flex items-center gap-1">
-                    <Building2 size={12} />{t('fundBill.companyNet')}
-                  </div>
-                  <div className="text-base font-semibold tabular-nums">{fmtCurrency(companyNet)}</div>
-                </div>
-                <div className="sm:text-right">
                   <div className="text-xs text-subtle">{t('fundBill.netAmount')}</div>
-                  <div className="text-lg font-semibold tabular-nums">{fmtCurrency(bill.net_amount)}</div>
-                  {bill.returned_net !== 0 && (
-                    <>
-                      <div className="text-xs text-subtle mt-1">{t('fundBill.netAfterReturns')}</div>
-                      <div className="text-base font-semibold tabular-nums text-success-fg">
-                        {fmtCurrency(bill.net_after_returns)}
-                      </div>
-                    </>
-                  )}
+                  <div className="text-xl font-semibold tabular-nums">{fmtCurrency(bill.net_amount)}</div>
                 </div>
+                {bill.returned_net !== 0 && (
+                  <div>
+                    <div className="text-xs text-subtle">{t('fundBill.netAfterReturns')}</div>
+                    <div className="text-base font-semibold tabular-nums text-success-fg">
+                      {fmtCurrency(bill.net_after_returns)}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {bill.void_reason && (
@@ -348,7 +362,7 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
               )}
             </div>
 
-            {/* The shop's side, grouped by contract. */}
+            {/* The document's lines, grouped by contract. */}
             <div className="rounded-md border border-line overflow-hidden">
               <div className="px-3 py-2 bg-surface flex items-center gap-2">
                 <Store size={14} className="text-subtle" />
@@ -424,35 +438,47 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
                       {manualLines.map(renderLine)}
                     </div>
                   )}
+
+                  {/* The document's own total, then whose money it was.
+                   *  The second part is what explains a fund book that does not
+                   *  match the bank: the company's share is withheld from the
+                   *  single transfer, not sent separately. */}
+                  <div className="border-t border-line bg-surface">
+                    <div className="px-3 py-2 flex items-center gap-2">
+                      <span className="text-sm font-medium">{t('fundBill.documentTotal')}</span>
+                      <span className="flex-1" />
+                      <span className="text-sm font-semibold tabular-nums">
+                        {fmtCurrency(documentNet)}
+                      </span>
+                    </div>
+                    {showOwnerBreakdown && (
+                      <>
+                        {ownerBreakdown.map(({ owner, net }) => (
+                          <div
+                            key={owner}
+                            className="px-3 py-1.5 border-t border-line-subtle flex items-center gap-2"
+                          >
+                            {owner === 'COMPANY'
+                              ? <Building2 size={12} className="text-subtle shrink-0" />
+                              : <Wallet size={12} className="text-subtle shrink-0" />}
+                            <span className="text-xs text-subtle truncate">
+                              {t(`fundBill.ownerShare_${owner}`, { defaultValue: owner })}
+                            </span>
+                            <span className="flex-1" />
+                            <span className="text-xs tabular-nums shrink-0">
+                              {net > 0 ? '+' : ''}{fmtCurrency(net)}
+                            </span>
+                          </div>
+                        ))}
+                        <div className="px-3 py-2 border-t border-line-subtle text-xs text-subtle">
+                          {t('fundBill.ownerShareHint')}
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </>
               )}
             </div>
-
-            {/* The fund company's own side — never shown to a shop, and never
-             *  transferred: it is recorded as paid the moment the document is. */}
-            {companyLines.length > 0 && (
-              <div className="rounded-md border border-line overflow-hidden">
-                <div className="px-3 py-2 bg-surface flex items-center gap-2">
-                  <Building2 size={14} className="text-subtle" />
-                  <span className="text-sm font-medium">{t('fundBill.companyLines')}</span>
-                  <span className="flex-1" />
-                  <span className="text-sm tabular-nums font-medium">{fmtCurrency(companyNet)}</span>
-                </div>
-                {companyLines.map(renderLine)}
-                <div className="px-3 py-2 border-t border-line text-xs text-subtle">
-                  {t('fundBill.companyLinesHint')}
-                </div>
-              </div>
-            )}
-
-            {otherLines.length > 0 && (
-              <div className="rounded-md border border-line overflow-hidden">
-                <div className="px-3 py-2 bg-surface text-sm font-medium">
-                  {t('fundBill.otherLines')}
-                </div>
-                {otherLines.map(renderLine)}
-              </div>
-            )}
 
             {/* Documents that cleared this one — a buyback, a clawback. */}
             {clearings.rows.length > 0 && (
