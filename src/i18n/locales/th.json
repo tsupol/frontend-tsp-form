@@ -3608,6 +3608,16 @@
     "editQty": "แก้ไขจำนวน",
     "catalogHint": "ราคาตามแคตตาล็อก: {{value}}"
   },
+  "contractCapital": {
+    "capitalOut": "ลงทุนไป",
+    "collected": "เก็บคืนแล้ว",
+    "expectedProfit": "กำไรที่คาดหวังถ้าเก็บครบ",
+    "expectedProfitHint": "จากยอดที่จะเก็บได้ทั้งสัญญา {{collect}}",
+    "realizedProfit": "กำไรจริงตอนนี้",
+    "recovered": "คืนทุนแล้ว",
+    "remainingToRecover": "เหลือถึงคืนทุน",
+    "title": "ทุนของสัญญานี้"
+  },
   "contractFee": {
     "title": "เปิดบิลค่าปรับ/บริการ",
     "done": "เปิดบิลค่าปรับ/บริการแล้ว",

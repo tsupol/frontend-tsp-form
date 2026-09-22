@@ -23,6 +23,7 @@ import { fmtCurrency } from '../../lib/format';
 import { getStateColor, getStateLabel, productName, formatInstallment } from './contractUtils';
 import { ContractActionButtons } from './ContractActions';
 import { PartnerCaseCard } from '../partner-cases/PartnerCaseCard';
+import { ContractCapitalStrip } from './ContractCapitalStrip';
 import { SettlementCard } from '../partner-settlement/SettlementCard';
 import { ContractMoneyPanel } from '../fund-bills/ContractMoneyPanel';
 import { useContractMoney } from '../fund-bills/useFundBills';
@@ -1314,6 +1315,12 @@ function MoneyTab({ contractId, contract, t, requestedSection, onSectionConsumed
 
   return (
     <div className="flex flex-col h-full min-h-0">
+      {/* Above the sub-tabs: this is the contract's position as a whole, not a
+       *  detail of any one section. Renders nothing when the row is withheld
+       *  (a shop session) or does not exist. */}
+      <div className="flex-none px-4 pt-3">
+        <ContractCapitalStrip contractId={contractId} />
+      </div>
       <ScrollableTabs
         tabs={sections}
         activeTab={section}

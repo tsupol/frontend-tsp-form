@@ -3612,6 +3612,16 @@
     "editQty": "Edit quantity",
     "catalogHint": "Catalog price: {{value}}"
   },
+  "contractCapital": {
+    "capitalOut": "Put in",
+    "collected": "Come back so far",
+    "expectedProfit": "Expected profit if paid in full",
+    "expectedProfitHint": "on {{collect}} collected over the full term",
+    "realizedProfit": "Profit so far",
+    "recovered": "Capital recovered",
+    "remainingToRecover": "Still to recover",
+    "title": "Capital on this contract"
+  },
   "contractFee": {
     "title": "Open service / fee bill",
     "done": "Service / fee bill created",
