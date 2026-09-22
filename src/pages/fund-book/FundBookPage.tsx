@@ -385,7 +385,7 @@ export function FundBookPage() {
                *  that has not been taken out. Said once, here, rather than left
                *  as two numbers that look like a fault. */}
               {shownBook && shownBook.bank_net !== shownBook.balance && (
-                <div className="flex-none px-2 pb-2 text-xs text-subtle">
+                <div className="flex-none px-2 pt-2 pb-3 text-xs text-subtle">
                   {t('fundBook.bankVsBalance', {
                     balance: fmtCurrency(shownBook.balance),
                     bank: fmtCurrency(shownBook.bank_net),

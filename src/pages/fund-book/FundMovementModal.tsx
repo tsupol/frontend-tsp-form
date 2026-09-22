@@ -70,8 +70,11 @@ export function FundMovementModal({
   const today = toLocalDateStr(new Date());
 
   const [view, setView] = useState<'form' | 'done'>('form');
-  // Whose money moves. A top-up is always holding's capital; an expense always
-  // comes out of the fund book; only a withdrawal has a real choice.
+  // Whose money moves. An expense always comes out of the fund book; a top-up
+  // and a withdrawal each have a real choice, because the company keeps its own
+  // book — its earnings go in, clawed-back commission comes out, and when more
+  // is clawed back than earned that book goes negative and has to be filled the
+  // same way holding fills the fund book.
   const [ownerType, setOwnerType] = useState<'HOLDING' | 'COMPANY'>('HOLDING');
   const [amount, setAmount] = useState('');
   const [paidDate, setPaidDate] = useState(today);
@@ -113,8 +116,8 @@ export function FundMovementModal({
 
   /** Which book this movement lands in, given the side picked. */
   const book = useMemo(
-    () => books.find(b => b.book_type === (ownerType === 'COMPANY' && isWithdraw ? 'COMPANY' : 'FUND')) ?? null,
-    [books, ownerType, isWithdraw],
+    () => books.find(b => b.book_type === (ownerType === 'COMPANY' && !isExpense ? 'COMPANY' : 'FUND')) ?? null,
+    [books, ownerType, isExpense],
   );
 
   const amountValue = Number(amount);
@@ -221,8 +224,9 @@ export function FundMovementModal({
               )}
 
               <div className="form-grid mt-4">
-                {/* Only a withdrawal has two sides to choose between. */}
-                {isWithdraw && (
+                {/* Both a top-up and a withdrawal have two sides to choose
+                 *  between; an expense is always the fund's. */}
+                {!isExpense && (
                   <div className="flex flex-col">
                     <label className="form-label">{t('fundBook.whoseMoney')}</label>
                     <RadioGroup

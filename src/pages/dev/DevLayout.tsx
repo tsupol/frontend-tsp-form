@@ -12,6 +12,7 @@ const navItems = [
   { path: '/dev/notifications', label: 'Notifications', icon: Bell },
   { path: '/dev/tokens', label: 'Token Debug', icon: KeyRound },
   { path: '/dev/remove-buttons', label: 'Remove Buttons', icon: Trash2 },
+  { path: '/dev/modal-backdrop', label: 'Modal Backdrop', icon: Trash2 },
 ];
 
 // The enrollment page is a SEPARATE Vite entry, not a route in this app, so it

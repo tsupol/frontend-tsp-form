@@ -161,6 +161,7 @@ import { DevBillPrintPage } from './pages/dev/DevBillPrintPage';
 import { DevNotificationsPage } from './pages/dev/DevNotificationsPage';
 import { DevTokensPage } from './pages/dev/DevTokensPage';
 import { DevRemoveButtonsPage } from './pages/dev/DevRemoveButtonsPage';
+import { DevModalBackdropPage } from './pages/dev/DevModalBackdropPage';
 import { DevLoginPage } from './pages/dev/DevLoginPage';
 import { isLocalDev } from './lib/devEnv';
 
@@ -944,6 +945,16 @@ function App() {
               <ProtectedRoute>
                 <AdminLayout>
                   <DevLayout><DevRemoveButtonsPage /></DevLayout>
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dev/modal-backdrop"
+            element={
+              <ProtectedRoute>
+                <AdminLayout>
+                  <DevLayout><DevModalBackdropPage /></DevLayout>
                 </AdminLayout>
               </ProtectedRoute>
             }
