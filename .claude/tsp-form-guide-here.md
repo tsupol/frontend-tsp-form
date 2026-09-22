@@ -1,6 +1,10 @@
-p# tsp-form — Project-Specific Patterns
+# tsp-form — Project-Specific Patterns
 
-Supplements `C:\Users\tonsu\.claude\tsp-form-guide.md` with patterns specific to this project.
+Supplements `C:\Users\tonsu\.claude\tsp-form-guide.md` with patterns specific to this project:
+conventions on top of library components, and the project's own components built on tsp-form
+(`ActionDoneView`, `ModalErrorBand`, `BranchPinInput`, backend-driven action footers).
+Both files are injected together by the global tsp-form hook on the first `.tsx`/`.css` edit
+of a session. Page-level nav guarding is its own doc (`.claude/nav-guard-pattern.md`).
 
 ## Never use native HTML controls
 
@@ -132,3 +136,157 @@ Always use `<BranchPinInput>` (`src/components/BranchPinInput.tsx`) for any PIN 
 ## API error display
 
 For an API error shown in a form/modal, use `<div className="alert alert-danger">` with an `XCircle` icon — never a hand-rolled `bg-danger/10 border border-danger` div. (See the catch-block translation pattern under API error handling in the project CLAUDE.md.)
+
+## ActionDoneView — the shared modal success view
+
+`src/pages/contracts/ActionDoneView.tsx`. The one component every data-mutating
+modal uses for its success step (the `view === 'done'` branch of the write-modal
+checklist in `.claude/CLAUDE.md`; the pattern itself is "Form modals: success step
++ nav guard" in the global guide). Renders both the `modal-content` body and the
+`modal-footer` — the host drops it inside its modal and stops there. Do NOT
+hand-roll a success screen; use this so all modals look and behave the same.
+
+**When:** any modal that creates/edits data, after the mutation resolves. Set
+`view='done'`, stash the result, render `<ActionDoneView .../>` instead of the
+form. The user reads the result and closes the modal themselves (never auto-close).
+
+| prop | type | purpose |
+|---|---|---|
+| `headline` | string | big bold line, e.g. "Late fee collected". Translate it. |
+| `contractCode` | string | subtitle under headline — contract/PO/asset code. |
+| `tone` | `'success'｜'warning'｜'danger'｜'neutral'` | icon + accent. Default `success`. |
+| `stateTransition` | `{from,to,fromColor?,toColor?}` | optional from→to badge pair (e.g. ACTIVE→TERMINATED). |
+| `detailRows` | `{label,value,emphasis?}[]` | receipt-style key/value list. `emphasis` bolds the value. |
+| `extras` | ReactNode | free slot below the rows (banners, lists). |
+| `billId` | number｜null | **if set, the footer shows Download + Print bill-receipt buttons** (print uses `.claude/in-app-print-pattern.md`). Takes precedence over `secondaryAction`. |
+| `secondaryAction` | `{label,onClick,startIcon?,endIcon?}` | one extra footer button (e.g. "Open PO"). Ignored if `billId` is set. |
+| `doneLabel` | string | Done-button label override. Default `t('common.done')`. |
+| `doneColor` | `'primary'｜'danger'` | Done-button color. Default `primary`. |
+| `onClose` | () => void | **required** — closes the host modal. |
+
+```tsx
+{view === 'done' && result && (
+  <ActionDoneView
+    headline={t('lateFee.done')}
+    contractCode={contractCode}
+    billId={result.bill_id}          // → receipt Download + Print in footer
+    detailRows={[
+      { label: t('lateFee.collected'), value: fmtCurrency(amount) },
+      { label: t('lateFee.netCharged'), value: fmtCurrency(net), emphasis: true },
+    ]}
+    onClose={forceClose}
+  />
+)}
+```
+
+Bill print works for any bill the print pattern can fetch — including bills that end
+PAID via a ledger drain (no cash step), e.g. `fn_bill_late_fee_collect`.
+
+Reference implementations: `ContractFeeModal.tsx` (cart, `billId`),
+`LateFeeCollectModal.tsx` (single RPC, `billId` + waive rows). Copy either.
+
+## ModalErrorBand — where a submit error goes
+
+`src/components/ModalErrorBand.tsx`. The failure-side counterpart to
+`ActionDoneView`: the one place a write-modal renders its submit error. Render it
+**between** `.modal-content` and `.modal-footer` — a sibling, never a child of
+`modal-content`:
+
+```tsx
+<div className="modal-content">…fields…</div>
+<ModalErrorBand message={error} />
+<div className="modal-footer">…buttons…</div>
+```
+
+Why not inside `modal-content`: it is the scrolling element (`overflow-y:auto; flex:1`)
+between a static header and footer. An alert placed inside it scrolls with the form,
+so on any modal taller than the viewport the error renders below the fold and the
+modal does not scroll to it — the user presses Save and sees **nothing happen**.
+Measured on CreateExpenseModal at 390×844 before the fix: error at y=966, content
+viewport ending at 740, `scrollTop: 0`. After: y=694, flush above the footer, visible
+at every scroll position. Putting it at the *top* of `modal-content` is not a fix
+either — it scrolls away as soon as the user scrolls down, far from the button that
+produced it.
+
+| prop | type | purpose |
+|---|---|---|
+| `message` | string｜null | falsy renders nothing (no wasted space) |
+| `variant` | `'danger'｜'warning'` | default `danger`; `warning` for known backend gaps |
+| `onDismiss` | () => void | shows an × that clears the parent's error state. Omit for a non-dismissable band. Pass `() => setError(null)`. |
+
+Translate the message before passing it — `translateApiError(err, t)` for
+`ApiError`, per the API error handling rules in `.claude/CLAUDE.md`.
+
+**Migration:** most modals still render `alert alert-danger` inline. Migrate a modal
+to the band when you touch it for another reason; no bulk sweep.
+
+## Action button end-icons — `elsewhere`, `not_wired`, gated
+
+Convention for backend-driven action footers (`ContractActions.tsx`,
+`AssetsPage.tsx` — anything rendered from a `fn_*_available_actions` allowlist) so
+users can tell at a glance which buttons do something *here*.
+
+| Icon | Meaning | Tooltip line | When |
+|------|---------|--------------|------|
+| `<ExternalLink size={12} />` | **Lives elsewhere** | `Use: <where>` | Implemented on another tab/page. Keep the button (so users know the capability exists) but point them to the real surface. |
+| `<Wrench size={12} />` | **Not yet wired** | `Not yet wired in this page` | In the allowlist but no FE handler/modal exists. Auto-applied to any allowlisted action missing from the page's wired-actions map (`SIMPLE_ACTIONS` / `BACKEND_TO_FE_ACTION` / dedicated-modal set). |
+| `<Lock size={12} />` | **FE permission gate** (AssetsPage) | the gate's reason | The action is permission-gated in the FE and the user fails it. Shown disabled with the reason — never hidden. |
+
+Plain wired actions get **no end-icon**. Always render every allowlisted action —
+the old "Show hidden" dev toggle is gone; the icon + tooltip carries the routing info.
+
+**Tooltip is a stack of lines**, not one winning over the others:
+1. action label (bold) — always;
+2. placement note — "Use: …" / "Not yet wired …" / gate reason (when applicable);
+3. blocking reason — translated `blockingReason.<code>` (only when `is_available === false` and `blocking_reason` is set).
+
+Single line → plain string; multi-line → vertical flex column, `font-medium` on line 1,
+`text-xs opacity-90` on the rest.
+
+Per-page configuration — two small maps near the top of the file:
+
+```ts
+type ActionPlacement =
+  | { kind: 'elsewhere'; where: string }
+  | { kind: 'not_wired' };
+
+const ACTION_PLACEMENT: Record<string, ActionPlacement> = {
+  SAVING_DEPOSIT: { kind: 'elsewhere', where: 'Wallets tab → Saving' },
+  // …
+};
+
+// Optional: regroup an action under a different category in the popover
+// (backend may tag SAVING_DEDUCT as FEE; we show it under WALLET).
+const CATEGORY_OVERRIDE: Record<string, string> = { SAVING_DEDUCT: 'WALLET' };
+```
+
+`renderActionButton` skeleton:
+
+```tsx
+const placement = ACTION_PLACEMENT[a.action_code];
+let endIcon: React.ReactNode = undefined;
+const lines: string[] = [label];
+
+if (placement?.kind === 'elsewhere') {
+  endIcon = <ExternalLink size={12} />;
+  lines.push(`${t('contract.actionElsewhere', { defaultValue: 'Use' })}: ${placement.where}`);
+} else if (placement?.kind === 'not_wired' || !wired) {
+  endIcon = <Wrench size={12} />;
+  lines.push(t('contract.actionNotImplemented', { defaultValue: 'Not yet wired in this page' }));
+}
+if (!a.is_available && a.blocking_reason) {
+  lines.push(t(`blockingReason.${a.blocking_reason}`, { ns: 'apiErrors', defaultValue: a.blocking_reason }));
+}
+
+const tooltipContent = lines.length === 1 ? lines[0] : (
+  <div className="flex flex-col gap-0.5">
+    {lines.map((line, i) => <div key={i} className={i === 0 ? 'font-medium' : 'text-xs opacity-90'}>{line}</div>)}
+  </div>
+);
+// <Tooltip content={tooltipContent}><Button endIcon={endIcon} …/></Tooltip>
+```
+
+(AssetsPage keeps the same keys in its own `assetActions` namespace:
+`actionElsewhere`, `notImplemented`.) `size={12}` matches the other small button
+end-icons. When you add a new backend-driven action surface, copy this pattern and
+keep icons + tooltip composition consistent across pages.

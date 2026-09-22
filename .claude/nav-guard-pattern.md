@@ -131,52 +131,18 @@ const snapshot = useFormSnapshot({ retailPrice, costPrice, fin2Profits, newField
 
 ## Guarding modal close
 
-For modals with forms (especially `react-hook-form`), guard the close action using `formState.isDirty`:
-
-```tsx
-function CreateSomethingModal({ open, onClose }) {
-  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
-  const { formState: { isDirty }, reset, ...form } = useForm({ ... });
-
-  const handleClose = () => {
-    if (isDirty) { setConfirmCloseOpen(true); return; }
-    forceClose();
-  };
-
-  const forceClose = () => {
-    reset();
-    setConfirmCloseOpen(false);
-    onClose();
-  };
-
-  return (
-    <>
-    <Modal open={open} onClose={handleClose}>
-      {/* form content, cancel button calls handleClose */}
-    </Modal>
-
-    <Modal open={confirmCloseOpen} onClose={() => setConfirmCloseOpen(false)} maxWidth="24rem" width="100%">
-      <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
-      <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
-      <div className="modal-footer">
-        <Button variant="ghost" onClick={() => setConfirmCloseOpen(false)}>{t('common.cancel')}</Button>
-        <Button color="danger" onClick={forceClose}>{t('common.discard')}</Button>
-      </div>
-    </Modal>
-    </>
-  );
-}
-```
-
-Key points:
-- The main Modal's `onClose` uses `handleClose` (guarded), so backdrop clicks are also protected
-- `forceClose` resets the form, closes the confirm modal, then closes the main modal
-- No `NavGuardContext` needed — this is self-contained within the modal component
+Modals don't use `NavGuardContext` — the guard is self-contained in the modal:
+one `handleClose` checks `formState.isDirty` (react-hook-form) or
+`useFormSnapshot(...).isDirty`, opens a confirm modal, and `forceClose` resets +
+closes. The full required pattern (with the success step it pairs with) is
+"Form modals: success step + nav guard" in the global `tsp-form-guide.md`; the
+write-modal checklist in `.claude/CLAUDE.md` is the pre-commit grep.
 
 ## Reference
 
 - **PricebookPage** (`src/pages/pricing/PricebookPage.tsx`) — page-level guard with `useFormSnapshot`
 - **CreateModelModal** (`src/pages/products/ModelsPage.tsx`) — modal close guard with `react-hook-form`
+- **ContractsLayout / AppSideNav** — `guardedNavigate` on every nav entry point
 - **Online-course project** (`D:\dev\online-course-prototype-frontend`) — original inspiration (CourseDetailPage, ProfileLayout)
 
 ## i18n keys
