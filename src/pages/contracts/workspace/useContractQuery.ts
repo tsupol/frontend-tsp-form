@@ -62,13 +62,14 @@ export interface ContractServerState {
   snapshot_term_months: number | null;
   snapshot_installment_amount: number | null;
   snapshot_installment_total: number | null;
-  snapshot_cost_price: number | null;
+  // snapshot_cost_price / snapshot_profit_amount were withdrawn from the shop's
+  // view (a fund's cost and profit are not the shop's business) and are not read
+  // anywhere here. Staff screens still get them from the staff contract view.
   snapshot_retail_price: number | null;
   snapshot_commercial_model: string | null;
   snapshot_interest_percent: number | null;
   snapshot_down_percent: number | null;
   snapshot_down_amount: number | null;
-  snapshot_profit_amount: number | null;
   snapshot_rate_card_id: number | null;
   snapshot_rate_id: number | null;
   snapshot_at: string | null;
