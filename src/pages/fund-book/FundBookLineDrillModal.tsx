@@ -189,11 +189,19 @@ export function FundBookLineDrillModal({ open, billId, onClose }: FundBookLineDr
 
       <div className="modal-footer">
         <Button variant="ghost" onClick={onClose}>{t('common.close', { defaultValue: 'Close' })}</Button>
+        {/* Close first, then navigate. Navigating straight from here unmounts
+         *  the dialog while it is still on the modal stack, so it never
+         *  deregisters: the backdrop is left behind at full opacity, swallowing
+         *  every click on the page underneath. */}
         {billId != null && (
           <Button
             variant="outline"
             endIcon={<ExternalLink size={14} />}
-            onClick={() => navigate(`/admin/fund-bills/${billId}`)}
+            onClick={() => {
+              const target = `/admin/fund-bills/${billId}`;
+              onClose();
+              navigate(target);
+            }}
           >
             {t('fundBook.openDocument')}
           </Button>
