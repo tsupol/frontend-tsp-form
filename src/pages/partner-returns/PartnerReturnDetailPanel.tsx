@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { PartnerReturnTimeline } from '../../components/PartnerReturnTimeline';
+import { PartnerRemitAccounts } from '../../components/PartnerRemitAccounts';
 import { fmtCurrency } from '../../lib/format';
 import { blockingReasonText } from '../../lib/apiErrors';
 import {
@@ -409,6 +410,16 @@ export function PartnerReturnDetailPanel({ returnId, isMobile, onBack, queueRow 
                 </div>
               )}
             </div>
+
+            {/* Where to send the money, next to what is owed. The shop had to
+             *  phone and ask for this before, and the obvious guess — the
+             *  account customers pay into — is the wrong one. Only shown while
+             *  the buyback is still unpaid; afterwards it is noise. Staff
+             *  sessions get nothing back from the view, so the panel hides
+             *  itself there. */}
+            {detail.resolution === 'BUYBACK' && detail.buyback_bill_id == null && (
+              <PartnerRemitAccounts only="PARTNER_REMIT" />
+            )}
 
             {/* The two return photo slots — read-only here; the shop attaches them. */}
             {(detail.return_photos ?? []).length > 0 && (
