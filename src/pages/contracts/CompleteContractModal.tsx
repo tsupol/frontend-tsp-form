@@ -337,16 +337,28 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
   const collectAddConfirm = async () => {
     setStep('collect');
     const wantsDiscount = payoffDiscount > 0;
-    const collectResult = await apiClient.rpc<PayoffBillInfo & { needs_approval?: boolean }>(
-      'fn_bill_early_payoff_collect',
-      {
-        p_contract_id: contract.id,
-        p_note: note.trim() || undefined,
-        ...(wantsDiscount
-          ? { p_discount_amount: payoffDiscount, p_discount_reason: payoffDiscountReason.trim() }
-          : {}),
-      },
-    );
+
+    // A payoff bill may already be open — most often because a discount was
+    // asked for on it and then refused or taken back. That bill is the one to
+    // pay; asking for a second one is refused outright.
+    const existing = preview?.open_bill;
+    const collectResult: PayoffBillInfo & { needs_approval?: boolean } = existing
+      ? {
+          bill_id: existing.bill_id,
+          bill_code: existing.bill_code,
+          bill_total: existing.total_amount,
+          installments_count: preview?.installments.count_unpaid ?? 0,
+        }
+      : await apiClient.rpc<PayoffBillInfo & { needs_approval?: boolean }>(
+        'fn_bill_early_payoff_collect',
+        {
+          p_contract_id: contract.id,
+          p_note: note.trim() || undefined,
+          ...(wantsDiscount
+            ? { p_discount_amount: payoffDiscount, p_discount_reason: payoffDiscountReason.trim() }
+            : {}),
+        },
+      );
     const billId = collectResult.bill_id;
     setPayoffBill(collectResult);
 
@@ -1331,10 +1343,15 @@ function PayoffView({
   // on a fund contract already has that contract's own settlement discount taken
   // off. Subtracting from the instalment total instead would quietly bill more
   // than the bill will actually come to.
-  const grossRemaining = preview?.summary?.net ?? preview?.installments.gross_remaining ?? 0;
-  // The only part the screen works out is what the staff are still typing; the
-  // moment the bill exists, its own total takes over (see the waiting view).
-  const billTotal = Math.max(grossRemaining - requestedDiscount, 0);
+  // Once a bill is open, its own total is what must be paid — it is the figure
+  // the backend raised, discounts and all. Only before that does the screen work
+  // anything out, and only from what the staff are still typing.
+  const openBillTotal = preview?.open_bill?.total_amount ?? null;
+  const grossRemaining = openBillTotal
+    ?? preview?.summary?.net
+    ?? preview?.installments.gross_remaining
+    ?? 0;
+  const billTotal = openBillTotal ?? Math.max(grossRemaining - requestedDiscount, 0);
   const totalPayment = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
   const isBalanced = billTotal > 0 && Math.abs(totalPayment - billTotal) < 0.01;
 
@@ -1816,10 +1833,13 @@ function validatePayoffPayment(
   if (zeroAmount) return t('contract.earlyPayoff_enterAmount', { defaultValue: 'Enter amount for all rows' });
   const missingBank = payments.find(p => p.method === 'TRANSFER' && !p.bank_account_id);
   if (missingBank) return t('contract.earlyPayoff_selectBank', { defaultValue: 'Select bank account for transfer payment' });
-  // The backend's net, not the instalment total: on a fund contract the bill is
-  // raised with that contract's settlement discount already taken off, so
-  // checking against the gross would demand more money than the bill asks for.
-  const billTotal = preview.summary?.net ?? preview.installments.gross_remaining;
+  // An open bill's own total wins — it is what the backend raised, discounts
+  // included. Failing that, the backend's net rather than the instalment total:
+  // on a fund contract the bill carries that contract's settlement discount, so
+  // checking against the gross would demand more than the bill asks for.
+  const billTotal = preview.open_bill?.total_amount
+    ?? preview.summary?.net
+    ?? preview.installments.gross_remaining;
   const total = payments.reduce((s, p) => s + (p.amount || 0), 0);
   if (Math.abs(total - billTotal) >= 0.01) return t('contract.earlyPayoff_notBalanced', { defaultValue: 'Total payment must match the payoff amount' });
   return null;
