@@ -107,7 +107,8 @@ interface OpenPayoffBill {
   paid_amount: number;
   discount_line_id: number | null;
   discount_amount: number | null;
-  discount_approval_status: 'PENDING' | 'APPROVED' | 'REJECTED' | null;
+  /** NEEDS_APPROVAL = the branch took the request back; it can be sent again. */
+  discount_approval_status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'NEEDS_APPROVAL' | null;
   discount_submit_reason: string | null;
   discount_decision_reason: string | null;
 }
@@ -403,6 +404,18 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
     onError: setApiError,
   });
 
+  const resubmitMutation = useMutation({
+    mutationFn: async () => {
+      if (!openBill?.discount_line_id) return;
+      await apiClient.rpc('fn_bill_line_item_submit_approval', {
+        p_line_item_id: openBill.discount_line_id,
+        p_reason: payoffDiscountReason.trim() || t('contract.payoffDiscount_resubmitReason'),
+      });
+      await queryClient.invalidateQueries({ queryKey: ['payoff-preview', contract.id] });
+    },
+    onError: setApiError,
+  });
+
   const removeDiscountMutation = useMutation({
     mutationFn: async () => {
       if (!openBill?.discount_line_id) return;
@@ -667,12 +680,13 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
               payments={payments}
               onPaymentsChange={setPayments}
               isRefreshing={previewLoading}
-              isPending={payMutation.isPending || withdrawMutation.isPending || removeDiscountMutation.isPending}
+              isPending={payMutation.isPending || withdrawMutation.isPending || removeDiscountMutation.isPending || resubmitMutation.isPending}
               step={step}
               onRefresh={() => {
                 void queryClient.invalidateQueries({ queryKey: ['payoff-preview', contract.id] });
               }}
               onWithdraw={() => { setError(''); withdrawMutation.mutate(); }}
+              onResubmit={() => { setError(''); resubmitMutation.mutate(); }}
               onDropDiscount={() => { setError(''); removeDiscountMutation.mutate(); }}
               onProceed={() => { setError(''); payApprovedMutation.mutate(); }}
               onClose={onClose}
@@ -1640,6 +1654,7 @@ function AwaitingDiscountView({
   step,
   onRefresh,
   onWithdraw,
+  onResubmit,
   onDropDiscount,
   onProceed,
   onClose,
@@ -1655,6 +1670,7 @@ function AwaitingDiscountView({
   step: string;
   onRefresh: () => void;
   onWithdraw: () => void;
+  onResubmit: () => void;
   onDropDiscount: () => void;
   onProceed: () => void;
   onClose: () => void;
@@ -1744,7 +1760,12 @@ function AwaitingDiscountView({
               {t('contract.payoffDiscount_withdraw')}
             </Button>
           )}
-          {status === 'REJECTED' && (
+          {status === 'NEEDS_APPROVAL' && (
+            <Button color="primary" onClick={onResubmit} disabled={isPending}>
+              {t('contract.payoffDiscount_resubmit')}
+            </Button>
+          )}
+          {(status === 'REJECTED' || status === 'NEEDS_APPROVAL') && (
             <Button onClick={onDropDiscount} disabled={isPending}>
               {t('contract.payoffDiscount_dropAndPayFull')}
             </Button>

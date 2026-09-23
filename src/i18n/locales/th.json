@@ -3625,7 +3625,11 @@
     "complete_done_installmentsCleared": "งวดที่ปิดครบ",
     "complete_done_closeReason": "เหตุผลการปิด",
     "complete_done_insuranceApplied": "หักจากกระเป๋าประกัน",
-    "complete_done_earlyPayoffAmount": "ยอดปิดยอด"
+    "complete_done_earlyPayoffAmount": "ยอดปิดยอด",
+    "payoffDiscount_status_NEEDS_APPROVAL": "ถอนคำขอแล้ว ยังไม่ได้ส่งขออนุมัติ",
+    "payoffDiscount_statusHint_NEEDS_APPROVAL": "ส่งคำขอใหม่อีกครั้ง หรือเอาส่วนลดออกแล้วรับเต็มยอด",
+    "payoffDiscount_resubmit": "ส่งคำขออีกครั้ง",
+    "payoffDiscount_resubmitReason": "สาขาส่งคำขอส่วนลดอีกครั้ง"
   },
   "contractAddon": {
     "title": "เพิ่ม Add-on",

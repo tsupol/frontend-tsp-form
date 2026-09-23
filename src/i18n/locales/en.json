@@ -3629,7 +3629,11 @@
     "complete_done_installmentsCleared": "Installments cleared",
     "complete_done_closeReason": "Close reason",
     "complete_done_insuranceApplied": "Insurance auto-applied",
-    "complete_done_earlyPayoffAmount": "Early payoff amount"
+    "complete_done_earlyPayoffAmount": "Early payoff amount",
+    "payoffDiscount_status_NEEDS_APPROVAL": "Request withdrawn — not sent for approval",
+    "payoffDiscount_statusHint_NEEDS_APPROVAL": "Send it again, or drop the discount and take the full amount.",
+    "payoffDiscount_resubmit": "Send the request again",
+    "payoffDiscount_resubmitReason": "Branch sent the discount request again"
   },
   "contractAddon": {
     "title": "Add add-on",
