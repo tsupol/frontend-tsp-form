@@ -1240,5 +1240,12 @@
   "FUND.VALIDATION.SETTLES_BILL_REQUIRED": "This document has to say which payout it settles.",
   "SALE.VALIDATION.FUND_BRANCH_NO_CASH": "A branch of a fund company cannot take cash — the money has to reach the fund’s account.",
   "fund.validation.manual_line_contract_required": "This document covers more than one contract — say which contract the line belongs to.",
-  "fund.validation.manual_line_contract_not_on_bill": "That contract is not on this document. Pick one of the contracts listed on it."
+  "fund.validation.manual_line_contract_not_on_bill": "That contract is not on this document. Pick one of the contracts listed on it.",
+  "BILL.VALIDATION.PAYOFF_DISCOUNT_EXCEEDS_CAP": "The discount asked for is above this company’s ceiling of {{max_amount}} ({{max_pct}}% of {{base}}).",
+  "BILL.VALIDATION.PAYOFF_DISCOUNT_NOT_ALLOWED": "This contract cannot be settled at a discount.",
+  "BILL.VALIDATION.SUBMIT_REASON_REQUIRED": "Say why the discount is being asked for.",
+  "BILL.VALIDATION.DISCOUNT_AMOUNT_INVALID": "The discount cannot be a negative amount.",
+  "BILL.STATE.DISCOUNT_NOT_APPROVED": "No money can be taken until the discount is agreed.",
+  "BILL.CONFLICT.EARLY_PAYOFF_EXISTS": "This contract already has a payoff bill open.",
+  "INV.VALIDATION.WALLET_REQUIRES_CONTRACT": "A wallet can only pay a bill that belongs to a contract."
 }

@@ -127,6 +127,10 @@ interface ContractDetail {
   discount_approval_id: number | null;
   discount_approval_status: string | null;
   total_paid: number | null;
+  /** Discount given for settling early — nothing to do with the sale discount. */
+  payoff_discount_amount: number | null;
+  /** What the customer actually handed over: what was charged, less that discount. */
+  total_received: number | null;
   outstanding_amount: number | null;
   credit_balance: number | null;
   credit_balance_company: number | null;
@@ -1115,6 +1119,15 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
             <InfoCell label={t('fin1Plan.rowDocFee')} value={fmtCurrency(contract.doc_fee_amount)} />
           )}
           <InfoCell label={t('contract.totalPaid')} value={fmtCurrency(contract.total_paid)} />
+          {/* A contract settled early at a discount was credited the instalments
+           *  in full but handed over less cash, so both figures are shown —
+           *  otherwise the schedule and the money do not agree. */}
+          {contract.payoff_discount_amount != null && contract.payoff_discount_amount > 0 && (
+            <>
+              <InfoCell label={t('contract.totalReceived')} value={fmtCurrency(contract.total_received)} />
+              <InfoCell label={t('contract.payoffDiscount')} value={fmtCurrency(contract.payoff_discount_amount)} />
+            </>
+          )}
           <InfoCell label={t('contract.outstanding')} value={fmtCurrency(contract.outstanding_amount)} highlight={contract.outstanding_amount != null && contract.outstanding_amount > 0} />
           {isFin2 && (
             <>
@@ -1128,8 +1141,9 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
           {contract.late_fee_balance != null && contract.late_fee_balance > 0 && (
             <InfoCell label={t('contract.lateFee')} value={fmtCurrency(contract.late_fee_balance)} highlight />
           )}
+          {/* Named for when it was given, so it never reads as the payoff one. */}
           {contract.discount_amount != null && contract.discount_amount > 0 && (
-            <InfoCell label={t('contract.discount')} value={`${fmtCurrency(contract.discount_amount)} (${contract.discount_percent ?? 0}%)`} />
+            <InfoCell label={t('contract.saleDiscount')} value={`${fmtCurrency(contract.discount_amount)} (${contract.discount_percent ?? 0}%)`} />
           )}
         </div>
       </div>
@@ -1341,7 +1355,7 @@ function MoneyTab({ contractId, contract, t, requestedSection, onSectionConsumed
         }}
       />
       <div className="flex-1 overflow-auto better-scroll">
-        {section === 'installments' && <InstallmentsTab contractId={contractId} t={t} />}
+        {section === 'installments' && <InstallmentsTab contractId={contractId} contract={contract} t={t} />}
         {section === 'txns' && <TxnsTab contractId={contractId} t={t} />}
         {section === 'wallets' && <WalletsTab contract={contract} />}
         {section === 'bills' && <BillsTab contractId={contractId} contract={contract} t={t} />}
@@ -1377,11 +1391,20 @@ function getInstallmentStatusColor(status: string): 'success' | 'warning' | 'dan
   }
 }
 
-function InstallmentsTab({ contractId, t }: { contractId: number; t: ReturnType<typeof useTranslation>['t'] }) {
+function InstallmentsTab({ contractId, contract, t }: {
+  contractId: number;
+  contract: ContractDetail;
+  t: ReturnType<typeof useTranslation>['t'];
+}) {
   const { data: installments, isLoading } = useQuery({
     queryKey: ['contract-installments', contractId],
     queryFn: () => apiClient.get<Installment[]>(`/v_installments?contract_id=eq.${contractId}&order=pay_no`),
   });
+
+  // Settling early marks every instalment paid in full, so the column adds up
+  // to more than the customer handed over. Without this line the two readings
+  // look like a mistake.
+  const payoffDiscount = contract.payoff_discount_amount ?? 0;
 
   if (isLoading) return <div className="p-8 text-center text-subtler">{t('common.loading')}</div>;
   if (!installments || installments.length === 0) return <div className="p-8 text-center text-subtler">{t('common.noData')}</div>;
@@ -1424,6 +1447,13 @@ function InstallmentsTab({ contractId, t }: { contractId: number; t: ReturnType<
           </tbody>
         </table>
       </div>
+      {payoffDiscount > 0 && (
+        <div className="mt-2 px-3 py-2 rounded-md bg-surface border border-line text-xs text-subtle flex flex-wrap gap-x-3 gap-y-1">
+          <span className="font-medium">{t('contract.complete_reason_earlyPayoff')}</span>
+          <span>{t('contract.payoffDiscount')}: <span className="tabular-nums">{fmtCurrency(payoffDiscount)}</span></span>
+          <span>{t('contract.totalReceived')}: <span className="tabular-nums">{fmtCurrency(contract.total_received)}</span></span>
+        </div>
+      )}
     </div>
   );
 }

@@ -268,7 +268,7 @@
   "SALE.VALIDATION.REFUND_EXCEEDS_SAVING": "ยอดคืนเงินเกินยอดเงินออม",
   "SALE.VALIDATION.INSUFFICIENT_SAVING_BALANCE": "เงินออมไม่เพียงพอ",
   "SALE.VALIDATION.INVALID_REFUND_CHANNEL": "ช่องทางคืนเงินต้องเป็น CASH หรือ TRANSFER",
-  "SALE.VALIDATION.EARLY_PAYOFF_NOT_RECORDED": "ต้องบันทึกการชำระซื้อขาดก่อน",
+  "SALE.VALIDATION.EARLY_PAYOFF_NOT_RECORDED": "ต้องบันทึกการชำระปิดยอดก่อน",
   "SALE.VALIDATION.DEDUCT_EXCEEDS_INSURANCE": "ยอดหักเกินยอดประกัน",
   "SALE.VALIDATION.NO_PARTNER_RATE": "ไม่มีอัตราค่าคอมฯ สำหรับสาขานี้",
   "SALE.VALIDATION.NOT_DEAL_PARTNER": "ใช้ได้เฉพาะสาขาพาร์ทเนอร์",
@@ -1240,5 +1240,12 @@
   "FUND.VALIDATION.SETTLES_BILL_REQUIRED": "ใบนี้ต้องระบุว่าเคลียร์ใบจ่ายใบไหน",
   "SALE.VALIDATION.FUND_BRANCH_NO_CASH": "สาขาของบริษัทกองทุนรับเงินสดไม่ได้ — เงินต้องเข้าบัญชีของกองทุน",
   "fund.validation.manual_line_contract_required": "ใบนี้มีหลายสัญญา ต้องระบุว่าบรรทัดนี้เป็นของสัญญาไหน",
-  "fund.validation.manual_line_contract_not_on_bill": "สัญญานี้ไม่ได้อยู่บนใบนี้ เลือกจากสัญญาที่อยู่บนใบ"
+  "fund.validation.manual_line_contract_not_on_bill": "สัญญานี้ไม่ได้อยู่บนใบนี้ เลือกจากสัญญาที่อยู่บนใบ",
+  "BILL.VALIDATION.PAYOFF_DISCOUNT_EXCEEDS_CAP": "ส่วนลดที่ขอเกินเพดานของบริษัท {{max_amount}} ({{max_pct}}% ของ {{base}})",
+  "BILL.VALIDATION.PAYOFF_DISCOUNT_NOT_ALLOWED": "สัญญานี้ขอส่วนลดปิดยอดไม่ได้",
+  "BILL.VALIDATION.SUBMIT_REASON_REQUIRED": "ต้องระบุเหตุผลที่ขอส่วนลด",
+  "BILL.VALIDATION.DISCOUNT_AMOUNT_INVALID": "ส่วนลดติดลบไม่ได้",
+  "BILL.STATE.DISCOUNT_NOT_APPROVED": "รับเงินไม่ได้จนกว่าส่วนลดจะได้รับการอนุมัติ",
+  "BILL.CONFLICT.EARLY_PAYOFF_EXISTS": "สัญญานี้มีบิลปิดยอดค้างอยู่แล้ว",
+  "INV.VALIDATION.WALLET_REQUIRES_CONTRACT": "กระเป๋าใช้ได้เฉพาะบิลที่ผูกกับสัญญา"
 }

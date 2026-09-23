@@ -38,7 +38,7 @@ export type ClosureAction =
 // Deal-partner contracts terminate through this same 'terminate' action — the
 // separate partner-only terminate RPC was retired (mig 1231).
 
-type View = 'payoff' | 'conflict' | 'wallets' | 'clear-wallet' | 'confirm' | 'done';
+type View = 'payoff' | 'conflict' | 'awaiting-discount' | 'wallets' | 'clear-wallet' | 'confirm' | 'done';
 
 interface ClearTarget {
   walletType: WalletType;
@@ -70,10 +70,46 @@ interface PayoffPreview {
   late_fee_balance: number;
   summary: {
     gross: number;
+    /** Discount already on the open bill, if any. Zero on a fresh payoff. */
+    discount?: number;
+    /** What the customer actually pays: gross minus the discount. */
+    net?: number;
     wallet_offset_max: number;
     cash_required_after_wallets: number;
   };
   allowed_methods: string[];
+  /**
+   * Whether this contract may be paid off at a discount, and by how much.
+   * Absent or disabled on a FIN1 contract, and disabled company-wide when the
+   * ceiling is set to zero — in both cases the screen offers no discount field.
+   */
+  payoff_discount?: {
+    enabled: boolean;
+    commercial_model: string | null;
+    max_pct: number;
+    /** The remaining instalments the ceiling is a percentage of. */
+    base: number;
+    max_amount: number;
+  } | null;
+  /**
+   * A payoff bill left open from an earlier attempt. When present the screen
+   * must continue on that bill — asking for a new one is refused.
+   */
+  open_bill?: OpenPayoffBill | null;
+}
+
+/** A payoff bill already open on this contract, with its discount request. */
+interface OpenPayoffBill {
+  bill_id: number;
+  bill_code: string;
+  status: string;
+  total_amount: number;
+  paid_amount: number;
+  discount_line_id: number | null;
+  discount_amount: number | null;
+  discount_approval_status: 'PENDING' | 'APPROVED' | 'REJECTED' | null;
+  discount_submit_reason: string | null;
+  discount_decision_reason: string | null;
 }
 
 interface ConflictBill {
@@ -114,6 +150,12 @@ interface CompleteResult {
   device_ownership_transferred: boolean;
   insurance_applied: { applied_amount?: number } | null;
   early_payoff_amount: number | null;
+  /** Discount allowed on the payoff. Null when the contract closed some other way. */
+  early_payoff_discount?: number | null;
+  /** What the customer actually handed over: the amount less that discount. */
+  early_payoff_paid?: number | null;
+  /** The device whose ownership passed to the customer. */
+  device?: { asset_id: number; asset_code: string; code_display: string } | null;
   asset_movements: AssetMovement[] | null;
 }
 
@@ -203,6 +245,12 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
   const [conflictBill, setConflictBill] = useState<ConflictBill | null>(null);
   const [conflictPin, setConflictPin] = useState('');
   const [step, setStep] = useState('');
+  // Discount the branch asks for when paying a fund contract off early, and
+  // why. Zero means an ordinary payoff at the full remaining amount.
+  const [payoffDiscount, setPayoffDiscount] = useState(0);
+  const [payoffDiscountReason, setPayoffDiscountReason] = useState('');
+  /** Set once a discounted bill exists and the decision has not come back yet. */
+  const [pendingDiscount, setPendingDiscount] = useState(false);
 
   // Captured for the done view (success detail)
   const [payoffBill, setPayoffBill] = useState<PayoffBillInfo | null>(null);
@@ -223,6 +271,9 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
       setConflictBill(null);
       setConflictPin('');
       setStep('');
+      setPayoffDiscount(0);
+      setPayoffDiscountReason('');
+      setPendingDiscount(false);
       setPayoffBill(null);
       setCompleteResult(null);
       setBeforeSnapshot(null);
@@ -253,6 +304,20 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
     staleTime: 30 * 1000,
   });
 
+  // A payoff bill left open from an earlier attempt is picked up rather than
+  // started again — asking for a second one is refused. When its discount is
+  // still undecided the screen goes straight to the waiting view.
+  useEffect(() => {
+    if (!open || !isEarlyPayoff) return;
+    const bill = preview?.open_bill;
+    if (!bill) return;
+    if (bill.discount_approval_status && view === 'payoff') {
+      setPendingDiscount(true);
+      setView('awaiting-discount');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, isEarlyPayoff, preview?.open_bill?.bill_id, preview?.open_bill?.discount_approval_status]);
+
   // Surface preview errors (e.g. 403 permission denied) in the top alert.
   // Without this, `previewLoading` flips to false but `preview` stays undefined
   // so PayoffView would spin forever.
@@ -263,14 +328,34 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
   }, [previewError]);
 
   // Multi-step pay flow: collect → add×N → confirm. After success → wallets gate.
+  //
+  // A payoff at a discount stops after the bill is made: the money cannot be
+  // taken until a company admin agrees to the discount, and trying anyway is
+  // refused. The screen parks on the waiting view and picks the same bill up
+  // again once the decision is in.
   const collectAddConfirm = async () => {
     setStep('collect');
-    const collectResult = await apiClient.rpc<PayoffBillInfo>(
+    const wantsDiscount = payoffDiscount > 0;
+    const collectResult = await apiClient.rpc<PayoffBillInfo & { needs_approval?: boolean }>(
       'fn_bill_early_payoff_collect',
-      { p_contract_id: contract.id, p_note: note.trim() || undefined },
+      {
+        p_contract_id: contract.id,
+        p_note: note.trim() || undefined,
+        ...(wantsDiscount
+          ? { p_discount_amount: payoffDiscount, p_discount_reason: payoffDiscountReason.trim() }
+          : {}),
+      },
     );
     const billId = collectResult.bill_id;
     setPayoffBill(collectResult);
+
+    if (wantsDiscount || collectResult.needs_approval) {
+      setStep('');
+      setPendingDiscount(true);
+      // The preview is what the waiting view reads the decision from.
+      await queryClient.invalidateQueries({ queryKey: ['payoff-preview', contract.id] });
+      return;
+    }
 
     // Snapshot before payment confirmation so the done view can show what was paid off
     if (preview) {
@@ -298,10 +383,76 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
     setStep('');
   };
 
+  // ── While a discount decision is outstanding ────────────────────────────────
+  //
+  // Three ways out, all acting on the bill that already exists: take the request
+  // back, drop the discount and charge the full amount, or — once it is agreed —
+  // take the money on that same bill.
+
+  const openBill = preview?.open_bill ?? null;
+
+  const withdrawMutation = useMutation({
+    mutationFn: async () => {
+      if (!openBill?.discount_line_id) return;
+      await apiClient.rpc('fn_bill_line_item_cancel_approval', {
+        p_line_item_id: openBill.discount_line_id,
+        p_reason: t('contract.payoffDiscount_withdrawReason'),
+      });
+      await queryClient.invalidateQueries({ queryKey: ['payoff-preview', contract.id] });
+    },
+    onError: setApiError,
+  });
+
+  const removeDiscountMutation = useMutation({
+    mutationFn: async () => {
+      if (!openBill?.discount_line_id) return;
+      await apiClient.rpc('fn_bill_line_item_remove', { p_line_item_id: openBill.discount_line_id });
+      await queryClient.invalidateQueries({ queryKey: ['payoff-preview', contract.id] });
+    },
+    onSuccess: () => {
+      // No discount any more, so the ordinary payoff screen takes over on the
+      // same bill, now back at its full amount.
+      setPayoffDiscount(0);
+      setPayoffDiscountReason('');
+      setPendingDiscount(false);
+      setView('payoff');
+    },
+    onError: setApiError,
+  });
+
+  /** Take the money on the already-approved bill, then carry on as usual. */
+  const payApprovedMutation = useMutation({
+    mutationFn: async () => {
+      const bill = preview?.open_bill;
+      if (!bill) throw new Error('no open bill');
+      setStep('payment');
+      for (const payment of payments) {
+        await apiClient.rpc('fn_bill_payment_add', {
+          p_bill_id: bill.bill_id,
+          p_method: payment.method,
+          p_amount: payment.amount,
+          p_bank_account_id: payment.method === 'TRANSFER' ? payment.bank_account_id : null,
+        });
+      }
+      setStep('confirm');
+      await apiClient.rpc('fn_bill_payment_confirm', { p_bill_id: bill.bill_id });
+      setStep('');
+    },
+    onSuccess: () => {
+      setError('');
+      setPendingDiscount(false);
+      setView('wallets');
+    },
+    onError: (err: unknown) => { setStep(''); setApiError(err); },
+  });
+
   const payMutation = useMutation({
     mutationFn: collectAddConfirm,
     onSuccess: () => {
       setError('');
+      // A discount request has taken no money yet, so it waits for the decision
+      // instead of moving on to the wallet gate.
+      if (pendingDiscount) { setView('awaiting-discount'); return; }
       // Banner shown on the wallets view replaces the snackbar — user sees what bill was just confirmed
       setView('wallets');
     },
@@ -460,10 +611,21 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
               onPaymentsChange={setPayments}
               note={note}
               onNoteChange={setNote}
+              discount={payoffDiscount}
+              onDiscountChange={setPayoffDiscount}
+              discountReason={payoffDiscountReason}
+              onDiscountReasonChange={setPayoffDiscountReason}
               isPending={payMutation.isPending}
               step={step}
               onCancel={onClose}
               onConfirm={() => {
+                // A discount request creates the bill and stops — there is no
+                // payment to balance yet, so the payment check does not apply.
+                if (payoffDiscount > 0) {
+                  setError('');
+                  payMutation.mutate();
+                  return;
+                }
                 const validationError = validatePayoffPayment(preview, payments, t);
                 if (validationError) {
                   setError(validationError);
@@ -493,6 +655,27 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
                 setError('');
                 voidAndRetryMutation.mutate();
               }}
+            />
+          )}
+
+          {view === 'awaiting-discount' && (
+            <AwaitingDiscountView
+              openBill={preview?.open_bill ?? null}
+              payoffBill={payoffBill}
+              branchId={contract.branch_id ?? null}
+              preview={preview}
+              payments={payments}
+              onPaymentsChange={setPayments}
+              isRefreshing={previewLoading}
+              isPending={payMutation.isPending || withdrawMutation.isPending || removeDiscountMutation.isPending}
+              step={step}
+              onRefresh={() => {
+                void queryClient.invalidateQueries({ queryKey: ['payoff-preview', contract.id] });
+              }}
+              onWithdraw={() => { setError(''); withdrawMutation.mutate(); }}
+              onDropDiscount={() => { setError(''); removeDiscountMutation.mutate(); }}
+              onProceed={() => { setError(''); payApprovedMutation.mutate(); }}
+              onClose={onClose}
             />
           )}
 
@@ -629,19 +812,46 @@ function DoneView({
   const insuranceAmount = insuranceApplied?.applied_amount ?? 0;
 
   // Build detail rows
+  // The server decides how the contract actually closed, so the summary follows
+  // its answer rather than the button that was pressed — settling early can be
+  // reached from the ordinary "paid up" button too.
+  const closedEarly = isComplete && (completeResult as CompleteResult).close_reason === 'EARLY_PAYOFF';
+  const payoffDiscount = isComplete ? ((completeResult as CompleteResult).early_payoff_discount ?? 0) : 0;
+  const payoffPaid = isComplete ? (completeResult as CompleteResult).early_payoff_paid : null;
+  const payoffGross = isComplete ? (completeResult as CompleteResult).early_payoff_amount : null;
+
   const rows: ActionDoneDetailRow[] = [];
   if (isEarlyPayoff && payoffBill) {
     rows.push(
       { label: t('contract.complete_done_bill', { defaultValue: 'Payoff bill' }), value: payoffBill.bill_code },
-      { label: t('contract.complete_done_payoffTotal', { defaultValue: 'Total paid' }), value: fmtCurrency(payoffBill.bill_total), emphasis: true },
-      { label: t('contract.complete_done_installmentsCleared', { defaultValue: 'Installments cleared' }), value: String(payoffBill.installments_count) },
     );
-  } else if (isComplete && (completeResult as CompleteResult).early_payoff_amount != null) {
+  }
+  if (closedEarly && payoffPaid != null) {
+    // What the customer handed over is the headline; the pre-discount figure is
+    // only worth a line when a discount was actually given.
+    rows.push({ label: t('contract.payoffDiscount_customerPaid'), value: fmtCurrency(payoffPaid), emphasis: true });
+    if (payoffDiscount > 0) {
+      rows.push({ label: t('contract.payoffDiscount'), value: fmtCurrency(payoffDiscount) });
+      if (payoffGross != null) {
+        rows.push({ label: t('contract.payoffDiscount_beforeDiscount'), value: fmtCurrency(payoffGross) });
+      }
+    }
+  } else if (isEarlyPayoff && payoffBill) {
+    rows.push({ label: t('contract.complete_done_payoffTotal', { defaultValue: 'Total paid' }), value: fmtCurrency(payoffBill.bill_total), emphasis: true });
+  } else if (isComplete && payoffGross != null) {
     rows.push({
       label: t('contract.complete_done_earlyPayoffAmount', { defaultValue: 'Early payoff amount' }),
-      value: fmtCurrency((completeResult as CompleteResult).early_payoff_amount ?? 0),
+      value: fmtCurrency(payoffGross),
       emphasis: true,
     });
+  }
+  if (isEarlyPayoff && payoffBill) {
+    rows.push({ label: t('contract.complete_done_installmentsCleared', { defaultValue: 'Installments cleared' }), value: String(payoffBill.installments_count) });
+  }
+  // The device's own code, not the searchable form carried on the movements.
+  const device = isComplete ? (completeResult as CompleteResult).device : null;
+  if (device?.code_display) {
+    rows.push({ label: t('contract.payoffDiscount_device'), value: device.code_display });
   }
   if (insuranceAmount > 0) {
     rows.push({
@@ -1065,6 +1275,10 @@ function PayoffView({
   onPaymentsChange,
   note,
   onNoteChange,
+  discount,
+  onDiscountChange,
+  discountReason,
+  onDiscountReasonChange,
   isPending,
   step,
   onCancel,
@@ -1078,6 +1292,11 @@ function PayoffView({
   onPaymentsChange: (payments: EarlyPayoffPayment[]) => void;
   note: string;
   onNoteChange: (v: string) => void;
+  /** Discount the branch is asking for. Zero means no request. */
+  discount: number;
+  onDiscountChange: (v: number) => void;
+  discountReason: string;
+  onDiscountReasonChange: (v: string) => void;
   isPending: boolean;
   step: string;
   onCancel: () => void;
@@ -1085,74 +1304,22 @@ function PayoffView({
 }) {
   const { t } = useTranslation();
 
-  const billTotal = preview?.installments.gross_remaining ?? 0;
+  // A discount is only offered when the backend says this contract and company
+  // allow one. Asking for it turns the payoff into a request: no money is taken
+  // until a company admin agrees, so the payment rows are put away until then.
+  const discountCap = preview?.payoff_discount;
+  const canDiscount = !!discountCap?.enabled;
+  const requestedDiscount = canDiscount ? discount : 0;
+  const overCap = canDiscount && requestedDiscount > (discountCap?.max_amount ?? 0);
+  const awaitingApproval = requestedDiscount > 0;
+
+  const grossRemaining = preview?.installments.gross_remaining ?? 0;
+  const billTotal = Math.max(grossRemaining - requestedDiscount, 0);
   const totalPayment = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
   const isBalanced = billTotal > 0 && Math.abs(totalPayment - billTotal) < 0.01;
 
-  const updatePayment = (idx: number, updates: Partial<EarlyPayoffPayment>) => {
-    onPaymentsChange(payments.map((p, i) => i === idx ? { ...p, ...updates } : p));
-  };
-
-  const addPaymentLine = () => {
-    onPaymentsChange([...payments, { method: '', amount: 0, bank_account_id: null }]);
-  };
-
-  const removePaymentLine = (idx: number) => {
-    onPaymentsChange(payments.filter((_, i) => i !== idx));
-  };
-
-  const walletBalanceFor = (method: string): number | null => {
-    if (!preview) return null;
-    if (method === 'CREDIT_WALLET') return preview.wallets.credit.balance;
-    if (method === 'INSURANCE_WALLET') return preview.wallets.insurance.balance;
-    if (method === 'SAVING_WALLET') return preview.wallets.saving.balance;
-    return null;
-  };
-
-  const fillRemaining = (idx: number) => {
-    const othersTotal = payments.reduce((sum, p, i) => i === idx ? sum : sum + (p.amount || 0), 0);
-    const remaining = billTotal - othersTotal;
-    if (remaining <= 0) return;
-    const walletCap = walletBalanceFor(payments[idx].method);
-    const fillAmount = walletCap !== null ? Math.min(remaining, walletCap) : remaining;
-    if (fillAmount > 0) updatePayment(idx, { amount: fillAmount });
-  };
-
-  // Methods: cash + transfer always; wallets always shown with balance + disabled when unusable.
-  //
-  // Two sources, intersected. fn_bill_early_payoff_preview.allowed_methods says
-  // what this contract's wallets and company features allow; on a deal-partner
-  // contract it still lists CASH (measured on DEV 2026-09-18, contract 96817),
-  // because the branch rule lives on the bill rather than the preview. Doc 144
-  // §2 / mig 1266 says a partner branch's CONTRACT_PAYOFF bill takes only
-  // TRANSFER and wallets — the customer pays the fund, not the shop — so the
-  // purpose rule from v_purpose_allowed_methods narrows the preview's list.
-  // fn_bill_payment_add would refuse CASH with PARTNER_METHOD_REQUIRED anyway;
-  // this stops it being offered in the first place.
-  const { isPartnerBranch, isFundBranch } = useBranchIsPartner(branchId);
-  const { codes: purposeMethods, isLoading: purposeLoading } = useAllowedPaymentMethods(
-    'CONTRACT_PAYOFF',
-    isPartnerBranch,
-    { isFundBranch },
-  );
-  const allowed = new Set(
-    (preview?.allowed_methods ?? []).filter(
-      m => purposeLoading || purposeMethods.length === 0 || purposeMethods.includes(m),
-    ),
-  );
-  const baseLabel = (m: string) => t(`paymentMethod.${m}`, { defaultValue: m });
-  const methodOptions = ALL_PAYOFF_METHODS.map(m => {
-    const isWallet = m.endsWith('_WALLET');
-    if (!isWallet) {
-      return { value: m, label: baseLabel(m), disabled: !allowed.has(m) };
-    }
-    const balance = walletBalanceFor(m) ?? 0;
-    return {
-      value: m,
-      label: `${baseLabel(m)} (${fmtCurrency(balance)})`,
-      disabled: !allowed.has(m) || balance === 0,
-    };
-  });
+  // The wallet badges below read the balances straight off the preview; the
+  // payment rows and the channel rules live in PayoffPaymentRows.
 
   // Wallet badges (informational — only show wallets with balance > 0)
   const walletEntries = preview ? [
@@ -1200,7 +1367,64 @@ function PayoffView({
         </div>
       </div>
 
-      {walletEntries.length > 0 && (
+      {/* Only shown where a discount is actually possible: a fund contract at a
+       *  company that has not switched the discount off. */}
+      {canDiscount && (
+        <div className="mb-4 flex flex-col gap-2">
+          <div className="flex flex-col">
+            <label className="form-label">{t('contract.payoffDiscount_amount')}</label>
+            <MaskedInput
+              mask="number"
+              decimalScale={2}
+              value={discount ? String(discount) : ''}
+              onChange={(raw) => onDiscountChange(parseFloat(raw) || 0)}
+              placeholder="0.00"
+              size="sm"
+              className="w-full"
+              error={overCap}
+              disabled={isPending}
+            />
+            <div className={`text-xs mt-1 ${overCap ? 'text-danger-fg' : 'text-subtle'}`}>
+              {t('contract.payoffDiscount_cap', {
+                max: fmtCurrency(discountCap?.max_amount ?? 0),
+                pct: discountCap?.max_pct ?? 0,
+                base: fmtCurrency(discountCap?.base ?? 0),
+              })}
+            </div>
+          </div>
+          {requestedDiscount > 0 && (
+            <div className="flex flex-col">
+              <label className="form-label">{t('contract.payoffDiscount_reason')}</label>
+              <TextArea
+                value={discountReason}
+                onChange={(e) => onDiscountReasonChange(e.target.value)}
+                placeholder={t('contract.payoffDiscount_reasonPlaceholder')}
+                rows={2}
+                disabled={isPending}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Asking for a discount holds the money up: the bill and the request are
+       *  created now, the customer pays once a company admin agrees. Saying so
+       *  here stops the staff wondering why no payment rows appear. */}
+      {awaitingApproval && (
+        <div className="mb-4 px-3 py-2.5 rounded-md bg-info-soft border border-info-border">
+          <div className="text-sm font-medium text-info-fg">{t('contract.payoffDiscount_needsApprovalTitle')}</div>
+          <div className="text-xs text-subtle mt-1">{t('contract.payoffDiscount_needsApprovalHint')}</div>
+          <div className="text-xs text-subtle mt-1 tabular-nums">
+            {t('contract.payoffDiscount_netLine', {
+              gross: fmtCurrency(grossRemaining),
+              discount: fmtCurrency(requestedDiscount),
+              net: fmtCurrency(billTotal),
+            })}
+          </div>
+        </div>
+      )}
+
+      {!awaitingApproval && walletEntries.length > 0 && (
         <div className="mb-4">
           <div className="text-xs text-subtle mb-1">{t('contract.earlyPayoff_availableWallets', { defaultValue: 'Available Wallets' })}</div>
           <div className="flex flex-wrap gap-2">
@@ -1213,58 +1437,20 @@ function PayoffView({
         </div>
       )}
 
-      <div className="flex flex-col gap-3 mb-4">
-        <label className="form-label">{t('wizard.paymentMethods', { defaultValue: 'Payment Methods' })}</label>
-        {payments.map((payment, idx) => (
-          <div key={idx} className="flex flex-col gap-2">
-            <div className="flex gap-2 items-center">
-              <div className="input-group flex-1 min-w-0">
-                <div className="w-28 shrink-0">
-                  <Select
-                    options={methodOptions}
-                    value={payment.method || null}
-                    onChange={(val) => updatePayment(idx, { method: val as string, bank_account_id: null })}
-                    placeholder={t('wizard.method', { defaultValue: 'Method' })}
-                    size="sm"
-                    searchable={false}
-                  />
-                </div>
-                <div className="input-group-divider" />
-                <MaskedInput
-                  mask="number"
-                  decimalScale={2}
-                  value={payment.amount ? String(payment.amount) : ''}
-                  onChange={(raw) => updatePayment(idx, { amount: parseFloat(raw) || 0 })}
-                  placeholder="0.00"
-                  size="sm"
-                  className="w-full"
-                  endIcon={<ChevronsRight size={14} />}
-                  onEndIconClick={() => fillRemaining(idx)}
-                />
-              </div>
-              {payments.length > 1 && (
-                <Button
-                  size="sm"
-                  className="shrink-0"
-                  startIcon={<Trash2 size={14} />}
-                  onClick={() => removePaymentLine(idx)}
-                />
-              )}
-            </div>
-            {payment.method === 'TRANSFER' && (
-              <BranchPaymentAccountField
-                active={payment.method === 'TRANSFER'}
-                onResolve={(id) => updatePayment(idx, { bank_account_id: id })}
-              />
-            )}
-          </div>
-        ))}
-        <Button size="sm" onClick={addPaymentLine} startIcon={<Plus size={14} />}>
-          {t('wizard.addPayment', { defaultValue: 'Add Payment' })}
-        </Button>
-      </div>
+      {!awaitingApproval && (
+        <PayoffPaymentRows
+          preview={preview}
+          branchId={branchId}
+          payments={payments}
+          onPaymentsChange={onPaymentsChange}
+          billTotal={billTotal}
+          disabled={isPending}
+        />
+      )}
 
       <div className={`flex justify-between items-center p-3 rounded-lg border mb-4 ${
+        awaitingApproval ? 'hidden' : ''
+      } ${
         isBalanced ? 'border-success-border bg-success-soft' : 'border-warning-border bg-warning-soft'
       }`}>
         <span className="text-sm">{t('wizard.totalPayment', { defaultValue: 'Total Payment' })}</span>
@@ -1292,13 +1478,299 @@ function PayoffView({
         <Button
           color="primary"
           onClick={onConfirm}
-          disabled={isPending}
+          disabled={isPending || overCap || (awaitingApproval && !discountReason.trim())}
         >
-          {isPending ? stepLabel || t('common.loading') : t('contract.earlyPayoff_confirmPayment', { defaultValue: 'Confirm Payment' })}
+          {isPending
+            ? stepLabel || t('common.loading')
+            : awaitingApproval
+              ? t('contract.payoffDiscount_submit')
+              : t('contract.earlyPayoff_confirmPayment', { defaultValue: 'Confirm Payment' })}
         </Button>
       </div>
     </>
   );
+}
+
+
+// ── Early-payoff: the payment rows ───────────────────────────────────────────
+//
+// Shared by the ordinary payoff screen and the one that resumes an approved
+// discount: the same rows against a different amount. Kept in one place so the
+// two cannot drift apart on which channels a branch may take.
+
+function PayoffPaymentRows({
+  preview,
+  branchId,
+  payments,
+  onPaymentsChange,
+  billTotal,
+  disabled,
+}: {
+  preview: PayoffPreview | undefined;
+  branchId: number | null;
+  payments: EarlyPayoffPayment[];
+  onPaymentsChange: (payments: EarlyPayoffPayment[]) => void;
+  /** What the rows have to add up to. */
+  billTotal: number;
+  disabled?: boolean;
+}) {
+  const { t } = useTranslation();
+
+  const updatePayment = (idx: number, updates: Partial<EarlyPayoffPayment>) => {
+    onPaymentsChange(payments.map((p, i) => i === idx ? { ...p, ...updates } : p));
+  };
+  const addPaymentLine = () => onPaymentsChange([...payments, { method: '', amount: 0, bank_account_id: null }]);
+  const removePaymentLine = (idx: number) => onPaymentsChange(payments.filter((_, i) => i !== idx));
+
+  const walletBalanceFor = (method: string): number | null => {
+    if (!preview) return null;
+    if (method === 'CREDIT_WALLET') return preview.wallets.credit.balance;
+    if (method === 'INSURANCE_WALLET') return preview.wallets.insurance.balance;
+    if (method === 'SAVING_WALLET') return preview.wallets.saving.balance;
+    return null;
+  };
+
+  const fillRemaining = (idx: number) => {
+    const othersTotal = payments.reduce((sum, p, i) => i === idx ? sum : sum + (p.amount || 0), 0);
+    const remaining = billTotal - othersTotal;
+    if (remaining <= 0) return;
+    const walletCap = walletBalanceFor(payments[idx].method);
+    const fillAmount = walletCap !== null ? Math.min(remaining, walletCap) : remaining;
+    if (fillAmount > 0) updatePayment(idx, { amount: fillAmount });
+  };
+
+  // Two sources, intersected — see the note on the payoff screen: the contract's
+  // own list still offers cash at a shop, where only the fund may be paid.
+  const { isPartnerBranch, isFundBranch } = useBranchIsPartner(branchId);
+  const { codes: purposeMethods, isLoading: purposeLoading } = useAllowedPaymentMethods(
+    'CONTRACT_PAYOFF',
+    isPartnerBranch,
+    { isFundBranch },
+  );
+  const allowed = new Set(
+    (preview?.allowed_methods ?? []).filter(
+      m => purposeLoading || purposeMethods.length === 0 || purposeMethods.includes(m),
+    ),
+  );
+  const baseLabel = (m: string) => t(`paymentMethod.${m}`, { defaultValue: m });
+  const methodOptions = ALL_PAYOFF_METHODS.map(m => {
+    const isWallet = m.endsWith('_WALLET');
+    if (!isWallet) return { value: m, label: baseLabel(m), disabled: !allowed.has(m) };
+    const balance = walletBalanceFor(m) ?? 0;
+    return {
+      value: m,
+      label: `${baseLabel(m)} (${fmtCurrency(balance)})`,
+      disabled: !allowed.has(m) || balance === 0,
+    };
+  });
+
+  return (
+    <div className="flex flex-col gap-3 mb-4">
+      <label className="form-label">{t('wizard.paymentMethods', { defaultValue: 'Payment Methods' })}</label>
+      {payments.map((payment, idx) => (
+        <div key={idx} className="flex flex-col gap-2">
+          <div className="flex gap-2 items-center">
+            <div className="input-group flex-1 min-w-0">
+              <div className="w-28 shrink-0">
+                <Select
+                  options={methodOptions}
+                  value={payment.method || null}
+                  onChange={(val) => updatePayment(idx, { method: val as string, bank_account_id: null })}
+                  placeholder={t('wizard.method', { defaultValue: 'Method' })}
+                  size="sm"
+                  searchable={false}
+                  disabled={disabled}
+                />
+              </div>
+              <div className="input-group-divider" />
+              <MaskedInput
+                mask="number"
+                decimalScale={2}
+                value={payment.amount ? String(payment.amount) : ''}
+                onChange={(raw) => updatePayment(idx, { amount: parseFloat(raw) || 0 })}
+                placeholder="0.00"
+                size="sm"
+                className="w-full"
+                disabled={disabled}
+                endIcon={<ChevronsRight size={14} />}
+                onEndIconClick={() => fillRemaining(idx)}
+              />
+            </div>
+            {payments.length > 1 && (
+              <Button
+                size="sm"
+                className="shrink-0"
+                startIcon={<Trash2 size={14} />}
+                disabled={disabled}
+                onClick={() => removePaymentLine(idx)}
+              />
+            )}
+          </div>
+          {payment.method === 'TRANSFER' && (
+            <BranchPaymentAccountField
+              active={payment.method === 'TRANSFER'}
+              onResolve={(id) => updatePayment(idx, { bank_account_id: id })}
+            />
+          )}
+        </div>
+      ))}
+      <Button size="sm" onClick={addPaymentLine} startIcon={<Plus size={14} />} disabled={disabled}>
+        {t('wizard.addPayment', { defaultValue: 'Add Payment' })}
+      </Button>
+    </div>
+  );
+}
+
+// ── Early-payoff: waiting on a discount decision ─────────────────────────────
+//
+// The bill and the discount request both exist by now. Nothing can be taken
+// from the customer until a company admin decides, so this view reports where
+// the request stands and offers the ways out. It reads the decision from the
+// contract's own payoff reading, which is refreshed when a decision lands.
+
+function AwaitingDiscountView({
+  openBill,
+  payoffBill,
+  branchId,
+  preview,
+  payments,
+  onPaymentsChange,
+  isRefreshing,
+  isPending,
+  step,
+  onRefresh,
+  onWithdraw,
+  onDropDiscount,
+  onProceed,
+  onClose,
+}: {
+  openBill: OpenPayoffBill | null;
+  payoffBill: PayoffBillInfo | null;
+  branchId: number | null;
+  preview: PayoffPreview | undefined;
+  payments: EarlyPayoffPayment[];
+  onPaymentsChange: (payments: EarlyPayoffPayment[]) => void;
+  isRefreshing: boolean;
+  isPending: boolean;
+  step: string;
+  onRefresh: () => void;
+  onWithdraw: () => void;
+  onDropDiscount: () => void;
+  onProceed: () => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+
+  const status = openBill?.discount_approval_status ?? 'PENDING';
+  const billCode = openBill?.bill_code ?? payoffBill?.bill_code ?? '';
+  const discountAmount = openBill?.discount_amount ?? 0;
+  const netAmount = openBill?.total_amount ?? payoffBill?.bill_total ?? 0;
+  const totalPayment = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+  const isBalanced = netAmount > 0 && Math.abs(totalPayment - netAmount) < 0.01;
+
+  // Written out in full rather than built from the status: a class name pieced
+  // together at runtime is never generated into the stylesheet.
+  const toneBox =
+    status === 'APPROVED' ? 'bg-success-soft border-success-border' :
+    status === 'REJECTED' ? 'bg-danger-soft border-danger-border' :
+    'bg-info-soft border-info-border';
+  const toneText =
+    status === 'APPROVED' ? 'text-success-fg' :
+    status === 'REJECTED' ? 'text-danger-fg' :
+    'text-info-fg';
+
+  return (
+    <>
+      <div className={`mb-4 px-3 py-2.5 rounded-md border ${toneBox}`}>
+        <div className={`text-sm font-medium ${toneText}`}>
+          {t(`contract.payoffDiscount_status_${status}`)}
+        </div>
+        <div className="text-xs text-subtle mt-1">
+          {t(`contract.payoffDiscount_statusHint_${status}`)}
+        </div>
+        {status === 'REJECTED' && openBill?.discount_decision_reason && (
+          <div className="text-xs text-subtle mt-1">
+            {t('contract.payoffDiscount_decisionReason')}: {openBill.discount_decision_reason}
+          </div>
+        )}
+      </div>
+
+      <div className="mb-4 rounded-md border border-line divide-y divide-line text-sm">
+        <Line label={t('contract.complete_done_bill')} value={billCode} />
+        <Line label={t('contract.payoffDiscount_amount')} value={fmtCurrency(discountAmount)} />
+        <Line label={t('contract.payoffDiscount_net')} value={fmtCurrency(netAmount)} emphasis />
+      </div>
+
+      {/* Once the discount is agreed the money is taken here, on the bill that
+       *  already exists — the amount to reach is the discounted one. */}
+      {status === 'APPROVED' && (
+        <>
+          <PayoffPaymentRows
+            preview={preview}
+            branchId={branchId}
+            payments={payments}
+            onPaymentsChange={onPaymentsChange}
+            billTotal={netAmount}
+            disabled={isPending}
+          />
+          <div className={`flex justify-between items-center p-3 rounded-lg border mb-4 ${
+            isBalanced ? 'border-success-border bg-success-soft' : 'border-warning-border bg-warning-soft'
+          }`}>
+            <span className="text-sm">{t('wizard.totalPayment', { defaultValue: 'Total Payment' })}</span>
+            <span className={`font-semibold tabular-nums ${isBalanced ? 'text-success' : 'text-warning-fg'}`}>
+              {fmtCurrency(totalPayment)} / {fmtCurrency(netAmount)}
+            </span>
+          </div>
+        </>
+      )}
+
+      <div className="flex flex-wrap justify-between gap-2">
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={onClose} disabled={isPending}>
+            {t('common.close')}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={onRefresh}
+            disabled={isPending || isRefreshing}
+            startIcon={<Loader2 size={14} className={isRefreshing ? 'animate-spin' : ''} />}
+          >
+            {t('common.refresh')}
+          </Button>
+        </div>
+        <div className="flex gap-2">
+          {status === 'PENDING' && (
+            <Button onClick={onWithdraw} disabled={isPending}>
+              {t('contract.payoffDiscount_withdraw')}
+            </Button>
+          )}
+          {status === 'REJECTED' && (
+            <Button onClick={onDropDiscount} disabled={isPending}>
+              {t('contract.payoffDiscount_dropAndPayFull')}
+            </Button>
+          )}
+          {status === 'APPROVED' && (
+            <Button color="primary" onClick={onProceed} disabled={isPending || !isBalanced}>
+              {isPending
+                ? (step === 'payment' ? t('contract.earlyPayoff_stepPayment')
+                  : step === 'confirm' ? t('contract.earlyPayoff_stepConfirm', { defaultValue: 'Confirming...' })
+                  : t('common.loading'))
+                : t('contract.payoffDiscount_takePayment')}
+            </Button>
+          )}
+        </div>
+      </div>
+    </>
+  );
+
+  function Line({ label, value, emphasis }: { label: string; value: string; emphasis?: boolean }) {
+    return (
+      <div className="flex items-center justify-between gap-4 px-3 py-2">
+        <span className="text-subtle text-xs">{label}</span>
+        <span className={`tabular-nums text-right ${emphasis ? 'font-semibold' : ''}`}>{value}</span>
+      </div>
+    );
+  }
 }
 
 // Validation helper for the payoff payment form (returns user-facing error or null)

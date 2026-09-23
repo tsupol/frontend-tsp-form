@@ -16,6 +16,9 @@ import { fmtCurrency } from '../../lib/format';
 import { translateApiError } from '../../lib/apiErrors';
 import { PartnerCaseDetailPanel } from '../partner-cases/PartnerCaseDetailPanel';
 import { usePartnerCaseDetail } from '../partner-cases/usePartnerCases';
+import { useAuth } from '../../contexts/AuthContext';
+import { wsClient } from '../../lib/api/ws';
+import { defaultScopeFor, scopeCountersChannel } from '../../lib/scope';
 
 /* ───────────────────────────────────────────────────────────────────────────
  * Types — match api.v_approvals_all_statuses (doc 59 / 92)
@@ -41,6 +44,7 @@ interface ApprovalRow {
   requested_at: string;
   decided_at?: string | null;          // v_approvals_all_statuses only (absent in the PENDING inbox view)
   status: ApprovalStatus;
+  /** What kind of discount this is — a sale one, or one for settling early. */
   policy_type: string | null;
   payload_snapshot?: Record<string, unknown> | null;  // v_pending_approvals only — drives the sell-out panel
   holding_id: number;
@@ -94,6 +98,7 @@ export function ApprovalsPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
+  const { user } = useAuth();
 
   const [statusFilter, setStatusFilter] = useState<ApprovalStatus | null>('PENDING');
   const [typeFilter, setTypeFilter] = useState<ApprovalType | null>(null);
@@ -134,7 +139,24 @@ export function ApprovalsPage() {
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['approvals-all'] });
+    // The side-nav badge counts the same queue, so it moves with the list
+    // instead of waiting out its own timer.
+    queryClient.invalidateQueries({ queryKey: ['nav', 'counters'] });
   };
+
+  // A request entering or leaving the queue is announced, so the list follows a
+  // branch's submission without anyone pressing anything. Announcements about
+  // other things are ignored — this queue only changes on an approval.
+  useEffect(() => {
+    if (!user) return;
+    const channel = scopeCountersChannel(defaultScopeFor(user));
+    if (!channel) return;
+    return wsClient.subscribe(channel, (payload) => {
+      const reason = (payload as { reason?: string } | undefined)?.reason;
+      if (reason && reason !== 'APPROVAL') return;
+      queryClient.invalidateQueries({ queryKey: ['approvals-all'] });
+    });
+  }, [user, queryClient]);
 
   const statusOptions: { value: ApprovalStatus; label: string }[] = [
     { value: 'PENDING', label: t('approvals.status_PENDING') },
@@ -427,6 +449,22 @@ function SimpleApprovalPanel({
   // exposes a cancel RPC (fn_negotiation_cancel); the other simple types don't.
   const canCancel = isPending && row.type === 'NEGOTIATION';
 
+  // A discount for settling a contract early, as opposed to one given at the
+  // point of sale. Only that kind carries a ceiling and the amount it applies to.
+  const payoff = useMemo(() => {
+    if (row.policy_type !== 'CONTRACT_PAYOFF') return null;
+    const snap = (row.payload_snapshot ?? {}) as Record<string, unknown>;
+    const cap = (snap.payoff_cap ?? {}) as Record<string, unknown>;
+    const num = (v: unknown) => (typeof v === 'number' ? v : null);
+    return {
+      base: num(snap.payoff_base),
+      maxPct: num(cap.max_pct),
+      maxAmount: num(cap.max_amount),
+      submitReason: typeof snap.submit_reason === 'string' ? snap.submit_reason : null,
+      contractId: num(snap.contract_id),
+    };
+  }, [row.policy_type, row.payload_snapshot]);
+
   const buildRpcCall = (action: 'approve' | 'reject' | 'cancel'): { rpc: string; params: Record<string, unknown> } => {
     const trimmed = reason.trim();
     switch (row.type) {
@@ -495,6 +533,11 @@ function SimpleApprovalPanel({
     <div className="relative flex flex-col h-full min-w-0 overflow-hidden">
       <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
         <Badge size="sm" color={typeColor(row.type)}>{t(`approvals.type_${row.type}`)}</Badge>
+        {row.policy_type && (
+          <Badge size="sm" color="default">
+            {t(`approvals.policy_${row.policy_type}`, { defaultValue: row.policy_type })}
+          </Badge>
+        )}
         <Badge size="sm" color={statusColor(row.status)}>{t(`approvals.status_${row.status}`)}</Badge>
       </div>
 
@@ -517,6 +560,28 @@ function SimpleApprovalPanel({
           <DetailRow label={t('approvals.amount')} value={formatNumber(row.amount)} mono />
           {row.discount_percent != null && (
             <DetailRow label={t('approvals.discountPercent')} value={`${row.discount_percent}%`} mono />
+          )}
+          {/* A request to settle a contract early carries its own ceiling, so
+           *  the approver can see at a glance whether it is within the company's
+           *  limit without opening the contract. */}
+          {payoff && (
+            <>
+              {payoff.base != null && (
+                <DetailRow label={t('approvals.payoffBase')} value={formatNumber(payoff.base)} mono />
+              )}
+              {payoff.maxPct != null && (
+                <DetailRow
+                  label={t('approvals.payoffCap')}
+                  value={payoff.maxAmount != null
+                    ? `${formatNumber(payoff.maxAmount)} (${payoff.maxPct}%)`
+                    : `${payoff.maxPct}%`}
+                  mono
+                />
+              )}
+              {payoff.submitReason && (
+                <DetailRow label={t('approvals.submitReason')} value={payoff.submitReason} />
+              )}
+            </>
           )}
         </div>
 

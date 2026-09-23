@@ -57,6 +57,14 @@ export function CompanyConfigDetailPage() {
     // icloud_device_cap: max devices bindable per Apple ID (Apple ceiling ~20).
     // BE enforces the same via CHECK; range check below rejects early.
     { key: 'icloud_device_cap', label: t('settings.config.icloudDeviceCap'), type: 'number', group: 'icloud', min: 1, max: 20 },
+    // Ceiling on the discount a branch may ask for when a customer pays a FIN2
+    // contract off early. 0 switches the discount off for the whole company;
+    // the request still goes to a company admin for approval either way.
+    {
+      key: 'fin2_early_payoff_discount_max_pct',
+      label: t('settings.config.fin2EarlyPayoffDiscountMaxPct'),
+      type: 'number', group: 'payoff', min: 0, max: 100,
+    },
   ];
 
   const groups = [
@@ -69,6 +77,7 @@ export function CompanyConfigDetailPage() {
     { key: 'policy', label: t('settings.config.groupPolicy') },
     { key: 'repair', label: t('settings.config.groupRepair') },
     { key: 'icloud', label: t('settings.config.groupIcloud') },
+    { key: 'payoff', label: t('settings.config.groupPayoff') },
   ];
 
   // Initialize form when config loads

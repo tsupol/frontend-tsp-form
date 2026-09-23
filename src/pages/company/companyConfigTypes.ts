@@ -20,6 +20,7 @@ export interface CompanyConfig {
   pay_pending_limit: number;
   repair_pickup_max_days: number;
   icloud_device_cap: number;
+  fin2_early_payoff_discount_max_pct: number;
   updated_by: number | null;
   updated_at: string;
 }
