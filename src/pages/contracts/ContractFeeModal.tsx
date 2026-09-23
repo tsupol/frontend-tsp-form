@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Modal, Button, Select, MaskedInput, Input, Badge, PopOver } from 'tsp-form';
 import { Plus, Trash2, XCircle, AlertCircle, ChevronsRight, Loader2, CheckCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
@@ -89,6 +89,7 @@ export function ContractFeeModal({ open, contract, onClose, onSuccess }: {
 }) {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   // Data-driven payment methods (doc 37 §13.4), narrowed by the kind of branch
   // this bill belongs to (doc 144 §2, mig 1266/1268): a fee on a deal-partner
@@ -300,6 +301,14 @@ export function ContractFeeModal({ open, contract, onClose, onSuccess }: {
 
       setResult({ billId, code: created.code_display ?? created.bill_code ?? String(billId) });
       setView('done');
+      // Wallet money leaves as each payment line is entered, so every reading of
+      // a balance is stale the moment this succeeds. The balances shown here
+      // arrive as a prop, so they are re-read at the source.
+      queryClient.invalidateQueries({ queryKey: ['contract-detail', contract.id] });
+      queryClient.invalidateQueries({ queryKey: ['workspace-contract', contract.id] });
+      queryClient.invalidateQueries({ queryKey: ['wallet-available', contract.id] });
+      queryClient.invalidateQueries({ queryKey: ['contract-wallet-txns', contract.id] });
+      queryClient.invalidateQueries({ queryKey: ['repair-pay-wallets', contract.id] });
       onSuccess();
     } catch (err) {
       if (err instanceof ApiError) {

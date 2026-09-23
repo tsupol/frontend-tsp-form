@@ -610,6 +610,14 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
       queryClient.invalidateQueries({ queryKey: ['contract-payments', contractId] });
       queryClient.invalidateQueries({ queryKey: ['contract-actions', contractId] });
       queryClient.invalidateQueries({ queryKey: ['contract-search'] });
+      // A wallet's money now leaves the moment a payment line is entered, not
+      // when the bill is confirmed — and comes back the moment one is voided.
+      // Every screen holding a balance has to be re-read, or the customer's
+      // savings still read full while the money has already gone.
+      queryClient.invalidateQueries({ queryKey: ['workspace-contract', contractId] });
+      queryClient.invalidateQueries({ queryKey: ['repair-pay-wallets', contractId] });
+      queryClient.invalidateQueries({ queryKey: ['wallet-available', contractId] });
+      queryClient.invalidateQueries({ queryKey: ['contract-wallet-txns', contractId] });
     }
   };
 

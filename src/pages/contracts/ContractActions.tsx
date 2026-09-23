@@ -3009,6 +3009,8 @@ interface ContractAfterPay {
   id: number;
   outstanding_amount: number | null;
   credit_balance: number | null;
+  saving_balance: number | null;
+  insurance_balance: number | null;
   paid_installment_count: number | null;
   total_installments: number | null;
   next_due_amount: number | null;
@@ -3205,7 +3207,10 @@ function PayInstallmentModal({ open, contract, onClose }: {
   const { data: contractAfter } = useQuery({
     queryKey: ['contract-after-pay', contract.id, result?.bill_id],
     queryFn: () => apiClient.get<ContractAfterPay[]>(
-      `/v_contracts?id=eq.${contract.id}&select=id,outstanding_amount,credit_balance,paid_installment_count,total_installments,next_due_amount,next_due_date,state`,
+      // All three wallet balances, not just credit: paying from a wallet now
+      // takes the money as the line is entered, so every balance the screen
+      // shows has moved by the time this runs.
+      `/v_contracts?id=eq.${contract.id}&select=id,outstanding_amount,credit_balance,saving_balance,insurance_balance,paid_installment_count,total_installments,next_due_amount,next_due_date,state`,
     ).then(rows => rows[0] ?? null),
     enabled: view === 'done' && result != null,
     staleTime: 0,
@@ -3256,11 +3261,16 @@ function PayInstallmentModal({ open, contract, onClose }: {
   // The picker starts on CASH; at a partner branch that value is not in its own
   // option list, so move it to the first channel the branch does accept once
   // the rule has loaded.
+  //
+  // Only while the form is still being filled in. Paying from a wallet empties
+  // it, which drops that channel from the list — and rewriting the choice then
+  // would make the receipt claim the customer paid cash.
   useEffect(() => {
+    if (view !== 'form') return;
     if (channelOptions.length === 0) return;
     if (channelOptions.some(o => o.value === channel)) return;
     setChannel(channelOptions[0].value);
-  }, [channelOptions, channel]);
+  }, [channelOptions, channel, view]);
 
   const parsedAmount = Number(amount) || 0;
   const walletBalance = channel === 'SAVING_WALLET' ? savingBalance
