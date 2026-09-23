@@ -58,3 +58,17 @@ the company. Adding by that sign puts each on the wrong side.
 end it is written from. Before computing any money total, search the response you already
 have for the number — it is usually sitting there. Document direction and book direction
 disagreeing is documented, expected, and not a bug to "fix".
+
+**Subtracting is the same mistake as summing.** Second case, 2026-09-23: the early-payoff
+screen worked out what the customer owes by taking the requested discount off the
+instalment total. The preview already returned that net — and its net also has a FIN1
+contract's own settlement discount taken off, which the screen's subtraction did not. The
+payment-balance check therefore demanded more than the bill would actually be raised for,
+on exactly the contracts that carry that second discount. Once a bill exists, its own
+`total_amount` is the only correct figure; the trigger computes it from the lines, and
+lines can exist that the screen never put there.
+
+**The check, before writing any arithmetic on an amount:** read the response you already
+have and look for the answer as a field. `+`, `-`, `reduce` or a percentage over money is
+the smell — not wrong by itself, but a prompt to go looking first. Only derive when you
+have looked and the number genuinely is not there, and say so when you do.

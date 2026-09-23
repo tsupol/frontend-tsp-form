@@ -1327,7 +1327,13 @@ function PayoffView({
   const overCap = canDiscount && requestedDiscount > (discountCap?.max_amount ?? 0);
   const awaitingApproval = requestedDiscount > 0;
 
-  const grossRemaining = preview?.installments.gross_remaining ?? 0;
+  // What the customer owes before this request: the backend's own figure, which
+  // on a fund contract already has that contract's own settlement discount taken
+  // off. Subtracting from the instalment total instead would quietly bill more
+  // than the bill will actually come to.
+  const grossRemaining = preview?.summary?.net ?? preview?.installments.gross_remaining ?? 0;
+  // The only part the screen works out is what the staff are still typing; the
+  // moment the bill exists, its own total takes over (see the waiting view).
   const billTotal = Math.max(grossRemaining - requestedDiscount, 0);
   const totalPayment = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
   const isBalanced = billTotal > 0 && Math.abs(totalPayment - billTotal) < 0.01;
@@ -1372,7 +1378,9 @@ function PayoffView({
     <>
       <div className="mb-4 px-3 py-2.5 rounded-md bg-warning-soft border border-warning-border">
         <div className="text-xs text-subtle">{t('contract.earlyPayoff_payoffAmount', { defaultValue: 'Payoff Amount' })}</div>
-        <div className="text-lg font-semibold tabular-nums">{fmtCurrency(preview.installments.gross_remaining)}</div>
+        {/* What is actually owed, which on a fund contract is less than the
+         *  instalments add up to — that is the figure the payment must match. */}
+        <div className="text-lg font-semibold tabular-nums">{fmtCurrency(grossRemaining)}</div>
         <div className="text-xs text-subtle mt-1">
           {t('contract.earlyPayoff_installmentsRemaining', {
             count: preview.installments.count_unpaid,
@@ -1808,7 +1816,10 @@ function validatePayoffPayment(
   if (zeroAmount) return t('contract.earlyPayoff_enterAmount', { defaultValue: 'Enter amount for all rows' });
   const missingBank = payments.find(p => p.method === 'TRANSFER' && !p.bank_account_id);
   if (missingBank) return t('contract.earlyPayoff_selectBank', { defaultValue: 'Select bank account for transfer payment' });
-  const billTotal = preview.installments.gross_remaining;
+  // The backend's net, not the instalment total: on a fund contract the bill is
+  // raised with that contract's settlement discount already taken off, so
+  // checking against the gross would demand more money than the bill asks for.
+  const billTotal = preview.summary?.net ?? preview.installments.gross_remaining;
   const total = payments.reduce((s, p) => s + (p.amount || 0), 0);
   if (Math.abs(total - billTotal) >= 0.01) return t('contract.earlyPayoff_notBalanced', { defaultValue: 'Total payment must match the payoff amount' });
   return null;
