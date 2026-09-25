@@ -308,7 +308,10 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
 
       {/* Footer — belongs to the numbers tab only; the switches save themselves. */}
       {activeTab === 'values' && (
-        <div className="flex-none border-t border-line px-4 py-3">
+        /* On mobile the whole panel is one scroller (that is how the library
+           lays it out), so the footer would sit at the end of the content —
+           past several screens of fields. Stick it to the bottom there. */
+        <div className={`flex-none border-t border-line px-4 py-3 bg-bg ${isMobile ? 'sticky bottom-0 z-10' : ''}`}>
           {errorMessage && (
             <div className="alert alert-danger mb-3">
               <XCircle size={16} />
