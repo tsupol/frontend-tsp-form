@@ -85,8 +85,7 @@ import { PausedContractsPage } from './pages/contracts/PausedContractsPage';
 import { PendingPaymentPage } from './pages/contracts/PendingPaymentPage';
 import { ContractWizardPage } from './pages/contracts/ContractWizardPage';
 import { CompanyLayout } from './pages/company/CompanyLayout';
-import { CompanyConfigRoot } from './pages/company/CompanyConfigRoot';
-import { CompanyConfigDetailPage } from './pages/company/CompanyConfigDetailPage';
+import { CompanyConfigPage } from './pages/company/CompanyConfigPage';
 import { BankAccountsPage } from './pages/company/BankAccountsPage';
 import { HolidaysPage } from './pages/company/HolidaysPage';
 import { DunningSystemPage } from './pages/dunning/DunningSystemPage';
@@ -1356,18 +1355,28 @@ function App() {
           </ProtectedRoute>
         }
       />
+      {/* Two-panel: company rail + that company's settings. The :companyId form
+          is the same page with a row preselected, so older links still work. */}
       <Route
         path="/admin/company/config"
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <CompanyLayout><CompanyConfigRoot /></CompanyLayout>
+              <CompanyLayout><CompanyConfigPage /></CompanyLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
-      >
-        <Route path=":companyId" element={<CompanyConfigDetailPage />} />
-      </Route>
+      />
+      <Route
+        path="/admin/company/config/:companyId"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <CompanyLayout><CompanyConfigPage /></CompanyLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/admin/company/bank-accounts"
         element={

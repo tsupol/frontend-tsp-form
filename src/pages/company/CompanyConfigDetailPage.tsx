@@ -1,23 +1,23 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  MobileHeader, Button, Input, Switch, Select, Modal, useSnackbarContext,
+  Button, Input, Switch, Select, Modal, useSnackbarContext,
 } from 'tsp-form';
-import { ArrowLeft, CheckCircle, XCircle, Save } from 'lucide-react';
+import { CheckCircle, XCircle, Save } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import type { CompanyConfig, EditableField } from './companyConfigTypes';
 import type { CompanyFeatureCode } from '../../hooks/useCompanyFeatures';
 import { translateApiError } from '../../lib/apiErrors';
 
-// ── Detail Page ──────────────────────────────────────────────────────────────
+// ── Detail panel ─────────────────────────────────────────────────────────────
+// Rendered inside the settings page's right panel. The company comes in as a
+// prop (the rail owns the selection); on mobile the panel is the whole screen
+// and the page's own header carries the back button, so this renders fields only.
 
-export function CompanyConfigDetailPage() {
+export function CompanyConfigDetail({ companyId, isMobile }: { companyId: number; isMobile: boolean }) {
   const { t } = useTranslation();
-  const { companyId } = useParams<{ companyId: string }>();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { addSnackbar } = useSnackbarContext();
@@ -179,66 +179,27 @@ export function CompanyConfigDetailPage() {
     setErrorMessage('');
   };
 
-  const goBack = () => navigate('/admin/company/config');
-
   if (isLoading || !config) {
     return (
-      <>
-        <MobileHeader className="mobile-header-bordered md:hidden">
-          <div className="mobile-header-start">
-            <button
-              className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
-              aria-label="Go back"
-              onClick={goBack}
-            >
-              <ArrowLeft size={20} />
-            </button>
-          </div>
-          <div className="mobile-header-title" />
-          <div className="mobile-header-end w-nav" />
-        </MobileHeader>
-        <div className="page-content">
-          <div className="p-8 text-center text-subtle">
-            {isLoading ? t('common.loading') : t('settings.config.empty')}
-          </div>
+      <div className="flex-1 h-full flex items-center justify-center text-subtler">
+        <div className="text-sm">
+          {isLoading ? t('common.loading') : t('settings.config.empty')}
         </div>
-      </>
+      </div>
     );
   }
 
   return (
     <>
-      {/* Mobile header */}
-      <MobileHeader className="mobile-header-bordered md:hidden">
-        <div className="mobile-header-start">
-          <button
-            className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
-            aria-label="Go back"
-            onClick={goBack}
-          >
-            <ArrowLeft size={20} />
-          </button>
+      {/* Panel header — the company being edited, fixed above the scrolling fields. */}
+      {!isMobile && (
+        <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
+          <h2 className="text-sm font-semibold truncate">{config.company_name}</h2>
         </div>
-        <div className="mobile-header-title mobile-header-title-truncate">
-          {config.company_name}
-        </div>
-        <div className="mobile-header-end w-nav" />
-      </MobileHeader>
+      )}
 
-      <div className="page-content max-w-2xl mx-auto pb-0">
-        {/* Desktop header — sticks to the top of the scrolling area so the
-            company you are editing stays named while the fields scroll under it. */}
-        <div className="sticky top-0 z-10 bg-bg pt-4 -mt-4 flex items-center gap-3 mb-6 max-md:hidden">
-          <button
-            className="flex items-center gap-1 text-sm text-subtle hover:text-fg transition-colors cursor-pointer"
-            onClick={goBack}
-          >
-            <ArrowLeft size={14} />
-            {t('settings.config.title')}
-          </button>
-          <span className="text-fg/30">/</span>
-          <h1 className="heading-2">{config.company_name}</h1>
-        </div>
+      <div className="flex-1 overflow-auto better-scroll px-4 py-3">
+        <div className="max-w-2xl mx-auto pb-0">
 
         {errorMessage && (
           <div className="alert alert-danger mb-4">
@@ -296,6 +257,7 @@ export function CompanyConfigDetailPage() {
         <WalletFeaturesSection companyId={config.company_id} />
         <hr className="border-line mt-6 mb-6" />
         <ChargeOwnerSection companyId={config.company_id} />
+        </div>
       </div>
     </>
   );
@@ -348,7 +310,7 @@ function ContractTemplateSection({ companyId }: { companyId: number }) {
         p_changes: { contract_template_code: pendingCode },
       });
       await queryClient.invalidateQueries({ queryKey: ['company-contract-template', companyId] });
-      queryClient.invalidateQueries({ queryKey: ['company-config-detail', String(companyId)] });
+      queryClient.invalidateQueries({ queryKey: ['company-config-detail', companyId] });
       setPendingCode(null);
       addSnackbar({
         message: (
