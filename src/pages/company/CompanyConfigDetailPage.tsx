@@ -283,8 +283,8 @@ export function CompanyConfigDetail({ companyId, isMobile }: { companyId: number
             </div>
           )}
           <div className="flex items-center justify-end gap-2">
-            <Button onClick={handleReset} disabled={saving || !isDirty}>{t('common.cancel')}</Button>
-            <Button color="primary" startIcon={<Save size={16} />} onClick={handleSave} disabled={saving || !isDirty}>
+            <Button size="sm" onClick={handleReset} disabled={saving || !isDirty}>{t('common.cancel')}</Button>
+            <Button size="sm" color="primary" startIcon={<Save size={14} />} onClick={handleSave} disabled={saving || !isDirty}>
               {saving ? t('common.saving') : t('common.save')}
             </Button>
           </div>
