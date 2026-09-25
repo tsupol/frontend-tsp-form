@@ -47,44 +47,38 @@ export function CompanyConfigDetail({ companyId, isMobile }: { companyId: number
     { key: 'grace_period_days', label: t('settings.config.gracePeriodDays'), type: 'number', group: 'contract' },
     { key: 'max_co_lessees', label: t('settings.config.maxCoLessees'), type: 'number', group: 'contract' },
     { key: 'deposit_max_days', label: t('settings.config.depositMaxDays'), type: 'number', group: 'contract' },
-    { key: 'late_fee_per_day', label: t('settings.config.lateFeePerDay'), type: 'number', group: 'lateFee' },
-    { key: 'late_fee_split_holding', label: t('settings.config.lateFeeSplitHolding'), type: 'number', group: 'lateFee' },
-    { key: 'late_fee_split_company', label: t('settings.config.lateFeeSplitCompany'), type: 'number', group: 'lateFee' },
+    { key: 'late_fee_per_day', label: t('settings.config.lateFeePerDay'), type: 'number', group: 'money' },
+    { key: 'late_fee_split_holding', label: t('settings.config.lateFeeSplitHolding'), type: 'number', group: 'money' },
+    { key: 'late_fee_split_company', label: t('settings.config.lateFeeSplitCompany'), type: 'number', group: 'money' },
     { key: 'comm_min_active_days', label: t('settings.config.commMinActiveDays'), type: 'number', group: 'commission' },
     { key: 'comm_min_paid_installments', label: t('settings.config.commMinPaidInstallments'), type: 'number', group: 'commission' },
     { key: 'comm_require_no_overdue', label: t('settings.config.commRequireNoOverdue'), type: 'boolean', group: 'commission' },
-    { key: 'pause_max_deferred', label: t('settings.config.pauseMaxDeferred'), type: 'number', group: 'pause' },
-    { key: 'pause_enabled', label: t('settings.config.pauseEnabled'), type: 'boolean', group: 'pause' },
-    { key: 'repo_fee_per_case', label: t('settings.config.repoFeePerCase'), type: 'number', group: 'legal' },
-    { key: 'buyback_auto_reject_days', label: t('settings.config.buybackAutoRejectDays'), type: 'number', group: 'buyback', min: 1, max: 365 },
+    { key: 'pause_max_deferred', label: t('settings.config.pauseMaxDeferred'), type: 'number', group: 'contract' },
+    { key: 'pause_enabled', label: t('settings.config.pauseEnabled'), type: 'boolean', group: 'contract' },
+    { key: 'repo_fee_per_case', label: t('settings.config.repoFeePerCase'), type: 'number', group: 'money' },
+    { key: 'buyback_auto_reject_days', label: t('settings.config.buybackAutoRejectDays'), type: 'number', group: 'device', min: 1, max: 365 },
     // pay_pending_limit: 0 = pay only what's due, 99 = allow pay-ahead (mig 533). Fill policy.
-    { key: 'pay_pending_limit', label: t('settings.config.payPendingLimit'), type: 'number', group: 'policy', min: 0, max: 99 },
+    { key: 'pay_pending_limit', label: t('settings.config.payPendingLimit'), type: 'number', group: 'money', min: 0, max: 99 },
     // repair_pickup_max_days: default pickup window for new repair orders (mig 671).
-    { key: 'repair_pickup_max_days', label: t('settings.config.repairPickupMaxDays'), type: 'number', group: 'repair', min: 1, max: 365 },
+    { key: 'repair_pickup_max_days', label: t('settings.config.repairPickupMaxDays'), type: 'number', group: 'device', min: 1, max: 365 },
     // icloud_device_cap: max devices bindable per Apple ID (Apple ceiling ~20).
     // BE enforces the same via CHECK; range check below rejects early.
-    { key: 'icloud_device_cap', label: t('settings.config.icloudDeviceCap'), type: 'number', group: 'icloud', min: 1, max: 20 },
+    { key: 'icloud_device_cap', label: t('settings.config.icloudDeviceCap'), type: 'number', group: 'device', min: 1, max: 20 },
     // Ceiling on the discount a branch may ask for when a customer pays a FIN2
     // contract off early. 0 switches the discount off for the whole company;
     // the request still goes to a company admin for approval either way.
     {
       key: 'fin2_early_payoff_discount_max_pct',
       label: t('settings.config.fin2EarlyPayoffDiscountMaxPct'),
-      type: 'number', group: 'payoff', min: 0, max: 100,
+      type: 'number', group: 'money', min: 0, max: 100,
     },
   ];
 
   const groups = [
-    { key: 'contract', label: t('settings.config.groupContract') },
-    { key: 'lateFee', label: t('settings.config.groupLateFee') },
+    { key: 'contract', label: t('settings.config.groupContractTerms') },
+    { key: 'money', label: t('settings.config.groupMoney') },
     { key: 'commission', label: t('settings.config.groupCommission') },
-    { key: 'pause', label: t('settings.config.groupPause') },
-    { key: 'legal', label: t('settings.config.groupLegal') },
-    { key: 'buyback', label: t('settings.config.groupBuyback') },
-    { key: 'policy', label: t('settings.config.groupPolicy') },
-    { key: 'repair', label: t('settings.config.groupRepair') },
-    { key: 'icloud', label: t('settings.config.groupIcloud') },
-    { key: 'payoff', label: t('settings.config.groupPayoff') },
+    { key: 'device', label: t('settings.config.groupDevice') },
   ];
 
   // Initialize form when config loads
@@ -228,18 +222,21 @@ export function CompanyConfigDetail({ companyId, isMobile }: { companyId: number
       </div>
 
       <div className="flex-1 overflow-auto better-scroll px-4 py-3">
-        <div className="max-w-2xl mx-auto">
+        <div className={activeTab === 'values' ? 'max-w-5xl mx-auto' : 'max-w-2xl mx-auto'}>
           {activeTab === 'values' ? (
-            <div className="flex flex-col">
-              {groups.map((group, i) => {
+            /* Groups sit side by side on a wide panel: each is only a handful of
+               small number fields, so one column per group wasted the width. */
+            <div className="grid gap-x-8 gap-y-6 lg:grid-cols-2 items-start">
+              {groups.map(group => {
                 const groupFields = fields.filter(f => f.group === group.key);
                 return (
-                  <div key={group.key}>
-                    {i > 0 && <hr className="border-line mt-0 mb-6" />}
-                    <h4 className="text-sm font-semibold text-fg uppercase tracking-wider mb-3">{group.label}</h4>
-                    <div className="form-grid md:grid-cols-2">
+                  <div key={group.key} className="min-w-0">
+                    <h4 className="text-sm font-semibold text-fg uppercase tracking-wider mb-3 pb-2 border-b border-line">
+                      {group.label}
+                    </h4>
+                    <div className="form-grid sm:grid-cols-2 gap-4">
                       {groupFields.map(field => (
-                        <div key={field.key} className="flex flex-col">
+                        <div key={field.key} className="flex flex-col min-w-0">
                           <label className="form-label">{field.label}</label>
                           {field.type === 'boolean' ? (
                             <Switch

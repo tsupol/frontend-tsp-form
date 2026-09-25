@@ -8073,7 +8073,10 @@
       "contractTemplateConfirmBody": "Change the contract form to {{template}}? Contracts opened after this will use it · existing contracts and drafts left open will not change.",
       "tab_values": "Values",
       "tab_instant": "Switches",
-      "instantHint": "These save as soon as you change them — there is no Save button on this tab."
+      "instantHint": "These save as soon as you change them — there is no Save button on this tab.",
+      "groupContractTerms": "Contract terms",
+      "groupMoney": "Fees & payment",
+      "groupDevice": "Devices & returns"
     },
     "bankAccounts": {
       "title": "Bank Accounts",
