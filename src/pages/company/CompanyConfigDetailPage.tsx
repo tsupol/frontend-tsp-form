@@ -11,6 +11,12 @@ import type { CompanyConfig, EditableField } from './companyConfigTypes';
 import type { CompanyFeatureCode } from '../../hooks/useCompanyFeatures';
 import { translateApiError } from '../../lib/apiErrors';
 
+// Two tabs, split by how a setting is saved: 'values' are typed numbers that
+// share one Save button; 'instant' are the pickers/switches that write the
+// moment they are touched.
+type ConfigTab = 'values' | 'instant';
+const TABS: ConfigTab[] = ['values', 'instant'];
+
 // ── Detail panel ─────────────────────────────────────────────────────────────
 // Rendered inside the settings page's right panel. The company comes in as a
 // prop (the rail owns the selection); on mobile the panel is the whole screen
@@ -25,6 +31,7 @@ export function CompanyConfigDetail({ companyId, isMobile }: { companyId: number
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [formValues, setFormValues] = useState<Record<string, number | boolean>>({});
+  const [activeTab, setActiveTab] = useState<ConfigTab>('values');
 
   const { data: config, isLoading } = useQuery({
     queryKey: ['company-config-detail', companyId],
@@ -198,67 +205,94 @@ export function CompanyConfigDetail({ companyId, isMobile }: { companyId: number
         </div>
       )}
 
-      <div className="flex-1 overflow-auto better-scroll px-4 py-3">
-        <div className="max-w-2xl mx-auto pb-0">
-
-        {errorMessage && (
-          <div className="alert alert-danger mb-4">
-            <XCircle size={16} />
-            <div><div className="alert-description text-xs">{errorMessage}</div></div>
-          </div>
-        )}
-
-        <div className="flex flex-col">
-          {groups.map((group, i) => {
-            const groupFields = fields.filter(f => f.group === group.key);
-            return (
-              <div key={group.key}>
-                {i > 0 && <hr className="border-line mt-0 mb-6" />}
-                <h4 className="text-sm font-semibold text-fg uppercase tracking-wider mb-3">{group.label}</h4>
-                <div className="form-grid md:grid-cols-2">
-                  {groupFields.map(field => (
-                    <div key={field.key} className="flex flex-col">
-                      <label className="form-label">{field.label}</label>
-                      {field.type === 'boolean' ? (
-                        <Switch
-                          checked={getValue(field.key) as boolean}
-                          onChange={(e) => setValue(field.key, (e.target as HTMLInputElement).checked)}
-                        />
-                      ) : (
-                        <Input
-                          type="number"
-                          className="w-full"
-                          min={field.min}
-                          max={field.max}
-                          value={String(getValue(field.key) ?? '')}
-                          onChange={(e) => setValue(field.key, Number(e.target.value))}
-                        />
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Footer (config fields — saves via fn_config_update) */}
-        <div className="sticky bottom-0 flex items-center justify-end gap-2 py-3 bg-bg border-t border-line md:border-t-0 z-10">
-          <Button onClick={handleReset} disabled={saving || !isDirty}>{t('common.cancel')}</Button>
-          <Button color="primary" startIcon={<Save size={16} />} onClick={handleSave} disabled={saving || !isDirty}>
-            {saving ? t('common.saving') : t('common.save')}
-          </Button>
-        </div>
-
-        {/* Contract template + wallet features + bill-line owner — own save flow each. */}
-        <hr className="border-line mt-2 mb-6" />
-        <ContractTemplateSection companyId={config.company_id} />
-        <hr className="border-line mt-6 mb-6" />
-        <WalletFeaturesSection companyId={config.company_id} />
-        <hr className="border-line mt-6 mb-6" />
-        <ChargeOwnerSection companyId={config.company_id} />
+      {/* Split by how a setting saves, not by topic: the numbers tab shares one
+          Save button (so it owns the footer), the switches tab writes on touch
+          (so it has no footer at all — a Save there would be a lie). */}
+      <div className="flex-none border-b border-line">
+        <div className="flex px-2">
+          {TABS.map(tab => (
+            <button
+              key={tab}
+              type="button"
+              className={`py-2 px-3 text-sm font-medium transition-colors cursor-pointer border-b-2 whitespace-nowrap bg-transparent ${
+                activeTab === tab
+                  ? 'border-primary-fg text-primary-fg'
+                  : 'border-transparent text-fg'
+              }`}
+              onClick={() => setActiveTab(tab)}
+            >
+              {t(`settings.config.tab_${tab}`)}
+            </button>
+          ))}
         </div>
       </div>
+
+      <div className="flex-1 overflow-auto better-scroll px-4 py-3">
+        <div className="max-w-2xl mx-auto">
+          {activeTab === 'values' ? (
+            <div className="flex flex-col">
+              {groups.map((group, i) => {
+                const groupFields = fields.filter(f => f.group === group.key);
+                return (
+                  <div key={group.key}>
+                    {i > 0 && <hr className="border-line mt-0 mb-6" />}
+                    <h4 className="text-sm font-semibold text-fg uppercase tracking-wider mb-3">{group.label}</h4>
+                    <div className="form-grid md:grid-cols-2">
+                      {groupFields.map(field => (
+                        <div key={field.key} className="flex flex-col">
+                          <label className="form-label">{field.label}</label>
+                          {field.type === 'boolean' ? (
+                            <Switch
+                              checked={getValue(field.key) as boolean}
+                              onChange={(e) => setValue(field.key, (e.target as HTMLInputElement).checked)}
+                            />
+                          ) : (
+                            <Input
+                              type="number"
+                              className="w-full"
+                              min={field.min}
+                              max={field.max}
+                              value={String(getValue(field.key) ?? '')}
+                              onChange={(e) => setValue(field.key, Number(e.target.value))}
+                            />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex flex-col">
+              <p className="text-xs text-subtle mb-5">{t('settings.config.instantHint')}</p>
+              <ContractTemplateSection companyId={config.company_id} />
+              <hr className="border-line mt-6 mb-6" />
+              <WalletFeaturesSection companyId={config.company_id} />
+              <hr className="border-line mt-6 mb-6" />
+              <ChargeOwnerSection companyId={config.company_id} />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Footer — belongs to the numbers tab only; the switches save themselves. */}
+      {activeTab === 'values' && (
+        <div className="flex-none border-t border-line px-4 py-3">
+          {errorMessage && (
+            <div className="alert alert-danger mb-3">
+              <XCircle size={16} />
+              <div><div className="alert-description text-xs">{errorMessage}</div></div>
+            </div>
+          )}
+          <div className="flex items-center justify-end gap-2">
+            <Button onClick={handleReset} disabled={saving || !isDirty}>{t('common.cancel')}</Button>
+            <Button color="primary" startIcon={<Save size={16} />} onClick={handleSave} disabled={saving || !isDirty}>
+              {saving ? t('common.saving') : t('common.save')}
+            </Button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
