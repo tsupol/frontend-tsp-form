@@ -3,12 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
-  PageNav, PageNavPanel, DataTable, MobileHeader, Input,
+  PageNav, PageNavPanel, DataTable, MobileHeader, Input, Modal, Button,
 } from 'tsp-form';
 import { ArrowRightFromLine, ArrowLeft, Settings2 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import type { CompanyConfig } from './companyConfigTypes';
 import { CompanyConfigDetail } from './CompanyConfigDetailPage';
+import { useNavGuard } from '../../contexts/NavGuardContext';
 
 // ── Company settings — PageNav 2-panel ───────────────────────────────────────
 // Left rail: the companies of this holding. Right panel: that company's
@@ -29,6 +30,34 @@ export function CompanyConfigPage() {
   const [selectedId, setSelectedId] = useState<number | null>(
     companyId ? Number(companyId) : null,
   );
+
+  // Unsaved-changes guard: the settings panel reports dirty here, and every way
+  // out of it (another company, mobile back, the app's side nav) checks first.
+  const navGuard = useNavGuard();
+  const editorDirtyRef = useRef(false);
+  useEffect(() => { navGuard?.setDirtyRef(editorDirtyRef); }, [navGuard]);
+  const [pendingNav, setPendingNav] = useState<
+    | { type: 'company'; companyId: number; goTo?: (id: string) => void }
+    | { type: 'back'; goBack: () => void }
+    | null
+  >(null);
+
+  const applyNav = (nav: NonNullable<typeof pendingNav>) => {
+    editorDirtyRef.current = false;
+    if (nav.type === 'company') {
+      setSelectedId(nav.companyId);
+      navigate(`/admin/company/config/${nav.companyId}`, { replace: true });
+      nav.goTo?.('detail');
+    } else {
+      nav.goBack();
+    }
+  };
+
+  const confirmDiscard = () => {
+    if (!pendingNav) return;
+    applyNav(pendingNav);
+    setPendingNav(null);
+  };
 
   const { data: configs = [], isFetching, isLoading } = useQuery({
     queryKey: ['company-config-list'],
@@ -68,9 +97,13 @@ export function CompanyConfigPage() {
     >
       {({ isMobile, isRoot, goTo, goBack }) => {
         const select = (row: CompanyConfig) => {
-          setSelectedId(row.company_id);
-          navigate(`/admin/company/config/${row.company_id}`, { replace: true });
-          if (isMobile) goTo('detail');
+          const nav = {
+            type: 'company' as const,
+            companyId: row.company_id,
+            goTo: isMobile ? goTo : undefined,
+          };
+          if (editorDirtyRef.current) { setPendingNav(nav); return; }
+          applyNav(nav);
         };
 
         return (
@@ -90,7 +123,10 @@ export function CompanyConfigPage() {
                     <button
                       className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
                       aria-label="Go back"
-                      onClick={goBack}
+                      onClick={() => {
+                        if (editorDirtyRef.current) { setPendingNav({ type: 'back', goBack }); return; }
+                        goBack();
+                      }}
                     >
                       <ArrowLeft size={20} />
                     </button>
@@ -132,8 +168,9 @@ export function CompanyConfigPage() {
                   })}
                   enableKeyboardNav={!isMobile}
                   onRowActivate={row => {
-                    setSelectedId(row.original.company_id);
-                    navigate(`/admin/company/config/${row.original.company_id}`, { replace: true });
+                    const nav = { type: 'company' as const, companyId: row.original.company_id };
+                    if (editorDirtyRef.current) { setPendingNav(nav); return; }
+                    applyNav(nav);
                   }}
                   renderRow={row => {
                     const c = row.original;
@@ -181,10 +218,25 @@ export function CompanyConfigPage() {
                     </div>
                   </div>
                 ) : (
-                  <CompanyConfigDetail companyId={selectedId} isMobile={isMobile} />
+                  <CompanyConfigDetail companyId={selectedId} isMobile={isMobile} isDirtyRef={editorDirtyRef} />
                 )}
               </PageNavPanel>
             </div>
+
+            {/* ── Unsaved changes confirm ── */}
+            <Modal open={!!pendingNav} onClose={() => setPendingNav(null)} maxWidth="400px" ariaLabel={t('common.unsavedChanges')}>
+              <div className="modal-header">
+                <h2 className="modal-title">{t('common.unsavedChanges')}</h2>
+                <button type="button" className="modal-close-btn" onClick={() => setPendingNav(null)} aria-label="Close">&times;</button>
+              </div>
+              <div className="modal-content">
+                <p>{t('common.unsavedChangesMessage')}</p>
+              </div>
+              <div className="modal-footer">
+                <Button variant="ghost" onClick={() => setPendingNav(null)}>{t('common.cancel')}</Button>
+                <Button variant="danger" onClick={confirmDiscard}>{t('common.discard')}</Button>
+              </div>
+            </Modal>
           </>
         );
       }}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import type { MutableRefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -22,7 +23,12 @@ const TABS: ConfigTab[] = ['values', 'instant'];
 // prop (the rail owns the selection); on mobile the panel is the whole screen
 // and the page's own header carries the back button, so this renders fields only.
 
-export function CompanyConfigDetail({ companyId, isMobile }: { companyId: number; isMobile: boolean }) {
+export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
+  companyId: number;
+  isMobile: boolean;
+  /** The page's unsaved-changes guard reads this — see .claude/nav-guard-pattern.md. */
+  isDirtyRef?: MutableRefObject<boolean>;
+}) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -115,6 +121,13 @@ export function CompanyConfigDetail({ companyId, isMobile }: { companyId: number
     return fields.some(f => formValues[f.key] !== (config[f.key] as number | boolean));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formValues, config]);
+
+  // Report unsaved edits to the page so leaving asks first.
+  useEffect(() => {
+    if (isDirtyRef) isDirtyRef.current = isDirty;
+  }, [isDirty, isDirtyRef]);
+
+  useEffect(() => () => { if (isDirtyRef) isDirtyRef.current = false; }, [isDirtyRef]);
 
   const handleSave = async () => {
     if (!config || !user) return;
