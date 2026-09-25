@@ -226,8 +226,9 @@ export function CompanyConfigDetailPage() {
       </MobileHeader>
 
       <div className="page-content max-w-2xl mx-auto pb-0">
-        {/* Desktop header */}
-        <div className="flex items-center gap-3 mb-6 max-md:hidden">
+        {/* Desktop header — sticks to the top of the scrolling area so the
+            company you are editing stays named while the fields scroll under it. */}
+        <div className="sticky top-0 z-10 bg-bg pt-4 -mt-4 flex items-center gap-3 mb-6 max-md:hidden">
           <button
             className="flex items-center gap-1 text-sm text-subtle hover:text-fg transition-colors cursor-pointer"
             onClick={goBack}

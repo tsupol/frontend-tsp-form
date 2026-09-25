@@ -55,6 +55,18 @@ body {
         margin: 0 auto;
     }
 
+    /* On desktop AnimatedOutlet renders its child plain (no absolutely
+       positioned, self-scrolling panel like the mobile branch uses), but keeps
+       height:100% + overflow:clip. Anything taller than the window is then cut
+       off with no way to reach it — the outer pane can't scroll either, since
+       the outlet never grows past its own height. Let the outlet scroll itself.
+       Mobile is untouched: there the panels scroll and clip is correct. */
+    @media (min-width: 768px) {
+        .animated-outlet {
+            overflow-y: auto;
+        }
+    }
+
     .responsive-dvh-mobile-header {
         height: 100dvh;
         max-height: 100dvh;
