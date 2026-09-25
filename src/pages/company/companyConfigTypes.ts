@@ -35,4 +35,6 @@ export type EditableField = {
   group: string;
   min?: number;
   max?: number;
+  /** Explanation shown under the field, so the label itself stays one line. */
+  hint?: string;
 };

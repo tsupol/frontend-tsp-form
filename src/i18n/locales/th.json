@@ -8066,7 +8066,15 @@
       "instantHint": "หัวข้อในแท็บนี้บันทึกทันทีที่เปลี่ยน — ไม่มีปุ่มบันทึก",
       "groupContractTerms": "เงื่อนไขสัญญา",
       "groupMoney": "ค่าธรรมเนียมและการชำระ",
-      "groupDevice": "เครื่องและการคืน"
+      "groupDevice": "เครื่องและการคืน",
+      "payPendingLimitShort": "จ่ายล่วงหน้า",
+      "payPendingLimitHint": "0 = เฉพาะยอดที่ถึงกำหนด · 99 = จ่ายล่วงหน้าได้",
+      "fin2EarlyPayoffDiscountMaxPctShort": "เพดานส่วนลดปิดยอด FIN2",
+      "fin2EarlyPayoffDiscountMaxPctHint": "% ของยอดคงเหลือ · 0 = ปิดใช้",
+      "repairPickupMaxDaysShort": "ช่วงเวลามารับเครื่อง",
+      "repairPickupMaxDaysHint": "วันหลังซ่อมเสร็จ",
+      "icloudDeviceCapShort": "เครื่องต่อบัญชี iCloud",
+      "icloudDeviceCapHint": "1–20"
     },
     "bankAccounts": {
       "title": "บัญชีธนาคาร",

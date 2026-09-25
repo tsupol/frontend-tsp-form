@@ -8076,7 +8076,15 @@
       "instantHint": "These save as soon as you change them — there is no Save button on this tab.",
       "groupContractTerms": "Contract terms",
       "groupMoney": "Fees & payment",
-      "groupDevice": "Devices & returns"
+      "groupDevice": "Devices & returns",
+      "payPendingLimitShort": "Pay-ahead",
+      "payPendingLimitHint": "0 = due amount only · 99 = allow prepay",
+      "fin2EarlyPayoffDiscountMaxPctShort": "FIN2 payoff discount cap",
+      "fin2EarlyPayoffDiscountMaxPctHint": "% of remaining · 0 = off",
+      "repairPickupMaxDaysShort": "Pickup window",
+      "repairPickupMaxDaysHint": "Days after completion",
+      "icloudDeviceCapShort": "Devices per iCloud account",
+      "icloudDeviceCapHint": "1–20"
     },
     "bankAccounts": {
       "title": "Bank Accounts",

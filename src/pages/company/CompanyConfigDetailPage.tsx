@@ -58,18 +58,31 @@ export function CompanyConfigDetail({ companyId, isMobile }: { companyId: number
     { key: 'repo_fee_per_case', label: t('settings.config.repoFeePerCase'), type: 'number', group: 'money' },
     { key: 'buyback_auto_reject_days', label: t('settings.config.buybackAutoRejectDays'), type: 'number', group: 'device', min: 1, max: 365 },
     // pay_pending_limit: 0 = pay only what's due, 99 = allow pay-ahead (mig 533). Fill policy.
-    { key: 'pay_pending_limit', label: t('settings.config.payPendingLimit'), type: 'number', group: 'money', min: 0, max: 99 },
+    {
+      key: 'pay_pending_limit', label: t('settings.config.payPendingLimitShort'),
+      hint: t('settings.config.payPendingLimitHint'),
+      type: 'number', group: 'money', min: 0, max: 99,
+    },
     // repair_pickup_max_days: default pickup window for new repair orders (mig 671).
-    { key: 'repair_pickup_max_days', label: t('settings.config.repairPickupMaxDays'), type: 'number', group: 'device', min: 1, max: 365 },
+    {
+      key: 'repair_pickup_max_days', label: t('settings.config.repairPickupMaxDaysShort'),
+      hint: t('settings.config.repairPickupMaxDaysHint'),
+      type: 'number', group: 'device', min: 1, max: 365,
+    },
     // icloud_device_cap: max devices bindable per Apple ID (Apple ceiling ~20).
     // BE enforces the same via CHECK; range check below rejects early.
-    { key: 'icloud_device_cap', label: t('settings.config.icloudDeviceCap'), type: 'number', group: 'device', min: 1, max: 20 },
+    {
+      key: 'icloud_device_cap', label: t('settings.config.icloudDeviceCapShort'),
+      hint: t('settings.config.icloudDeviceCapHint'),
+      type: 'number', group: 'device', min: 1, max: 20,
+    },
     // Ceiling on the discount a branch may ask for when a customer pays a FIN2
     // contract off early. 0 switches the discount off for the whole company;
     // the request still goes to a company admin for approval either way.
     {
       key: 'fin2_early_payoff_discount_max_pct',
-      label: t('settings.config.fin2EarlyPayoffDiscountMaxPct'),
+      label: t('settings.config.fin2EarlyPayoffDiscountMaxPctShort'),
+      hint: t('settings.config.fin2EarlyPayoffDiscountMaxPctHint'),
       type: 'number', group: 'money', min: 0, max: 100,
     },
   ];
@@ -226,15 +239,18 @@ export function CompanyConfigDetail({ companyId, isMobile }: { companyId: number
           {activeTab === 'values' ? (
             /* Groups sit side by side on a wide panel: each is only a handful of
                small number fields, so one column per group wasted the width. */
-            <div className="grid gap-x-8 gap-y-6 lg:grid-cols-2 items-start">
+            /* The wrapper is the container; the grid inside it is what responds
+               to the wrapper's width. An element cannot be both. */
+            <div className="@container/values">
+              <div className="grid gap-x-8 gap-y-6 @xl/values:grid-cols-2 items-start">
               {groups.map(group => {
                 const groupFields = fields.filter(f => f.group === group.key);
                 return (
-                  <div key={group.key} className="min-w-0">
+                  <div key={group.key} className="@container/group min-w-0">
                     <h4 className="text-sm font-semibold text-fg uppercase tracking-wider mb-3 pb-2 border-b border-line">
                       {group.label}
                     </h4>
-                    <div className="form-grid sm:grid-cols-2 gap-4">
+                    <div className="form-grid @md/group:grid-cols-2 gap-4">
                       {groupFields.map(field => (
                         <div key={field.key} className="flex flex-col min-w-0">
                           <label className="form-label">{field.label}</label>
@@ -253,12 +269,16 @@ export function CompanyConfigDetail({ companyId, isMobile }: { companyId: number
                               onChange={(e) => setValue(field.key, Number(e.target.value))}
                             />
                           )}
+                          {field.hint && (
+                            <span className="text-xs text-subtler mt-1">{field.hint}</span>
+                          )}
                         </div>
                       ))}
                     </div>
                   </div>
                 );
               })}
+              </div>
             </div>
           ) : (
             <div className="flex flex-col">
