@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  MobileHeader, Button, Input, Switch, useSnackbarContext,
+  MobileHeader, Button, Input, Switch, Select, Modal, useSnackbarContext,
 } from 'tsp-form';
 import { ArrowLeft, CheckCircle, XCircle, Save } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
@@ -288,14 +288,136 @@ export function CompanyConfigDetailPage() {
           </Button>
         </div>
 
-        {/* Wallet features + bill-line owner — separate views/RPCs, own save flow. */}
+        {/* Contract template + wallet features + bill-line owner — own save flow each. */}
         <hr className="border-line mt-2 mb-6" />
+        <ContractTemplateSection companyId={config.company_id} />
+        <hr className="border-line mt-6 mb-6" />
         <WalletFeaturesSection companyId={config.company_id} />
         <hr className="border-line mt-6 mb-6" />
         <ChargeOwnerSection companyId={config.company_id} />
       </div>
     </>
   );
+}
+
+// ── Contract template (mig 1343) ───────────────────────────────────────────────
+// Which master lease form this company's NEW contracts print as. The code is
+// stamped onto a contract when it is created, so changing it here never touches
+// a contract that already exists — including an unsigned draft left open. That
+// is the whole reason this field carries a permanent hint AND a confirm step
+// instead of riding the page's shared Save button.
+function ContractTemplateSection({ companyId }: { companyId: number }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const { addSnackbar } = useSnackbarContext();
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [pendingCode, setPendingCode] = useState<string | null>(null);
+
+  const { data: templates = [] } = useQuery({
+    queryKey: ['contract-templates'],
+    queryFn: () => apiClient.get<ContractTemplateRow[]>('/v_contract_templates?order=sort_order'),
+  });
+
+  const { data: current = null, isLoading } = useQuery({
+    queryKey: ['company-contract-template', companyId],
+    queryFn: async () => {
+      const rows = await apiClient.get<{ contract_template_code: string | null }[]>(
+        `/v_company_config?company_id=eq.${companyId}&select=contract_template_code`,
+      );
+      return rows[0]?.contract_template_code ?? null;
+    },
+  });
+
+  const options = templates.map(row => ({
+    value: row.code,
+    label: t(`settings.config.template_${row.code}`, { defaultValue: row.code }),
+  }));
+
+  const labelFor = (code: string) =>
+    t(`settings.config.template_${code}`, { defaultValue: code });
+
+  const confirmSave = async () => {
+    if (!pendingCode) return;
+    setSaving(true);
+    setError('');
+    try {
+      await apiClient.rpc('fn_config_update', {
+        p_company_id: companyId,
+        p_changes: { contract_template_code: pendingCode },
+      });
+      await queryClient.invalidateQueries({ queryKey: ['company-contract-template', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['company-config-detail', String(companyId)] });
+      setPendingCode(null);
+      addSnackbar({
+        message: (
+          <div className="alert alert-success"><CheckCircle size={16} /><span className="alert-description">{t('settings.config.saved')}</span></div>
+        ),
+        type: 'success',
+      });
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(translateApiError(err, t) || err.message);
+      }
+      setPendingCode(null);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div>
+      <h4 className="text-sm font-semibold text-fg uppercase tracking-wider mb-1">{t('settings.config.groupContractTemplate')}</h4>
+      <p className="text-xs text-subtle mb-3">{t('settings.config.contractTemplateHint')}</p>
+      {error && (
+        <div className="alert alert-danger mb-3"><XCircle size={16} /><div><div className="alert-description text-xs">{error}</div></div></div>
+      )}
+      <div className="max-w-sm">
+        <Select
+          options={options}
+          value={current}
+          onChange={(val) => {
+            const next = val as string | null;
+            if (!next || next === current) return;
+            setError('');
+            setPendingCode(next);
+          }}
+          disabled={isLoading || saving}
+          placeholder={t('settings.config.contractTemplatePlaceholder')}
+          searchable={false}
+        />
+      </div>
+
+      {/* Confirm before switching — the change only reaches contracts opened after it. */}
+      <Modal
+        open={!!pendingCode}
+        onClose={() => setPendingCode(null)}
+        maxWidth="26rem"
+        width="100%"
+      >
+        <div className="modal-header">
+          <h2 className="modal-title">{t('settings.config.contractTemplateConfirmTitle')}</h2>
+          <button type="button" className="modal-close-btn" onClick={() => setPendingCode(null)}>&times;</button>
+        </div>
+        <div className="modal-content">
+          <p className="text-sm">
+            {t('settings.config.contractTemplateConfirmBody', { template: pendingCode ? labelFor(pendingCode) : '' })}
+          </p>
+        </div>
+        <div className="modal-footer">
+          <Button variant="ghost" onClick={() => setPendingCode(null)} disabled={saving}>{t('common.cancel')}</Button>
+          <Button color="primary" onClick={confirmSave} disabled={saving}>
+            {saving ? t('common.saving') : t('common.confirm')}
+          </Button>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+interface ContractTemplateRow {
+  code: string;
+  sort_order: number;
 }
 
 // ── Wallet features (SAVING / CREDIT / INSURANCE) ──────────────────────────────

@@ -8063,7 +8063,14 @@
       "maxDeferred": "Max",
       "saved": "Configuration saved",
       "empty": "No company configurations found",
-      "selectToEdit": "Select a company to edit"
+      "selectToEdit": "Select a company to edit",
+      "groupContractTemplate": "Contract form",
+      "contractTemplateHint": "Applies only to contracts opened after this is saved — existing contracts, including drafts left open, keep printing their original form.",
+      "contractTemplatePlaceholder": "Select a contract form",
+      "template_LEASE_00001": "Standard lease contract",
+      "template_LEASE_00002": "Lease contract form 2",
+      "contractTemplateConfirmTitle": "Change contract form?",
+      "contractTemplateConfirmBody": "Change the contract form to {{template}}? Contracts opened after this will use it · existing contracts and drafts left open will not change."
     },
     "bankAccounts": {
       "title": "Bank Accounts",

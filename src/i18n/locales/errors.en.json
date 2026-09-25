@@ -1247,5 +1247,6 @@
   "BILL.VALIDATION.DISCOUNT_AMOUNT_INVALID": "The discount cannot be a negative amount.",
   "BILL.STATE.DISCOUNT_NOT_APPROVED": "No money can be taken until the discount is agreed.",
   "BILL.CONFLICT.EARLY_PAYOFF_EXISTS": "This contract already has a payoff bill open.",
-  "INV.VALIDATION.WALLET_REQUIRES_CONTRACT": "A wallet can only pay a bill that belongs to a contract."
+  "INV.VALIDATION.WALLET_REQUIRES_CONTRACT": "A wallet can only pay a bill that belongs to a contract.",
+  "sale.validation.contract_template_unknown": "Contract form not found or inactive."
 }

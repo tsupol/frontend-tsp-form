@@ -8053,7 +8053,14 @@
       "maxDeferred": "สูงสุด",
       "saved": "บันทึกการตั้งค่าแล้ว",
       "empty": "ไม่พบการตั้งค่า Company",
-      "selectToEdit": "เลือก Company เพื่อแก้ไข"
+      "selectToEdit": "เลือก Company เพื่อแก้ไข",
+      "groupContractTemplate": "แบบสัญญา",
+      "contractTemplateHint": "มีผลเฉพาะสัญญาที่เปิดใหม่หลังจากนี้ — สัญญาเดิม รวมถึงสัญญาที่เปิดค้างไว้ จะพิมพ์แบบเดิม",
+      "contractTemplatePlaceholder": "เลือกแบบสัญญา",
+      "template_LEASE_00001": "สัญญาเช่าแบบมาตรฐาน",
+      "template_LEASE_00002": "สัญญาเช่าแบบที่ 2",
+      "contractTemplateConfirmTitle": "เปลี่ยนแบบสัญญาหรือไม่?",
+      "contractTemplateConfirmBody": "เปลี่ยนแบบสัญญาเป็น {{template}}? สัญญาที่เปิดใหม่หลังจากนี้จะใช้แบบนี้ · สัญญาเดิมและสัญญาที่เปิดค้างไว้จะไม่เปลี่ยน"
     },
     "bankAccounts": {
       "title": "บัญชีธนาคาร",
