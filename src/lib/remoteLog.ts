@@ -1,11 +1,11 @@
 // Remote console logging for device debugging (e.g. iPad Safari where you can't
 // open devtools). When enabled, console.* calls + uncaught errors are batched and
-// POSTed to the devlog server, viewable at https://devlog.ecap.space/.
+// POSTed to the devlog server, viewable at https://devlog.krat.uk/.
 //
 // Enable: visit any page with ?debug=1 (persists via localStorage). Disable: ?debug=0.
 // Off by default — installs nothing unless the flag is set, so prod is unaffected.
 
-const ENDPOINT = 'https://devlog.ecap.space/log';
+const ENDPOINT = 'https://devlog.krat.uk/log';
 const FLUSH_INTERVAL_MS = 2000;
 const FLUSH_AT_COUNT = 25;
 const LEVELS = ['log', 'info', 'warn', 'error', 'debug'] as const;

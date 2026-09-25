@@ -4,7 +4,7 @@ When you need to see `console.*` output or uncaught errors from a device you can
 attach devtools to (iPad Safari, etc.), the app ships them to **devlog** and you read
 them in a browser. No copy-paste off the device.
 
-- **Live:** https://devlog.ecap.space (viewer at `/`)
+- **Live:** https://devlog.krat.uk (viewer at `/`)
 - **Client shim (this repo):** `src/lib/remoteLog.ts`, installed in `src/main.tsx` before render
 - **Server source:** `D:\dev\nnf-devlog` (Go, stdlib only) — its own `.claude/devlog.md` has the full server reference
 
@@ -15,7 +15,7 @@ them in a browser. No copy-paste off the device.
 3. Read the logs:
    - **As Claude:** use the `devlog` MCP — `query_logs` (filter by session/level/since/q/limit)
      and `clear_logs`. Pull the logs straight into context instead of asking the user to read the viewer.
-   - **In a browser:** open https://devlog.ecap.space/ , filter by that session (or level/text). Auto-refreshes.
+   - **In a browser:** open https://devlog.krat.uk/ , filter by that session (or level/text). Auto-refreshes.
 
 ## Shim behavior (`src/lib/remoteLog.ts`)
 
