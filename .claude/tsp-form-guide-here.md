@@ -59,7 +59,8 @@ When an input can be auto-filled from a related value (e.g. catalog price, defau
     onEndIconClick={suggested !== null ? () => setCost(String(suggested)) : undefined}
   />
   ```
-- **Hide when no suggestion:** pass `undefined` for both `endIcon` and `onEndIconClick` — don't show a disabled icon.
+- **Hide when no suggestion:** pass `undefined` for both `endIcon` and `onEndIconClick` — don't show a disabled icon. This is for a suggestion that may not exist at all (no catalog price, no default).
+- **Grey + tooltip when the fill waits on a sibling field** (a calculator: "term from installment", "installment from term"). The fill always exists, it just needs another field first, so hiding it would flicker as the user types and nobody learns the field can be derived. Keep the icon visible: live = `text-primary-fg` with the result previewed in the tooltip ("→ 14 months"); inert = `text-subtler cursor-not-allowed` with the tooltip naming the field to fill first. The icon slot is `pointer-events:none` unless clickable, so wrap the inert icon in a `pointer-events-auto` span for the tooltip to open. Reference: `PanelProductPlan` FIN2 calculator.
 - **Reference uses:** `DayClosePage`, `ContractActions`, `RetailBillsPage`, `CompleteContractModal`, `CreateRetailBillModal`, `CardPayment`, `PanelReviewPay`, `PurchaseOrdersPage` (add-line modal).
 
 Don't substitute `Wand2`, `Sparkles`, `RefreshCw`, etc. — keep the convention.

@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Input, Select, Badge, Button, MaskedInput, useSnackbarContext } from 'tsp-form';
-import { ScanBarcode, XCircle, X, Calculator, Info, CheckCircle, Package, BookOpen, AlertTriangle, Wand2 } from 'lucide-react';
+import { Input, Select, Badge, Button, MaskedInput, Tooltip, useSnackbarContext } from 'tsp-form';
+import { ScanBarcode, XCircle, X, Calculator, Info, CheckCircle, Package, BookOpen, AlertTriangle, ChevronsRight } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { fmtCurrency } from '../../../lib/format';
 import { getConditionLabel, getConditionTextColor, assetSearchOrClause } from '../../inventory/inventoryUtils';
@@ -132,7 +132,7 @@ interface Props {
 
 export function PanelProductPlan(_props: Props) {
   const { t } = useTranslation();
-  const { data: wizardData, contract, invalidateContract } = useWorkspace();
+  const { data: wizardData, contract, invalidateContract, setPanelDirty } = useWorkspace();
   // Deal-partner shops must point the contract at a real registered device —
   // the catalog "promised but not in stock" path is internal-only (design
   // v3.1 §1; owner 09-10). The approval freeze on the BE side will hold the
@@ -651,7 +651,6 @@ export function PanelProductPlan(_props: Props) {
 
   const { addSnackbar } = useSnackbarContext();
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState('');
 
   // ── FIN1 rate step (DELIVERY 2026-09-09; used devices added mig 1235) ──
@@ -732,8 +731,8 @@ export function PanelProductPlan(_props: Props) {
   // reports `down_percent: 0` and the contract's own `snapshot_down_percent`
   // is 0 too, so the percent comparison below can never notice a re-negotiated
   // down payment or installment. Compare the amounts themselves as well, or a
-  // staff member who changes only one of them is left with a dead confirm
-  // button once the two-second "saved" window closes.
+  // staff member who changes only one of them is left with a footer that
+  // says "saved" and offers no save button.
   // Null-safe on purpose: comparing raw values would make a NaN on either side
   // differ from itself and pin the button open forever. Missing on one side and
   // present on the other counts as changed; missing on both does not.
@@ -747,20 +746,32 @@ export function PanelProductPlan(_props: Props) {
     amountChanged(localQuote?.down_amount, contract?.down_payment)
     || amountChanged(localQuote?.installment_amount, contract?.installment_amount);
 
+  // A missing local quote is "not loaded yet" (the restore effect above has
+  // not matched the contract's rate to a row), not "the user cleared it" — a
+  // fresh panel must not read as unsaved.
+  const quoteChanged = !!localQuote && (
+    localQuote.finance_model !== (contract?.commercial_model ?? undefined)
+    || localQuote.term_months !== (contract?.value_month ?? undefined)
+    || localQuote.down_percent !== (contract?.snapshot_down_percent ?? undefined)
+    || moneyChanged
+  );
   const hasChanges = mode === 'used'
-    ? localTargetAssetId !== (contract?.target_asset_id ?? null)
-      || localQuote?.finance_model !== (contract?.commercial_model ?? undefined)
-      || localQuote?.term_months !== (contract?.value_month ?? undefined)
-      || localQuote?.down_percent !== (contract?.snapshot_down_percent ?? undefined)
-      || moneyChanged
+    ? localTargetAssetId !== (contract?.target_asset_id ?? null) || quoteChanged
     : localModelId !== (contract?.model_id ?? null)
       || localVariantId !== (contract?.variant_id ?? null)
-      || localQuote?.finance_model !== (contract?.commercial_model ?? undefined)
-      || localQuote?.term_months !== (contract?.value_month ?? undefined)
-      || localQuote?.down_percent !== (contract?.snapshot_down_percent ?? undefined)
-      || moneyChanged;
+      || quoteChanged;
 
-  const handleConfirm = async () => {
+  // The workspace asks before a panel switch, the mobile back button or the
+  // side nav throws away what this panel has not saved yet.
+  useEffect(() => { setPanelDirty(hasChanges || fin1Dirty); }, [hasChanges, fin1Dirty, setPanelDirty]);
+  useEffect(() => () => setPanelDirty(false), [setPanelDirty]);
+
+  // `quoteOverride` is how the FIN2 calculator saves in one step: its button
+  // hands the agreed figures straight here instead of parking them in the
+  // footer for a second press.
+  const handleConfirm = async (quoteOverride?: Quote) => {
+    const quote = quoteOverride ?? localQuote;
+    if (quoteOverride) setLocalQuote(quoteOverride);
     setSaving(true);
     setSaveError('');
     try {
@@ -774,7 +785,7 @@ export function PanelProductPlan(_props: Props) {
         p_data: {
           modelId: localModelId,
           variantId: localVariantId,
-          selectedQuote: localQuote,
+          selectedQuote: quote,
           savingTargetAmount: wizardData.savingTargetAmount,
           isUsedAsset: mode === 'used',
           targetAssetId: localTargetAssetId,
@@ -802,7 +813,7 @@ export function PanelProductPlan(_props: Props) {
 
         // Set commercial model if changed
         const prevModel = contract?.commercial_model;
-        const newModel = localQuote?.finance_model;
+        const newModel = quote?.finance_model;
         if (newModel && newModel !== prevModel) {
           await apiClient.rpc('fn_contract_set_commercial_model', {
             p_contract_id: contractId,
@@ -811,26 +822,26 @@ export function PanelProductPlan(_props: Props) {
         }
 
         // Set rate (USED path — server detects target_asset_id)
-        if (localQuote) {
-          const rateTerm = localQuote.base_term_months ?? localQuote.term_months;
+        if (quote) {
+          const rateTerm = quote.base_term_months ?? quote.term_months;
           await apiClient.rpc('fn_contract_set_rate', {
             p_contract_id: contractId,
             p_term_months: rateTerm,
-            ...(localQuote.finance_model === 'FIN1' ? { p_down_percent: localQuote.down_percent } : {}),
+            ...(quote.finance_model === 'FIN1' ? { p_down_percent: quote.down_percent } : {}),
           });
 
           // FIN2's real down comes from negotiation, not set_rate (set_rate always
           // snapshots down = 0 as a reference ceiling). 0 is a legal negotiated
           // down, so always send it — never treat 0 as "unset" or the rate-card
           // down silently wins. Per UI_FEEDBACK/2026-08-03_IMPLEMENT_contract_open_down_zero.
-          const hasCustomTerm = localQuote.base_term_months != null && localQuote.term_months !== localQuote.base_term_months;
-          const isFin2 = localQuote.finance_model === 'FIN2';
+          const hasCustomTerm = quote.base_term_months != null && quote.term_months !== quote.base_term_months;
+          const isFin2 = quote.finance_model === 'FIN2';
           if (hasCustomTerm || isFin2) {
             await apiClient.rpc('fn_contract_apply_negotiation', {
               p_contract_id: contractId,
-              p_installment_amount: localQuote.installment_amount,
-              ...(hasCustomTerm ? { p_value_month: localQuote.term_months } : {}),
-              ...(isFin2 ? { p_down_payment: localQuote.down_amount } : {}),
+              p_installment_amount: quote.installment_amount,
+              ...(hasCustomTerm ? { p_value_month: quote.term_months } : {}),
+              ...(isFin2 ? { p_down_payment: quote.down_amount } : {}),
             });
           }
         }
@@ -855,7 +866,7 @@ export function PanelProductPlan(_props: Props) {
         }
 
         const prevModel = contract?.commercial_model;
-        const newModel = localQuote?.finance_model;
+        const newModel = quote?.finance_model;
         if (newModel && newModel !== prevModel) {
           await apiClient.rpc('fn_contract_set_commercial_model', {
             p_contract_id: contractId,
@@ -863,32 +874,30 @@ export function PanelProductPlan(_props: Props) {
           });
         }
 
-        if (localQuote) {
-          const rateTerm = localQuote.base_term_months ?? localQuote.term_months;
+        if (quote) {
+          const rateTerm = quote.base_term_months ?? quote.term_months;
           await apiClient.rpc('fn_contract_set_rate', {
             p_contract_id: contractId,
             p_term_months: rateTerm,
-            ...(localQuote.finance_model === 'FIN1' ? { p_down_percent: localQuote.down_percent } : {}),
+            ...(quote.finance_model === 'FIN1' ? { p_down_percent: quote.down_percent } : {}),
           });
 
           // Same rule as the USED path above: FIN2 always sends the negotiated
           // down (0 included) — treating 0 as "unset" lets the rate-card down win.
-          const hasCustomTerm = localQuote.base_term_months != null && localQuote.term_months !== localQuote.base_term_months;
-          const isFin2 = localQuote.finance_model === 'FIN2';
+          const hasCustomTerm = quote.base_term_months != null && quote.term_months !== quote.base_term_months;
+          const isFin2 = quote.finance_model === 'FIN2';
           if (hasCustomTerm || isFin2) {
             await apiClient.rpc('fn_contract_apply_negotiation', {
               p_contract_id: contractId,
-              p_installment_amount: localQuote.installment_amount,
-              ...(hasCustomTerm ? { p_value_month: localQuote.term_months } : {}),
-              ...(isFin2 ? { p_down_payment: localQuote.down_amount } : {}),
+              p_installment_amount: quote.installment_amount,
+              ...(hasCustomTerm ? { p_value_month: quote.term_months } : {}),
+              ...(isFin2 ? { p_down_payment: quote.down_amount } : {}),
             });
           }
         }
       }
 
       invalidateContract();
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
       addSnackbar({
         message: (
           <div className="alert alert-success">
@@ -912,8 +921,8 @@ export function PanelProductPlan(_props: Props) {
   // ── Confirm button enabled logic ────────────────────────────────────
 
   const canConfirm = mode === 'used'
-    ? !!localTargetAssetId && !!localQuote && !saving && (hasChanges || saved)
-    : !!localModelId && !saving && (hasChanges || saved);
+    ? !!localTargetAssetId && !!localQuote && !saving && hasChanges
+    : !!localModelId && !saving && hasChanges;
 
   return (
     <div className="flex flex-col h-full max-w-2xl">
@@ -1192,8 +1201,8 @@ export function PanelProductPlan(_props: Props) {
                 <span className="text-sm font-medium">{t('priceCheck.fin2Desc')}</span>
               </div>
               <QuoteTable rows={fin2Rows} terms={fin2Terms} type="fin2" isSelected={isSelected} onSelect={(r) => setLocalQuote(toQuote(r, 'FIN2'))} t={t} />
-              <Fin2Calculator fin2Rows={fin2Rows} fin2Terms={fin2Terms} t={t} onUse={(r) => {
-                setLocalQuote({
+              <Fin2Calculator fin2Rows={fin2Rows} fin2Terms={fin2Terms} t={t} saving={saving} onUse={(r) => {
+                void handleConfirm({
                   variant_id: localVariantId!,
                   item_name: localVariantName,
                   finance_model: 'FIN2',
@@ -1278,9 +1287,19 @@ export function PanelProductPlan(_props: Props) {
         </div>
       </div>
     ) : localQuote ? (
-      <div className="shrink-0 border-t border-primary bg-primary-soft px-4 py-3 flex flex-col gap-3">
+      <div className={`shrink-0 border-t px-4 py-3 flex flex-col gap-3 ${hasChanges ? 'border-warning-border bg-warning-soft' : 'border-success-border bg-success-soft'}`}>
         <div>
-          <div className="text-xs text-primary-fg font-medium mb-2">{t('wizard.selectedPlan')}</div>
+          {hasChanges ? (
+            <div className="flex items-center gap-1.5 text-xs text-warning-fg font-medium mb-2">
+              <AlertTriangle size={12} />
+              {t('wizard.selectedPlanUnsaved')}
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 text-xs text-success-fg font-medium mb-2">
+              <CheckCircle size={12} />
+              {t('wizard.savedPlan')}
+            </div>
+          )}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
               <div className="text-xs text-subtle">{t('wizard.financeModel')}</div>
@@ -1300,17 +1319,18 @@ export function PanelProductPlan(_props: Props) {
             </div>
           </div>
         </div>
-        <div className="flex justify-end">
-          <Button
-            size="sm"
-            color={saved ? 'success' : 'primary'}
-            onClick={handleConfirm}
-            disabled={!canConfirm}
-            startIcon={saved ? <CheckCircle size={14} /> : undefined}
-          >
-            {saving ? t('common.saving') : saved ? t('common.saved') : t('common.confirm')}
-          </Button>
-        </div>
+        {hasChanges && (
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              color="primary"
+              onClick={() => handleConfirm()}
+              disabled={!canConfirm}
+            >
+              {saving ? t('common.saving') : t('wizard.savePlan')}
+            </Button>
+          </div>
+        )}
       </div>
     ) : (
       <div className="shrink-0 border-t border-danger bg-danger-soft px-4 py-4 text-center text-sm text-danger-fg">
@@ -1396,13 +1416,14 @@ interface CalcResult {
   installment: number;
 }
 
-function Fin2Calculator({ fin2Rows, fin2Terms, t, onUse }: {
+function Fin2Calculator({ fin2Rows, fin2Terms, t, saving, onUse }: {
   fin2Rows: PricingRow[];
   fin2Terms: number[];
   t: (key: string, opts?: Record<string, unknown>) => string;
+  saving: boolean;
   onUse: (r: CalcResult) => void;
 }) {
-  // 3 free user inputs — no auto-overwrite. Wand buttons fill on demand.
+  // 3 free user inputs — no auto-overwrite. The » icons fill on demand.
   const [termInput, setTermInput] = useState('');
   const [downInput, setDownInput] = useState('');
   const [installmentInput, setInstallmentInput] = useState('');
@@ -1426,17 +1447,46 @@ function Fin2Calculator({ fin2Rows, fin2Terms, t, onUse }: {
   const clampedDown = Math.min(Math.max(downAmount, 0), total);
   const financed = Math.max(0, total - clampedDown);
 
-  // Auto-fill formulas
+  // Auto-fill formulas. Each » stays visible whether or not it can act (the
+  // fill always exists here — it only waits on the sibling field), so the
+  // icon carries a state: live = primary + result preview, inert = grey +
+  // the field to fill first. Deliberate exception to the guide's "hide when
+  // no suggestion" rule, which is for suggestions that may not exist at all.
+  const termFillValue = installmentAmount > 0 && financed > 0
+    ? Math.max(1, Math.ceil(financed / installmentAmount))
+    : null;
+  const termFillTip = termFillValue != null
+    ? t('priceCheck.fillTermTip', { months: termFillValue })
+    : installmentAmount <= 0
+      ? t('priceCheck.fillTermNeedInstallment')
+      : t('priceCheck.fillTermNoFinanced');
   const fillTerm = () => {
-    if (installmentAmount <= 0 || financed <= 0) return;
-    const t = Math.max(1, Math.ceil(financed / installmentAmount));
-    setTermInput(String(t));
+    if (termFillValue == null) return;
+    setTermInput(String(termFillValue));
   };
+
+  const installmentFillValue = termMonths >= 1 && !termOverMax
+    ? Math.round(financed / termMonths)
+    : null;
+  const installmentFillTip = installmentFillValue != null
+    ? t('priceCheck.fillInstallmentTip', { amount: fmt(installmentFillValue) })
+    : termOverMax
+      ? t('priceCheck.termOverMax', { max: TERM_MONTHS_MAX })
+      : t('priceCheck.fillInstallmentNeedTerm');
   const fillInstallment = () => {
-    if (termMonths < 1) return;
-    const inst = Math.round(financed / termMonths);
-    setInstallmentInput(String(inst));
+    if (installmentFillValue == null) return;
+    setInstallmentInput(String(installmentFillValue));
   };
+
+  // The input's icon slot is pointer-events:none unless clickable, so the
+  // inert icon needs its own hit area for the tooltip to open.
+  const fillIcon = (live: boolean, tip: string) => (
+    <Tooltip content={tip} placement="top">
+      <span className={`pointer-events-auto inline-flex ${live ? 'text-primary-fg' : 'text-subtler cursor-not-allowed'}`}>
+        <ChevronsRight size={14} />
+      </span>
+    </Tooltip>
+  );
 
   // Result is ready when we have a profit-rate row + both term and installment typed.
   const result = useMemo(() => {
@@ -1487,8 +1537,8 @@ function Fin2Calculator({ fin2Rows, fin2Terms, t, onUse }: {
             placeholder={fin2Terms.join(', ')}
             value={termInput}
             onChange={(e) => setTermInput(e.target.value)}
-            endIcon={<Wand2 size={14} />}
-            onEndIconClick={installmentAmount > 0 && financed > 0 ? fillTerm : undefined}
+            endIcon={fillIcon(termFillValue != null, termFillTip)}
+            onEndIconClick={termFillValue != null ? fillTerm : undefined}
             className="w-full"
           />
           {termOverMax && (
@@ -1509,8 +1559,8 @@ function Fin2Calculator({ fin2Rows, fin2Terms, t, onUse }: {
             decimalScale={0}
             value={installmentInput}
             onChange={(raw) => setInstallmentInput(raw)}
-            endIcon={<Wand2 size={14} />}
-            onEndIconClick={termMonths >= 1 ? fillInstallment : undefined}
+            endIcon={fillIcon(installmentFillValue != null, installmentFillTip)}
+            onEndIconClick={installmentFillValue != null ? fillInstallment : undefined}
             className="w-full"
           />
         </div>
@@ -1560,6 +1610,7 @@ function Fin2Calculator({ fin2Rows, fin2Terms, t, onUse }: {
             <Button
               size="sm"
               color="primary"
+              disabled={saving}
               onClick={() => onUse({
                 termMonths: result.termMonths,
                 baseTerm: result.baseTerm,
@@ -1570,7 +1621,7 @@ function Fin2Calculator({ fin2Rows, fin2Terms, t, onUse }: {
                 installment: result.installment,
               })}
             >
-              {t('priceCheck.useThisPlan')}
+              {saving ? t('common.saving') : t('priceCheck.saveAgreedPrice')}
             </Button>
           </div>
         </div>
