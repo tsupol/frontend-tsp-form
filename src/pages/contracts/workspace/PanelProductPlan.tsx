@@ -480,16 +480,20 @@ export function PanelProductPlan(_props: Props) {
       finance_model: match.finance_model,
       term_months: match.term_months,
       down_percent: match.down_percent,
-      down_amount: match.down_amount,
+      // The rate card row is only a starting point — the amounts actually owed
+      // are the negotiated ones on the contract head. Seeding from the card
+      // would both display a figure nobody agreed to and, now that the confirm
+      // button compares amounts, arm that button the moment the panel opens.
+      down_amount: contract.down_payment ?? match.down_amount,
       retail_price: match.retail_price,
-      installment_amount: match.installment_amount,
+      installment_amount: contract.installment_amount ?? match.installment_amount,
       total_amount: match.total_amount,
       financed_amount: match.financed_amount,
       cost_price: match.cost_price,
       interest_percent_total: match.interest_percent_total,
       fin2_profit_amount: match.fin2_profit_amount,
     });
-  }, [dedupedQuotes, localVariantId, localVariantName, localQuote, contract?.commercial_model, contract?.value_month, contract?.installment_amount, contract?.snapshot_down_percent]);
+  }, [dedupedQuotes, localVariantId, localVariantName, localQuote, contract?.commercial_model, contract?.value_month, contract?.installment_amount, contract?.down_payment, contract?.snapshot_down_percent]);
 
   // ── Handlers: NEW ───────────────────────────────────────────────────
 
@@ -724,16 +728,37 @@ export function PanelProductPlan(_props: Props) {
     }
   };
 
+  // A FIN2 plan is negotiated in baht, not percent: the calculator always
+  // reports `down_percent: 0` and the contract's own `snapshot_down_percent`
+  // is 0 too, so the percent comparison below can never notice a re-negotiated
+  // down payment or installment. Compare the amounts themselves as well, or a
+  // staff member who changes only one of them is left with a dead confirm
+  // button once the two-second "saved" window closes.
+  // Null-safe on purpose: comparing raw values would make a NaN on either side
+  // differ from itself and pin the button open forever. Missing on one side and
+  // present on the other counts as changed; missing on both does not.
+  const amountChanged = (local: number | null | undefined, saved: number | null | undefined) => {
+    const a = local == null ? null : Number(local);
+    const b = saved == null ? null : Number(saved);
+    if (a == null || b == null) return (a == null) !== (b == null);
+    return a !== b;
+  };
+  const moneyChanged =
+    amountChanged(localQuote?.down_amount, contract?.down_payment)
+    || amountChanged(localQuote?.installment_amount, contract?.installment_amount);
+
   const hasChanges = mode === 'used'
     ? localTargetAssetId !== (contract?.target_asset_id ?? null)
       || localQuote?.finance_model !== (contract?.commercial_model ?? undefined)
       || localQuote?.term_months !== (contract?.value_month ?? undefined)
       || localQuote?.down_percent !== (contract?.snapshot_down_percent ?? undefined)
+      || moneyChanged
     : localModelId !== (contract?.model_id ?? null)
       || localVariantId !== (contract?.variant_id ?? null)
       || localQuote?.finance_model !== (contract?.commercial_model ?? undefined)
       || localQuote?.term_months !== (contract?.value_month ?? undefined)
-      || localQuote?.down_percent !== (contract?.snapshot_down_percent ?? undefined);
+      || localQuote?.down_percent !== (contract?.snapshot_down_percent ?? undefined)
+      || moneyChanged;
 
   const handleConfirm = async () => {
     setSaving(true);
