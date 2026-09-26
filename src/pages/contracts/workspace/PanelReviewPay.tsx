@@ -13,7 +13,8 @@ import { fmtCurrency } from '../../../lib/format';
 import { printWithMarker } from '../../../lib/printDoc';
 import { useWorkspace } from './WorkspaceContext';
 import type { PaymentMethod, PaymentLine, BillOpenResult, ContractOpenState } from './WorkspaceTypes';
-import { ERROR_TO_MODAL } from './WorkspaceTypes';
+import { ReadinessChecklist, type ReadinessItem } from './ReadinessChecklist';
+import { readinessErrorsFromApiError } from './readinessFromError';
 import { BranchPaymentAccountField, useBranchPaymentAccount } from '../../../components/BranchPaymentAccountField';
 import { BillReceipt, type BillDetail } from './BillReceipt';
 import { BillCart, type DraftCartLine } from './BillCart';
@@ -55,6 +56,7 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
   const { data, updateData, contract, invalidateContract, setOpenModal } = useWorkspace();
   const { isDealPartner } = useAuth();
+  const queryClient = useQueryClient();
 
   const savingBalance = contract?.saving_balance ?? 0;
 
@@ -79,6 +81,10 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
   const readinessWarnings = !readiness || readinessFetching ? [] : (readiness.warnings ?? []);
   const readinessKnown = !!readiness && !readinessFetching;
   const readinessReady = readinessKnown && readiness.ready;
+  // Blockers the open call itself reported. The pre-flight check above can be
+  // seconds out of date — a customer blacklisted in between is refused here,
+  // and this is the list that explains why.
+  const [openBlockers, setOpenBlockers] = useState<ReadinessItem[] | null>(null);
 
   // ── System (auto) lines — shown read-only at the top of the cart ─────
   const downPayment = contract?.down_payment ?? 0;
@@ -318,6 +324,7 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
     if (!canConfirm || !data.contractId) return;
     setLoading(true);
     setError('');
+    setOpenBlockers(null);
     // Tracks the bill opened at step 1 so the catch can tell "failed before any
     // server state changed" from "bill opened, later step failed" (updateData is
     // async, so data.billId isn't reliable inside this closure).
@@ -414,7 +421,14 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
       updateData({ billConfirmed: true });
       invalidateContract();
     } catch (err) {
-      if (err instanceof ApiError) {
+      // A refusal from the open call carries the full blocker list inside it.
+      // Show that checklist instead of the envelope's generic sentence, which
+      // names nothing the user can act on.
+      const blockers = readinessErrorsFromApiError(err);
+      if (blockers && blockers.length > 0) {
+        setOpenBlockers(blockers);
+        queryClient.invalidateQueries({ queryKey: ['contract-readiness', data.contractId] });
+      } else if (err instanceof ApiError) {
         const translated = translateApiError(err, t);
         setError(translated || err.message);
       } else {
@@ -615,62 +629,27 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
 
       {/* ── Footer ───────────────────────────────────────────── */}
       <div className="shrink-0 border-t border-line bg-bg flex flex-col">
-        {readinessErrors.length > 0 && (
+        {/* One checklist for both sources: the pre-flight readiness check and
+            the blockers the open call itself came back with. The latter wins —
+            it is the newer answer, and it is what stopped the button. */}
+        {(openBlockers?.length || readinessErrors.length > 0 || readinessWarnings.length > 0) ? (
           <>
             <div className="px-4 py-2">
-              <div className="alert alert-danger">
-                <XCircle size={16} />
-                <div className="flex flex-col gap-1 min-w-0 flex-1">
-                  {readinessErrors.map((err, i) => {
-                    const targetModal = ERROR_TO_MODAL[err.code];
-                    const label = t(err.code, { ns: 'apiErrors', defaultValue: err.code });
-                    return targetModal ? (
-                      <button
-                        key={i}
-                        type="button"
-                        className="text-left bg-transparent border-none p-0 text-danger hover:underline cursor-pointer text-sm"
-                        onClick={() => setOpenModal(targetModal)}
-                      >
-                        {label}
-                      </button>
-                    ) : (
-                      <span key={i} className="text-sm">{label}</span>
-                    );
-                  })}
-                </div>
-              </div>
+              <ReadinessChecklist
+                errors={openBlockers ?? readinessErrors}
+                warnings={readinessWarnings}
+                contractId={data.contractId}
+                onOpenModal={setOpenModal}
+                onRecheck={() => {
+                  setOpenBlockers(null);
+                  queryClient.invalidateQueries({ queryKey: ['contract-readiness', data.contractId] });
+                }}
+                showHeadline={!!openBlockers?.length}
+              />
             </div>
             <div className="border-t border-line" />
           </>
-        )}
-        {readinessWarnings.length > 0 && (
-          <>
-            <div className="px-4 py-2">
-              <div className="alert alert-warning">
-                <AlertTriangle size={16} />
-                <div className="flex flex-col gap-1 min-w-0 flex-1">
-                  {readinessWarnings.map((warn, i) => {
-                    const targetModal = ERROR_TO_MODAL[warn.code];
-                    const label = t(warn.code, { ns: 'apiErrors', defaultValue: warn.code });
-                    return targetModal ? (
-                      <button
-                        key={i}
-                        type="button"
-                        className="text-left bg-transparent border-none p-0 text-warning-fg hover:underline cursor-pointer text-sm"
-                        onClick={() => setOpenModal(targetModal)}
-                      >
-                        {label}
-                      </button>
-                    ) : (
-                      <span key={i} className="text-sm">{label}</span>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-            <div className="border-t border-line" />
-          </>
-        )}
+        ) : null}
         <div className="px-4 py-3 flex justify-end gap-2">
           <Button
             color="primary"

@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from 'tsp-form';
-import { CheckCircle, XCircle, Loader2, AlertCircle, AlertTriangle } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, AlertCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { useWorkspace } from './WorkspaceContext';
 import type { ReadinessResult } from './WorkspaceTypes';
-import { ERROR_TO_MODAL } from './WorkspaceTypes';
 import { translateApiError } from '../../../lib/apiErrors';
+import { ReadinessChecklist, type ReadinessItem } from './ReadinessChecklist';
+import { readinessErrorsFromApiError } from './readinessFromError';
 
 export function CardReadiness() {
   const { t } = useTranslation();
@@ -24,11 +25,17 @@ export function CardReadiness() {
 
   const [billLoading, setBillLoading] = useState(false);
   const [billError, setBillError] = useState('');
+  // The open call re-runs the readiness check server-side, so it can refuse with
+  // a list of its own — someone may have blacklisted a customer since the check
+  // on screen was taken. That list replaces the stale one rather than showing
+  // the envelope's "contract is not ready", which tells the user nothing.
+  const [billBlockers, setBillBlockers] = useState<ReadinessItem[] | null>(null);
 
   const handleCreateBill = async () => {
     if (!readiness?.ready) return;
     setBillLoading(true);
     setBillError('');
+    setBillBlockers(null);
     try {
       const res = await apiClient.rpc<{
         bill_id: number;
@@ -46,7 +53,11 @@ export function CardReadiness() {
         billData: res,
       });
     } catch (err) {
-      if (err instanceof ApiError) {
+      const blockers = readinessErrorsFromApiError(err);
+      if (blockers && blockers.length > 0) {
+        setBillBlockers(blockers);
+        refetch();
+      } else if (err instanceof ApiError) {
         const translated = translateApiError(err, t);
         setBillError(translated || err.message);
       } else {
@@ -76,54 +87,22 @@ export function CardReadiness() {
         ) : readiness ? (
           <div className="flex flex-col gap-2">
             {/* Readiness checks */}
-            {readiness.ready ? (
+            {readiness.ready && !billBlockers ? (
               <div className="flex items-center gap-2 text-sm text-success">
                 <CheckCircle size={14} />
                 <span>{t('workspace.allReady')}</span>
               </div>
-            ) : (
-              <div className="flex flex-col gap-1.5">
-                {readiness.errors.map((err, i) => {
-                  const targetModal = ERROR_TO_MODAL[err.code];
-                  return (
-                    <button
-                      key={i}
-                      className={`flex items-center gap-2 text-sm text-left w-full ${
-                        targetModal ? 'text-danger hover:underline cursor-pointer' : 'text-danger cursor-default'
-                      }`}
-                      onClick={targetModal ? () => setOpenModal(targetModal) : undefined}
-                      disabled={!targetModal}
-                    >
-                      <XCircle size={14} className="shrink-0" />
-                      <span>{t(err.code, { ns: 'apiErrors', defaultValue: err.code })}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            ) : null}
 
-            {/* Non-blocking warnings (e.g. minor primary lessee). Shown even when
-                ready — they never gate the Create bill button. */}
-            {readiness.warnings && readiness.warnings.length > 0 && (
-              <div className="flex flex-col gap-1.5">
-                {readiness.warnings.map((warn, i) => {
-                  const targetModal = ERROR_TO_MODAL[warn.code];
-                  return (
-                    <button
-                      key={i}
-                      className={`flex items-center gap-2 text-sm text-left w-full text-warning-fg ${
-                        targetModal ? 'hover:underline cursor-pointer' : 'cursor-default'
-                      }`}
-                      onClick={targetModal ? () => setOpenModal(targetModal) : undefined}
-                      disabled={!targetModal}
-                    >
-                      <AlertTriangle size={14} className="shrink-0" />
-                      <span>{t(warn.code, { ns: 'apiErrors', defaultValue: warn.code })}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            {/* Warnings ride along even when ready — they never gate the button. */}
+            <ReadinessChecklist
+              errors={billBlockers ?? readiness.errors}
+              warnings={readiness.warnings ?? []}
+              contractId={data.contractId}
+              onOpenModal={setOpenModal}
+              onRecheck={() => { setBillBlockers(null); refetch(); }}
+              showHeadline={!!billBlockers || !readiness.ready}
+            />
 
             {/* Bill error */}
             {billError && (

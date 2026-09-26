@@ -7013,6 +7013,21 @@
     "scope": "สัญญา • สาขา • คลัง • การเงิน",
     "signIn": "เข้าสู่ระบบ"
   },
+  "readiness": {
+    "unknownCode": "มีเงื่อนไขที่ยังไม่ผ่าน กรุณาแจ้งผู้ดูแลระบบ",
+    "notReadyHeadline": "เปิดสัญญายังไม่ได้ — เหลือ {{count}} เรื่องที่ต้องแก้",
+    "blacklistRole": {
+      "PRIMARY": "ผู้เช่า",
+      "CO_LESSEE": "ผู้เช่าร่วม"
+    },
+    "blacklistHeadline": "{{role}} \"{{name}}\" ติด blacklist",
+    "blacklistHeadlineNoName": "{{role}} ติด blacklist",
+    "blacklistReason": "เหตุผล: {{reason}}",
+    "blacklistAutoTag": "บันทึกอัตโนมัติจาก TPA",
+    "blacklistAskAdmin": "ต้องให้แอดมินบริษัทปลด blacklist ก่อน จึงจะเปิดสัญญาได้",
+    "blacklistLift": "ปลด blacklist",
+    "blacklistAutoNote": "blacklist นี้ระบบบันทึกอัตโนมัติจากยอดค้างใน TPA — ถ้าลูกค้าเคลียร์ยอดใน TPA แล้ว ระบบจะปลดให้เองภายในคืนนี้ (ตี 2) · ถ้าปลดเองโดยที่ยอดใน TPA ยังค้าง ระบบจะใส่กลับตอนตี 2"
+  },
   "receiving": {
     "title": "รับสินค้า",
     "allStatuses": "ทุกสถานะ",

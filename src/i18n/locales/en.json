@@ -7022,6 +7022,21 @@
     "scope": "Contracts • Branches • Inventory • Finance",
     "signIn": "Sign in"
   },
+  "readiness": {
+    "unknownCode": "A requirement has not been met. Please contact your system administrator.",
+    "notReadyHeadline": "Cannot open this contract yet — {{count}} item(s) to fix",
+    "blacklistRole": {
+      "PRIMARY": "Lessee",
+      "CO_LESSEE": "Co-lessee"
+    },
+    "blacklistHeadline": "{{role}} \"{{name}}\" is blacklisted",
+    "blacklistHeadlineNoName": "{{role}} is blacklisted",
+    "blacklistReason": "Reason: {{reason}}",
+    "blacklistAutoTag": "Recorded automatically from TPA",
+    "blacklistAskAdmin": "A company admin must lift the blacklist before this contract can be opened.",
+    "blacklistLift": "Lift blacklist",
+    "blacklistAutoNote": "This blacklist entry is recorded automatically from the outstanding balance in TPA. If the customer has cleared it there, the system lifts the entry by itself tonight (02:00). If it is lifted by hand while the balance is still outstanding, the system puts it back at 02:00."
+  },
   "receiving": {
     "title": "Receiving",
     "allStatuses": "All statuses",
