@@ -1482,7 +1482,7 @@ function Fin2Calculator({ fin2Rows, fin2Terms, t, saving, onUse }: {
   // inert icon needs its own hit area for the tooltip to open.
   const fillIcon = (live: boolean, tip: string) => (
     <Tooltip content={tip} placement="top">
-      <span className={`pointer-events-auto inline-flex ${live ? 'text-primary-fg' : 'text-subtler cursor-not-allowed'}`}>
+      <span className={`pointer-events-auto flex items-center ${live ? 'text-primary-fg' : 'text-subtler cursor-not-allowed'}`}>
         <ChevronsRight size={14} />
       </span>
     </Tooltip>
@@ -1548,11 +1548,11 @@ function Fin2Calculator({ fin2Rows, fin2Terms, t, saving, onUse }: {
           )}
         </div>
         <div className="flex flex-col gap-1 flex-1">
-          <label className="form-label">{t('priceCheck.downPayment')}</label>
+          <label className="form-label">{t('priceCheck.downPayment')} ({t('priceCheck.thb')})</label>
           <MaskedInput size="sm" mask="number" decimalScale={0} value={downInput} onChange={(raw) => setDownInput(raw)} className="w-full" />
         </div>
         <div className="flex flex-col gap-1 flex-1">
-          <label className="form-label">{t('priceCheck.installment')}</label>
+          <label className="form-label">{t('priceCheck.installment')} ({t('priceCheck.thb')})</label>
           <MaskedInput
             size="sm"
             mask="number"
