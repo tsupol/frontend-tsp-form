@@ -456,6 +456,21 @@ export function PanelProductPlan(_props: Props) {
   // plan" despite having a committed rate. Match the saved rate against the
   // loaded quote rows once and seed localQuote so the panel reflects server
   // truth. Guarded so it never overrides a user's in-session selection.
+  // A FIN1 plan is written by its editor, not by a row pick, so a FIN2 row
+  // still held here once the contract is FIN1 is stale: seeded from the saved
+  // step data of an earlier FIN2 save, or matched by the restore below before
+  // the FIN1 confirm landed. Left in place it reads as an unsaved change and
+  // arms the leave-guard on a contract that is fully saved. A pick made while
+  // the contract is already FIN1 is a real switch and is kept.
+  const prevModelRef = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    const model = contract?.commercial_model;
+    const changed = prevModelRef.current !== model;
+    prevModelRef.current = model;
+    if (!changed || model !== 'FIN1') return;
+    setLocalQuote(q => (q && q.finance_model !== 'FIN1' ? null : q));
+  }, [contract?.commercial_model]);
+
   const restoredQuoteRef = useRef(false);
   useEffect(() => {
     if (restoredQuoteRef.current || localQuote) return;
@@ -684,6 +699,9 @@ export function PanelProductPlan(_props: Props) {
     const contractId = contract?.id ?? wizardData.contractId;
     if (!contractId) return;
     if (mode === 'used' ? !localTargetAssetId : !localModelId || !localVariantId) return;
+    // Going FIN1 abandons any FIN2 row picked before; left in place it would
+    // keep reading as an unsaved change after the FIN1 plan is confirmed.
+    setLocalQuote(null);
     setFin1Preparing(true);
     setFin1Error('');
     try {
@@ -1258,39 +1276,7 @@ export function PanelProductPlan(_props: Props) {
         FIN1 writes its plan through its own editor (no local quote to
         confirm), so its footer just mirrors what is on the contract, with the
         lighter final installment spelled out when the plan isn't uniform. */}
-    {contractIsFin1 && contract?.value_month != null && contract?.installment_amount != null ? (
-      <div className="shrink-0 border-t border-primary bg-primary-soft px-4 py-3">
-        <div className="flex items-center gap-2 mb-2 flex-wrap">
-          <span className="text-xs text-primary-fg font-medium">{t('wizard.selectedPlan')}</span>
-          {fin1Dirty && (
-            <span className="inline-flex items-center gap-1 text-xs text-warning-fg">
-              <AlertTriangle size={12} />
-              {t('fin1Plan.footerOutOfDate')}
-            </span>
-          )}
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div>
-            <div className="text-xs text-subtle">{t('wizard.financeModel')}</div>
-            <div className="text-sm font-medium">FIN1</div>
-          </div>
-          <div>
-            <div className="text-xs text-subtle">{t('contract.termMonths')}</div>
-            <div className="text-sm font-medium">{contract.value_month} {t('contract.months')}</div>
-          </div>
-          <div>
-            <div className="text-xs text-subtle">{t('contract.downPayment')}</div>
-            <div className="text-sm font-medium">{fmtCurrency(contract.down_payment)}</div>
-          </div>
-          <div>
-            <div className="text-xs text-subtle">{t('contract.installmentAmount')}</div>
-            <div className="text-sm font-medium text-primary-fg">
-              {formatInstallment(contract, t, fmtCurrency)}
-            </div>
-          </div>
-        </div>
-      </div>
-    ) : localQuote ? (
+    {localQuote ? (
       <div className={`shrink-0 border-t px-4 py-3 flex flex-col gap-3 ${hasChanges ? 'border-warning-border bg-warning-soft' : 'border-success-border bg-success-soft'}`}>
         <div>
           {hasChanges ? (
@@ -1335,6 +1321,38 @@ export function PanelProductPlan(_props: Props) {
             </Button>
           </div>
         )}
+      </div>
+    ) : contractIsFin1 && contract?.value_month != null && contract?.installment_amount != null ? (
+      <div className="shrink-0 border-t border-primary bg-primary-soft px-4 py-3">
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
+          <span className="text-xs text-primary-fg font-medium">{t('wizard.selectedPlan')}</span>
+          {fin1Dirty && (
+            <span className="inline-flex items-center gap-1 text-xs text-warning-fg">
+              <AlertTriangle size={12} />
+              {t('fin1Plan.footerOutOfDate')}
+            </span>
+          )}
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div>
+            <div className="text-xs text-subtle">{t('wizard.financeModel')}</div>
+            <div className="text-sm font-medium">FIN1</div>
+          </div>
+          <div>
+            <div className="text-xs text-subtle">{t('contract.termMonths')}</div>
+            <div className="text-sm font-medium">{contract.value_month} {t('contract.months')}</div>
+          </div>
+          <div>
+            <div className="text-xs text-subtle">{t('contract.downPayment')}</div>
+            <div className="text-sm font-medium">{fmtCurrency(contract.down_payment)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-subtle">{t('contract.installmentAmount')}</div>
+            <div className="text-sm font-medium text-primary-fg">
+              {formatInstallment(contract, t, fmtCurrency)}
+            </div>
+          </div>
+        </div>
       </div>
     ) : (
       <div className="shrink-0 border-t border-danger bg-danger-soft px-4 py-4 text-center text-sm text-danger-fg">
