@@ -749,10 +749,14 @@ export function PanelProductPlan(_props: Props) {
   // A missing local quote is "not loaded yet" (the restore effect above has
   // not matched the contract's rate to a row), not "the user cleared it" — a
   // fresh panel must not read as unsaved.
+  // The down percent is null on the contract for a FIN2 plan negotiated in
+  // baht (seen on a live draft 2026-09-27) while every quote row carries 0, so
+  // a raw comparison never settles: the footer stayed on "not saved" after a
+  // successful save and the leave-guard fired. Missing means 0 on both sides.
   const quoteChanged = !!localQuote && (
     localQuote.finance_model !== (contract?.commercial_model ?? undefined)
     || localQuote.term_months !== (contract?.value_month ?? undefined)
-    || localQuote.down_percent !== (contract?.snapshot_down_percent ?? undefined)
+    || Number(localQuote.down_percent ?? 0) !== Number(contract?.snapshot_down_percent ?? 0)
     || moneyChanged
   );
   const hasChanges = mode === 'used'
