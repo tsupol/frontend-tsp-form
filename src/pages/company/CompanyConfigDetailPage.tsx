@@ -8,6 +8,7 @@ import {
 import { CheckCircle, XCircle, Save } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { PhoneInput } from '../../components/PhoneInput';
 import type { CompanyConfig, EditableField } from './companyConfigTypes';
 import type { CompanyFeatureCode } from '../../hooks/useCompanyFeatures';
 import { translateApiError } from '../../lib/apiErrors';
@@ -295,6 +296,11 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
             </div>
           ) : (
             <div className="flex flex-col">
+              {/* The instant-save note sits on the sections it is true for.
+                  The document fields above have their own Save button, so a
+                  blanket "everything here saves on touch" would be a lie. */}
+              <CompanyDocumentSection companyId={config.company_id} />
+              <hr className="border-line mt-6 mb-6" />
               <p className="text-xs text-subtle mb-5">{t('settings.config.instantHint')}</p>
               <ContractTemplateSection companyId={config.company_id} />
               <hr className="border-line mt-6 mb-6" />
@@ -359,13 +365,16 @@ function ContractTemplateSection({ companyId }: { companyId: number }) {
     },
   });
 
+  // Names come from the view, not from our own i18n keys (mig 1349): the owner
+  // renames a template in the database and the dropdown follows with no FE
+  // release. Fall back to the code only if a row somehow arrives without a name.
   const options = templates.map(row => ({
     value: row.code,
-    label: t(`settings.config.template_${row.code}`, { defaultValue: row.code }),
+    label: row.name || row.code,
   }));
 
   const labelFor = (code: string) =>
-    t(`settings.config.template_${code}`, { defaultValue: code });
+    templates.find(row => row.code === code)?.name || code;
 
   const confirmSave = async () => {
     if (!pendingCode) return;
@@ -448,6 +457,8 @@ function ContractTemplateSection({ companyId }: { companyId: number }) {
 interface ContractTemplateRow {
   code: string;
   sort_order: number;
+  /** mig 1349 — the owner-facing name, set in the database. */
+  name: string | null;
 }
 
 // ── Wallet features (SAVING / CREDIT / INSURANCE) ──────────────────────────────
@@ -521,6 +532,178 @@ function WalletFeaturesSection({ companyId }: { companyId: number }) {
     </div>
   );
 }
+
+// ── Document + customer contact details (mig 1348) ────────────────────────────
+// The name customers know the company by, plus the contact channels a fund
+// company has to print for them. Separate from the company's name in the system,
+// which is what the team calls it internally. Nothing reads these yet — the DB
+// team switches documents over in a later round — so the hint says so plainly
+// rather than implying the next printed bill will change.
+//
+// Its own Save button, not the numbers tab's: this writes a different RPC and
+// lives on the other tab.
+function CompanyDocumentSection({ companyId }: { companyId: number }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const { addSnackbar } = useSnackbarContext();
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState<CompanyDocumentFields>(EMPTY_DOC_FIELDS);
+
+  const { data: row, isLoading } = useQuery({
+    queryKey: ['company-document', companyId],
+    queryFn: async () => {
+      const rows = await apiClient.get<CompanyDocumentRow[]>(
+        `/v_companies?id=eq.${companyId}&select=id,name,doc_name,address,phone,email,line_id`,
+      );
+      return rows[0] ?? null;
+    },
+  });
+
+  useEffect(() => {
+    if (!row) return;
+    setForm({
+      doc_name: row.doc_name ?? '',
+      address: row.address ?? '',
+      phone: row.phone ?? '',
+      email: row.email ?? '',
+      line_id: row.line_id ?? '',
+    });
+    setError('');
+  }, [row?.id, row?.doc_name, row?.address, row?.phone, row?.email, row?.line_id]);
+
+  const isDirty = !!row && DOC_FIELD_KEYS.some(k => form[k] !== (row[k] ?? ''));
+
+  const handleSave = async () => {
+    if (!row) return;
+    setSaving(true);
+    setError('');
+    try {
+      // Only the fields the user actually changed. An omitted field is left
+      // alone by the RPC; an empty string clears it.
+      const params: Record<string, string | number> = { p_company_id: companyId };
+      for (const k of DOC_FIELD_KEYS) {
+        if (form[k] !== (row[k] ?? '')) params[`p_${k}`] = form[k];
+      }
+      await apiClient.rpc('fn_company_document_set', params);
+      await queryClient.invalidateQueries({ queryKey: ['company-document', companyId] });
+      addSnackbar({
+        message: (
+          <div className="alert alert-success"><CheckCircle size={16} /><span className="alert-description">{t('settings.config.saved')}</span></div>
+        ),
+        type: 'success',
+      });
+    } catch (err) {
+      if (err instanceof ApiError) setError(translateApiError(err, t) || err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleReset = () => {
+    if (!row) return;
+    setForm({
+      doc_name: row.doc_name ?? '',
+      address: row.address ?? '',
+      phone: row.phone ?? '',
+      email: row.email ?? '',
+      line_id: row.line_id ?? '',
+    });
+    setError('');
+  };
+
+  const set = (key: keyof CompanyDocumentFields, val: string) =>
+    setForm(prev => ({ ...prev, [key]: val }));
+
+  return (
+    <div>
+      <h4 className="text-sm font-semibold text-fg uppercase tracking-wider mb-1">{t('settings.config.groupDocumentInfo')}</h4>
+      <p className="text-xs text-subtle mb-3">{t('settings.config.documentInfoHint')}</p>
+      <div className="form-grid gap-4 md:grid-cols-2 max-w-3xl">
+        <div className="flex flex-col">
+          <label className="form-label">{t('settings.config.docName')}</label>
+          <Input
+            value={form.doc_name}
+            onChange={(e) => set('doc_name', e.target.value)}
+            disabled={isLoading || saving}
+            size="md"
+            className="w-full"
+            placeholder={row?.name ?? ''}
+          />
+          <span className="text-xs text-subtler mt-1">{t('settings.config.docNameHint')}</span>
+        </div>
+        <div className="flex flex-col">
+          <label className="form-label">{t('settings.config.docPhone')}</label>
+          <PhoneInput
+            value={form.phone}
+            onChange={(raw) => set('phone', raw)}
+            disabled={isLoading || saving}
+            size="md"
+            className="w-full"
+          />
+        </div>
+        <div className="flex flex-col md:col-span-2">
+          <label className="form-label">{t('settings.config.docAddress')}</label>
+          <Input
+            value={form.address}
+            onChange={(e) => set('address', e.target.value)}
+            disabled={isLoading || saving}
+            size="md"
+            className="w-full"
+          />
+        </div>
+        <div className="flex flex-col">
+          <label className="form-label">{t('settings.config.docEmail')}</label>
+          <Input
+            value={form.email}
+            onChange={(e) => set('email', e.target.value)}
+            disabled={isLoading || saving}
+            size="md"
+            className="w-full"
+            inputMode="email"
+          />
+        </div>
+        <div className="flex flex-col">
+          <label className="form-label">{t('settings.config.docLineId')}</label>
+          <Input
+            value={form.line_id}
+            onChange={(e) => set('line_id', e.target.value)}
+            disabled={isLoading || saving}
+            size="md"
+            className="w-full"
+          />
+        </div>
+      </div>
+      {error && (
+        <div className="alert alert-danger mb-3"><XCircle size={16} /><div><div className="alert-description text-xs">{error}</div></div></div>
+      )}
+      <div className="flex items-center justify-end gap-2">
+        <Button size="sm" onClick={handleReset} disabled={saving || !isDirty}>{t('common.cancel')}</Button>
+        <Button size="sm" color="primary" startIcon={<Save size={14} />} onClick={handleSave} disabled={saving || !isDirty}>
+          {saving ? t('common.saving') : t('common.save')}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+interface CompanyDocumentRow {
+  id: number;
+  name: string;
+  doc_name: string | null;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  line_id: string | null;
+}
+
+type CompanyDocumentFields = Record<'doc_name' | 'address' | 'phone' | 'email' | 'line_id', string>;
+
+const DOC_FIELD_KEYS = ['doc_name', 'address', 'phone', 'email', 'line_id'] as const;
+
+const EMPTY_DOC_FIELDS: CompanyDocumentFields = {
+  doc_name: '', address: '', phone: '', email: '', line_id: '',
+};
 
 // ── Bill-line owner override ───────────────────────────────────────────────────
 // One boolean (mig 546): override_owner_to_holding. On = force every bill line of

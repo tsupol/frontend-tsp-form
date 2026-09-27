@@ -12,6 +12,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { PhoneInput } from '../components/PhoneInput';
 import { translateApiError } from '../lib/apiErrors';
 import { useCompanyTypes } from '../hooks/useCompanyTypes';
+import { useMyPermissions } from '../hooks/useMyPermissions';
 import { ModalErrorBand } from '../components/ModalErrorBand';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -26,6 +27,8 @@ interface Branch {
   is_active: boolean;
   /** mig 1257 — the type of the company this branch belongs to. */
   company_type: string | null;
+  /** mig 1348 — the name customers see on documents. Empty falls back to name. */
+  doc_name: string | null;
   address: string | null;
   phone: string | null;
   branch_lat: number | null;
@@ -41,6 +44,8 @@ interface BranchEditModel {
   code?: string;
   name: string;
   branch_type: string;
+  /** mig 1348 — saved by its own RPC, gated on COMPANY.UPDATE. Edit-only. */
+  doc_name: string;
   address: string;
   /** mig 1269 — sent as p_is_company_warehouse on create. Create-only. */
   is_company_warehouse: boolean;
@@ -54,7 +59,7 @@ interface BranchEditModel {
 }
 
 const EMPTY_EDIT: BranchEditModel = {
-  name: '', branch_type: '', address: '', phone: '',
+  name: '', branch_type: '', doc_name: '', address: '', phone: '',
   is_company_warehouse: false,
   branch_lat: '', branch_lng: '', line_id: '',
   google_map_url: '', facebook_url: '',
@@ -179,6 +184,13 @@ export function BranchesPage() {
 
   const { types: companyTypes, allowedBranchTypes, canHoldMoney, typeName } = useCompanyTypes();
 
+  // The document name is a company-level responsibility (mig 1348): a branch
+  // manager holds BRANCH.UPDATE and edits every other field in this form, but
+  // only COMPANY.UPDATE may change the name customers see on a contract or bill.
+  // Read the permission, not the role — a granted admin must pass too.
+  const { hasPermission } = useMyPermissions();
+  const canEditDocName = hasPermission('COMPANY.UPDATE');
+
   // Every branch type any company type allows — the filter bar's option list.
   // Derived from the ref view so the filter never disagrees with what can be
   // created. Order follows the ref view's own sort_order.
@@ -258,6 +270,7 @@ export function BranchesPage() {
       name: b.name,
       branch_type: b.branch_type,
       is_company_warehouse: false,
+      doc_name: b.doc_name ?? '',
       address: b.address ?? '',
       phone: b.phone ?? '',
       branch_lat: b.branch_lat != null ? String(b.branch_lat) : '',
@@ -301,6 +314,15 @@ export function BranchesPage() {
           await apiClient.rpc('fn_branch_change_type', {
             p_branch_id: modalOrig.id,
             p_branch_type: modalData.branch_type,
+          });
+        }
+        // The document name has its own RPC and its own permission — a branch
+        // manager may rename the branch but not the name customers see on a
+        // contract. Only send it when the field was editable and changed.
+        if (canEditDocName && modalData.doc_name !== (modalOrig.doc_name ?? '')) {
+          await apiClient.rpc('fn_branch_doc_name_set', {
+            p_branch_id: modalOrig.id,
+            p_doc_name: modalData.doc_name,
           });
         }
       }
@@ -595,6 +617,25 @@ export function BranchesPage() {
               <label className="form-label">{t('org.name')}</label>
               <Input value={modalData.name} onChange={(e) => updateField('name', e.target.value)} size="md" className="w-full" />
             </div>
+            {/* Document name (mig 1348) — edit-only, and read-only for anyone
+                without COMPANY.UPDATE. Shown either way so a branch manager can
+                see what customers read, and knows who to ask to change it. */}
+            {modalMode === 'edit' && (
+              <div className="flex flex-col">
+                <label className="form-label">{t('branches.docName')}</label>
+                <Input
+                  value={modalData.doc_name}
+                  onChange={(e) => updateField('doc_name', e.target.value)}
+                  size="md"
+                  className="w-full"
+                  placeholder={modalData.name}
+                  disabled={!canEditDocName}
+                />
+                <span className="text-xs text-subtler mt-1">
+                  {canEditDocName ? t('branches.docNameHint') : t('branches.docNameReadOnly')}
+                </span>
+              </div>
+            )}
             <div className="flex flex-col">
               <label className="form-label">{t('org.branchTypeLabel')}</label>
               {/* Options are this company's allowed_branch_types (mig 1257) —
