@@ -1301,7 +1301,7 @@ export function PanelProductPlan(_props: Props) {
             </div>
             <div>
               <div className="text-xs text-subtle">{t('contract.downPayment')}</div>
-              <div className="text-sm font-medium">{fmtCurrency(localQuote.down_amount)} <span className="text-xs font-normal text-subtle">({localQuote.down_percent}%)</span></div>
+              <div className="text-sm font-medium">{fmtCurrency(localQuote.down_amount)}{localQuote.down_percent != null && <> <span className="text-xs font-normal text-subtle">({localQuote.down_percent}%)</span></>}</div>
             </div>
             <div>
               <div className="text-xs text-subtle">{t('contract.installmentAmount')}</div>
