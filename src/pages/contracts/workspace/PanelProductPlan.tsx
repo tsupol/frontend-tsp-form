@@ -1552,15 +1552,16 @@ function Fin2Calculator({ fin2Rows, fin2Terms, t, saving, onUse }: {
           )}
         </div>
         <div className="flex flex-col gap-1 flex-1">
-          <label className="form-label">{t('priceCheck.downPayment')} ({t('priceCheck.thb')})</label>
-          <MaskedInput size="sm" mask="number" decimalScale={0} value={downInput} onChange={(raw) => setDownInput(raw)} className="w-full" />
+          <label className="form-label">{t('priceCheck.downPayment')}</label>
+          <MaskedInput size="sm" mask="number" decimalScale={0} placeholder={t('priceCheck.thb')} value={downInput} onChange={(raw) => setDownInput(raw)} className="w-full" />
         </div>
         <div className="flex flex-col gap-1 flex-1">
-          <label className="form-label">{t('priceCheck.installment')} ({t('priceCheck.thb')})</label>
+          <label className="form-label">{t('priceCheck.installment')}</label>
           <MaskedInput
             size="sm"
             mask="number"
             decimalScale={0}
+            placeholder={t('priceCheck.thb')}
             value={installmentInput}
             onChange={(raw) => setInstallmentInput(raw)}
             endIcon={fillIcon(installmentFillValue != null, installmentFillTip)}
