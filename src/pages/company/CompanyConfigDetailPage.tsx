@@ -39,6 +39,8 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
   const [errorMessage, setErrorMessage] = useState('');
   const [formValues, setFormValues] = useState<Record<string, number | boolean>>({});
   const [activeTab, setActiveTab] = useState<ConfigTab>('values');
+  // Unsaved edits in the document-info section, which owns its own Save button.
+  const [docDirty, setDocDirty] = useState(false);
 
   const { data: config, isLoading } = useQuery({
     queryKey: ['company-config-detail', companyId],
@@ -123,10 +125,12 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formValues, config]);
 
-  // Report unsaved edits to the page so leaving asks first.
+  // Report unsaved edits to the page so leaving asks first. Two tabs can hold
+  // them independently — the numbers tab and the document fields, which save
+  // through a different button — so the guard reads either being dirty.
   useEffect(() => {
-    if (isDirtyRef) isDirtyRef.current = isDirty;
-  }, [isDirty, isDirtyRef]);
+    if (isDirtyRef) isDirtyRef.current = isDirty || docDirty;
+  }, [isDirty, docDirty, isDirtyRef]);
 
   useEffect(() => () => { if (isDirtyRef) isDirtyRef.current = false; }, [isDirtyRef]);
 
@@ -299,7 +303,7 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
               {/* The instant-save note sits on the sections it is true for.
                   The document fields above have their own Save button, so a
                   blanket "everything here saves on touch" would be a lie. */}
-              <CompanyDocumentSection companyId={config.company_id} />
+              <CompanyDocumentSection companyId={config.company_id} onDirtyChange={setDocDirty} />
               <hr className="border-line mt-6 mb-6" />
               <p className="text-xs text-subtle mb-5">{t('settings.config.instantHint')}</p>
               <ContractTemplateSection companyId={config.company_id} />
@@ -542,7 +546,11 @@ function WalletFeaturesSection({ companyId }: { companyId: number }) {
 //
 // Its own Save button, not the numbers tab's: this writes a different RPC and
 // lives on the other tab.
-function CompanyDocumentSection({ companyId }: { companyId: number }) {
+function CompanyDocumentSection({ companyId, onDirtyChange }: {
+  companyId: number;
+  /** Reports unsaved edits up so leaving the page asks first. */
+  onDirtyChange?: (dirty: boolean) => void;
+}) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
@@ -573,6 +581,12 @@ function CompanyDocumentSection({ companyId }: { companyId: number }) {
   }, [row?.id, row?.doc_name, row?.address, row?.phone, row?.email, row?.line_id]);
 
   const isDirty = !!row && DOC_FIELD_KEYS.some(k => form[k] !== (row[k] ?? ''));
+
+  // This section has its own Save button, so the page's guard cannot see it
+  // through the shared form state — report it, and clear on unmount so a
+  // section left dirty does not block navigation forever.
+  useEffect(() => { onDirtyChange?.(isDirty); }, [isDirty, onDirtyChange]);
+  useEffect(() => () => { onDirtyChange?.(false); }, [onDirtyChange]);
 
   const handleSave = async () => {
     if (!row) return;
