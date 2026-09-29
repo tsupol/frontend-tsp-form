@@ -92,6 +92,7 @@ export interface ContractRepoDetail {
   device_serial: string | null;
   product_display_name: string | null;
   has_loaner: boolean;
+  loaner_device_id: number | null;
   loaner_code_display: string | null;
   loaner_product_display_name: string | null;
   address_display: string | null;
@@ -155,6 +156,15 @@ export function fetchContractRepo(contractId: number): Promise<ContractRepoDetai
   return apiClient
     .get<ContractRepoDetail[]>(`/v_contract_repo?contract_id=eq.${contractId}`)
     .then((rows) => rows[0] ?? null);
+}
+
+// The repo views carry the bound device's code but not its id (the loaner's id IS
+// there). The asset page routes by id, so resolve it from v_contracts — that view
+// returns device_id for any contract, so it serves the legal tab as well.
+export function fetchContractDeviceId(contractId: number): Promise<number | null> {
+  return apiClient
+    .get<Array<{ device_id: number | null }>>(`/v_contracts?select=device_id&id=eq.${contractId}`)
+    .then((rows) => rows[0]?.device_id ?? null);
 }
 
 export function fetchRepoActions(contractId: number): Promise<RepoAction[]> {

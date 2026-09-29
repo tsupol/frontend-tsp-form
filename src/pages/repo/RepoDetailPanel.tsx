@@ -1,16 +1,18 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Badge, Tooltip, useSnackbarContext } from 'tsp-form';
 import {
   User, Phone, Smartphone, MapPin, Loader2, ClipboardList, Scale,
-  Star, StarOff, CheckCircle, Clock, AlertTriangle, Repeat,
+  Star, StarOff, CheckCircle, Clock, AlertTriangle, Repeat, ExternalLink,
 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { apiClient } from '../../lib/api';
 import { formatTel } from '../../lib/format';
+import { DeviceLink } from '../call-center/ccBadges';
 import {
-  fetchContractRepo, fetchRepoActions,
+  fetchContractRepo, fetchRepoActions, fetchContractDeviceId,
   type RepoAction, type RepoActionCode, type GeoPrecision,
 } from './repoApi';
 import { RepoLogAttemptModal } from './RepoLogAttemptModal';
@@ -62,6 +64,7 @@ export function RepoDetailPanel({ contractId, onChanged }: {
   onChanged: () => void;
 }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
 
@@ -74,6 +77,12 @@ export function RepoDetailPanel({ contractId, onChanged }: {
     queryKey: ['repo', 'actions', contractId],
     queryFn: () => fetchRepoActions(contractId),
     staleTime: 15_000,
+  });
+  // The asset page routes by id; the repo views only give the device's code.
+  const { data: deviceId = null } = useQuery({
+    queryKey: ['repo', 'deviceId', contractId],
+    queryFn: () => fetchContractDeviceId(contractId),
+    staleTime: 5 * 60_000,
   });
 
   const [logOpen, setLogOpen] = useState(false);
@@ -146,7 +155,14 @@ export function RepoDetailPanel({ contractId, onChanged }: {
     <div className="flex-1 min-h-0 flex flex-col">
       {/* Header */}
       <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
-        <span className="font-mono text-sm font-medium truncate">{contractCode}</span>
+        <button
+          type="button"
+          onClick={() => navigate(`/admin/contracts/search/${contractId}`)}
+          className="font-mono text-sm font-medium truncate text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
+        >
+          {contractCode}
+          <ExternalLink size={12} className="shrink-0" />
+        </button>
         <Badge color={statusColor} size="sm">{t(`repo.status.${detail.dunning_status}`, { defaultValue: detail.dunning_status })}</Badge>
         <div className="ml-auto flex items-center gap-2">
           {focusAction && (
@@ -189,7 +205,7 @@ export function RepoDetailPanel({ contractId, onChanged }: {
               <Smartphone size={14} className="text-subtle shrink-0 mt-0.5" />
               <div className="min-w-0">
                 {detail.product_display_name && <div className="text-sm">{detail.product_display_name}</div>}
-                <div className="font-mono text-xs">{detail.device_code_display}</div>
+                <DeviceLink deviceId={deviceId} code={detail.device_code_display} product={null} />
                 {detail.device_serial && <div className="text-xs text-subtle font-mono">{detail.device_serial}</div>}
               </div>
             </div>
@@ -201,7 +217,7 @@ export function RepoDetailPanel({ contractId, onChanged }: {
               <div className="min-w-0">
                 <div className="text-xs font-medium text-danger-fg">{t('callCenter.loanerToCollect')}</div>
                 {detail.loaner_product_display_name && <div className="text-sm">{detail.loaner_product_display_name}</div>}
-                {detail.loaner_code_display && <div className="font-mono text-xs">{detail.loaner_code_display}</div>}
+                <DeviceLink deviceId={detail.loaner_device_id} code={detail.loaner_code_display} product={null} />
               </div>
             </div>
           )}
