@@ -6,7 +6,7 @@ import {
   PageNav, PageNavPanel, MobileHeader, DataTable, Select, Badge, Tooltip,
 } from 'tsp-form';
 import {
-  ArrowRightFromLine, ArrowLeft, Search, X, MapPin, Star, AlertTriangle, Clock,
+  ArrowRightFromLine, ArrowLeft, Search, X, MapPin, Star, AlertTriangle, Clock, ExternalLink,
 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { SearchInput } from '../../components/SearchInput';
@@ -154,13 +154,22 @@ export function RepoPoolPage() {
                 renderRow={(row) => {
                   const r = row.original;
                   return (
-                    <button
+                    <div
                       key={r.contract_id}
                       className="w-full text-left px-4 py-3 flex flex-col gap-1 transition-colors cursor-pointer"
                       onClick={() => selectRow(r.contract_id, isMobile ? goTo : undefined)}
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="font-mono text-sm font-medium truncate">{r.contract_code_display}</span>
+                        <Tooltip content={t('repo.pool.openContract')} placement="top">
+                          <button
+                            type="button"
+                            className="font-mono text-sm font-medium truncate text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
+                            onClick={(e) => { e.stopPropagation(); navigate(`/admin/contracts/search/${r.contract_id}`); }}
+                          >
+                            {r.contract_code_display}
+                            <ExternalLink size={12} className="shrink-0" />
+                          </button>
+                        </Tooltip>
                         {r.never_actioned && <Badge color="danger" size="xs">{t('repo.pool.neverBadge')}</Badge>}
                         {r.is_unclaimed && <Badge color="warning" size="xs">{t('repo.pool.unclaimedBadge')}</Badge>}
                         {r.on_focus && <Star size={13} className="text-primary-fg shrink-0" />}
@@ -187,7 +196,7 @@ export function RepoPoolPage() {
                         )}
                         {r.last_action_at && <span className="ml-auto"><DateTime value={r.last_action_at} showTime={false} /></span>}
                       </div>
-                    </button>
+                    </div>
                   );
                 }}
                 className={`flex-1 min-h-0 panel-datatable ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}

@@ -7498,7 +7498,8 @@
       "approxArea": "approx area",
       "noGeo": "no location",
       "empty": "No contracts in this pool",
-      "selectHint": "Select a contract to see details and act"
+      "selectHint": "Select a contract to see details and act",
+      "openContract": "Open contract"
     },
     "detail": {
       "inStatusFor": "In this status {{days}} day(s)",
