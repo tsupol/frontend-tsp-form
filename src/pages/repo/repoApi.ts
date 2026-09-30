@@ -111,9 +111,10 @@ export interface ContractRepoDetail {
 export type RepoActionCode =
   | 'REPO_LOG_ATTEMPT' | 'REPO_GIVE_UP' | 'REPO_REVERT_ACTIVE' | 'REPO_ADD_NOTE'
   | 'REPO_FOCUS_ADD' | 'REPO_FOCUS_REMOVE' | 'REPO_SET_TARGET'
+  | 'REPO_PRINT_AUTHORITY' | 'REPO_PRINT_CONTRACT'
   | 'LEGAL_FINISH' | 'LEGAL_RETURN_TO_REPO' | string;
 
-// fn_repo_available_actions — bare array, all 9 always present.
+// fn_repo_available_actions — bare array, all 11 always present.
 //  is_permitted = who (hide when false) · is_available = now (disable when false).
 export interface RepoAction {
   action_code: RepoActionCode;
@@ -173,4 +174,126 @@ export function fetchRepoActions(contractId: number): Promise<RepoAction[]> {
 
 export function fetchRepoGrants(companyId: number): Promise<RepoAgentGrant[]> {
   return apiClient.get<RepoAgentGrant[]>(`/v_repo_agent_grant?company_id=eq.${companyId}&order=username`);
+}
+
+// ── ใบมอบอำนาจ (repo authority) ────────────────────────────────────────────
+// One authority per (company × agent × kind) — the return section printed on the
+// bottom half of the field sheet is per-contract, so it does not tie the
+// authority to a contract.
+//  · is_live       = issued and not revoked
+//  · capability_on = the company's verification toggle; a live authority whose
+//    toggle is off will not pass a scan, so the screen has to say so.
+
+export type RepoAuthorityKind = 'REPO' | 'LEGAL' | string;
+
+export interface RepoAuthorityRow {
+  authority_id: number;
+  token_hint: string;
+  kind: RepoAuthorityKind;
+  company_id: number;
+  company_name: string;
+  agent_user_id: number;
+  agent_username: string;
+  agent_name: string | null;
+  agent_national_id_last4: string | null;
+  agent_address: string | null;
+  issued_at: string;
+  issued_by: number;
+  issued_by_username: string | null;
+  revoked_at: string | null;
+  revoked_by_username: string | null;
+  revoke_reason: string | null;
+  is_live: boolean;
+  capability_on: boolean;
+  would_verify_ok: boolean;
+  last_checked_at: string | null;
+  check_count: number;
+}
+
+export function fetchRepoAuthorities(companyId: number): Promise<RepoAuthorityRow[]> {
+  return apiClient.get<RepoAuthorityRow[]>(
+    `/v_repo_authority?company_id=eq.${companyId}&order=issued_at.desc`,
+  );
+}
+
+// Issuing returns the TOKEN, not the row — measured on DEV 2026-09-30, where
+// the reply is {kind, scope, token, company_id, newly_issued, agent_user_id,
+// authorised_by}. So there is no authority_id to use afterwards: re-read
+// v_repo_authority to get the row. `newly_issued: false` means the agent
+// already had a live one and it was returned unchanged.
+export interface RepoAuthorityIssueResult {
+  kind: RepoAuthorityKind;
+  scope: string;
+  token: string;
+  company_id: number;
+  newly_issued: boolean;
+  agent_user_id: number;
+  authorised_by: string | null;
+}
+
+export function repoAuthorityIssue(
+  companyId: number, agentUserId: number, kind: RepoAuthorityKind,
+): Promise<RepoAuthorityIssueResult> {
+  return apiClient.rpc<RepoAuthorityIssueResult>('ops_repo_authority_issue', {
+    p_company_id: companyId,
+    p_agent_user_id: agentUserId,
+    p_kind: kind,
+  });
+}
+
+// Void takes the id or the raw token; the screen only ever has the id.
+export function repoAuthorityVoid(authorityId: number, reason: string): Promise<unknown> {
+  return apiClient.rpc('ops_repo_authority_void', {
+    p_authority_id: authorityId,
+    p_reason: reason,
+  });
+}
+
+// ── Picking up work (focus) ────────────────────────────────────────────────
+// Focus is not a lock — several agents may pick the same contract. It marks
+// "I'm working this" AND is the key that unlocks the device's iCloud password.
+
+export interface RepoFocusAddResult { contract_id: number; on_focus: boolean; holders: number }
+export interface RepoFocusManyResult {
+  requested: number;
+  added: number;
+  already_on_focus: number;
+  skipped_no_access: number;
+  skipped_ids: number[];
+  focus_total: number;
+}
+
+export function repoFocusAdd(contractId: number): Promise<RepoFocusAddResult> {
+  return apiClient.rpc<RepoFocusAddResult>('ops_repo_focus_add', { p_contract_id: contractId });
+}
+
+export function repoFocusRemove(contractId: number): Promise<{ contract_id: number; on_focus: boolean }> {
+  return apiClient.rpc('ops_repo_focus_remove', { p_contract_id: contractId });
+}
+
+// One call for many contracts — never loop repoFocusAdd.
+export function repoFocusAddMany(contractIds: number[]): Promise<RepoFocusManyResult> {
+  return apiClient.rpc<RepoFocusManyResult>('ops_repo_focus_add_many', { p_contract_ids: contractIds });
+}
+
+export function repoFocusClear(): Promise<{ removed: number; focus_total: number }> {
+  return apiClient.rpc('ops_repo_focus_clear', {});
+}
+
+// ── iCloud password reveal ─────────────────────────────────────────────────
+// The password is in no view by design: every read is logged, so it comes only
+// from this RPC. Call it once per button press — never on load, never prefetch,
+// and never cache the answer.
+
+export interface RepoIcloudReveal {
+  contract_id: number;
+  asset_id: number;
+  device_code_display: string | null;
+  account_id: number;
+  apple_id: string;
+  password: string;
+}
+
+export function repoRevealIcloud(contractId: number): Promise<RepoIcloudReveal> {
+  return apiClient.rpc<RepoIcloudReveal>('ops_repo_reveal_icloud_password', { p_contract_id: contractId });
 }

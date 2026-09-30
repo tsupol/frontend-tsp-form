@@ -1256,5 +1256,12 @@
   "CONTRACT.STATE.NEGOTIATION_APPROVAL_REQUIRED": "The discount request has not been approved yet",
   "CONTRACT.STATE.PARTNER_APPROVAL_EXPIRED": "The shop approval has expired — withdraw it and submit a new one",
   "SALE.VALIDATION.CONTRACT_NOT_READY": "This contract is not ready to open — some requirements are still outstanding",
-  "CONTRACT.VALIDATION.CUSTOMER_BLACKLISTED": "The customer is blacklisted"
+  "CONTRACT.VALIDATION.CUSTOMER_BLACKLISTED": "The customer is blacklisted",
+  "MDM.VALIDATION.NO_ICLOUD_ASSIGNED": "This device has no iCloud account linked to it.",
+  "OPS.STATE.NOT_ON_FOCUS": "Add this job to today first, then the iCloud password can be shown.",
+  "OPS.STATE.NOT_IN_REPO_POOL": "This job is no longer in your repossession or legal list — reload the list.",
+  "OPS.VALIDATION.NO_CONTRACTS_GIVEN": "No jobs were selected.",
+  "OPS.VALIDATION.AGENT_PROFILE_INCOMPLETE": "Fill in your name, ID number and address in your profile before printing.",
+  "OPS.AUTH.NO_REPO_GRANT": "You do not have repossession rights at this company.",
+  "NO_DOCUMENTS": "This contract has no signed documents yet."
 }

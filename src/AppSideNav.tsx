@@ -47,7 +47,7 @@ import {
   // Fanout child icons — Collections
   Calendar, Users2,
   // Repo / legal
-  Gavel, ShieldCheck,
+  Gavel, ShieldCheck, FileSignature,
   // Chat
   MessageSquare,
   PictureInPicture2,
@@ -571,6 +571,7 @@ export const AppSideNav = () => {
           children: [
             { type: 'group' as const, key: 'grp-repo-work', label: t('nav.groupRepoWork') },
             { key: 'repo-pool', icon: <ListChecks size="1rem" />, label: t('nav.repoPool'), path: '/admin/repo/pool' },
+            { key: 'repo-authority', icon: <FileSignature size="1rem" />, label: t('nav.repoAuthority'), path: '/admin/repo/authority' },
             ...(isRepoAdmin ? [
               { type: 'group' as const, key: 'grp-repo-admin', label: t('nav.groupRepoAdmin') },
               { key: 'repo-grants', icon: <ShieldCheck size="1rem" />, label: t('nav.repoGrants'), path: '/admin/repo/grants' },

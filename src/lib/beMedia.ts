@@ -209,6 +209,29 @@ export async function beMediaRepairPdf(repairOrderId: number, docType: BeMediaRe
   return postContractPdf('/repair/pdf', { repair_order_id: repairOrderId, doc_type: docType });
 }
 
+// ── Repo (ยึดเครื่อง) print ────────────────────────────────────────────
+// Two sheets the repo agent carries into the field. The authority sheet is
+// issued (or reused) on the first press — there is no separate "create" step.
+//  · authority: one page — power of attorney on top, the device-return +
+//    contract-termination record the customer signs at the door below.
+//  · contract: every SEALED document for the contract, stamped COPY.
+// Errors: OPS.AUTH.NO_REPO_GRANT (403) · OPS.VALIDATION.AGENT_PROFILE_INCOMPLETE
+// (422 — the agent must fill name/national id/address in their own profile) ·
+// NO_DOCUMENTS (404, contract sheet only).
+export async function beMediaRepoAuthorityPdf(contractId: number): Promise<Blob> {
+  return postContractPdf('/repo/pdf/authority', { contract_id: contractId });
+}
+
+// The blank authority sheet for one issued authority row (no return section) —
+// for reprinting, or getting it signed by the company ahead of time.
+export async function beMediaRepoAuthorityPdfById(authorityId: number): Promise<Blob> {
+  return postContractPdf('/repo/pdf/authority', { authority_id: authorityId });
+}
+
+export async function beMediaRepoContractPdf(contractId: number): Promise<Blob> {
+  return postContractPdf('/repo/pdf/contract', { contract_id: contractId });
+}
+
 // Batch delete. Failures (per-key) come back in `failed`; harmless — the
 // sweeper picks them up. Callers should log if non-empty.
 export async function beMediaDelete(keys: string[]): Promise<{ failed: string[] | null }> {

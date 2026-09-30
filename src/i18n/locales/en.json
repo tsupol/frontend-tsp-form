@@ -963,6 +963,9 @@
     "registerViewAsset": "Open asset",
     "registerViewExisting": "View existing asset",
     "registerNoBranch": "You have no branch that can register devices into stock.",
+    "precheckConflict": "{{identifier}} is already registered as {{asset}} ({{bucket}}).",
+    "precheckLuhnFail": "{{identifier}} is not a valid IMEI.",
+    "precheckNotEligible": "{{identifier}} cannot be registered ({{verdict}}).",
     "printSticker": "Print sticker",
     "printQueue": "Print queue",
     "printQueueTitle": "Print queue",
@@ -5784,7 +5787,8 @@
     "unassigned": "Unassigned",
     "userArea": "NNF System",
     "userDetails": "User Details",
-    "users": "Users"
+    "users": "Users",
+    "repoAuthority": "Authority letters"
   },
   "nnfApp": {
     "title": "NNF App",
@@ -7472,13 +7476,20 @@
       "REPO_FOCUS_ADD": "Add to today",
       "REPO_FOCUS_REMOVE": "Remove from today",
       "setTargetDeferred": "Not yet available in this screen",
-      "notAvailableNow": "Not available in the current status"
+      "notAvailableNow": "Not available in the current status",
+      "REPO_PRINT_AUTHORITY": "Print authority sheet",
+      "REPO_PRINT_CONTRACT": "Print lease copy"
     },
     "focus": {
       "add": "Add to today",
       "remove": "Remove from today",
       "added": "Added to today's plan",
-      "removed": "Removed from today's plan"
+      "removed": "Removed from today's plan",
+      "select": "Select",
+      "selectedCount": "{{count}} selected",
+      "addSelected": "Add selected to today",
+      "addManyDone": "Added {{added}} to today’s plan",
+      "addManyPartial": "Added {{added}} of {{requested}} — the rest are not yours to work"
     },
     "pool": {
       "title": "Repossession Pool",
@@ -7499,7 +7510,8 @@
       "noGeo": "no location",
       "empty": "No contracts in this pool",
       "selectHint": "Select a contract to see details and act",
-      "openContract": "Open contract"
+      "openContract": "Open contract",
+      "lensMine": "My jobs"
     },
     "detail": {
       "inStatusFor": "In this status {{days}} day(s)",
@@ -7585,6 +7597,55 @@
       "idLast4": "ID ••••{{last4}}",
       "saved": "Permissions updated",
       "empty": "No repossession-eligible users. A holding admin assigns the Repossession role first."
+    },
+    "print": {
+      "authorityTitle": "Authority + device-return sheet",
+      "contractTitle": "Lease copy",
+      "openProfile": "Open my profile"
+    },
+    "icloud": {
+      "button": "iCloud password",
+      "title": "iCloud account for this device",
+      "hint": "Every time this is shown it is recorded, along with who looked.",
+      "appleId": "Apple ID",
+      "password": "Password",
+      "revealButton": "Show password",
+      "revealAgain": "Show again",
+      "pickUpFirst": "Add this job to today first",
+      "pickUpAndReveal": "Add to today and show",
+      "sharedAccountWarning": "This account also controls other customers’ devices. Do not pass it on.",
+      "copyFailed": "Could not copy"
+    },
+    "authority": {
+      "title": "Authority letters",
+      "description": "The letters the repossession and legal teams carry into the field.",
+      "hint": "One live letter per person per kind. Revoking one does not stop a new one being issued.",
+      "empty": "No authority letters yet",
+      "kind": "Kind",
+      "kind_REPO": "Repossession",
+      "kind_LEGAL": "Legal",
+      "agent": "Person",
+      "agentPlaceholder": "Select a person",
+      "noEligibleAgent": "Nobody in this company holds that permission yet.",
+      "agentProfileIncomplete": "This person must fill in their name, ID number and address before a letter can be issued.",
+      "live": "Live",
+      "revoked": "Revoked",
+      "toggleOff": "will not pass a scan",
+      "toggleOffHint": "This company’s verification is switched off, so scanning this letter fails.",
+      "issuedAt": "issued",
+      "revokedAt": "revoked",
+      "issue": "Issue a letter",
+      "issueTitle": "Issue an authority letter",
+      "issueDone": "Letter issued",
+      "issueReused": "This person already had a live letter",
+      "void": "Revoke",
+      "voidTitle": "Revoke authority letter",
+      "voidHint": "The letter stops verifying immediately. A new one can be issued afterwards.",
+      "voidReason": "Reason",
+      "voidReasonPlaceholder": "Why this letter is being revoked",
+      "voidDone": "Letter revoked",
+      "printTitle": "Authority letter",
+      "printHint": "Print a blank letter (no device-return section)"
     }
   },
   "reports": {

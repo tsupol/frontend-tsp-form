@@ -1,11 +1,11 @@
 // Sub-nav for the ยึดเครื่อง / กฎหมาย (Repo / Legal) section.
-// MVP shows two items: pool worklist + grant admin. Map / today / legal queue /
-// authority / oversight land here later. Mirrors CollectionsLayout.
+// Pool worklist + ใบมอบอำนาจ, plus grant admin for admins. Map / today /
+// legal queue / oversight land here later. Mirrors CollectionsLayout.
 
 import { useMemo, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ListChecks, ShieldCheck } from 'lucide-react';
+import { ListChecks, ShieldCheck, FileSignature } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -26,6 +26,7 @@ export function RepoLayout({ children }: { children: ReactNode }) {
   const navItems: NavItem[] = useMemo(() => [
     { type: 'group', labelKey: 'nav.groupRepoWork' },
     { type: 'link', path: '/admin/repo/pool', labelKey: 'nav.repoPool', icon: ListChecks },
+    { type: 'link', path: '/admin/repo/authority', labelKey: 'nav.repoAuthority', icon: FileSignature },
     ...(isAdmin ? [
       { type: 'group' as const, labelKey: 'nav.groupRepoAdmin' },
       { type: 'link' as const, path: '/admin/repo/grants', labelKey: 'nav.repoGrants', icon: ShieldCheck },

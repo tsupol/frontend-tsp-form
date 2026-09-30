@@ -98,6 +98,7 @@ import { CollectionPoolsPage } from './pages/collections/CollectionPoolsPage';
 import { RepoLayout } from './pages/repo/RepoLayout';
 import { RepoPoolPage } from './pages/repo/RepoPoolPage';
 import { RepoGrantsPage } from './pages/repo/RepoGrantsPage';
+import { RepoAuthorityPage } from './pages/repo/RepoAuthorityPage';
 import { TimelineOverviewPage } from './pages/collections/TimelineOverviewPage';
 import { OverdueAgingReportPage } from './pages/collections/OverdueAgingReportPage';
 import { BlacklistPage } from './pages/company/BlacklistPage';
@@ -1339,6 +1340,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <RepoLayout><RepoGrantsPage /></RepoLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/repo/authority"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <RepoLayout><RepoAuthorityPage /></RepoLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

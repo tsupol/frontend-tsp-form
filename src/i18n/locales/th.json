@@ -963,6 +963,9 @@
     "registerViewAsset": "เปิดหน้าเครื่อง",
     "registerViewExisting": "ดูเครื่องที่มีอยู่",
     "registerNoBranch": "คุณไม่มีสาขาที่ลงทะเบียนเครื่องเข้าสต็อกได้",
+    "precheckConflict": "{{identifier}} ถูกลงทะเบียนไว้แล้วเป็น {{asset}} ({{bucket}})",
+    "precheckLuhnFail": "{{identifier}} ไม่ใช่ IMEI ที่ถูกต้อง",
+    "precheckNotEligible": "{{identifier}} ลงทะเบียนไม่ได้ ({{verdict}})",
     "printSticker": "พิมพ์สติกเกอร์",
     "printQueue": "คิวพิมพ์",
     "printQueueTitle": "คิวพิมพ์สติกเกอร์",
@@ -5779,7 +5782,8 @@
     "unassigned": "สัญญาที่ยังไม่มีเจ้าของ",
     "userArea": "NNF System",
     "userDetails": "ข้อมูลผู้ใช้",
-    "users": "ผู้ใช้งาน"
+    "users": "ผู้ใช้งาน",
+    "repoAuthority": "ใบมอบอำนาจ"
   },
   "nnfApp": {
     "title": "แอป NNF",
@@ -7463,13 +7467,20 @@
       "REPO_FOCUS_ADD": "เพิ่มเข้างานวันนี้",
       "REPO_FOCUS_REMOVE": "เอาออกจากงานวันนี้",
       "setTargetDeferred": "ยังไม่เปิดใช้ในหน้านี้",
-      "notAvailableNow": "ทำไม่ได้ในสถานะปัจจุบัน"
+      "notAvailableNow": "ทำไม่ได้ในสถานะปัจจุบัน",
+      "REPO_PRINT_AUTHORITY": "พิมพ์ใบมอบอำนาจ",
+      "REPO_PRINT_CONTRACT": "พิมพ์สำเนาสัญญาเช่า"
     },
     "focus": {
       "add": "เพิ่มเข้างานวันนี้",
       "remove": "เอาออกจากงานวันนี้",
       "added": "เพิ่มเข้าแผนวันนี้แล้ว",
-      "removed": "เอาออกจากแผนวันนี้แล้ว"
+      "removed": "เอาออกจากแผนวันนี้แล้ว",
+      "select": "เลือก",
+      "selectedCount": "เลือกไว้ {{count}} ใบ",
+      "addSelected": "หยิบที่เลือก",
+      "addManyDone": "หยิบงานแล้ว {{added}} ใบ",
+      "addManyPartial": "หยิบได้ {{added}} จาก {{requested}} ใบ — ที่เหลือไม่ใช่งานของคุณ"
     },
     "pool": {
       "title": "กองงานยึด",
@@ -7490,7 +7501,8 @@
       "noGeo": "ไม่มีพิกัด",
       "empty": "ไม่มีสัญญาในกองนี้",
       "selectHint": "เลือกสัญญาเพื่อดูรายละเอียดและดำเนินการ",
-      "openContract": "เปิดหน้าสัญญา"
+      "openContract": "เปิดหน้าสัญญา",
+      "lensMine": "งานของฉัน"
     },
     "detail": {
       "inStatusFor": "อยู่ในสถานะนี้ {{days}} วัน",
@@ -7576,6 +7588,55 @@
       "idLast4": "บัตร ••••{{last4}}",
       "saved": "อัปเดตสิทธิ์แล้ว",
       "empty": "ไม่มีผู้ใช้ที่มีสิทธิ์เป็นทีมยึด — holding admin ต้องตั้ง role ทีมยึดให้ก่อน"
+    },
+    "print": {
+      "authorityTitle": "ใบมอบอำนาจ + บันทึกการส่งมอบเครื่องคืน",
+      "contractTitle": "สำเนาสัญญาเช่า",
+      "openProfile": "เปิดหน้าโปรไฟล์ของฉัน"
+    },
+    "icloud": {
+      "button": "รหัส iCloud",
+      "title": "บัญชี iCloud ของเครื่องนี้",
+      "hint": "ทุกครั้งที่เปิดดู ระบบจะบันทึกไว้ว่าใครเปิดดู",
+      "appleId": "Apple ID",
+      "password": "รหัสผ่าน",
+      "revealButton": "ดูรหัสผ่าน",
+      "revealAgain": "ดูอีกครั้ง",
+      "pickUpFirst": "หยิบงานนี้ก่อน",
+      "pickUpAndReveal": "หยิบงานแล้วดูรหัส",
+      "sharedAccountWarning": "บัญชีนี้คุมเครื่องของลูกค้ารายอื่นด้วย ห้ามส่งต่อ",
+      "copyFailed": "คัดลอกไม่สำเร็จ"
+    },
+    "authority": {
+      "title": "ใบมอบอำนาจ",
+      "description": "ใบมอบอำนาจที่ทีมยึดและทีมกฎหมายถือออกหน้างาน",
+      "hint": "หนึ่งคนมีใบที่ใช้งานได้ใบเดียวต่อประเภท · การยกเลิกใบเก่าไม่กระทบการออกใบใหม่",
+      "empty": "ยังไม่มีใบมอบอำนาจ",
+      "kind": "ประเภท",
+      "kind_REPO": "งานยึดเครื่อง",
+      "kind_LEGAL": "งานดำเนินคดี",
+      "agent": "เจ้าหน้าที่",
+      "agentPlaceholder": "เลือกเจ้าหน้าที่",
+      "noEligibleAgent": "ยังไม่มีใครในบริษัทนี้ได้สิทธิ์นี้",
+      "agentProfileIncomplete": "เจ้าหน้าที่ต้องกรอกชื่อ เลขบัตร ที่อยู่ ก่อนจึงออกใบได้",
+      "live": "ใช้งานได้",
+      "revoked": "ยกเลิกแล้ว",
+      "toggleOff": "สแกนไม่ผ่าน",
+      "toggleOffHint": "บริษัทปิด toggle ตรวจสอบไว้ ใบนี้จึงสแกนไม่ผ่าน",
+      "issuedAt": "ออกเมื่อ",
+      "revokedAt": "ยกเลิกเมื่อ",
+      "issue": "ออกใบให้เจ้าหน้าที่",
+      "issueTitle": "ออกใบมอบอำนาจ",
+      "issueDone": "ออกใบแล้ว",
+      "issueReused": "เจ้าหน้าที่มีใบที่ใช้งานได้อยู่แล้ว",
+      "void": "ยกเลิก",
+      "voidTitle": "ยกเลิกใบมอบอำนาจ",
+      "voidHint": "ใบนี้จะสแกนไม่ผ่านทันที และออกใบใหม่ได้หลังจากนี้",
+      "voidReason": "เหตุผล",
+      "voidReasonPlaceholder": "เหตุที่ยกเลิกใบนี้",
+      "voidDone": "ยกเลิกใบแล้ว",
+      "printTitle": "ใบมอบอำนาจ",
+      "printHint": "พิมพ์ใบเปล่า (ไม่มีส่วนส่งมอบเครื่องคืน)"
     }
   },
   "reports": {
