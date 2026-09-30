@@ -221,6 +221,19 @@ Translate the message before passing it — `translateApiError(err, t)` for
 **Migration:** most modals still render `alert alert-danger` inline. Migrate a modal
 to the band when you touch it for another reason; no bulk sweep.
 
+## Detail-panel buttons are `size="sm"` — all of them
+
+Every button inside a detail panel takes `size="sm"`: the action footer, the panel
+header, and any action sitting in the panel body. No exceptions for the primary
+action — a default-size button beside small ones is the mistake, not the emphasis.
+Emphasis comes from `variant="primary"`, never from size.
+
+Icons in those buttons are `size={14}` to match. (16 belongs to a default-size
+button and looks oversized at sm.)
+
+Repeatedly corrected. When adding or rebuilding a panel's actions, measure before
+claiming done: every button in the panel should report the same height.
+
 ## Action button end-icons — `elsewhere`, `not_wired`, gated
 
 Convention for backend-driven action footers (`ContractActions.tsx`,

@@ -226,7 +226,11 @@ export function RepoDetailPanel({ contractId, onChanged }: {
   return (
     <div className="flex-1 min-h-0 flex flex-col">
       {/* Header */}
-      <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
+      {/* Wraps instead of forcing a minimum width: at a narrow window the code,
+          the badge and the two controls could not fit on one line, and because
+          nothing here shrinks they pushed the whole panel off the right edge.
+          min-h rather than a fixed height so a second line has room. */}
+      <div className="flex-none flex items-center flex-wrap gap-2 min-h-panel-header-h px-4 py-1.5 border-b border-line">
         {/* A real link, so ctrl/cmd-click and middle-click open the contract
             in a new tab. */}
         <Link
@@ -393,7 +397,8 @@ export function RepoDetailPanel({ contractId, onChanged }: {
             >
               <Button
                 variant="primary"
-                startIcon={<ClipboardList size={16} />}
+                size="sm"
+                startIcon={<ClipboardList size={14} />}
                 disabled={!primaryAction.is_available}
                 onClick={() => runAction(primaryAction)}
               >

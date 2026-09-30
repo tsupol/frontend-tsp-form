@@ -441,7 +441,7 @@ export function RepoPoolPage() {
               />
             </PageNavPanel>
 
-            <PageNavPanel id="detail" className="flex-1 min-h-0 flex flex-col">
+            <PageNavPanel id="detail" className="flex-1 min-w-0 min-h-0 flex flex-col">
               {selectedId ? (
                 <RepoDetailPanel
                   key={selectedId}
