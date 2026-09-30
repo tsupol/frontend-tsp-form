@@ -452,14 +452,18 @@ function AuthorityRow({ row, isAdmin, onPrint, onVoid }: {
       </div>
 
       <div className="flex items-center gap-2 shrink-0">
-        <Tooltip content={t('repo.authority.printHint')} placement="top">
-          <Button variant="outline" size="sm" startIcon={<Printer size={14} />} onClick={() => onPrint(row)} />
-        </Tooltip>
+        {/* Revoke first, print last: print is on EVERY row, so anchoring it at
+            the end keeps it in the same place down the whole list. Leading with
+            the conditional one instead would shift print left or right
+            depending on the row, and the eye would have to hunt for it. */}
         {isAdmin && row.is_live && (
           <Tooltip content={t('repo.authority.void')} placement="top">
             <Button variant="outline" size="sm" color="danger" startIcon={<Ban size={14} />} onClick={() => onVoid(row)} />
           </Tooltip>
         )}
+        <Tooltip content={t('repo.authority.printHint')} placement="top">
+          <Button variant="outline" size="sm" startIcon={<Printer size={14} />} onClick={() => onPrint(row)} />
+        </Tooltip>
       </div>
     </div>
   );
