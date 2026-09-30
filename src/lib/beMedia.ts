@@ -27,7 +27,10 @@ export interface BeMediaUploadResult {
 }
 
 interface OkEnvelope<T> { ok: true; data: T }
-interface ErrEnvelope { ok: false; error: { code: string; message: string; http?: number } }
+interface ErrEnvelope {
+  ok: false;
+  error: { code: string; message: string; http?: number; params?: Record<string, unknown> | null };
+}
 
 // Thrown on a be-media error envelope. Carries the DB i18n `code` so callers
 // can translate via the `apiErrors` namespace; `message` is the English
@@ -35,11 +38,15 @@ interface ErrEnvelope { ok: false; error: { code: string; message: string; http?
 export class BeMediaError extends Error {
   code: string;
   http?: number;
-  constructor(code: string, message: string, http?: number) {
+  /** The backend's `error.params` — the facts behind the code (e.g.
+   *  AGENT_PROFILE_INCOMPLETE carries `reason: "signature"`). */
+  params?: Record<string, unknown>;
+  constructor(code: string, message: string, http?: number, params?: Record<string, unknown>) {
     super(message || code);
     this.name = 'BeMediaError';
     this.code = code;
     this.http = http;
+    this.params = params;
   }
 }
 
@@ -61,7 +68,7 @@ async function call<T>(path: string, init: RequestInit): Promise<T> {
     const msg = err?.message ?? `be-media error (HTTP ${res.status})`;
     // BeMediaError (extends Error, same .message) so callers can translate the
     // DB i18n `code`; .message-only callers are unaffected.
-    throw new BeMediaError(err?.code ?? '', msg, err?.http ?? res.status);
+    throw new BeMediaError(err?.code ?? '', msg, err?.http ?? res.status, err?.params ?? undefined);
   }
   return body.data;
 }
@@ -158,14 +165,16 @@ async function postContractPdf(path: string, body: Record<string, unknown>): Pro
   if (!res.ok) {
     let code = '';
     let message = '';
+    let params: Record<string, unknown> | undefined;
     try {
       const j = (await res.json()) as ErrEnvelope;
       code = j?.error?.code || '';
       message = j?.error?.message || '';
+      params = j?.error?.params ?? undefined;
     } catch {
       /* non-json body */
     }
-    throw new BeMediaError(code, message || `contract pdf ${res.status}`, res.status);
+    throw new BeMediaError(code, message || `contract pdf ${res.status}`, res.status, params);
   }
   return res.blob();
 }
@@ -257,6 +266,27 @@ export async function beMediaRepoAuthorityPdfById(authorityId: number): Promise<
   return postContractPdf('/repo/pdf/authority', { authority_id: authorityId });
 }
 
+// A user's own signature, for the repo authority letter (mig 1357). The key
+// must be new every time — an issued letter keeps pointing at the old file, so
+// uploading over it is refused. Follow with me_signature_set(key).
+export async function uploadUserSignature(userId: number, file: File): Promise<BeMediaUploadResult> {
+  const slug = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  return beMediaUpload({
+    type: 'user_signature',
+    file,
+    size: 'lg',
+    params: { user_id: userId, signature_slug: slug },
+  });
+}
+
+// Repo photo album (CONTRACT / REPO_ATTACHMENT), staff web upload: two sizes
+// under one idx, so both land as repo-<idx>-sm / repo-<idx>-lg.
+export const CONTRACT_REPO_EVIDENCE_TYPE = 'contract_repo_evidence';
+export const CONTRACT_REPO_EVIDENCE_RESIZE: Record<'sm' | 'lg', ResizeOptions> = {
+  sm: { maxWidth: 320, maxHeight: 320, quality: 0.82, format: 'webp', mode: 'contain' },
+  lg: { maxWidth: 1600, maxHeight: 1600, quality: 0.82, format: 'webp', mode: 'contain' },
+};
+
 export async function beMediaRepoContractPdf(contractId: number): Promise<Blob> {
   return postContractPdf('/repo/pdf/contract', { contract_id: contractId });
 }
@@ -292,6 +322,10 @@ export function beMediaCanPresign(key: string): boolean {
   const k = key.replace(/^\//, '');
   return (
     /^private\/contracts\/\d+\/(chat|slip|signature|evidence)-/.test(k) ||
+    // repo album (mig 807 shape A2 — any staff in the holding).
+    /^private\/contracts\/\d+\/repo-/.test(k) ||
+    // a user's own signature (mig 1357 — presigns holding-wide).
+    /^private\/users\/\d+\/signature-/.test(k) ||
     /^private\/customers\/\d+\/id-card-/.test(k) ||
     /^private\/branches\/\d+\/signatory-/.test(k) ||
     /^private\/companies\/\d+\/signatory-/.test(k) ||

@@ -7032,7 +7032,16 @@
     "nationalIdSaved": "National ID saved",
     "nationalIdMasked": "•••••••••{{last4}}",
     "nationalIdLast4": "Last 4 digits",
-    "nationalIdConfirmLast4": "Check the last 4 digits match your card — a single mistyped digit can still pass the checksum."
+    "nationalIdConfirmLast4": "Check the last 4 digits match your card — a single mistyped digit can still pass the checksum.",
+    "signature": {
+      "title": "My signature",
+      "hint": "Printed on your authority letter. A repossession agent can’t get a new letter until this is set.",
+      "notSet": "No signature yet",
+      "set": "Add signature",
+      "replace": "Replace signature",
+      "modalHint": "Draw with a finger or mouse, or take a photo of your signature on white paper. Letters already issued keep the signature they were printed with.",
+      "saved": "Signature saved"
+    }
   },
   "public": {
     "welcome": "Welcome",
@@ -7491,7 +7500,8 @@
       "notWiredHere": "Not yet available in this screen",
       "onlyWhileAwaitingRepo": "Only while the job is waiting to be repossessed",
       "onlyWhileAwaitingLegal": "Only while the job is with legal",
-      "onlyWhileInPool": "Only while the job is waiting for repossession or legal"
+      "onlyWhileInPool": "Only while the job is waiting for repossession or legal",
+      "REPO_HANDOVER_START": "Device returned — customer signs"
     },
     "focus": {
       "add": "Add to today",
@@ -7609,16 +7619,19 @@
       "canLegal": "Legal",
       "holdingScoped": "Holding-wide",
       "profileIncomplete": "Profile incomplete",
-      "profileIncompleteHint": "This person can't print an authority letter until they fill in their name, ID number and address in their profile.",
+      "profileIncompleteHint": "This person can’t get an authority letter until they fill in their name, ID number, address and signature in their profile.",
       "neverSet": "never set",
       "idLast4": "ID ••••{{last4}}",
       "saved": "Permissions updated",
-      "empty": "No repossession-eligible users. A holding admin assigns the Repossession role first."
+      "empty": "No repossession-eligible users. A holding admin assigns the Repossession role first.",
+      "noSignature": "No signature",
+      "noSignatureHint": "This person has no signature in their profile, so a new authority letter can’t be issued for them."
     },
     "print": {
       "authorityTitle": "Authority + device-return sheet",
       "contractTitle": "Lease copy",
-      "openProfile": "Open my profile"
+      "openProfile": "Open my profile",
+      "noSignature": "Can’t print — your profile has no signature yet. Add it under “My signature”."
     },
     "icloud": {
       "button": "iCloud password",
@@ -7662,7 +7675,35 @@
       "voidReasonPlaceholder": "Why this letter is being revoked",
       "voidDone": "Letter revoked",
       "printTitle": "Authority letter",
-      "printHint": "Print a blank letter (no device-return section)"
+      "printHint": "Print a blank letter (no device-return section)",
+      "agentNoSignature": "This person has no signature in their profile yet — a letter can’t be issued until they add one."
+    },
+    "handover": {
+      "title": "Device returned — customer signs",
+      "tooltip": "The customer signs the device-return record on your iPad or phone",
+      "intro": "The customer reads and signs a one-page device-return record. You have already signed it as the company’s authorised agent.",
+      "noteLabel": "What was handed over",
+      "notePlaceholder": "e.g. box and charger included, screen scratched",
+      "noteHint": "Printed on the record as written.",
+      "confirm": "Get the signing QR",
+      "reused": "Continuing the record opened earlier — it stays open for 72 hours.",
+      "scanHint": "Scan with your iPad or phone, then hand it to the customer to read and sign.",
+      "waiting": "Waiting for the customer to sign…",
+      "expired": "The signing link ran out before the customer signed.",
+      "newQr": "New QR",
+      "doneHeadline": "Device return signed",
+      "doneDetail": "Visit recorded",
+      "doneDetailValue": "Device recovered — recorded automatically"
+    },
+    "album": {
+      "title": "Repossession photos",
+      "fromPhone": "Take on phone",
+      "uploading": "Uploading…",
+      "empty": "No photos yet",
+      "removeTitle": "Remove photo",
+      "removeBody": "Remove this photo from the repossession album?",
+      "qrHint": "Scan to open the camera. Photos go into this album on their own.",
+      "qrCount": "{{count}} / {{max}} taken"
     }
   },
   "reports": {

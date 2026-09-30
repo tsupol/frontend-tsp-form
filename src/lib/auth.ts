@@ -45,6 +45,9 @@ export interface UserProfile {
   images: Record<string, string>[] | null;
   has_national_id: boolean;
   national_id_last4: string | null;
+  /** mig 1357 — the signature printed on the repo authority letter. */
+  has_signature?: boolean;
+  signature_path?: string | null;
   created_at: string;
   updated_at: string;
 }

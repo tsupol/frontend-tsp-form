@@ -161,7 +161,11 @@ function IssueAuthorityModal({ open, onClose, companyId, onIssued }: {
                 {profileBlocked && (
                   <div className="alert alert-warning">
                     <AlertTriangle size={16} />
-                    <span className="alert-description">{t('repo.authority.agentProfileIncomplete')}</span>
+                    <span className="alert-description">
+                      {selectedAgent && !selectedAgent.has_signature
+                        ? t('repo.authority.agentNoSignature')
+                        : t('repo.authority.agentProfileIncomplete')}
+                    </span>
                   </div>
                 )}
               </div>

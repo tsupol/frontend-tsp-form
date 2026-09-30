@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, resizeToVariants } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
@@ -24,6 +24,9 @@ interface Props {
   // render the capture UI directly. Used inside the sign modal where the user
   // already clicked "sign" — showing a Replace button there is redundant.
   startInEditing?: boolean;
+  /** Reports whether the drawing pad holds unsaved strokes, so a host modal
+   *  can ask before discarding them. */
+  onPadEmptyChange?: (empty: boolean) => void;
 }
 
 // Wrap a single-variant `resizeToVariants` result as an UploadedImage with the
@@ -60,7 +63,7 @@ async function resizePhotoForUpload(file: File): Promise<UploadedImage> {
   return toUploadedImage(variants, file);
 }
 
-export function SignatureCapture({ fileUrl, uploading, disabled, cacheBust = 0, onUpload, startInEditing = false }: Props) {
+export function SignatureCapture({ fileUrl, uploading, disabled, cacheBust = 0, onUpload, startInEditing = false, onPadEmptyChange }: Props) {
   const { t } = useTranslation();
   const { url: displayUrl } = useMediaUrl(fileUrl, cacheBust);
   const [mode, setMode] = useState<SigMode>('draw');
@@ -71,6 +74,15 @@ export function SignatureCapture({ fileUrl, uploading, disabled, cacheBust = 0, 
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const wasUploadingRef = useRef(false);
+  // The pad rebuilds itself whenever its onChange changes identity, which
+  // would wipe the strokes on every parent render — so the handler must be
+  // stable and read the host's callback through a ref.
+  const padEmptyCbRef = useRef(onPadEmptyChange);
+  padEmptyCbRef.current = onPadEmptyChange;
+  const handlePadChange = useCallback((empty: boolean) => {
+    setSigEmpty(empty);
+    padEmptyCbRef.current?.(empty);
+  }, []);
 
   // When an upload completes successfully, flash a transient "saved" state on
   // the action button, then exit editing mode so the new preview shows.
@@ -205,7 +217,7 @@ export function SignatureCapture({ fileUrl, uploading, disabled, cacheBust = 0, 
           <div className={`relative border rounded-lg overflow-hidden bg-white aspect-[3/1] w-full transition-colors ${
             justSaved ? 'border-success ring-2 ring-success/30' : 'border-line'
           }`}>
-            <SignaturePad ref={padRef} onChange={setSigEmpty} />
+            <SignaturePad ref={padRef} onChange={handlePadChange} />
             {justSaved && (
               <div className="absolute inset-0 bg-success-soft flex items-center justify-center pointer-events-none">
                 <CheckCircle size={32} className="text-success drop-shadow" />
@@ -221,7 +233,7 @@ export function SignatureCapture({ fileUrl, uploading, disabled, cacheBust = 0, 
               {t('workspace.sigUndo')}
             </Button>
             <Button
-              onClick={() => { padRef.current?.clear(); setSigEmpty(true); }}
+              onClick={() => { padRef.current?.clear(); setSigEmpty(true); onPadEmptyChange?.(true); }}
               disabled={sigEmpty || uploading || disabled}
               startIcon={<Eraser size={16} />}
             >

@@ -61,8 +61,16 @@ export function RepoPrintModal({
       } catch (err) {
         if (cancelled) return;
         if (err instanceof BeMediaError) {
-          if (err.code === 'OPS.VALIDATION.AGENT_PROFILE_INCOMPLETE') setNeedsProfile(true);
-          setErrMsg(t(err.code, { ns: 'apiErrors', defaultValue: err.message }));
+          if (err.code === 'OPS.VALIDATION.AGENT_PROFILE_INCOMPLETE') {
+            setNeedsProfile(true);
+            // mig 1357: the same code with reason "signature" means only the
+            // signature is missing — say that, not the whole checklist.
+            setErrMsg(err.params?.reason === 'signature'
+              ? t('repo.print.noSignature')
+              : t(err.code, { ns: 'apiErrors', defaultValue: err.message }));
+          } else {
+            setErrMsg(t(err.code, { ns: 'apiErrors', defaultValue: err.message }));
+          }
         } else {
           setErrMsg(err instanceof Error ? err.message : String(err));
         }

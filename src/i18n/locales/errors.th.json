@@ -1261,7 +1261,7 @@
   "OPS.STATE.NOT_ON_FOCUS": "กดหยิบงานนี้ก่อน จึงจะดูรหัส iCloud ได้",
   "OPS.STATE.NOT_IN_REPO_POOL": "งานนี้ไม่อยู่ในรายการยึด/ดำเนินคดีของคุณแล้ว — กรุณาโหลดรายการใหม่",
   "OPS.VALIDATION.NO_CONTRACTS_GIVEN": "ยังไม่ได้เลือกงาน",
-  "OPS.VALIDATION.AGENT_PROFILE_INCOMPLETE": "กรอกชื่อ เลขบัตร ที่อยู่ ในหน้าโปรไฟล์ของคุณก่อนพิมพ์",
+  "OPS.VALIDATION.AGENT_PROFILE_INCOMPLETE": "กรอกชื่อ เลขบัตร ที่อยู่ และลายเซ็นในหน้าโปรไฟล์ของคุณก่อน",
   "OPS.AUTH.NO_REPO_GRANT": "คุณไม่มีสิทธิ์งานยึดของบริษัทนี้",
   "NO_DOCUMENTS": "สัญญานี้ยังไม่มีเอกสารที่เซ็นแล้ว",
   "blockingReason.no_unbind_to_undo": "ไม่มีการถอดเครื่องให้ย้อน",
@@ -1275,5 +1275,8 @@
   "blockingReason.insurance_not_cleared": "ต้องถอนเงินประกัน {{balance}} บาท ก่อน",
   "blockingReason.insurance_not_cleared_basic": "ต้องถอนเงินประกันก่อน",
   "blockingReason.credit_not_cleared": "ต้องถอนเงินเครดิต {{balance}} บาท ก่อน",
-  "blockingReason.credit_not_cleared_basic": "ต้องถอนเงินเครดิตก่อน"
+  "blockingReason.credit_not_cleared_basic": "ต้องถอนเงินเครดิตก่อน",
+  "OPS.AUTH.NO_LIVE_AUTHORITY": "ยังไม่มีใบมอบอำนาจสำหรับงานนี้ — กด “พิมพ์ใบมอบอำนาจ” หนึ่งครั้ง ระบบออกใบให้ตอนพิมพ์ครั้งแรก",
+  "OPS.AUTH.NO_LEGAL_GRANT": "คุณไม่มีสิทธิ์งานกฎหมายของบริษัทนี้",
+  "USER.VALIDATION.INVALID_SIGNATURE_MEDIA": "ไฟล์ลายเซ็นนี้ไม่ได้อัปโหลดในบัญชีของคุณ ลองใหม่อีกครั้ง"
 }

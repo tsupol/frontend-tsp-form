@@ -6,6 +6,7 @@ import { ArrowRightFromLine, Eye, EyeOff, KeyRound, CheckCircle, XCircle, Camera
 import { Button, Input, FormErrorMessage, Modal, ImageCropper, Slider, MobileHeader, useSnackbarContext } from 'tsp-form';
 import { EditProfileModal } from './EditProfileModal';
 import { EditNationalIdModal } from './EditNationalIdModal';
+import { MySignatureCard } from './MySignatureCard';
 import type { ImageCropperRef } from 'tsp-form';
 import { useAuth } from '../contexts/AuthContext';
 import { DateTime } from '../components/DateTime';
@@ -592,7 +593,8 @@ export function UserPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
           <ProfileCard />
-          <div className="self-start">
+          <div className="self-start flex flex-col gap-6">
+            <MySignatureCard />
             <ChangePasswordForm />
           </div>
         </div>

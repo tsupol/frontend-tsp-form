@@ -1261,7 +1261,7 @@
   "OPS.STATE.NOT_ON_FOCUS": "Add this job to today first, then the iCloud password can be shown.",
   "OPS.STATE.NOT_IN_REPO_POOL": "This job is no longer in your repossession or legal list — reload the list.",
   "OPS.VALIDATION.NO_CONTRACTS_GIVEN": "No jobs were selected.",
-  "OPS.VALIDATION.AGENT_PROFILE_INCOMPLETE": "Fill in your name, ID number and address in your profile before printing.",
+  "OPS.VALIDATION.AGENT_PROFILE_INCOMPLETE": "Fill in your name, ID number, address and signature in your profile first.",
   "OPS.AUTH.NO_REPO_GRANT": "You do not have repossession rights at this company.",
   "NO_DOCUMENTS": "This contract has no signed documents yet.",
   "blockingReason.no_unbind_to_undo": "There is no device removal to undo",
@@ -1275,5 +1275,8 @@
   "blockingReason.insurance_not_cleared": "Cash out the {{balance}} THB insurance balance first",
   "blockingReason.insurance_not_cleared_basic": "Cash out the insurance balance first",
   "blockingReason.credit_not_cleared": "Cash out the {{balance}} THB credit balance first",
-  "blockingReason.credit_not_cleared_basic": "Cash out the credit balance first"
+  "blockingReason.credit_not_cleared_basic": "Cash out the credit balance first",
+  "OPS.AUTH.NO_LIVE_AUTHORITY": "You have no authority letter for this yet — press “Print authority sheet” once; the first print issues it.",
+  "OPS.AUTH.NO_LEGAL_GRANT": "You do not have legal rights at this company.",
+  "USER.VALIDATION.INVALID_SIGNATURE_MEDIA": "That signature file wasn’t uploaded for your account. Try again."
 }
