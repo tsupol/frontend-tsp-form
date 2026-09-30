@@ -260,7 +260,15 @@ export function RepoPoolPage() {
               {/* Worklist */}
               <DataTable<RepoPoolRow>
                 data={rows}
-                getRowProps={(row) => ({ 'data-state': selectedId === row.original.contract_id ? 'selected' : undefined })}
+                // Two different things can be true of a row, so they get two
+                // different marks: the one whose detail is open on the right
+                // (data-state, the table's own highlight), and the ones ticked
+                // for a bulk pick-up (data-picked, the accent bar + tint). A row
+                // can be both.
+                getRowProps={(row) => ({
+                  'data-state': selectedId === row.original.contract_id ? 'selected' : undefined,
+                  'data-picked': picked.has(row.original.contract_id) ? 'true' : undefined,
+                })}
                 enableKeyboardNav={!isMobile}
                 onRowActivate={(row) => selectRow(row.original.contract_id)}
                 renderRow={(row) => {

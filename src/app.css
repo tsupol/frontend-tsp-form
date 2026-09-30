@@ -50,18 +50,22 @@
         border-top: 1px solid var(--color-line);
     }
 
-    /* Selected row in a list rail.
-       The shared table tint is an 8% wash — right for a wide table where the row
-       spans the screen, too faint in a narrow rail where the row is the only
-       thing telling you which record the panel beside it is showing. So the rail
-       gets a stronger tint plus a left accent bar, which reads at a glance even
-       on a busy row. Scoped to .panel-datatable so ordinary tables keep the
-       subtle treatment. The bar is an inset shadow rather than a border, so the
-       row's height and text alignment stay identical to its neighbours. */
-    .panel-datatable .table-row[data-state='selected'],
-    .panel-datatable .data-table-freeform-row[data-state='selected'] {
-        background-color: var(--color-table-row-selected-rail);
-        box-shadow: inset 3px 0 0 0 var(--color-primary);
+    /* A rail row carries two independent states, so they must not look alike:
+        · ticked for a bulk action  → strong tint + a left accent bar. This is a
+          choice the user made and is about to act on, so it is the loud one.
+        · open in the panel beside  → the table's own subtle highlight, left as
+          it is. It only says "this is what you're looking at".
+       The bar is an inset shadow rather than a border, so a row's height and
+       text alignment stay identical to its neighbours whatever its state. */
+    /* The table paints its own keyboard-cursor and hover washes over the row,
+       which flatten a ticked row back to plain grey. A tick is a choice the user
+       made and is about to act on, so it has to survive both — hence the
+       override. Measured: without it, the row under the keyboard cursor loses
+       its tint entirely. */
+    .panel-datatable .table-row[data-picked='true'],
+    .panel-datatable .data-table-freeform-row[data-picked='true'] {
+        background-color: var(--color-table-row-selected-rail) !important;
+        box-shadow: inset 3px 0 0 0 var(--color-primary) !important;
     }
 
     /* Search boxes that show the "at least N characters" hint inside the field
