@@ -6,6 +6,7 @@ import { Button, Badge, Tooltip, useSnackbarContext } from 'tsp-form';
 import {
   User, Phone, Smartphone, MapPin, Loader2, ClipboardList, Scale,
   Star, StarOff, CheckCircle, Clock, AlertTriangle, Repeat, ExternalLink,
+  Printer, FileText, KeyRound,
 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { apiClient } from '../../lib/api';
@@ -18,6 +19,8 @@ import {
 import { RepoLogAttemptModal } from './RepoLogAttemptModal';
 import { RepoGiveUpModal } from './RepoGiveUpModal';
 import { RepoNoteActionModal, type NoteActionConfig } from './RepoNoteActionModal';
+import { RepoPrintModal, type RepoPrintDoc } from './RepoPrintModal';
+import { RepoIcloudRevealModal } from './RepoIcloudRevealModal';
 
 // Note-driven actions handled by the one reusable modal (keyed by action_code).
 const NOTE_ACTIONS: Partial<Record<RepoActionCode, NoteActionConfig>> = {
@@ -39,12 +42,19 @@ const NOTE_ACTIONS: Partial<Record<RepoActionCode, NoteActionConfig>> = {
 // Actions handled inline (focus toggle) or dedicated modals — not the note modal.
 const INLINE_OR_DEDICATED = new Set<RepoActionCode>([
   'REPO_LOG_ATTEMPT', 'REPO_GIVE_UP', 'REPO_FOCUS_ADD', 'REPO_FOCUS_REMOVE', 'REPO_SET_TARGET',
+  'REPO_PRINT_AUTHORITY', 'REPO_PRINT_CONTRACT',
 ]);
 
 const ACTION_COLOR: Partial<Record<RepoActionCode, 'primary' | 'warning' | 'danger'>> = {
   REPO_LOG_ATTEMPT: 'primary',
   REPO_GIVE_UP: 'warning',
   LEGAL_FINISH: 'primary',
+};
+
+const ACTION_ICON: Partial<Record<RepoActionCode, React.ReactNode>> = {
+  REPO_GIVE_UP: <Scale size={14} />,
+  REPO_PRINT_AUTHORITY: <Printer size={14} />,
+  REPO_PRINT_CONTRACT: <FileText size={14} />,
 };
 
 function GeoPin({ precision }: { precision: GeoPrecision }) {
@@ -89,6 +99,8 @@ export function RepoDetailPanel({ contractId, onChanged }: {
   const [giveUpOpen, setGiveUpOpen] = useState(false);
   const [noteAction, setNoteAction] = useState<NoteActionConfig | null>(null);
   const [focusBusy, setFocusBusy] = useState(false);
+  const [printDoc, setPrintDoc] = useState<RepoPrintDoc | null>(null);
+  const [icloudOpen, setIcloudOpen] = useState(false);
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['repo', 'detail', contractId] });
@@ -124,6 +136,8 @@ export function RepoDetailPanel({ contractId, onChanged }: {
       case 'REPO_GIVE_UP': setGiveUpOpen(true); break;
       case 'REPO_FOCUS_ADD': toggleFocus(true); break;
       case 'REPO_FOCUS_REMOVE': toggleFocus(false); break;
+      case 'REPO_PRINT_AUTHORITY': setPrintDoc('authority'); break;
+      case 'REPO_PRINT_CONTRACT': setPrintDoc('contract'); break;
       default: {
         const cfg = NOTE_ACTIONS[a.action_code];
         if (cfg) setNoteAction(cfg);
@@ -144,8 +158,16 @@ export function RepoDetailPanel({ contractId, onChanged }: {
     .filter((a) => a.is_permitted)
     .filter((a) => a.action_code !== 'REPO_FOCUS_ADD' && a.action_code !== 'REPO_FOCUS_REMOVE'); // focus is its own header control
 
-  const focusAction = actions.find((a) => (a.action_code === 'REPO_FOCUS_ADD' || a.action_code === 'REPO_FOCUS_REMOVE') && a.is_permitted && a.is_available);
+  // Picking a job up is the gate on the iCloud password, so the control must be
+  // findable even when the evaluator says no: permitted-but-unavailable renders
+  // disabled with the reason, matching every other action here. Filtering on
+  // is_available (as this did) made the button disappear entirely, which reads
+  // as "the feature doesn't exist" — the reason production shows no picked-up
+  // jobs at all (RECHECK 2026-09-30).
   const onFocus = detail.on_focus;
+  const focusAction = actions.find(
+    (a) => a.action_code === (onFocus ? 'REPO_FOCUS_REMOVE' : 'REPO_FOCUS_ADD') && a.is_permitted,
+  );
 
   const statusColor = detail.dunning_status === 'WAIT_FOR_LEGAL' ? 'warning'
     : detail.dunning_status === 'REPO_COMPLETED' || detail.dunning_status === 'LEGAL_COMPLETED' ? 'success'
@@ -165,16 +187,39 @@ export function RepoDetailPanel({ contractId, onChanged }: {
         </button>
         <Badge color={statusColor} size="sm">{t(`repo.status.${detail.dunning_status}`, { defaultValue: detail.dunning_status })}</Badge>
         <div className="ml-auto flex items-center gap-2">
-          {focusAction && (
+          {/* The password is only readable on a job you've picked up, so the
+              button is shown disabled (not hidden) with the reason when not. */}
+          <Tooltip
+            content={onFocus ? t('repo.icloud.title') : t('repo.icloud.pickUpFirst')}
+            placement="top"
+          >
             <Button
               variant="outline"
               size="sm"
-              startIcon={focusBusy ? <Loader2 size={14} className="animate-spin" /> : onFocus ? <StarOff size={14} /> : <Star size={14} />}
-              disabled={focusBusy}
-              onClick={() => toggleFocus(!onFocus)}
+              startIcon={<KeyRound size={14} />}
+              disabled={!onFocus}
+              onClick={() => setIcloudOpen(true)}
             >
-              {onFocus ? t('repo.focus.remove') : t('repo.focus.add')}
+              {t('repo.icloud.button')}
             </Button>
+          </Tooltip>
+          {focusAction && (
+            <Tooltip
+              content={focusAction.is_available
+                ? (onFocus ? t('repo.focus.remove') : t('repo.focus.add'))
+                : t('repo.action.notAvailableNow')}
+              placement="top"
+            >
+              <Button
+                variant="outline"
+                size="sm"
+                startIcon={focusBusy ? <Loader2 size={14} className="animate-spin" /> : onFocus ? <StarOff size={14} /> : <Star size={14} />}
+                disabled={focusBusy || !focusAction.is_available}
+                onClick={() => toggleFocus(!onFocus)}
+              >
+                {onFocus ? t('repo.focus.remove') : t('repo.focus.add')}
+              </Button>
+            </Tooltip>
           )}
         </div>
       </div>
@@ -275,7 +320,7 @@ export function RepoDetailPanel({ contractId, onChanged }: {
                   size="sm"
                   color={ACTION_COLOR[a.action_code]}
                   disabled={disabled}
-                  startIcon={a.action_code === 'REPO_GIVE_UP' ? <Scale size={14} /> : undefined}
+                  startIcon={ACTION_ICON[a.action_code]}
                   onClick={() => runAction(a)}
                 >
                   {t(`repo.action.${a.action_code}`, { defaultValue: a.action_code })}
@@ -307,6 +352,21 @@ export function RepoDetailPanel({ contractId, onChanged }: {
         contractCode={contractCode}
         onClose={() => setNoteAction(null)}
         onSuccess={refresh}
+      />
+      <RepoPrintModal
+        open={!!printDoc}
+        doc={printDoc ?? 'authority'}
+        contractId={contractId}
+        contractCode={contractCode}
+        onClose={() => setPrintDoc(null)}
+      />
+      <RepoIcloudRevealModal
+        open={icloudOpen}
+        contractId={contractId}
+        contractCode={contractCode}
+        deviceCode={detail.device_code_display}
+        onClose={() => setIcloudOpen(false)}
+        onFocusChanged={refresh}
       />
     </div>
   );
