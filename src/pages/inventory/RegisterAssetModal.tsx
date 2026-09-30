@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Modal, Button, Input, Select, MaskedInput, LabeledCheckbox, InputDatePicker } from 'tsp-form';
-import { XCircle, CheckCircle, Search, Package, Keyboard, ExternalLink, RotateCcw } from 'lucide-react';
+import { XCircle, CheckCircle, Search, Package, Keyboard, ExternalLink, RotateCcw, AlertTriangle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { makeDatePickerFormat, toLocalDateStr, fmtCurrency } from '../../lib/format';
@@ -11,14 +11,38 @@ import { ImeiInput } from '../../components/ImeiInput';
 import { getConditionLabel, getBucketLabel, CONDITION_VALUES } from './inventoryUtils';
 import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 
-// Direct device intake — fn_inv_asset_register. For our own shops (INTERNAL) and
-// company-owned consignment branches (EXTERNAL): the device lands straight in
-// ON_HAND_AVAILABLE, no PO / receipt / approval. DEAL_PARTNER is intentionally
-// excluded here — those branches own their own devices, so letting them self-
-// register would let them push stock in unchecked (their intake goes through the
-// approval path, not this screen). Not the PO/buyback intake path.
+// Direct device intake — fn_inv_asset_register. The device lands straight in
+// ON_HAND_AVAILABLE, no PO / receipt / approval. Not the PO/buyback intake path.
+//
+// DEAL_PARTNER branches register here too. They were excluded on the assumption
+// that a shop self-registering would push stock in unchecked; the BE disagrees —
+// registering as a DEAL_PARTNER branch returns needs_approval:false and the shop
+// is the owner by definition, so excluding them only meant a shop could never
+// take a device in at all (NOTICE 1346). The BE enforces the shop-specific rules:
+// contractable models only, and owner is fixed to the shop.
 
 interface BranchRow { id: number; name: string; branch_type: string; is_active: boolean }
+
+const REGISTRABLE_BRANCH_TYPES = ['INTERNAL', 'EXTERNAL', 'DEAL_PARTNER'];
+
+// fn_inv_asset_register_check — the pre-flight the BE exposes so the form can say
+// "this IMEI is already in stock" before the user presses Register. Verdicts:
+// OK · CONFLICT (already registered — carries the existing asset) · EMPTY ·
+// IMEI_LUHN_FAIL.
+interface RegisterCheckRow {
+  verdict: 'OK' | 'CONFLICT' | 'EMPTY' | 'IMEI_LUHN_FAIL' | string;
+  eligible: boolean;
+  identifier_type: string;
+  identifier_value: string;
+  conflict_asset_code?: string | null;
+  conflict_bucket?: string | null;
+}
+interface RegisterCheckResponse {
+  eligible: boolean;
+  checks: RegisterCheckRow[];
+  grade_valid: boolean;
+  variant_model_match: boolean;
+}
 
 interface ProductSearchVariant { variant_id: number; sku_code: string; name: string; is_active: boolean }
 interface ProductSearchModel {
@@ -78,16 +102,15 @@ export function RegisterAssetModal({
   // sends the existing asset's id/code so we can link straight to it.
   const [conflictAssetId, setConflictAssetId] = useState<number | null>(null);
 
-  // INTERNAL (own shops) + EXTERNAL (company-owned consignment) may register here.
-  // DEAL_PARTNER is excluded — they own their devices; self-register would let them
-  // push stock in without approval.
+  // INTERNAL (own shops), EXTERNAL (company-owned consignment) and DEAL_PARTNER
+  // (shops that own their devices) all register here. Warehouse branches don't.
   const { data: branches = [] } = useQuery({
     queryKey: ['branches-register'],
     queryFn: () => apiClient.get<BranchRow[]>('/v_branches?is_active=is.true&order=name'),
     enabled: open,
   });
   const eligibleBranches = useMemo(
-    () => branches.filter(b => b.branch_type === 'INTERNAL' || b.branch_type === 'EXTERNAL'),
+    () => branches.filter(b => REGISTRABLE_BRANCH_TYPES.includes(b.branch_type)),
     [branches],
   );
   const branchOptions = useMemo(
@@ -161,6 +184,29 @@ export function RegisterAssetModal({
 
   const canSubmit = !!branchId && !!modelId && !!variantId
     && (imei.trim() !== '' || serial.trim() !== '');
+
+  // Pre-flight the identifiers as soon as the form is complete enough, so a
+  // duplicate device is named before the user presses Register rather than
+  // after. Purely advisory — the register RPC re-checks and owns the verdict.
+  const checkIds = buildIdentifiers();
+  const checkKey = JSON.stringify(checkIds);
+  const { data: precheck } = useQuery({
+    queryKey: ['register-precheck', branchId, modelId, variantId, condition, checkKey],
+    queryFn: () => apiClient.rpc<RegisterCheckResponse>('fn_inv_asset_register_check', {
+      p_branch_id: Number(branchId),
+      p_model_id: modelId,
+      p_variant_id: variantId,
+      p_condition_grade: condition,
+      p_identifiers: checkIds,
+    }),
+    enabled: open && view === 'form' && canSubmit,
+    retry: false,
+    staleTime: 30_000,
+  });
+
+  // Only verdicts the user can act on. A CONFLICT names the existing asset; a
+  // failed Luhn means the typed IMEI is wrong.
+  const precheckProblems = (precheck?.checks ?? []).filter(c => c.verdict !== 'OK' && c.verdict !== 'EMPTY');
 
   const mutation = useMutation({
     mutationFn: () => apiClient.rpc<RegisterResult>('fn_inv_asset_register', {
@@ -299,6 +345,35 @@ export function RegisterAssetModal({
                           {t('asset.registerViewExisting', { defaultValue: 'View existing asset' })}
                         </Link>
                       )}
+                    </div>
+                  </div>
+                )}
+
+                {precheckProblems.length > 0 && !error && (
+                  <div className="alert alert-warning mb-4">
+                    <AlertTriangle size={16} />
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      {precheckProblems.map((c, i) => (
+                        <span key={i}>
+                          {c.verdict === 'CONFLICT'
+                            ? t('asset.precheckConflict', {
+                                identifier: c.identifier_value,
+                                asset: c.conflict_asset_code ?? '—',
+                                bucket: c.conflict_bucket ? getBucketLabel(c.conflict_bucket, t) : '—',
+                                defaultValue: '{{identifier}} is already registered as {{asset}} ({{bucket}}).',
+                              })
+                            : c.verdict === 'IMEI_LUHN_FAIL'
+                              ? t('asset.precheckLuhnFail', {
+                                  identifier: c.identifier_value,
+                                  defaultValue: '{{identifier}} is not a valid IMEI.',
+                                })
+                              : t('asset.precheckNotEligible', {
+                                  identifier: c.identifier_value,
+                                  verdict: c.verdict,
+                                  defaultValue: '{{identifier}} cannot be registered ({{verdict}}).',
+                                })}
+                        </span>
+                      ))}
                     </div>
                   </div>
                 )}
