@@ -10,8 +10,8 @@
 // a scan at the door, so that row says so rather than looking healthy.
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Badge, Button, Tooltip, MobileHeader, Modal, Select, TextArea, useSnackbarContext } from 'tsp-form';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Badge, Button, DataTable, Tooltip, MobileHeader, Modal, Select, TextArea, useSnackbarContext } from 'tsp-form';
 import {
   ArrowRightFromLine, ShieldCheck, AlertTriangle, CheckCircle, XCircle, Loader2,
   Plus, Printer, Ban, User,
@@ -416,7 +416,7 @@ function AuthorityRow({ row, isAdmin, onPrint, onVoid }: {
   const toggleOff = row.is_live && !row.capability_on;
 
   return (
-    <div className="flex items-center gap-3 px-4 py-3 border-b border-line">
+    <div className="flex items-center gap-3 px-4 py-3">
       <div className="w-8 h-8 rounded-full bg-surface-shallow flex items-center justify-center shrink-0">
         <User size={16} className="text-subtle" />
       </div>
@@ -477,12 +477,18 @@ export function RepoAuthorityPage() {
   const [voidRow, setVoidRow] = useState<RepoAuthorityRow | null>(null);
   const [printRow, setPrintRow] = useState<RepoAuthorityRow | null>(null);
 
-  const { data: rows = [], isLoading, error } = useQuery({
-    queryKey: ['repo', 'authorities', companyId],
-    queryFn: () => fetchRepoAuthorities(companyId!),
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
+
+  const { data: authPage, isLoading, isFetching, error } = useQuery({
+    queryKey: ['repo', 'authorities', companyId, pageIndex, pageSize],
+    queryFn: () => fetchRepoAuthorities(companyId!, pageIndex + 1, pageSize),
     enabled: companyId != null,
     staleTime: 15_000,
+    placeholderData: keepPreviousData,
   });
+  const rows = authPage?.data ?? [];
+  const totalCount = authPage?.totalCount ?? 0;
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['repo', 'authorities', companyId] });
 
@@ -536,23 +542,33 @@ export function RepoAuthorityPage() {
           </div>
         )}
 
-        <div className="flex-1 min-h-0 overflow-auto better-scroll border border-line rounded-lg bg-surface">
-          {isLoading ? (
-            <div className="p-8 flex items-center justify-center text-subtle"><Loader2 size={24} className="animate-spin" /></div>
-          ) : rows.length === 0 ? (
-            <div className="p-8 text-center text-subtler text-sm">{t('repo.authority.empty')}</div>
-          ) : (
-            rows.map((r) => (
+        {/* The shared table rather than a hand-rolled list: it owns the row
+            dividers, the pager and keyboard navigation, and keeps this page
+            consistent with every other list in the app. A letter carries too
+            little to justify a detail panel, so this stays single-column. */}
+        {isLoading ? (
+          <div className="p-8 flex items-center justify-center text-subtle"><Loader2 size={24} className="animate-spin" /></div>
+        ) : (
+          <DataTable<RepoAuthorityRow>
+            data={rows}
+            renderRow={(row) => (
               <AuthorityRow
-                key={r.authority_id}
-                row={r}
+                row={row.original}
                 isAdmin={isAdmin}
                 onPrint={setPrintRow}
                 onVoid={setVoidRow}
               />
-            ))
-          )}
-        </div>
+            )}
+            enablePagination
+            pageIndex={pageIndex}
+            pageSize={pageSize}
+            pageSizeOptions={[15, 25, 50]}
+            rowCount={totalCount}
+            onPageChange={({ pageIndex: pi, pageSize: ps }) => { setPageIndex(pi); setPageSize(ps); }}
+            className={`flex-1 min-h-0 padded-datatable ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
+            noResults={<div className="p-8 text-center text-subtler text-sm">{t('repo.authority.empty')}</div>}
+          />
+        )}
       </div>
 
       <IssueAuthorityModal

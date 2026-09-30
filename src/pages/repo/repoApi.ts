@@ -216,9 +216,14 @@ export interface RepoAuthorityRow {
   check_count: number;
 }
 
-export function fetchRepoAuthorities(companyId: number): Promise<RepoAuthorityRow[]> {
-  return apiClient.get<RepoAuthorityRow[]>(
+// Paged server-side like the worklist: the view honours a row range and returns
+// the total, so the list shows real page numbers. Verified on DEV.
+export function fetchRepoAuthorities(
+  companyId: number, page: number, pageSize: number,
+): Promise<{ data: RepoAuthorityRow[]; totalCount: number }> {
+  return apiClient.getPaginated<RepoAuthorityRow>(
     `/v_repo_authority?company_id=eq.${companyId}&order=issued_at.desc`,
+    { page, pageSize },
   );
 }
 
