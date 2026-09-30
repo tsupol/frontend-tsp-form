@@ -9,7 +9,9 @@ import { ListChecks, ShieldCheck, FileSignature } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useAuth } from '../../contexts/AuthContext';
 
-const ADMIN_ROLES = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'];
+// Only company admins can set repo/legal permissions (guide 07-21 §0 menu 7,
+// and the backend refuses everyone else). Same rule as the global side menu.
+const GRANT_ADMIN_ROLES = ['COMPANY_ADMIN'];
 
 type NavItem =
   | { type: 'link'; path: string; labelKey: string; icon: typeof ListChecks }
@@ -21,7 +23,7 @@ export function RepoLayout({ children }: { children: ReactNode }) {
   const navGuard = useNavGuard();
   const { user } = useAuth();
   const role = user?.role_code ?? '';
-  const isAdmin = ADMIN_ROLES.includes(role);
+  const isAdmin = GRANT_ADMIN_ROLES.includes(role);
 
   const navItems: NavItem[] = useMemo(() => [
     { type: 'group', labelKey: 'nav.groupRepoWork' },

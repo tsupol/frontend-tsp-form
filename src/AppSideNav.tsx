@@ -238,7 +238,11 @@ export const AppSideNav = () => {
   // Repo/legal access is grant-based at the DB, but nav visibility is by role:
   // repo staff + admins see the section (DB returns empty rows for anyone without a grant).
   const isRepoRole = ['COMPANY_REPO', 'HOLDING_REPO', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
-  const isRepoAdmin = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
+  // Setting repo/legal permissions is a company admin's job alone: the backend
+  // reads the company from the caller's login and only company admins hold the
+  // permission (a holding admin is refused "no company in token"). Same rule
+  // in the section's own sub-nav (RepoLayout).
+  const isRepoAdmin = role === 'COMPANY_ADMIN';
   const canChat = can('CONTRACT.CHAT');
   // Slip review queue. Read from v_my_permissions, not can() / role: the fund
   // company's finance desk gets PAYMENT.SUBMISSION_REVIEW by role but its

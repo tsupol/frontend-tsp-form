@@ -1,11 +1,12 @@
 import { useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Switch, Badge, Tooltip, MobileHeader, useSnackbarContext } from 'tsp-form';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Switch, Badge, Tooltip, MobileHeader, DataTable, useSnackbarContext } from 'tsp-form';
 import { ArrowRightFromLine, User, ShieldCheck, AlertTriangle, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
-import { fetchRepoGrants, type RepoAgentGrant } from './repoApi';
+import { fetchRepoGrantsPage, type RepoAgentGrant } from './repoApi';
 import { translateApiError } from '../../lib/apiErrors';
 
 /* ตั้งสิทธิ์ทีมยึด — admin toggles can_repo / can_legal per user (ops_repo_grant_set).
@@ -28,7 +29,7 @@ function GrantRow({ grant, onToggle, busy }: {
 }) {
   const { t } = useTranslation();
   return (
-    <div className="flex items-center gap-3 px-4 py-3 border-b border-line">
+    <div className="flex items-center gap-3 px-4 py-3">
       <div className="w-8 h-8 rounded-full bg-surface-shallow flex items-center justify-center shrink-0">
         <User size={16} className="text-subtle" />
       </div>
@@ -37,9 +38,13 @@ function GrantRow({ grant, onToggle, busy }: {
           <span className="font-medium text-sm truncate">{grant.full_name || grant.username}</span>
           {grant.is_holding_scoped && <Badge color="info" size="xs">{t('repo.grants.holdingScoped')}</Badge>}
           {!grant.profile_complete && (
-            <Tooltip content={t('repo.grants.profileIncompleteHint')} placement="top">
+            <Tooltip
+              content={grant.has_signature ? t('repo.grants.profileIncompleteHint') : t('repo.grants.noSignatureHint')}
+              placement="top"
+            >
               <span className="inline-flex items-center gap-1 text-[11px] text-warning-fg">
-                <AlertTriangle size={12} />{t('repo.grants.profileIncomplete')}
+                <AlertTriangle size={12} />
+                {grant.has_signature ? t('repo.grants.profileIncomplete') : t('repo.grants.noSignature')}
               </span>
             </Tooltip>
           )}
@@ -82,14 +87,24 @@ export function RepoGrantsPage() {
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
   const companyId = user?.company_id ?? null;
+  // Neither menu offers this page to anyone but a company admin, and the
+  // backend refuses everyone else — so someone arriving by its address goes to
+  // the worklist instead of a page of switches that can't be used.
+  const allowed = user?.role_code === 'COMPANY_ADMIN';
   const [busyUserId, setBusyUserId] = useState<number | null>(null);
 
-  const { data: grants = [], isLoading } = useQuery({
-    queryKey: ['repo', 'grants', companyId],
-    queryFn: () => fetchRepoGrants(companyId!),
-    enabled: companyId != null,
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
+
+  const { data: grantPage, isLoading, isFetching } = useQuery({
+    queryKey: ['repo', 'grants', companyId, pageIndex, pageSize],
+    queryFn: () => fetchRepoGrantsPage(companyId!, pageIndex + 1, pageSize),
+    enabled: companyId != null && allowed,
     staleTime: 15_000,
+    placeholderData: keepPreviousData,
   });
+  const grants = grantPage?.data ?? [];
+  const totalCount = grantPage?.totalCount ?? 0;
 
   const onToggle = async (g: RepoAgentGrant, next: { can_repo: boolean; can_legal: boolean }) => {
     setBusyUserId(g.user_id);
@@ -115,6 +130,8 @@ export function RepoGrantsPage() {
     }
   };
 
+  if (user && !allowed) return <Navigate to="/admin/repo/pool" replace />;
+
   return (
     <>
       <MobileHeader className="mobile-header-bordered md:hidden">
@@ -138,17 +155,26 @@ export function RepoGrantsPage() {
           <div className="alert-description">{t('repo.grants.hint')}</div>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-auto better-scroll border border-line rounded-lg bg-surface">
-          {isLoading ? (
-            <div className="p-8 flex items-center justify-center text-subtle"><Loader2 size={24} className="animate-spin" /></div>
-          ) : grants.length === 0 ? (
-            <div className="p-8 text-center text-subtler text-sm">{t('repo.grants.empty')}</div>
-          ) : (
-            grants.map((g) => (
-              <GrantRow key={g.user_id} grant={g} onToggle={onToggle} busy={busyUserId === g.user_id} />
-            ))
-          )}
-        </div>
+        {/* The shared table, same as the authority letters page: it owns the
+            row dividers, the pager and keyboard navigation. */}
+        {isLoading ? (
+          <div className="p-8 flex items-center justify-center text-subtle"><Loader2 size={24} className="animate-spin" /></div>
+        ) : (
+          <DataTable<RepoAgentGrant>
+            data={grants}
+            renderRow={(row) => (
+              <GrantRow grant={row.original} onToggle={onToggle} busy={busyUserId === row.original.user_id} />
+            )}
+            enablePagination
+            pageIndex={pageIndex}
+            pageSize={pageSize}
+            pageSizeOptions={[15, 25, 50]}
+            rowCount={totalCount}
+            onPageChange={({ pageIndex: pi, pageSize: ps }) => { setPageIndex(pi); setPageSize(ps); }}
+            className={`flex-1 min-h-0 padded-datatable ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
+            noResults={<div className="p-8 text-center text-subtler text-sm">{t('repo.grants.empty')}</div>}
+          />
+        )}
       </div>
     </>
   );
