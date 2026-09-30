@@ -50,22 +50,28 @@
         border-top: 1px solid var(--color-line);
     }
 
-    /* A rail row carries two independent states, so they must not look alike:
-        · ticked for a bulk action  → strong tint + a left accent bar. This is a
-          choice the user made and is about to act on, so it is the loud one.
-        · open in the panel beside  → the table's own subtle highlight, left as
-          it is. It only says "this is what you're looking at".
+    /* A rail row carries two independent states, so each owns ONE signal and
+       nothing else. A row that is both simply gets both, with no third rule:
+         · open in the panel beside → background tint, no bar.
+         · ticked for a bulk action → left accent bar, no tint.
        The bar is an inset shadow rather than a border, so a row's height and
-       text alignment stay identical to its neighbours whatever its state. */
-    /* The table paints its own keyboard-cursor and hover washes over the row,
-       which flatten a ticked row back to plain grey. A tick is a choice the user
-       made and is about to act on, so it has to survive both — hence the
-       override. Measured: without it, the row under the keyboard cursor loses
-       its tint entirely. */
+       text alignment stay identical to its neighbours in every state. Both
+       override the table's own cursor and hover washes, which otherwise flatten
+       the row back to grey and lose the signal. */
+    /* A tick alone carries no background — the table's own cursor wash would
+       otherwise grey the row and read as a second kind of selection. */
     .panel-datatable .table-row[data-picked='true'],
     .panel-datatable .data-table-freeform-row[data-picked='true'] {
-        background-color: var(--color-table-row-selected-rail) !important;
+        background-color: transparent !important;
         box-shadow: inset 3px 0 0 0 var(--color-primary) !important;
+    }
+
+    /* The open row's tint comes after, so a row that is BOTH open and ticked
+       keeps the tint and gains the bar rather than one cancelling the other.
+       Equal specificity, so source order decides — do not move this above. */
+    .panel-datatable .table-row[data-state='selected'],
+    .panel-datatable .data-table-freeform-row[data-state='selected'] {
+        background-color: var(--color-table-row-selected-rail) !important;
     }
 
     /* Search boxes that show the "at least N characters" hint inside the field
