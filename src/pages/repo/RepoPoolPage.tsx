@@ -155,6 +155,17 @@ export function RepoPoolPage() {
   // before the refresh made the bar collapse and the list jump underneath,
   // which read as a different, heavier thing happening — so the ticks are
   // cleared only after the refreshed rows are in.
+  // An action consumes ONLY the rows it applied to. Tick four, press remove on
+  // the one that was yours, and the other three stay ticked with "Add 3 to
+  // today" ready — clearing the lot would silently throw away a selection the
+  // user was still working with. When the action covered everything ticked,
+  // nothing is left and the bar hides on its own.
+  const unpick = (ids: number[]) => setPicked((prev) => {
+    const next = new Set(prev);
+    ids.forEach((id) => next.delete(id));
+    return next;
+  });
+
   const pickUpSelected = async () => {
     if (toAddIds.length === 0) return;
     setFocusBusy(true);
@@ -166,7 +177,7 @@ export function RepoPoolPage() {
       } else {
         ok(t('repo.focus.addManyDone', { added: res.added }));
       }
-      setPicked(new Set());
+      unpick(toAddIds);
     } catch (err) {
       failFrom(err);
     } finally {
@@ -181,7 +192,7 @@ export function RepoPoolPage() {
       const res = await repoFocusRemoveMany(toRemoveIds);
       invalidateRepo();
       ok(t('repo.focus.removeManyDone', { removed: res.removed }));
-      setPicked(new Set());
+      unpick(toRemoveIds);
     } catch (err) {
       failFrom(err);
     } finally {
