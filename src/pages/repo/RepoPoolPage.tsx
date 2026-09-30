@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -310,15 +310,19 @@ export function RepoPoolPage() {
                             aria-label={t('repo.focus.select')}
                           />
                         </span>
+                        {/* A real link, not a button: ctrl/cmd-click and
+                            middle-click then open the contract in a new tab, and
+                            the address is visible on hover. stopPropagation keeps
+                            a plain click from also opening the row here. */}
                         <Tooltip content={t('repo.pool.openContract')} placement="top">
-                          <button
-                            type="button"
-                            className="font-mono text-sm font-medium truncate text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
-                            onClick={(e) => { e.stopPropagation(); navigate(`/admin/contracts/search/${r.contract_id}`); }}
+                          <Link
+                            to={`/admin/contracts/search/${r.contract_id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="font-mono text-sm font-medium truncate text-primary-fg hover:underline inline-flex items-center gap-1"
                           >
                             {r.contract_code_display}
                             <ExternalLink size={12} className="shrink-0" />
-                          </button>
+                          </Link>
                         </Tooltip>
                         {r.never_actioned && <Badge color="danger" size="xs">{t('repo.pool.neverBadge')}</Badge>}
                         {r.is_unclaimed && <Badge color="warning" size="xs">{t('repo.pool.unclaimedBadge')}</Badge>}

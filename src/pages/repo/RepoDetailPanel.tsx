@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Badge, Tooltip, useSnackbarContext } from 'tsp-form';
 import {
@@ -179,14 +179,15 @@ export function RepoDetailPanel({ contractId, onChanged }: {
     <div className="flex-1 min-h-0 flex flex-col">
       {/* Header */}
       <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
-        <button
-          type="button"
-          onClick={() => navigate(`/admin/contracts/search/${contractId}`)}
-          className="font-mono text-sm font-medium truncate text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
+        {/* A real link, so ctrl/cmd-click and middle-click open the contract
+            in a new tab. */}
+        <Link
+          to={`/admin/contracts/search/${contractId}`}
+          className="font-mono text-sm font-medium truncate text-primary-fg hover:underline inline-flex items-center gap-1"
         >
           {contractCode}
           <ExternalLink size={12} className="shrink-0" />
-        </button>
+        </Link>
         <Badge color={statusColor} size="sm">{t(`repo.status.${detail.dunning_status}`, { defaultValue: detail.dunning_status })}</Badge>
         <div className="ml-auto flex items-center gap-2">
           {/* The password is only readable on a job you've picked up, so the
