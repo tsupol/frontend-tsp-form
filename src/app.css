@@ -50,6 +50,20 @@
         border-top: 1px solid var(--color-line);
     }
 
+    /* Selected row in a list rail.
+       The shared table tint is an 8% wash — right for a wide table where the row
+       spans the screen, too faint in a narrow rail where the row is the only
+       thing telling you which record the panel beside it is showing. So the rail
+       gets a stronger tint plus a left accent bar, which reads at a glance even
+       on a busy row. Scoped to .panel-datatable so ordinary tables keep the
+       subtle treatment. The bar is an inset shadow rather than a border, so the
+       row's height and text alignment stay identical to its neighbours. */
+    .panel-datatable .table-row[data-state='selected'],
+    .panel-datatable .data-table-freeform-row[data-state='selected'] {
+        background-color: var(--color-table-row-selected-rail);
+        box-shadow: inset 3px 0 0 0 var(--color-primary);
+    }
+
     /* Search boxes that show the "at least N characters" hint inside the field
        (right-aligned) instead of on a line below, so the list underneath never
        shifts as the user types. The end slot's default padding is sized for an
