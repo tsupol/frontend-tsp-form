@@ -6,7 +6,7 @@ import { Button, Badge, Tooltip, PopOver, useSnackbarContext } from 'tsp-form';
 import {
   User, Phone, Smartphone, MapPin, Loader2, ClipboardList, Scale,
   Star, StarOff, CheckCircle, Clock, AlertTriangle, Repeat, ExternalLink,
-  Printer, FileText, KeyRound, ChevronDown,
+  Printer, FileText, KeyRound, ChevronDown, PenLine,
 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { apiClient } from '../../lib/api';
@@ -22,6 +22,8 @@ import { RepoNoteActionModal, type NoteActionConfig } from './RepoNoteActionModa
 import { RepoPrintModal, type RepoPrintDoc } from './RepoPrintModal';
 import { beMediaRepoAuthorityPdf, beMediaRepoContractPdf, openPdfInNewTab } from '../../lib/beMedia';
 import { RepoIcloudRevealModal } from './RepoIcloudRevealModal';
+import { RepoHandoverModal } from './RepoHandoverModal';
+import { RepoAlbum } from './RepoAlbum';
 
 // Note-driven actions handled by the one reusable modal (keyed by action_code).
 const NOTE_ACTIONS: Partial<Record<RepoActionCode, NoteActionConfig>> = {
@@ -43,7 +45,7 @@ const NOTE_ACTIONS: Partial<Record<RepoActionCode, NoteActionConfig>> = {
 // Actions handled inline (focus toggle) or dedicated modals — not the note modal.
 const INLINE_OR_DEDICATED = new Set<RepoActionCode>([
   'REPO_LOG_ATTEMPT', 'REPO_GIVE_UP', 'REPO_FOCUS_ADD', 'REPO_FOCUS_REMOVE', 'REPO_SET_TARGET',
-  'REPO_PRINT_AUTHORITY', 'REPO_PRINT_CONTRACT',
+  'REPO_PRINT_AUTHORITY', 'REPO_PRINT_CONTRACT', 'REPO_HANDOVER_START',
 ]);
 
 const ACTION_COLOR: Partial<Record<RepoActionCode, 'primary' | 'warning' | 'danger'>> = {
@@ -56,6 +58,7 @@ const ACTION_ICON: Partial<Record<RepoActionCode, React.ReactNode>> = {
   REPO_GIVE_UP: <Scale size={14} />,
   REPO_PRINT_AUTHORITY: <Printer size={14} />,
   REPO_PRINT_CONTRACT: <FileText size={14} />,
+  REPO_HANDOVER_START: <PenLine size={14} />,
 };
 
 // Why an action can't be used right now.
@@ -75,6 +78,7 @@ const STAGE_REQUIRED: Partial<Record<RepoActionCode, 'REPO' | 'LEGAL' | 'EITHER'
   REPO_SET_TARGET: 'EITHER',
   REPO_PRINT_AUTHORITY: 'EITHER',
   REPO_PRINT_CONTRACT: 'EITHER',
+  REPO_HANDOVER_START: 'EITHER',
   LEGAL_FINISH: 'LEGAL',
   LEGAL_RETURN_TO_REPO: 'LEGAL',
 };
@@ -134,6 +138,7 @@ export function RepoDetailPanel({ contractId, onChanged }: {
   const [moreOpen, setMoreOpen] = useState(false);
   const moreTriggerRef = useRef<HTMLDivElement>(null);
   const [icloudOpen, setIcloudOpen] = useState(false);
+  const [handoverOpen, setHandoverOpen] = useState(false);
 
   // Refresh the whole section, not just this contract: the worklist behind the
   // panel shows the same job, and picking it up here used to leave that row
@@ -187,6 +192,7 @@ export function RepoDetailPanel({ contractId, onChanged }: {
       case 'REPO_FOCUS_REMOVE': toggleFocus(false); break;
       case 'REPO_PRINT_AUTHORITY': setPrintDoc('authority'); break;
       case 'REPO_PRINT_CONTRACT': setPrintDoc('contract'); break;
+      case 'REPO_HANDOVER_START': setHandoverOpen(true); break;
       default: {
         const cfg = NOTE_ACTIONS[a.action_code];
         if (cfg) setNoteAction(cfg);
@@ -216,9 +222,16 @@ export function RepoDetailPanel({ contractId, onChanged }: {
   const isPrintAction = (c: RepoActionCode) => c === 'REPO_PRINT_AUTHORITY' || c === 'REPO_PRINT_CONTRACT';
 
   const primaryAction = permitted.find((a) => a.action_code === 'REPO_LOG_ATTEMPT') ?? null;
+  // The good ending at the door — the customer hands the device back and
+  // signs. Sits beside the primary button, not in the menu.
+  const handoverAction = permitted.find((a) => a.action_code === 'REPO_HANDOVER_START') ?? null;
   const printActions = permitted.filter((a) => isPrintAction(a.action_code));
+  // The album's add/remove needs the repo/legal grant; the evaluator's
+  // is_permitted on any grant-only action says exactly that.
+  const canEditAlbum = !!actions.find((a) => a.action_code === 'REPO_ADD_NOTE')?.is_permitted;
   const moreActions = permitted.filter(
     (a) => a.action_code !== 'REPO_LOG_ATTEMPT'
+      && a.action_code !== 'REPO_HANDOVER_START'
       && !isFocusAction(a.action_code)
       && !isPrintAction(a.action_code),
   );
@@ -378,6 +391,8 @@ export function RepoDetailPanel({ contractId, onChanged }: {
           )}
         </div>
 
+        <RepoAlbum contractId={contractId} contractCode={contractCode} canEdit={canEditAlbum} />
+
         {/* Last action */}
         <div className="rounded-md border border-line bg-surface px-3 py-3 text-sm">
           <div className="text-xs text-subtle mb-1">{t('repo.detail.lastAction')}</div>
@@ -405,7 +420,7 @@ export function RepoDetailPanel({ contractId, onChanged }: {
           One primary button for the job this screen exists for; everything else
           behind a menu so it can't compete with it. Every action the backend
           returns is listed there — disabled with its reason, never hidden. */}
-      {(primaryAction || moreActions.length > 0) && (
+      {(primaryAction || handoverAction || moreActions.length > 0) && (
         <div className="flex-none border-t border-line px-4 py-3 flex items-center gap-2">
           {primaryAction && (
             <Tooltip
@@ -422,6 +437,25 @@ export function RepoDetailPanel({ contractId, onChanged }: {
                 onClick={() => runAction(primaryAction)}
               >
                 {t('repo.action.REPO_LOG_ATTEMPT')}
+              </Button>
+            </Tooltip>
+          )}
+
+          {handoverAction && (
+            <Tooltip
+              content={handoverAction.is_available
+                ? t('repo.handover.tooltip')
+                : unavailableReason(handoverAction.action_code, t)}
+              placement="top"
+            >
+              <Button
+                variant="outline"
+                size="sm"
+                startIcon={<PenLine size={14} />}
+                disabled={!handoverAction.is_available}
+                onClick={() => runAction(handoverAction)}
+              >
+                {t('repo.action.REPO_HANDOVER_START')}
               </Button>
             </Tooltip>
           )}
@@ -512,6 +546,13 @@ export function RepoDetailPanel({ contractId, onChanged }: {
         contractId={contractId}
         contractCode={contractCode}
         onClose={() => setPrintDoc(null)}
+      />
+      <RepoHandoverModal
+        open={handoverOpen}
+        contractId={contractId}
+        contractCode={contractCode}
+        onClose={() => setHandoverOpen(false)}
+        onSuccess={refresh}
       />
       <RepoIcloudRevealModal
         open={icloudOpen}

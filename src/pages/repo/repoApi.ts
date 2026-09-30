@@ -141,7 +141,10 @@ export interface RepoAgentGrant {
   granted_at: string | null;
   granted_by_username: string | null;
   updated_at: string | null;
+  // mig 1357: profile_complete now also requires a signature; has_signature
+  // says whether that is the missing piece.
   profile_complete: boolean;
+  has_signature: boolean;
   national_id_last4: string | null;
   has_live_repo_authority: boolean;
   has_live_legal_authority: boolean;
@@ -180,6 +183,18 @@ export function fetchRepoActions(contractId: number): Promise<RepoAction[]> {
 
 export function fetchRepoGrants(companyId: number): Promise<RepoAgentGrant[]> {
   return apiClient.get<RepoAgentGrant[]>(`/v_repo_agent_grant?company_id=eq.${companyId}&order=username`);
+}
+
+// The permissions page pages server-side, like the authority letters: the view
+// honours a row range and returns the total (verified on DEV — "0-1/3", then
+// "2-2/3"). The authority modal's person picker still reads the whole list.
+export function fetchRepoGrantsPage(
+  companyId: number, page: number, pageSize: number,
+): Promise<{ data: RepoAgentGrant[]; totalCount: number }> {
+  return apiClient.getPaginated<RepoAgentGrant>(
+    `/v_repo_agent_grant?company_id=eq.${companyId}&order=username`,
+    { page, pageSize },
+  );
 }
 
 // ── ใบมอบอำนาจ (repo authority) ────────────────────────────────────────────
@@ -319,6 +334,55 @@ export interface RepoIcloudReveal {
 
 export function repoRevealIcloud(contractId: number): Promise<RepoIcloudReveal> {
   return apiClient.rpc<RepoIcloudReveal>('ops_repo_reveal_icloud_password', { p_contract_id: contractId });
+}
+
+// ── Device returned at the door: the customer e-signs (mig 1358) ───────────
+// Opens (or reuses, within 72 h) a one-page handover sheet the agent has
+// already signed. The reply says how to mint the signing QR; once the customer
+// signs, the backend seals the sheet, records the visit as a success and moves
+// the job to REPO_COMPLETED / LEGAL_COMPLETED itself — the screen only
+// refreshes. Never follow it with ops_repo_log_attempt.
+
+export interface RepoHandoverStartResult {
+  signing_id: number;
+  contract_id: number;
+  dunning_status: DunningStatus;
+  kind: string;
+  reused: boolean;
+  parties: Array<{ party_role: string; signed: boolean; customer_id?: number | null }>;
+  mint: { p_entity_type: string; p_entity_id: number; p_meta: Record<string, unknown> };
+  next_action: string;
+}
+
+export function repoHandoverStart(contractId: number, note: string | null): Promise<RepoHandoverStartResult> {
+  return apiClient.rpc<RepoHandoverStartResult>('ops_repo_handover_start', {
+    p_contract_id: contractId,
+    p_note: note,
+    p_client_action_id: null,
+  });
+}
+
+// ── Repo photo album (CONTRACT / REPO_ATTACHMENT) ──────────────────────────
+// Separate from the photos taken when the contract was opened. Every staff
+// member in the holding can see it; adding and removing needs the repo/legal
+// grant (the database decides). Customers never see it.
+
+export interface RepoAlbumPhoto {
+  entity_media_id: number;
+  media_id: number;
+  storage_path: string;
+  variants_json: Record<string, string> | null;
+  sort_order: number;
+  created_at: string;
+  uploaded_by: number | null;
+}
+
+export function fetchRepoAlbum(contractId: number): Promise<RepoAlbumPhoto[]> {
+  return apiClient.get<RepoAlbumPhoto[]>(
+    `/v_entity_media?entity_type=eq.CONTRACT&entity_id=eq.${contractId}&usage_type=eq.REPO_ATTACHMENT`
+    + '&select=entity_media_id,media_id,storage_path,variants_json,sort_order,created_at,uploaded_by'
+    + '&order=sort_order,created_at',
+  );
 }
 
 // ── Keeping the two panels in agreement ────────────────────────────────────
