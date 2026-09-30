@@ -233,10 +233,18 @@ export function RepoPoolPage() {
                 ))}
               </div>
 
-              {/* Bulk pick-up — only once something is ticked, so the rail stays
-                  quiet in normal use. */}
-              {pickedVisible.length > 0 && (
-                <div className="flex-none px-2 py-1.5 border-b border-line flex items-center gap-2 bg-surface">
+              {/* Bulk pick-up — hidden until something is ticked, so the rail
+                  stays quiet in normal use.
+
+                  Kept MOUNTED and toggled with `hidden`, not mounted on the
+                  first tick. Mounting it made the first tick build the bar and
+                  lay the rail out again, on top of the table's own re-render of
+                  every row, so the bar arrived visibly later the first time than
+                  on every tick after. */}
+              <div
+                hidden={pickedVisible.length === 0}
+                className="flex-none px-2 py-1.5 border-b border-line flex items-center gap-2 bg-surface"
+              >
                   <span className="text-xs text-subtle">
                     {t('repo.focus.selectedCount', { count: pickedVisible.length })}
                   </span>
@@ -254,8 +262,7 @@ export function RepoPoolPage() {
                       {t('repo.focus.addSelected')}
                     </Button>
                   </div>
-                </div>
-              )}
+              </div>
 
               {/* Worklist */}
               <DataTable<RepoPoolRow>
