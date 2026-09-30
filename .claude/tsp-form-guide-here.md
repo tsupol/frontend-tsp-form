@@ -221,6 +221,34 @@ Translate the message before passing it — `translateApiError(err, t)` for
 **Migration:** most modals still render `alert alert-danger` inline. Migrate a modal
 to the band when you touch it for another reason; no bulk sweep.
 
+## Anything that opens a document or another page honours ctrl/middle click
+
+Two cases, one expectation: the user can always say "open that somewhere else".
+
+**A link to another page** — use a real `<Link>`, never a button calling
+`navigate()`. A button gives the browser nothing to act on: no new tab, no
+address on hover, no copy-link. Add `onClick={(e) => e.stopPropagation()}` when
+it sits inside a clickable row.
+
+**A server-rendered document** (any be-media PDF: contract, repair, repo sheets,
+authority letters) — these CANNOT be links, because they are rendered from a POST
+carrying the user's JWT, so there is no URL to follow. Use `openPdfInNewTab`
+from `src/lib/beMedia.ts`:
+
+```tsx
+onAuxClick={(e) => { if (e.button === 1) { e.preventDefault(); openDoc(true); } }}
+onClick={(e) => openDoc(e.ctrlKey || e.metaKey)}
+// openDoc(newTab): newTab ? openPdfInNewTab(fetch) : showInPlace()
+// …and fall back to showInPlace() when the helper returns false (tab blocked).
+```
+
+Don't re-implement the helper: it opens the tab *before* the request (else it's
+blocked as a popup) and deliberately omits `noopener` (which would sever the
+handle and leave the tab blank). Both were learned the hard way.
+
+Repeatedly asked for. When adding any print button or any code/reference that
+navigates, wire this without being told.
+
 ## Detail-panel buttons are `size="sm"` — all of them
 
 Every button inside a detail panel takes `size="sm"`: the action footer, the panel

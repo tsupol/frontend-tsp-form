@@ -209,6 +209,35 @@ export async function beMediaRepairPdf(repairOrderId: number, docType: BeMediaRe
   return postContractPdf('/repair/pdf', { repair_order_id: repairOrderId, doc_type: docType });
 }
 
+// ── Opening a server-rendered document in a new tab ───────────────────
+// Every PDF here is rendered from a POST carrying the user's JWT, so there is
+// no address a browser could follow and these can never be plain links. But
+// ctrl/cmd-click and middle-click are still how people say "not in this tab",
+// so any button that opens one of these documents honours the modifier through
+// this helper rather than re-implementing it.
+//
+// Two things are load-bearing:
+//  · the tab opens BEFORE the request, while the click is still trusted —
+//    opening it after the document arrives gets it blocked as a popup;
+//  · NO `noopener`, unlike other new tabs in the app: it severs the handle
+//    needed to put the document into the tab, leaving it permanently blank.
+//    Safe here because the tab is ours and shows a document we fetched.
+//
+// Returns false when the browser blocked the tab or the render failed, so the
+// caller can fall back to showing the document in place.
+export async function openPdfInNewTab(fetchPdf: () => Promise<Blob>): Promise<boolean> {
+  const win = window.open('', '_blank');
+  if (!win) return false;
+  try {
+    const blob = await fetchPdf();
+    win.location.href = URL.createObjectURL(blob);
+    return true;
+  } catch {
+    win.close();
+    return false;
+  }
+}
+
 // ── Repo (ยึดเครื่อง) print ────────────────────────────────────────────
 // Two sheets the repo agent carries into the field. The authority sheet is
 // issued (or reused) on the first press — there is no separate "create" step.

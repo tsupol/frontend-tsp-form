@@ -23,7 +23,7 @@ import { DateTime } from '../../components/DateTime';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { PdfCanvasViewer } from '../../components/PdfCanvasViewer';
-import { beMediaRepoAuthorityPdfById, BeMediaError } from '../../lib/beMedia';
+import { beMediaRepoAuthorityPdfById, openPdfInNewTab, BeMediaError } from '../../lib/beMedia';
 import {
   fetchRepoAuthorities, fetchRepoGrants, repoAuthorityIssue, repoAuthorityVoid,
   type RepoAuthorityRow, type RepoAuthorityKind,
@@ -407,7 +407,7 @@ function AuthorityPrintModal({ open, onClose, row }: {
 function AuthorityRow({ row, isAdmin, onPrint, onVoid }: {
   row: RepoAuthorityRow;
   isAdmin: boolean;
-  onPrint: (r: RepoAuthorityRow) => void;
+  onPrint: (r: RepoAuthorityRow, newTab: boolean) => void;
   onVoid: (r: RepoAuthorityRow) => void;
 }) {
   const { t } = useTranslation();
@@ -462,7 +462,13 @@ function AuthorityRow({ row, isAdmin, onPrint, onVoid }: {
           </Tooltip>
         )}
         <Tooltip content={t('repo.authority.printHint')} placement="top">
-          <Button variant="outline" size="sm" startIcon={<Printer size={14} />} onClick={() => onPrint(row)} />
+          <Button
+            variant="outline"
+            size="sm"
+            startIcon={<Printer size={14} />}
+            onAuxClick={(e) => { if (e.button === 1) { e.preventDefault(); onPrint(row, true); } }}
+            onClick={(e) => onPrint(row, e.ctrlKey || e.metaKey)}
+          />
         </Tooltip>
       </div>
     </div>
@@ -480,6 +486,14 @@ export function RepoAuthorityPage() {
   const [issueOpen, setIssueOpen] = useState(false);
   const [voidRow, setVoidRow] = useState<RepoAuthorityRow | null>(null);
   const [printRow, setPrintRow] = useState<RepoAuthorityRow | null>(null);
+
+  // In place by default; in a new tab on ctrl/cmd or middle click. Falls back to
+  // in place if the browser blocks the tab. Shared helper — see the note on it.
+  const openPrint = async (row: RepoAuthorityRow, newTab: boolean) => {
+    if (!newTab) { setPrintRow(row); return; }
+    const opened = await openPdfInNewTab(() => beMediaRepoAuthorityPdfById(row.authority_id));
+    if (!opened) setPrintRow(row);
+  };
 
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(25);
@@ -559,7 +573,7 @@ export function RepoAuthorityPage() {
               <AuthorityRow
                 row={row.original}
                 isAdmin={isAdmin}
-                onPrint={setPrintRow}
+                onPrint={openPrint}
                 onVoid={setVoidRow}
               />
             )}
