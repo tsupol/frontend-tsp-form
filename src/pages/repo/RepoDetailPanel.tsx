@@ -13,7 +13,7 @@ import { apiClient } from '../../lib/api';
 import { formatTel } from '../../lib/format';
 import { DeviceLink } from '../call-center/ccBadges';
 import {
-  fetchContractRepo, fetchRepoActions, fetchContractDeviceId,
+  fetchContractRepo, fetchRepoActions, fetchContractDeviceId, invalidateRepoQueries,
   type RepoAction, type RepoActionCode, type GeoPrecision,
 } from './repoApi';
 import { RepoLogAttemptModal } from './RepoLogAttemptModal';
@@ -102,9 +102,11 @@ export function RepoDetailPanel({ contractId, onChanged }: {
   const [printDoc, setPrintDoc] = useState<RepoPrintDoc | null>(null);
   const [icloudOpen, setIcloudOpen] = useState(false);
 
+  // Refresh the whole section, not just this contract: the worklist behind the
+  // panel shows the same job, and picking it up here used to leave that row
+  // stale. onChanged still fires so the host can react (scroll, close, …).
   const refresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['repo', 'detail', contractId] });
-    queryClient.invalidateQueries({ queryKey: ['repo', 'actions', contractId] });
+    invalidateRepoQueries(queryClient);
     onChanged();
   };
 

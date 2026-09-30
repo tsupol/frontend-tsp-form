@@ -297,3 +297,20 @@ export interface RepoIcloudReveal {
 export function repoRevealIcloud(contractId: number): Promise<RepoIcloudReveal> {
   return apiClient.rpc<RepoIcloudReveal>('ops_repo_reveal_icloud_password', { p_contract_id: contractId });
 }
+
+// ── Keeping the two panels in agreement ────────────────────────────────────
+// The worklist and the detail panel read overlapping data, so anything that
+// changes a job (picking it up, logging a visit, giving up, a note) has to
+// refresh BOTH — otherwise the panel updates and the rail still shows the old
+// row. That went wrong once already: the rail passed an empty callback with a
+// comment claiming it refetched itself, so picking a job up from the panel left
+// the list stale.
+//
+// One helper, used by every caller on both sides, so the two can't drift apart
+// again. It matches on the section prefix, which covers the worklist (keyed on
+// its filters), the detail, and the action evaluator.
+export function invalidateRepoQueries(queryClient: {
+  invalidateQueries: (f: { queryKey: unknown[] }) => unknown;
+}): void {
+  queryClient.invalidateQueries({ queryKey: ['repo'] });
+}

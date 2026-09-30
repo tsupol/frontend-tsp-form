@@ -16,7 +16,7 @@ import { fmtCurrency } from '../../lib/format';
 import { ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import {
-  fetchRepoPool, repoFocusAdd, repoFocusRemove, repoFocusAddMany,
+  fetchRepoPool, repoFocusAdd, repoFocusRemove, repoFocusAddMany, invalidateRepoQueries,
   type RepoPoolRow, type DunningStatus,
 } from './repoApi';
 import { RepoDetailPanel } from './RepoDetailPanel';
@@ -94,11 +94,9 @@ export function RepoPoolPage() {
     goTo?.('detail');
   };
 
-  const invalidatePool = () => {
-    queryClient.invalidateQueries({ queryKey: ['repo', 'pool'] });
-    queryClient.invalidateQueries({ queryKey: ['repo', 'detail'] });
-    queryClient.invalidateQueries({ queryKey: ['repo', 'actions'] });
-  };
+  // Both panels read overlapping data, so every change refreshes the whole
+  // section through the one shared helper — see the note on it in repoApi.
+  const invalidateRepo = () => invalidateRepoQueries(queryClient);
 
   const ok = (message: string) => addSnackbar({
     message: <div className="alert alert-success"><CheckCircle size={16} /><span className="alert-description">{message}</span></div>,
@@ -117,7 +115,7 @@ export function RepoPoolPage() {
     try {
       if (add) await repoFocusAdd(contractId);
       else await repoFocusRemove(contractId);
-      invalidatePool();
+      invalidateRepo();
       ok(add ? t('repo.focus.added') : t('repo.focus.removed'));
     } catch (err) {
       failFrom(err);
@@ -136,7 +134,7 @@ export function RepoPoolPage() {
     try {
       const res = await repoFocusAddMany(ids);
       setPicked(new Set());
-      invalidatePool();
+      invalidateRepo();
       if (res.skipped_no_access > 0) {
         fail(t('repo.focus.addManyPartial', { added: res.added, requested: res.requested }));
       } else {
@@ -349,7 +347,7 @@ export function RepoPoolPage() {
                   key={selectedId}
                   contractId={selectedId}
                   isMobile={isMobile}
-                  onChanged={() => { /* pool query keyed on filters refetches on focus/status change */ }}
+                  onChanged={invalidateRepo}
                 />
               ) : (
                 <div className="flex-1 flex flex-col items-center justify-center text-subtler gap-2">
