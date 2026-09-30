@@ -20,6 +20,7 @@ import { RepoLogAttemptModal } from './RepoLogAttemptModal';
 import { RepoGiveUpModal } from './RepoGiveUpModal';
 import { RepoNoteActionModal, type NoteActionConfig } from './RepoNoteActionModal';
 import { RepoPrintModal, type RepoPrintDoc } from './RepoPrintModal';
+import { beMediaRepoAuthorityPdf, beMediaRepoContractPdf } from '../../lib/beMedia';
 import { RepoIcloudRevealModal } from './RepoIcloudRevealModal';
 
 // Note-driven actions handled by the one reusable modal (keyed by action_code).
@@ -56,6 +57,35 @@ const ACTION_ICON: Partial<Record<RepoActionCode, React.ReactNode>> = {
   REPO_PRINT_AUTHORITY: <Printer size={14} />,
   REPO_PRINT_CONTRACT: <FileText size={14} />,
 };
+
+// Opening a printed sheet in a new tab.
+//
+// These are NOT links: the media service renders them from a submitted request
+// carrying the user's login, so there is no address a browser could follow.
+// Ctrl/cmd-click and middle-click are still the natural way to say "not here" —
+// so we honour them by fetching the finished document and handing the browser
+// that instead.
+//
+// The tab is opened BEFORE the request, while the click is still trusted;
+// opening it after the document arrives gets it blocked as a popup. It shows a
+// blank page for the second or two the render takes, and closes itself if the
+// request fails so the user isn't left staring at nothing.
+async function openPdfInNewTab(fetchPdf: () => Promise<Blob>): Promise<boolean> {
+  // No `noopener` here, unlike every other new tab in the app: it severs the
+  // handle we need to put the document into the tab once it arrives, leaving a
+  // permanently blank page. Safe in this one case because the tab is ours and
+  // shows a document we fetched, not a third-party address.
+  const win = window.open('', '_blank');
+  if (!win) return false;               // popup blocked — caller falls back
+  try {
+    const blob = await fetchPdf();
+    win.location.href = URL.createObjectURL(blob);
+    return true;
+  } catch {
+    win.close();
+    return false;
+  }
+}
 
 // Why an action can't be used right now.
 //
@@ -161,6 +191,20 @@ export function RepoDetailPanel({ contractId, onChanged }: {
     } finally {
       setFocusBusy(false);
     }
+  };
+
+  // A print button: in place by default, in a new tab on ctrl/cmd or middle
+  // click. If the browser blocks the new tab we fall back to showing it here
+  // rather than doing nothing.
+  const openPrint = async (action: RepoActionCode, newTab: boolean) => {
+    const doc: RepoPrintDoc = action === 'REPO_PRINT_AUTHORITY' ? 'authority' : 'contract';
+    if (!newTab) { setPrintDoc(doc); return; }
+    const opened = await openPdfInNewTab(() => (
+      doc === 'authority'
+        ? beMediaRepoAuthorityPdf(contractId)
+        : beMediaRepoContractPdf(contractId)
+    ));
+    if (!opened) setPrintDoc(doc);
   };
 
   const runAction = (a: RepoAction) => {
@@ -349,7 +393,11 @@ export function RepoDetailPanel({ contractId, onChanged }: {
                     size="sm"
                     startIcon={ACTION_ICON[a.action_code]}
                     disabled={!a.is_available}
-                    onClick={() => runAction(a)}
+                    onAuxClick={(e) => {
+                      // middle click
+                      if (e.button === 1) { e.preventDefault(); openPrint(a.action_code, true); }
+                    }}
+                    onClick={(e) => openPrint(a.action_code, e.ctrlKey || e.metaKey)}
                   >
                     {t(`repo.action.${a.action_code}`, { defaultValue: a.action_code })}
                   </Button>
