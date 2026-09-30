@@ -8,7 +8,7 @@ import {
 } from 'tsp-form';
 import {
   ArrowRightFromLine, ArrowLeft, Search, X, MapPin, Star, AlertTriangle, Clock,
-  ExternalLink, CheckCircle, Loader2,
+  ExternalLink, CheckCircle, Loader2, StarOff,
 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { SearchInput } from '../../components/SearchInput';
@@ -16,7 +16,8 @@ import { fmtCurrency } from '../../lib/format';
 import { ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import {
-  fetchRepoPool, repoFocusAdd, repoFocusRemove, repoFocusAddMany, invalidateRepoQueries,
+  fetchRepoPool, repoFocusAdd, repoFocusRemove, repoFocusAddMany, repoFocusRemoveMany,
+  invalidateRepoQueries,
   type RepoPoolRow, type DunningStatus,
 } from './repoApi';
 import { RepoDetailPanel } from './RepoDetailPanel';
@@ -98,6 +99,18 @@ export function RepoPoolPage() {
   const pickedHere = [...picked].filter((id) => visibleIds.has(id)).length;
   const pickedElsewhere = picked.size - pickedHere;
 
+  // A tick says "I marked this row"; the star says "this job is mine today".
+  // They are different things, so a mixed selection has no single action — some
+  // ticked rows may already be mine and some not. Each button therefore acts
+  // ONLY on the rows it applies to and says how many that is, so nothing is a
+  // surprise. Rows ticked on another page can't be classified from here, so
+  // they are counted as addable: adding one already picked up is harmless (the
+  // backend reports it as already-on-focus), whereas removing one silently
+  // would not be.
+  const onFocusIds = new Set(rows.filter((r) => r.on_focus).map((r) => r.contract_id));
+  const toRemoveIds = [...picked].filter((id) => onFocusIds.has(id));
+  const toAddIds = [...picked].filter((id) => !onFocusIds.has(id));
+
 
   const selectRow = (id: number, goTo?: (p: string) => void) => {
     navigate(`/admin/repo/pool/${id}`);
@@ -134,22 +147,41 @@ export function RepoPoolPage() {
     }
   };
 
-  // Many rows in ONE call — ops_repo_focus_add_many, never a loop. It doesn't
-  // reject when some contracts aren't the caller's, so the result has to be read
-  // and reported: "picked up X of Y".
+  // Many rows in ONE call — never a loop. It doesn't reject when some contracts
+  // aren't the caller's, so the result has to be read and reported.
+  //
+  // This is the SAME action as the star on a row, so it must settle the same
+  // way: the rows update in place and nothing else moves. Clearing the ticks
+  // before the refresh made the bar collapse and the list jump underneath,
+  // which read as a different, heavier thing happening — so the ticks are
+  // cleared only after the refreshed rows are in.
   const pickUpSelected = async () => {
-    const ids = [...picked];
-    if (ids.length === 0) return;
+    if (toAddIds.length === 0) return;
     setFocusBusy(true);
     try {
-      const res = await repoFocusAddMany(ids);
-      setPicked(new Set());
+      const res = await repoFocusAddMany(toAddIds);
       invalidateRepo();
       if (res.skipped_no_access > 0) {
         fail(t('repo.focus.addManyPartial', { added: res.added, requested: res.requested }));
       } else {
         ok(t('repo.focus.addManyDone', { added: res.added }));
       }
+      setPicked(new Set());
+    } catch (err) {
+      failFrom(err);
+    } finally {
+      setFocusBusy(false);
+    }
+  };
+
+  const dropSelected = async () => {
+    if (toRemoveIds.length === 0) return;
+    setFocusBusy(true);
+    try {
+      const res = await repoFocusRemoveMany(toRemoveIds);
+      invalidateRepo();
+      ok(t('repo.focus.removeManyDone', { removed: res.removed }));
+      setPicked(new Set());
     } catch (err) {
       failFrom(err);
     } finally {
@@ -264,18 +296,35 @@ export function RepoPoolPage() {
                     )}
                   </span>
                   <div className="ml-auto flex items-center gap-2">
+                    {/* "Deselect all", not "Clear" — it unticks, it does not
+                        undo the action. Naming it Clear invited the reading
+                        "clear these from my day", which is the button beside
+                        it. */}
                     <Button variant="ghost" size="sm" onClick={() => setPicked(new Set())} disabled={focusBusy}>
-                      {t('common.clear')}
+                      {t('repo.focus.deselectAll')}
                     </Button>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      startIcon={focusBusy ? <Loader2 size={14} className="animate-spin" /> : <Star size={14} />}
-                      disabled={focusBusy}
-                      onClick={pickUpSelected}
-                    >
-                      {t('repo.focus.addSelected')}
-                    </Button>
+                    {toRemoveIds.length > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        startIcon={focusBusy ? <Loader2 size={14} className="animate-spin" /> : <StarOff size={14} />}
+                        disabled={focusBusy}
+                        onClick={dropSelected}
+                      >
+                        {t('repo.focus.removeSelected', { count: toRemoveIds.length })}
+                      </Button>
+                    )}
+                    {toAddIds.length > 0 && (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        startIcon={focusBusy ? <Loader2 size={14} className="animate-spin" /> : <Star size={14} />}
+                        disabled={focusBusy}
+                        onClick={pickUpSelected}
+                      >
+                        {t('repo.focus.addSelected', { count: toAddIds.length })}
+                      </Button>
+                    )}
                   </div>
               </div>
 

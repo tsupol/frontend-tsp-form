@@ -7478,10 +7478,13 @@
       "removed": "เอาออกจากแผนวันนี้แล้ว",
       "select": "เลือก",
       "selectedCount": "เลือกไว้ {{count}} ใบ",
-      "addSelected": "หยิบที่เลือก",
+      "addSelected": "เพิ่มเข้างานวันนี้ {{count}} ใบ",
       "addManyDone": "หยิบงานแล้ว {{added}} ใบ",
       "addManyPartial": "หยิบได้ {{added}} จาก {{requested}} ใบ — ที่เหลือไม่ใช่งานของคุณ",
-      "selectedOffPage": "อยู่หน้าอื่น {{count}} ใบ"
+      "selectedOffPage": "อยู่หน้าอื่น {{count}} ใบ",
+      "removeSelected": "เอาออกจากงานวันนี้ {{count}} ใบ",
+      "removeManyDone": "เอาออกจากแผนวันนี้แล้ว {{removed}} ใบ",
+      "deselectAll": "ยกเลิกการเลือก"
     },
     "pool": {
       "title": "กองงานยึด",

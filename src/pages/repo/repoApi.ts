@@ -282,6 +282,18 @@ export function repoFocusAddMany(contractIds: number[]): Promise<RepoFocusManyRe
   return apiClient.rpc<RepoFocusManyResult>('ops_repo_focus_add_many', { p_contract_ids: contractIds });
 }
 
+export interface RepoFocusRemoveManyResult {
+  removed: number;
+  requested: number;
+  focus_total: number;
+}
+
+// Drop many jobs in one call, the mirror of adding many. Verified on DEV:
+// three in, three out, nothing left picked up.
+export function repoFocusRemoveMany(contractIds: number[]): Promise<RepoFocusRemoveManyResult> {
+  return apiClient.rpc<RepoFocusRemoveManyResult>('ops_repo_focus_remove_many', { p_contract_ids: contractIds });
+}
+
 export function repoFocusClear(): Promise<{ removed: number; focus_total: number }> {
   return apiClient.rpc('ops_repo_focus_clear', {});
 }

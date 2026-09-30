@@ -7487,10 +7487,13 @@
       "removed": "Removed from today's plan",
       "select": "Select",
       "selectedCount": "{{count}} selected",
-      "addSelected": "Add selected to today",
+      "addSelected": "Add {{count}} to today",
       "addManyDone": "Added {{added}} to today’s plan",
       "addManyPartial": "Added {{added}} of {{requested}} — the rest are not yours to work",
-      "selectedOffPage": "{{count}} on another page"
+      "selectedOffPage": "{{count}} on another page",
+      "removeSelected": "Remove {{count}} from today",
+      "removeManyDone": "Removed {{removed}} from today’s plan",
+      "deselectAll": "Deselect all"
     },
     "pool": {
       "title": "Repossession Pool",
