@@ -149,8 +149,14 @@ export interface RepoAgentGrant {
 
 // ── Query helpers ──────────────────────────────────────────────────────────
 
-export function fetchRepoPool(params: string): Promise<RepoPoolRow[]> {
-  return apiClient.get<RepoPoolRow[]>(`/v_repo_pool?${params}`);
+// The rail pages server-side: the view honours a row range and returns the
+// total alongside it, so the pager shows real page numbers rather than a
+// "load more". Paging also keeps the rendered row count small, which is what
+// the rail's responsiveness is bound by.
+export function fetchRepoPool(
+  params: string, page: number, pageSize: number,
+): Promise<{ data: RepoPoolRow[]; totalCount: number }> {
+  return apiClient.getPaginated<RepoPoolRow>(`/v_repo_pool?${params}`, { page, pageSize });
 }
 
 export function fetchContractRepo(contractId: number): Promise<ContractRepoDetail | null> {

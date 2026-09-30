@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   PageNav, PageNavPanel, MobileHeader, DataTable, Select, Badge, Tooltip,
   Button, Checkbox, useSnackbarContext,
@@ -53,16 +53,21 @@ export function RepoPoolPage() {
   const [lens, setLens] = useState<string>('');
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
-  // Contracts ticked for a bulk pick-up. Cleared whenever the list changes
-  // underneath, so a tick can never apply to a row the user can no longer see.
+  // Contracts ticked for a bulk pick-up. These SURVIVE paging and filtering —
+  // losing a tick because you looked at page two is the one behaviour nobody
+  // expects. The cost is that some ticks may be off-screen, so the bulk bar
+  // always states the total and says when part of it is elsewhere.
   const [picked, setPicked] = useState<Set<number>>(new Set());
   const [focusBusy, setFocusBusy] = useState(false);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
 
   // Build the PostgREST query from status + lens + search. Area filtering by
   // *_code (typeahead) is deferred to the map screen; here we keep the movement
   // lenses + a free-text customer/code search.
   const params = (() => {
-    const p: string[] = [`dunning_status=eq.${status}`, 'limit=100'];
+    // No limit here — the row range comes from the pager.
+    const p: string[] = [`dunning_status=eq.${status}`];
     let order = 'days_waiting.desc';
     if (lens === MINE_LENS) p.push('on_focus=is.true');
     else if (lens === 'never') p.push('never_actioned=is.true');
@@ -78,15 +83,20 @@ export function RepoPoolPage() {
     return p.join('&');
   })();
 
-  const { data: rows = [], isFetching } = useQuery({
-    queryKey: ['repo', 'pool', status, lens, search],
-    queryFn: () => fetchRepoPool(params),
+  const { data: poolPage, isFetching } = useQuery({
+    queryKey: ['repo', 'pool', status, lens, search, pageIndex, pageSize],
+    queryFn: () => fetchRepoPool(params, pageIndex + 1, pageSize),
     staleTime: 15_000,
+    placeholderData: keepPreviousData,
   });
+  const rows = poolPage?.data ?? [];
+  const totalCount = poolPage?.totalCount ?? 0;
 
-  // A tick only means anything for a row still on screen.
+  // How many ticks are on this page, and how many are elsewhere. The second
+  // number is what makes an off-screen selection honest instead of a surprise.
   const visibleIds = new Set(rows.map((r) => r.contract_id));
-  const pickedVisible = [...picked].filter((id) => visibleIds.has(id));
+  const pickedHere = [...picked].filter((id) => visibleIds.has(id)).length;
+  const pickedElsewhere = picked.size - pickedHere;
 
 
   const selectRow = (id: number, goTo?: (p: string) => void) => {
@@ -186,7 +196,7 @@ export function RepoPoolPage() {
           {!isMobile && (
             <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
               <h1 className="heading-2 shrink-0">{t('repo.pool.title')}</h1>
-              <span className="text-sm text-subtle">{t('repo.pool.count', { count: rows.length })}</span>
+              <span className="text-sm text-subtle">{t('repo.pool.count', { count: totalCount })}</span>
             </div>
           )}
 
@@ -197,18 +207,18 @@ export function RepoPoolPage() {
                 <SearchInput
                   value={searchInput}
                   onChange={setSearchInput}
-                  onDebouncedChange={setSearch}
+                  onDebouncedChange={(v) => { setSearch(v); setPageIndex(0); }}
                   placeholder={t('repo.pool.searchPlaceholder')}
                   size="sm"
                   className="w-full flex-1 min-w-0"
                   startIcon={<Search size={14} />}
                   endIcon={searchInput ? <X size={14} /> : undefined}
-                  onEndIconClick={searchInput ? () => { setSearchInput(''); setSearch(''); } : undefined}
+                  onEndIconClick={searchInput ? () => { setSearchInput(''); setSearch(''); setPageIndex(0); } : undefined}
                 />
                 <div style={{ width: '11rem' }} className="shrink-0">
                   <Select
                     value={lens || null}
-                    onChange={(v) => setLens((v as string) ?? '')}
+                    onChange={(v) => { setLens((v as string) ?? ''); setPageIndex(0); }}
                     options={LENS_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
                     size="sm"
                     showChevron
@@ -226,7 +236,7 @@ export function RepoPoolPage() {
                     className={`flex-1 py-2 text-sm font-medium transition-colors cursor-pointer border-b-2 ${
                       status === s.value ? 'border-primary-fg text-primary-fg' : 'border-transparent text-fg'
                     }`}
-                    onClick={() => setStatus(s.value)}
+                    onClick={() => { setStatus(s.value); setPageIndex(0); }}
                   >
                     {t(s.labelKey)}
                   </button>
@@ -242,11 +252,16 @@ export function RepoPoolPage() {
                   every row, so the bar arrived visibly later the first time than
                   on every tick after. */}
               <div
-                hidden={pickedVisible.length === 0}
+                hidden={picked.size === 0}
                 className="flex-none px-2 py-1.5 border-b border-line flex items-center gap-2 bg-surface"
               >
                   <span className="text-xs text-subtle">
-                    {t('repo.focus.selectedCount', { count: pickedVisible.length })}
+                    {t('repo.focus.selectedCount', { count: picked.size })}
+                    {pickedElsewhere > 0 && (
+                      <span className="text-warning-fg">
+                        {' · '}{t('repo.focus.selectedOffPage', { count: pickedElsewhere })}
+                      </span>
+                    )}
                   </span>
                   <div className="ml-auto flex items-center gap-2">
                     <Button variant="ghost" size="sm" onClick={() => setPicked(new Set())} disabled={focusBusy}>
@@ -351,6 +366,12 @@ export function RepoPoolPage() {
                     </div>
                   );
                 }}
+                enablePagination
+                pageIndex={pageIndex}
+                pageSize={pageSize}
+                pageSizeOptions={[15, 25, 50]}
+                rowCount={totalCount}
+                onPageChange={({ pageIndex: pi, pageSize: ps }) => { setPageIndex(pi); setPageSize(ps); }}
                 className={`flex-1 min-h-0 panel-datatable ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
                 noResults={<div className="p-8 text-center text-subtler">{t('repo.pool.empty')}</div>}
               />

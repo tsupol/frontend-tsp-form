@@ -7480,7 +7480,8 @@
       "selectedCount": "เลือกไว้ {{count}} ใบ",
       "addSelected": "หยิบที่เลือก",
       "addManyDone": "หยิบงานแล้ว {{added}} ใบ",
-      "addManyPartial": "หยิบได้ {{added}} จาก {{requested}} ใบ — ที่เหลือไม่ใช่งานของคุณ"
+      "addManyPartial": "หยิบได้ {{added}} จาก {{requested}} ใบ — ที่เหลือไม่ใช่งานของคุณ",
+      "selectedOffPage": "อยู่หน้าอื่น {{count}} ใบ"
     },
     "pool": {
       "title": "กองงานยึด",

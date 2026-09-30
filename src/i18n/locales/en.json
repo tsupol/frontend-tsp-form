@@ -7489,7 +7489,8 @@
       "selectedCount": "{{count}} selected",
       "addSelected": "Add selected to today",
       "addManyDone": "Added {{added}} to today’s plan",
-      "addManyPartial": "Added {{added}} of {{requested}} — the rest are not yours to work"
+      "addManyPartial": "Added {{added}} of {{requested}} — the rest are not yours to work",
+      "selectedOffPage": "{{count}} on another page"
     },
     "pool": {
       "title": "Repossession Pool",
