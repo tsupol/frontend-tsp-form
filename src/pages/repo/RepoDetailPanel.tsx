@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Badge, Tooltip, useSnackbarContext } from 'tsp-form';
 import {
@@ -74,7 +74,6 @@ export function RepoDetailPanel({ contractId, onChanged }: {
   onChanged: () => void;
 }) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
 
