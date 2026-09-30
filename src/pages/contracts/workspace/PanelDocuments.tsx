@@ -11,6 +11,7 @@ import { ContractAttachments } from '../ContractAttachments';
 import { useWorkspace } from './WorkspaceContext';
 import { IdPhotoUpload } from './IdPhotoUpload';
 import { ContractPreviewModal } from '../ContractPreviewModal';
+import { beMediaContractPreviewAll, openPdfInNewTab } from '../../../lib/beMedia';
 import { useGenerateContractPdfServer } from '../useGenerateContractPdfServer';
 import { SignatoryEditor } from './SignatoryEditor';
 import { ConfidenceScoreEditor } from './ConfidenceScoreEditor';
@@ -43,6 +44,7 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
   const customerId = workspace.customerId;
   const { generating: printing, generate } = useGenerateContractPdfServer();
   const [previewAllOpen, setPreviewAllOpen] = useState(false);
+
   const [viewQrOpen, setViewQrOpen] = useState(false);
 
   // Signatory used to be a prereq card — it now lives inline at the top of
@@ -90,6 +92,14 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
     activated_at: contract.activated_at,
     created_at: contract.created_at,
   } : null;
+
+  // In place by default; in a new tab on ctrl/cmd or middle click. The packet is
+  // rendered from a request carrying the user's login, so it can't be a link.
+  const openPreviewAll = async (newTab: boolean) => {
+    if (!newTab || !previewContract) { setPreviewAllOpen(true); return; }
+    const opened = await openPdfInNewTab(() => beMediaContractPreviewAll(previewContract.id));
+    if (!opened) setPreviewAllOpen(true);
+  };
 
   const { data: coLessees = [] } = useContractCoLessees(contractId);
 
@@ -235,7 +245,8 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
         <Button
           variant="outline"
           startIcon={<Eye size={14} />}
-          onClick={() => setPreviewAllOpen(true)}
+          onAuxClick={(e) => { if (e.button === 1) { e.preventDefault(); openPreviewAll(true); } }}
+          onClick={(e) => openPreviewAll(e.ctrlKey || e.metaKey)}
           disabled={!previewContract || !prereqsMet}
         >
           {t('contract.previewContract', { defaultValue: 'Preview' })}

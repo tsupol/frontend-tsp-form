@@ -24,6 +24,7 @@ import {
   RepairMarkCompletedModal, RepairUncompleteModal, RepairPickupSetModal, RepairNoteAddModal,
 } from './RepairActionModals';
 import { RepairDocPreviewModal } from './RepairDocPreviewModal';
+import { beMediaRepairPdf, openPdfInNewTab } from '../../../lib/beMedia';
 import { RepairConditionPhotos } from './RepairConditionPhotos';
 import { RepairTimeline } from './RepairTimeline';
 import { PauseContractModal } from '../../contracts/PauseContractModal';
@@ -105,6 +106,19 @@ export function RepairDetailPanel({
   const queryClient = useQueryClient();
   const [activeAction, setActiveAction] = useState<RepairActionCode | 'NOTE_ADD' | null>(null);
   const [previewDoc, setPreviewDoc] = useState<BeMediaRepairDoc | null>(null);
+
+  // In place by default; in a new tab on ctrl/cmd or middle click, falling back
+  // to in place if the browser blocks the tab. Shared helper — a rendered
+  // document can't be a link, so the modifier is honoured by hand.
+  const openDoc = async (doc: BeMediaRepairDoc, newTab: boolean) => {
+    if (!newTab) { setPreviewDoc(doc); return; }
+    const opened = await openPdfInNewTab(() => beMediaRepairPdf(order.repair_order_id, doc));
+    if (!opened) setPreviewDoc(doc);
+  };
+  const docClickProps = (doc: BeMediaRepairDoc) => ({
+    onAuxClick: (e: React.MouseEvent) => { if (e.button === 1) { e.preventDefault(); openDoc(doc, true); } },
+    onClick: (e: React.MouseEvent) => openDoc(doc, e.ctrlKey || e.metaKey),
+  });
   const [moreOpen, setMoreOpen] = useState(false);
   const [pauseOpen, setPauseOpen] = useState(false);
   const [tab, setTab] = useState<'details' | 'money' | 'photos' | 'history'>('details');
@@ -263,17 +277,17 @@ export function RepairDetailPanel({
           <div className="ml-auto flex items-center gap-1">
             {order.intake_document_id != null && (
               <Tooltip content={t('repair.printIntake')}>
-                <Button variant="ghost" size="sm" className="btn-icon-sm" startIcon={<Printer size={16} />} onClick={() => setPreviewDoc('INTAKE')} />
+                <Button variant="ghost" size="sm" className="btn-icon-sm" startIcon={<Printer size={16} />} {...docClickProps('INTAKE')} />
               </Tooltip>
             )}
             {order.c_charge_gross > 0 && (
               <Tooltip content={t('repair.printChargeNotice')}>
-                <Button variant="ghost" size="sm" className="btn-icon-sm" startIcon={<FileText size={16} />} onClick={() => setPreviewDoc('CHARGE_NOTICE')} />
+                <Button variant="ghost" size="sm" className="btn-icon-sm" startIcon={<FileText size={16} />} {...docClickProps('CHARGE_NOTICE')} />
               </Tooltip>
             )}
             {order.close_document_id != null && (
               <Tooltip content={t('repair.printReturn')}>
-                <Button variant="ghost" size="sm" className="btn-icon-sm" startIcon={<Package size={16} />} onClick={() => setPreviewDoc('RETURN')} />
+                <Button variant="ghost" size="sm" className="btn-icon-sm" startIcon={<Package size={16} />} {...docClickProps('RETURN')} />
               </Tooltip>
             )}
           </div>
