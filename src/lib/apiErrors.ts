@@ -1,7 +1,7 @@
 import type { TFunction } from 'i18next';
 import i18n from 'i18next';
 import { ApiError } from './api';
-import { formatDateTime } from './format';
+import { formatDateTime, fmtCurrency } from './format';
 import { getBucketLabel } from '../pages/inventory/inventoryUtils';
 
 // Backend error/blocking params that carry a plain `YYYY-MM-DD` date. They go
@@ -65,6 +65,16 @@ export function prepareErrorParams(
   const params: Record<string, unknown> = { ...flattenCheckDetails(raw), ...(raw ?? {}) };
   if (typeof params.type === 'string') {
     params.type = t(`asset.idType.${params.type}`, { defaultValue: params.type });
+  }
+  // mig 1356: a blocked terminate/complete ships the amount that must be
+  // cleared first. Format it as money so the sentence can name the figure —
+  // the raw number would read as "300" with no unit. It changes nightly, so
+  // this always uses the value from the response in hand, never a cached one.
+  if (typeof params.balance === 'number') {
+    // Format in place, under the backend's own field name — a second key was a
+    // needless extra name to keep in step with the label. The figure is the
+    // backend's; we only add the thousands separator.
+    params.balance = fmtCurrency(params.balance);
   }
   if (typeof params.existing_bucket === 'string') {
     params.existing_bucket = getBucketLabel(params.existing_bucket, t as (k: string) => string);

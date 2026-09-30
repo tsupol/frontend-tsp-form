@@ -80,7 +80,7 @@
   "blockingReason.saving_balance_not_cleared": "Saving wallet still has a balance — clear it first",
   "blockingReason.credit_balance_not_cleared": "Credit wallet still has a balance — clear it first",
   "blockingReason.insurance_balance_not_cleared": "Insurance wallet still has a balance — clear it first",
-  "blockingReason.late_fee_not_cleared": "Late fee not billed yet — issue the late-fee bill (collect or waive)",
+  "blockingReason.late_fee_not_cleared": "Collect or waive the {{balance}} THB late fee first",
   "blockingReason.open_bills_pending": "The contract has open/partial bills — settle or waive them first",
   "blockingReason.charge_type_not_match": "Not a late-fee bill",
   "blockingReason.nothing_remaining": "Nothing unpaid left on this bill",
@@ -1263,5 +1263,17 @@
   "OPS.VALIDATION.NO_CONTRACTS_GIVEN": "No jobs were selected.",
   "OPS.VALIDATION.AGENT_PROFILE_INCOMPLETE": "Fill in your name, ID number and address in your profile before printing.",
   "OPS.AUTH.NO_REPO_GRANT": "You do not have repossession rights at this company.",
-  "NO_DOCUMENTS": "This contract has no signed documents yet."
+  "NO_DOCUMENTS": "This contract has no signed documents yet.",
+  "blockingReason.no_unbind_to_undo": "There is no device removal to undo",
+  "blockingReason.undo_window_expired": "A device removal can only be undone within {{window_hours}} hours",
+  "blockingReason.undo_window_expired_basic": "A device removal can only be undone within 24 hours",
+  "blockingReason.device_moved_since_unbind": "The device has been moved since it was removed, so this cannot be undone",
+  "blockingReason.device_taken_by_other_contract": "The device is already bound to another contract",
+  "blockingReason.late_fee_not_cleared_basic": "Late fee not billed yet — issue the late-fee bill (collect or waive)",
+  "blockingReason.saving_not_cleared": "Cash out the {{balance}} THB savings balance first",
+  "blockingReason.saving_not_cleared_basic": "Cash out the savings balance first",
+  "blockingReason.insurance_not_cleared": "Cash out the {{balance}} THB insurance balance first",
+  "blockingReason.insurance_not_cleared_basic": "Cash out the insurance balance first",
+  "blockingReason.credit_not_cleared": "Cash out the {{balance}} THB credit balance first",
+  "blockingReason.credit_not_cleared_basic": "Cash out the credit balance first"
 }

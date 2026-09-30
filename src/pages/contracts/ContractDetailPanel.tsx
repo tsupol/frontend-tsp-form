@@ -46,7 +46,7 @@ import { MediaLightbox, MediaThumbButton } from '../../components/MediaLightbox'
 import { CustomerLoginCard, useCustomerLoginInfo, useInvalidateLoginInfo, type CustomerLoginInfo } from '../../components/CustomerLoginCard';
 import { OwnerBadge } from '../../components/OwnerBadge';
 import type { OwnerType } from '../../lib/ownerTypes';
-import { translateApiError } from '../../lib/apiErrors';
+import { blockingReasonText, translateApiError } from '../../lib/apiErrors';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -752,6 +752,10 @@ interface ManageActionRow {
   action_code: string;
   is_available: boolean;
   blocking_reason: string | null;
+  // The backend ships the facts behind the reason — the amount still to clear,
+  // the hours left in a window — and the sentence needs them to say anything
+  // useful. Dropping them left the tooltip showing a raw placeholder.
+  blocking_params?: Record<string, unknown> | null;
 }
 
 // Backend action_code → the requestedAction the footer machinery consumes.
@@ -796,9 +800,14 @@ function ManageContractSection({
         {rows.map(({ code, action, icon: Icon, danger }) => {
           const cap = byCode.get(code)!;
           const label = t(code, { ns: 'contractActions', defaultValue: code });
-          const blockingText = !cap.is_available && cap.blocking_reason
-            ? t(`blockingReason.${cap.blocking_reason}`, { ns: 'apiErrors', defaultValue: cap.blocking_reason })
+          // The shared resolver, so this tooltip says exactly what the footer's
+          // does — including the figure the backend sent, which we format but
+          // never compute.
+          const blockingText = !cap.is_available ? blockingReasonText(cap, t) : '';
+          const hint = !cap.is_available && typeof cap.blocking_params?.hint_code === 'string'
+            ? t(`contract.hint.${cap.blocking_params.hint_code}`, { defaultValue: '' })
             : '';
+          const tipText = [blockingText, hint].filter(Boolean).join(' · ');
           const btn = (
             <Button
               size="sm"
@@ -811,8 +820,8 @@ function ManageContractSection({
               {label}
             </Button>
           );
-          return blockingText ? (
-            <Tooltip key={code} content={blockingText} placement="top">
+          return tipText ? (
+            <Tooltip key={code} content={tipText} placement="top">
               <span className="inline-flex">{btn}</span>
             </Tooltip>
           ) : (

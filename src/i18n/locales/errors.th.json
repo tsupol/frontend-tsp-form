@@ -80,7 +80,7 @@
   "blockingReason.saving_balance_not_cleared": "กระเป๋าออมยังมียอดคงเหลือ — เคลียร์ก่อน",
   "blockingReason.credit_balance_not_cleared": "กระเป๋าเครดิตยังมียอดคงเหลือ — เคลียร์ก่อน",
   "blockingReason.insurance_balance_not_cleared": "กระเป๋าประกันยังมียอดคงเหลือ — เคลียร์ก่อน",
-  "blockingReason.late_fee_not_cleared": "ค่าปรับยังไม่ได้ออกบิล — ออกบิลค่าปรับ (เก็บหรือยกเว้น) ก่อน",
+  "blockingReason.late_fee_not_cleared": "ต้องเก็บหรือยกเว้นค่าปรับ {{balance}} บาท ก่อน",
   "blockingReason.open_bills_pending": "สัญญามีบิลค้างชำระ/ชำระบางส่วน — รับชำระหรือยกเว้นให้เรียบร้อยก่อน",
   "blockingReason.charge_type_not_match": "ไม่ใช่บิลค่าปรับ",
   "blockingReason.nothing_remaining": "บิลนี้ไม่เหลือยอดค้างให้ยกเว้น",
@@ -1263,5 +1263,17 @@
   "OPS.VALIDATION.NO_CONTRACTS_GIVEN": "ยังไม่ได้เลือกงาน",
   "OPS.VALIDATION.AGENT_PROFILE_INCOMPLETE": "กรอกชื่อ เลขบัตร ที่อยู่ ในหน้าโปรไฟล์ของคุณก่อนพิมพ์",
   "OPS.AUTH.NO_REPO_GRANT": "คุณไม่มีสิทธิ์งานยึดของบริษัทนี้",
-  "NO_DOCUMENTS": "สัญญานี้ยังไม่มีเอกสารที่เซ็นแล้ว"
+  "NO_DOCUMENTS": "สัญญานี้ยังไม่มีเอกสารที่เซ็นแล้ว",
+  "blockingReason.no_unbind_to_undo": "ไม่มีการถอดเครื่องให้ย้อน",
+  "blockingReason.undo_window_expired": "ย้อนการถอดเครื่องได้ภายใน {{window_hours}} ชม. เท่านั้น",
+  "blockingReason.undo_window_expired_basic": "ย้อนการถอดเครื่องได้ภายใน 24 ชม. เท่านั้น",
+  "blockingReason.device_moved_since_unbind": "เครื่องถูกย้ายไปแล้วหลังถอด ย้อนไม่ได้",
+  "blockingReason.device_taken_by_other_contract": "เครื่องถูกผูกกับสัญญาอื่นแล้ว",
+  "blockingReason.late_fee_not_cleared_basic": "ยังไม่ได้ออกบิลค่าปรับ — ออกบิลค่าปรับก่อน (เก็บหรือยกเว้น)",
+  "blockingReason.saving_not_cleared": "ต้องถอนเงินออม {{balance}} บาท ก่อน",
+  "blockingReason.saving_not_cleared_basic": "ต้องถอนเงินออมก่อน",
+  "blockingReason.insurance_not_cleared": "ต้องถอนเงินประกัน {{balance}} บาท ก่อน",
+  "blockingReason.insurance_not_cleared_basic": "ต้องถอนเงินประกันก่อน",
+  "blockingReason.credit_not_cleared": "ต้องถอนเงินเครดิต {{balance}} บาท ก่อน",
+  "blockingReason.credit_not_cleared_basic": "ต้องถอนเงินเครดิตก่อน"
 }

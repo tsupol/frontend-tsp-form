@@ -3635,7 +3635,15 @@
     "payoffDiscount_status_NEEDS_APPROVAL": "ถอนคำขอแล้ว ยังไม่ได้ส่งขออนุมัติ",
     "payoffDiscount_statusHint_NEEDS_APPROVAL": "ส่งคำขอใหม่อีกครั้ง หรือเอาส่วนลดออกแล้วรับเต็มยอด",
     "payoffDiscount_resubmit": "ส่งคำขออีกครั้ง",
-    "payoffDiscount_resubmitReason": "สาขาส่งคำขอส่วนลดอีกครั้ง"
+    "payoffDiscount_resubmitReason": "สาขาส่งคำขอส่วนลดอีกครั้ง",
+    "hint": {
+      "USE_LATE_FEE_COLLECT": "ใช้ปุ่ม “เก็บค่าปรับ”",
+      "USE_LATE_FEE_WAIVE": "ใช้ปุ่ม “ยกเว้นค่าปรับ”",
+      "USE_WALLET_CASHOUT": "ใช้ปุ่มถอนเงินกระเป๋า",
+      "USE_WALLET_CASHOUT_SAVING": "ใช้ปุ่ม “ถอนเงินออม”",
+      "USE_WALLET_CASHOUT_INSURANCE": "ใช้ปุ่ม “ถอนเงินประกัน”",
+      "USE_WALLET_CASHOUT_CREDIT": "ใช้ปุ่ม “ถอนเงินเครดิต”"
+    }
   },
   "contractAddon": {
     "title": "เพิ่ม Add-on",

@@ -1039,6 +1039,15 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
         ? t(code.toLowerCase(), { ns: 'apiErrors', defaultValue: '', ...a.blocking_params })
         : '';
       lines.push(codeLine || blockingReasonText(a, t));
+
+      // mig 1356: a blocked terminate/complete also names the action that
+      // clears the blocker. Say which button to press — the reason alone tells
+      // the user they're stuck without telling them the way out.
+      const hint = typeof a.blocking_params?.hint_code === 'string' ? a.blocking_params.hint_code : null;
+      if (hint) {
+        const via = t(`contract.hint.${hint}`, { defaultValue: '' });
+        if (via) lines.push(via);
+      }
     }
     const tooltipContent: React.ReactNode = lines.length === 1
       ? lines[0]
