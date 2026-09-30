@@ -7469,7 +7469,12 @@
       "setTargetDeferred": "ยังไม่เปิดใช้ในหน้านี้",
       "notAvailableNow": "ทำไม่ได้ในสถานะปัจจุบัน",
       "REPO_PRINT_AUTHORITY": "พิมพ์ใบมอบอำนาจ",
-      "REPO_PRINT_CONTRACT": "พิมพ์สำเนาสัญญาเช่า"
+      "REPO_PRINT_CONTRACT": "พิมพ์สำเนาสัญญาเช่า",
+      "more": "อื่น ๆ",
+      "notWiredHere": "ยังทำในหน้านี้ไม่ได้",
+      "onlyWhileAwaitingRepo": "ใช้ได้เฉพาะตอนงานรอยึดเครื่อง",
+      "onlyWhileAwaitingLegal": "ใช้ได้เฉพาะตอนงานอยู่กับทีมกฎหมาย",
+      "onlyWhileInPool": "ใช้ได้เฉพาะตอนงานรอยึดหรือรอดำเนินคดี"
     },
     "focus": {
       "add": "เพิ่มเข้างานวันนี้",

@@ -7478,7 +7478,12 @@
       "setTargetDeferred": "Not yet available in this screen",
       "notAvailableNow": "Not available in the current status",
       "REPO_PRINT_AUTHORITY": "Print authority sheet",
-      "REPO_PRINT_CONTRACT": "Print lease copy"
+      "REPO_PRINT_CONTRACT": "Print lease copy",
+      "more": "More",
+      "notWiredHere": "Not yet available in this screen",
+      "onlyWhileAwaitingRepo": "Only while the job is waiting to be repossessed",
+      "onlyWhileAwaitingLegal": "Only while the job is with legal",
+      "onlyWhileInPool": "Only while the job is waiting for repossession or legal"
     },
     "focus": {
       "add": "Add to today",

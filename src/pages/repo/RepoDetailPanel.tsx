@@ -1,12 +1,12 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Badge, Tooltip, useSnackbarContext } from 'tsp-form';
+import { Button, Badge, Tooltip, PopOver, useSnackbarContext } from 'tsp-form';
 import {
   User, Phone, Smartphone, MapPin, Loader2, ClipboardList, Scale,
   Star, StarOff, CheckCircle, Clock, AlertTriangle, Repeat, ExternalLink,
-  Printer, FileText, KeyRound,
+  Printer, FileText, KeyRound, ChevronDown,
 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { apiClient } from '../../lib/api';
@@ -57,6 +57,37 @@ const ACTION_ICON: Partial<Record<RepoActionCode, React.ReactNode>> = {
   REPO_PRINT_CONTRACT: <FileText size={14} />,
 };
 
+// Why an action can't be used right now.
+//
+// The repossession evaluator sends only "are you allowed" and "is it possible",
+// with no reason — unlike the contract one, which also sends a blocking code.
+// But its rules are fixed and public: each action is possible only in a given
+// stage of the job. So the reason is derivable here rather than guessed, and
+// the user gets "only while the job is waiting for legal" instead of a shrug.
+//
+// If the backend ever sends a reason of its own, prefer that and delete this.
+const STAGE_REQUIRED: Partial<Record<RepoActionCode, 'REPO' | 'LEGAL' | 'EITHER'>> = {
+  REPO_LOG_ATTEMPT: 'REPO',
+  REPO_GIVE_UP: 'REPO',
+  REPO_REVERT_ACTIVE: 'REPO',
+  REPO_ADD_NOTE: 'EITHER',
+  REPO_SET_TARGET: 'EITHER',
+  REPO_PRINT_AUTHORITY: 'EITHER',
+  REPO_PRINT_CONTRACT: 'EITHER',
+  LEGAL_FINISH: 'LEGAL',
+  LEGAL_RETURN_TO_REPO: 'LEGAL',
+};
+
+function unavailableReason(
+  action: RepoActionCode, t: ReturnType<typeof useTranslation>['t'],
+): string {
+  const stage = STAGE_REQUIRED[action];
+  if (stage === 'REPO') return t('repo.action.onlyWhileAwaitingRepo');
+  if (stage === 'LEGAL') return t('repo.action.onlyWhileAwaitingLegal');
+  if (stage === 'EITHER') return t('repo.action.onlyWhileInPool');
+  return t('repo.action.notAvailableNow');
+}
+
 function GeoPin({ precision }: { precision: GeoPrecision }) {
   const { t } = useTranslation();
   if (precision === 'EXACT') {
@@ -99,6 +130,8 @@ export function RepoDetailPanel({ contractId, onChanged }: {
   const [noteAction, setNoteAction] = useState<NoteActionConfig | null>(null);
   const [focusBusy, setFocusBusy] = useState(false);
   const [printDoc, setPrintDoc] = useState<RepoPrintDoc | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreTriggerRef = useRef<HTMLDivElement>(null);
   const [icloudOpen, setIcloudOpen] = useState(false);
 
   // Refresh the whole section, not just this contract: the worklist behind the
@@ -155,9 +188,25 @@ export function RepoDetailPanel({ contractId, onChanged }: {
 
   // Hide not-permitted; show permitted-but-unavailable as disabled with a tooltip.
   // REPO_SET_TARGET is deferred (no address picker in the MVP) — treat as not-wired.
-  const footerActions = actions
-    .filter((a) => a.is_permitted)
-    .filter((a) => a.action_code !== 'REPO_FOCUS_ADD' && a.action_code !== 'REPO_FOCUS_REMOVE'); // focus is its own header control
+  // This screen exists so an agent standing outside a customer's house can
+  // record what happened. So the actions are split by their role here rather
+  // than shown as eleven equals:
+  //   · recording the visit      → the one primary button
+  //   · the two printed sheets   → beside the device they describe, in the body
+  //   · picking the job up       → its own header control
+  //   · everything else          → one menu, every action listed with its
+  //                                reason when it can't be used
+  const permitted = actions.filter((a) => a.is_permitted);
+  const isFocusAction = (c: RepoActionCode) => c === 'REPO_FOCUS_ADD' || c === 'REPO_FOCUS_REMOVE';
+  const isPrintAction = (c: RepoActionCode) => c === 'REPO_PRINT_AUTHORITY' || c === 'REPO_PRINT_CONTRACT';
+
+  const primaryAction = permitted.find((a) => a.action_code === 'REPO_LOG_ATTEMPT') ?? null;
+  const printActions = permitted.filter((a) => isPrintAction(a.action_code));
+  const moreActions = permitted.filter(
+    (a) => a.action_code !== 'REPO_LOG_ATTEMPT'
+      && !isFocusAction(a.action_code)
+      && !isPrintAction(a.action_code),
+  );
 
   // Picking a job up is the gate on the iCloud password, so the control must be
   // findable even when the evaluator says no: permitted-but-unavailable renders
@@ -277,6 +326,33 @@ export function RepoDetailPanel({ contractId, onChanged }: {
               <AlertTriangle size={12} />{t('repo.geo.centroidWarn')}
             </div>
           )}
+
+          {/* The two sheets live here, not in the footer: they describe THIS
+              device and address, and they are printed while looking at them,
+              before setting off — not at the end of the job. */}
+          {printActions.length > 0 && (
+            <div className="pt-2 mt-1 border-t border-line flex flex-wrap gap-2">
+              {printActions.map((a) => (
+                <Tooltip
+                  key={a.action_code}
+                  content={a.is_available
+                    ? t(`repo.action.${a.action_code}`)
+                    : unavailableReason(a.action_code, t)}
+                  placement="top"
+                >
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    startIcon={ACTION_ICON[a.action_code]}
+                    disabled={!a.is_available}
+                    onClick={() => runAction(a)}
+                  >
+                    {t(`repo.action.${a.action_code}`, { defaultValue: a.action_code })}
+                  </Button>
+                </Tooltip>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Last action */}
@@ -302,36 +378,87 @@ export function RepoDetailPanel({ contractId, onChanged }: {
         </div>
       </div>
 
-      {/* Action footer */}
-      {footerActions.length > 0 && (
-        <div className="flex-none border-t border-line px-4 py-3 flex flex-wrap gap-2">
-          {footerActions.map((a) => {
+      {/* Actions.
+          One primary button for the job this screen exists for; everything else
+          behind a menu so it can't compete with it. Every action the backend
+          returns is listed there — disabled with its reason, never hidden. */}
+      {(primaryAction || moreActions.length > 0) && (
+        <div className="flex-none border-t border-line px-4 py-3 flex items-center gap-2">
+          {primaryAction && (
+            <Tooltip
+              content={primaryAction.is_available
+                ? t('repo.action.REPO_LOG_ATTEMPT')
+                : unavailableReason(primaryAction.action_code, t)}
+              placement="top"
+            >
+              <Button
+                variant="primary"
+                startIcon={<ClipboardList size={16} />}
+                disabled={!primaryAction.is_available}
+                onClick={() => runAction(primaryAction)}
+              >
+                {t('repo.action.REPO_LOG_ATTEMPT')}
+              </Button>
+            </Tooltip>
+          )}
+
+          {moreActions.length > 0 && (
+            <div ref={moreTriggerRef} className="ml-auto">
+              <Button
+                variant="outline"
+                size="sm"
+                endIcon={<ChevronDown size={14} />}
+                onClick={() => setMoreOpen((v) => !v)}
+              >
+                {t('repo.action.more')}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      <PopOver
+        isOpen={moreOpen}
+        onClose={() => setMoreOpen(false)}
+        triggerRef={moreTriggerRef}
+        placement="top"
+        align="end"
+        maxWidth="22rem"
+      >
+        <div className="flex flex-col p-1.5">
+          {moreActions.map((a) => {
             const wired = INLINE_OR_DEDICATED.has(a.action_code) || !!NOTE_ACTIONS[a.action_code];
-            const isSetTarget = a.action_code === 'REPO_SET_TARGET'; // deferred in MVP
+            const isSetTarget = a.action_code === 'REPO_SET_TARGET'; // no address picker yet
             const disabled = !a.is_available || !wired || isSetTarget;
-            const lines: string[] = [t(a.action_code, { ns: 'contractActions', defaultValue: t(`repo.action.${a.action_code}`, { defaultValue: a.action_code }) })];
-            if (isSetTarget) lines.push(t('repo.action.setTargetDeferred'));
-            else if (!a.is_available) lines.push(t('repo.action.notAvailableNow'));
-            const tip = lines.length === 1 ? lines[0] : (
-              <div className="flex flex-col gap-0.5">{lines.map((l, i) => <div key={i} className={i === 0 ? 'font-medium' : 'text-xs opacity-90'}>{l}</div>)}</div>
-            );
+            const reason = isSetTarget
+              ? t('repo.action.setTargetDeferred')
+              : !a.is_available
+                ? unavailableReason(a.action_code, t)
+                : !wired
+                  ? t('repo.action.notWiredHere')
+                  : null;
             return (
-              <Tooltip key={a.action_code} content={tip} placement="top">
-                <Button
-                  variant={a.action_code === 'REPO_LOG_ATTEMPT' ? undefined : 'outline'}
-                  size="sm"
-                  color={ACTION_COLOR[a.action_code]}
-                  disabled={disabled}
-                  startIcon={ACTION_ICON[a.action_code]}
-                  onClick={() => runAction(a)}
-                >
-                  {t(`repo.action.${a.action_code}`, { defaultValue: a.action_code })}
-                </Button>
-              </Tooltip>
+              <button
+                key={a.action_code}
+                type="button"
+                disabled={disabled}
+                onClick={() => { setMoreOpen(false); runAction(a); }}
+                className="text-left px-2.5 py-2 rounded-md flex items-start gap-2.5 bg-transparent border-none cursor-pointer hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent"
+              >
+                <span className="shrink-0 mt-0.5 text-subtle">
+                  {ACTION_ICON[a.action_code] ?? <ClipboardList size={14} />}
+                </span>
+                <span className="min-w-0 flex flex-col gap-0.5">
+                  <span className={`text-sm ${ACTION_COLOR[a.action_code] === 'danger' || a.action_code === 'REPO_GIVE_UP' ? 'text-warning-fg' : ''}`}>
+                    {t(`repo.action.${a.action_code}`, { defaultValue: a.action_code })}
+                  </span>
+                  {reason && <span className="text-xs text-subtle">{reason}</span>}
+                </span>
+              </button>
             );
           })}
         </div>
-      )}
+      </PopOver>
 
       <RepoLogAttemptModal
         open={logOpen}
