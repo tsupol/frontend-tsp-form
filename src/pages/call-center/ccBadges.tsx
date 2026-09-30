@@ -3,7 +3,7 @@
 // labels come from FE i18n; unknown codes render raw with a neutral color.
 
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Badge, Tooltip } from 'tsp-form';
 import { AlertTriangle, Cpu, User, Wrench, Store, Repeat, CalendarClock, ExternalLink } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
@@ -213,20 +213,22 @@ export function DeviceLink({
   product: string | null;
   className?: string;
 }) {
-  const navigate = useNavigate();
   if (!code && !product) return null;
   return (
     <span className={`inline-flex items-center gap-1.5 min-w-0 ${className}`}>
       {product && <span className="truncate">{product}</span>}
       {code && (
         deviceId ? (
-          <button
-            type="button"
-            onClick={() => navigate(`/admin/inventory/assets/${deviceId}`)}
-            className="shrink-0 text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer font-mono text-xs"
+          // A real link, not a button: ctrl/cmd-click and middle-click open the
+          // device in a new tab, and the address shows on hover. stopPropagation
+          // so clicking it inside a clickable row doesn't also open that row.
+          <Link
+            to={`/admin/inventory/assets/${deviceId}`}
+            onClick={(e) => e.stopPropagation()}
+            className="shrink-0 text-primary-fg hover:underline inline-flex items-center gap-1 font-mono text-xs"
           >
             {code}<ExternalLink size={11} />
-          </button>
+          </Link>
         ) : (
           <span className="shrink-0 font-mono text-xs text-subtle">{code}</span>
         )
