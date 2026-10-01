@@ -100,7 +100,12 @@ export function RepoNoteActionModal({ open, config, contractId, contractCode, on
               headline={t(`repo.${stem}.done_headline`)}
               contractCode={contractCode}
               tone={config.tone ?? 'success'}
-              stateTransition={config.transition}
+              // The config holds status codes; the badges show their names.
+              stateTransition={config.transition && {
+                ...config.transition,
+                from: t(`repo.status.${config.transition.from}`, { defaultValue: config.transition.from }),
+                to: t(`repo.status.${config.transition.to}`, { defaultValue: config.transition.to }),
+              }}
               onClose={forceClose}
             />
           ) : config ? (

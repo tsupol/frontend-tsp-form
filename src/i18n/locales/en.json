@@ -7577,7 +7577,8 @@
       "notePlaceholder": "e.g. Visited 4 times, house abandoned, neighbours confirm they moved out",
       "noteHint": "At least {{min}} characters ({{count}})",
       "confirm": "Send to Legal",
-      "done_headline": "Sent to Legal"
+      "done_headline": "Sent to Legal",
+      "done_note": "The job is now in the legal team's queue."
     },
     "addNote": {
       "title": "Add note",
