@@ -94,6 +94,14 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
       hint: t('settings.config.fin2EarlyPayoffDiscountMaxPctHint'),
       type: 'number', group: 'money', min: 0, max: 100,
     },
+    // Points a customer earns per fully-paid installment (mig 1371). Only paid
+    // out while the company's REWARD switch (Switches tab) is on.
+    {
+      key: 'reward_points_per_installment',
+      label: t('settings.config.rewardPointsPerInstallmentShort'),
+      hint: t('settings.config.rewardPointsPerInstallmentHint'),
+      type: 'number', group: 'reward', min: 0, max: 10000,
+    },
   ];
 
   const groups = [
@@ -101,6 +109,7 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
     { key: 'money', label: t('settings.config.groupMoney') },
     { key: 'commission', label: t('settings.config.groupCommission') },
     { key: 'device', label: t('settings.config.groupDevice') },
+    { key: 'reward', label: t('settings.config.groupReward') },
   ];
 
   // Initialize form when config loads
@@ -308,7 +317,19 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
               <p className="text-xs text-subtle mb-5">{t('settings.config.instantHint')}</p>
               <ContractTemplateSection companyId={config.company_id} />
               <hr className="border-line mt-6 mb-6" />
-              <WalletFeaturesSection companyId={config.company_id} />
+              <FeatureSwitchesSection
+                companyId={config.company_id}
+                codes={['SAVING', 'CREDIT', 'INSURANCE']}
+                title={t('settings.config.groupWallet')}
+                hint={t('settings.config.walletHint')}
+              />
+              <hr className="border-line mt-6 mb-6" />
+              <FeatureSwitchesSection
+                companyId={config.company_id}
+                codes={['REWARD']}
+                title={t('settings.config.groupReward')}
+                hint={t('settings.config.rewardHint')}
+              />
               <hr className="border-line mt-6 mb-6" />
               <ChargeOwnerSection companyId={config.company_id} />
             </div>
@@ -465,11 +486,16 @@ interface ContractTemplateRow {
   name: string | null;
 }
 
-// ── Wallet features (SAVING / CREDIT / INSURANCE) ──────────────────────────────
+// ── Company feature switches (wallets, REWARD) ────────────────────────────────
 // Each toggle writes immediately via fn_company_feature_set (no shared save
 // button — one RPC per flip, like a settings switch). Default-safe: a company
 // with no rows reads all-enabled from the view.
-function WalletFeaturesSection({ companyId }: { companyId: number }) {
+function FeatureSwitchesSection({ companyId, codes, title, hint }: {
+  companyId: number;
+  codes: CompanyFeatureCode[];
+  title: string;
+  hint: string;
+}) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
@@ -506,18 +532,17 @@ function WalletFeaturesSection({ companyId }: { companyId: number }) {
     }
   };
 
-  const order: CompanyFeatureCode[] = ['SAVING', 'CREDIT', 'INSURANCE'];
   const byCode = (c: string) => rows.find(r => r.feature_code === c);
 
   return (
     <div>
-      <h4 className="text-sm font-semibold text-fg uppercase tracking-wider mb-1">{t('settings.config.groupWallet')}</h4>
-      <p className="text-xs text-subtle mb-3">{t('settings.config.walletHint')}</p>
+      <h4 className="text-sm font-semibold text-fg uppercase tracking-wider mb-1">{title}</h4>
+      <p className="text-xs text-subtle mb-3">{hint}</p>
       {error && (
         <div className="alert alert-danger mb-3"><XCircle size={16} /><div><div className="alert-description text-xs">{error}</div></div></div>
       )}
       <div className="form-grid md:grid-cols-3">
-        {order.map(code => {
+        {codes.map(code => {
           const row = byCode(code);
           const enabled = row ? row.is_enabled : true;
           return (

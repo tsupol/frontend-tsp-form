@@ -21,6 +21,8 @@ export interface CompanyConfig {
   repair_pickup_max_days: number;
   icloud_device_cap: number;
   fin2_early_payoff_discount_max_pct: number;
+  // Points per fully-paid installment (mig 1371); 0 = none.
+  reward_points_per_installment: number;
   // Master lease form this company's NEW contracts print as (mig 1343). Edited
   // in its own section, not via the shared field list — it needs a confirm step.
   contract_template_code: string | null;

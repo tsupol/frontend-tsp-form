@@ -3900,6 +3900,17 @@
       "colAction": "การเปลี่ยนแปลง",
       "colDetail": "รายละเอียด",
       "valueChange": "{{from}} → {{to}}"
+    },
+    "reward": {
+      "title": "คะแนนสะสม",
+      "balance": "คะแนนคงเหลือ",
+      "points": "{{value}} คะแนน",
+      "noHistory": "ยังไม่มีคะแนน",
+      "installmentNo": "งวดที่ {{no}}",
+      "entry_INSTALLMENT_EARN": "จ่ายงวดครบ",
+      "entry_BACKFILL_EARN": "งวดที่จ่ายครบก่อนเปิดใช้",
+      "entry_INSTALLMENT_REVERSAL": "ยกเลิกรายการจ่าย",
+      "entry_CONTRACT_FORFEIT": "สัญญาถูกยกเลิก"
     }
   },
   "dashboard": {
@@ -8224,7 +8235,12 @@
       "repairPickupMaxDaysShort": "ช่วงเวลามารับเครื่อง",
       "repairPickupMaxDaysHint": "วันหลังซ่อมเสร็จ",
       "icloudDeviceCapShort": "เครื่องต่อบัญชี iCloud",
-      "icloudDeviceCapHint": "1–20"
+      "icloudDeviceCapHint": "1–20",
+      "groupReward": "คะแนนสะสม",
+      "rewardHint": "เปิด = ลูกค้าได้คะแนนทุกครั้งที่จ่ายงวดครบ · ปิด = หยุดให้คะแนนใหม่ คะแนนเดิมของลูกค้ายังอยู่",
+      "rewardPointsPerInstallmentShort": "คะแนนต่องวด",
+      "rewardPointsPerInstallmentHint": "0–10,000 · ให้เฉพาะตอนเปิดคะแนนสะสม (แท็บสวิตช์) · มีผลกับงวดที่จ่ายหลังบันทึก",
+      "feature_REWARD": "คะแนนสะสม"
     },
     "bankAccounts": {
       "title": "บัญชีธนาคาร",

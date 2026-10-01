@@ -10,7 +10,7 @@ import { apiClient } from '../lib/api';
 // them with WALLET_FEATURE_DISABLED / SALE.FEATURE_DISABLED, but hiding avoids a
 // dead-end for the user). Never gate data fetching on it — visibility only.
 
-export type CompanyFeatureCode = 'SAVING' | 'CREDIT' | 'INSURANCE';
+export type CompanyFeatureCode = 'SAVING' | 'CREDIT' | 'INSURANCE' | 'REWARD';
 
 export interface CompanyFeatureRow {
   company_id: number;

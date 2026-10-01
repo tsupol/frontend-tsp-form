@@ -19,6 +19,7 @@ import { ContractDetailPanel } from '../contracts/ContractDetailPanel';
 import { useAuth } from '../../contexts/AuthContext';
 import { SearchInput } from '../../components/SearchInput';
 import { AddToBlacklistModal, LiftBlacklistModal } from './BlacklistModals';
+import { CustomerRewardSection } from './CustomerRewardSection';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -626,6 +627,9 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
             </div>
           )}
         </div>
+
+        {/* ── Reward points ── */}
+        <CustomerRewardSection customerId={customerId} />
       </div>
 
       {/* ── Modals ── */}

@@ -3904,6 +3904,17 @@
       "colAction": "Action",
       "colDetail": "Detail",
       "valueChange": "{{from}} → {{to}}"
+    },
+    "reward": {
+      "title": "Reward points",
+      "balance": "Balance",
+      "points": "{{value}} pts",
+      "noHistory": "No points yet",
+      "installmentNo": "Installment {{no}}",
+      "entry_INSTALLMENT_EARN": "Installment paid",
+      "entry_BACKFILL_EARN": "Earlier installment paid",
+      "entry_INSTALLMENT_REVERSAL": "Payment reversed",
+      "entry_CONTRACT_FORFEIT": "Contract cancelled"
     }
   },
   "dashboard": {
@@ -8234,7 +8245,12 @@
       "repairPickupMaxDaysShort": "Pickup window",
       "repairPickupMaxDaysHint": "Days after completion",
       "icloudDeviceCapShort": "Devices per iCloud account",
-      "icloudDeviceCapHint": "1–20"
+      "icloudDeviceCapHint": "1–20",
+      "groupReward": "Reward points",
+      "rewardHint": "On = customers earn points each time an installment is fully paid · Off = no new points; points already earned stay.",
+      "rewardPointsPerInstallmentShort": "Points per installment",
+      "rewardPointsPerInstallmentHint": "0–10,000 · only while Reward points is on (Switches tab) · applies to installments paid after saving",
+      "feature_REWARD": "Reward points"
     },
     "bankAccounts": {
       "title": "Bank Accounts",
