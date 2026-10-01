@@ -76,6 +76,11 @@ export function prepareErrorParams(
     // backend's; we only add the thousands separator.
     params.balance = fmtCurrency(params.balance);
   }
+  // mig 1357 IDENTIFIER_FORMAT_INVALID ships `reason` (IMEI_FORMAT, APPLE_SERIAL_FORMAT, …) —
+  // the same codes the forms' own check returns, so one label set serves both.
+  if (typeof params.reason === 'string' && /^(IMEI_FORMAT|IMEI_LUHN_FAIL|APPLE_SERIAL_FORMAT|SERIAL_FORMAT)$/.test(params.reason)) {
+    params.reason_label = t(`identifierFormat.${params.reason}`, { defaultValue: params.reason });
+  }
   if (typeof params.existing_bucket === 'string') {
     params.existing_bucket = getBucketLabel(params.existing_bucket, t as (k: string) => string);
   }

@@ -4,7 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Modal, Button, Input, MaskedInput, TextArea, Badge, FormErrorMessage } from 'tsp-form';
 import { XCircle, User, Package, FileText } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
-import { validateiPhoneSerial } from '../../../lib/validators';
+import { identifierFormatReason } from '../../../lib/validators';
+import { SerialInput } from '../../../components/SerialInput';
 import { isSearchable } from '../../../lib/searchKeyword';
 import { ActionDoneView } from '../../contracts/ActionDoneView';
 import { getStateColor } from '../../contracts/contractUtils';
@@ -118,9 +119,9 @@ export function RepairCreateModal({
   const symptomOk = repairNote.trim().length >= 3;
 
   // Serial is optional for a walk-in, but when typed it must be a valid Apple
-  // serial (same rule as the register flow — mostly-Apple product). Blank = ok.
+  // serial (the backend's register rule — mostly-Apple product). Blank = ok.
   const serialError = extSerial.trim().length > 0
-    ? validateiPhoneSerial(extSerial).error ?? null
+    ? identifierFormatReason('SERIAL_NO', extSerial, true)
     : null;
 
   const canSubmit = useMemo(() => {
@@ -146,8 +147,7 @@ export function RepairCreateModal({
       params.p_ext_customer_name = extName.trim();
       params.p_ext_customer_phone = extPhone.trim();
       params.p_ext_model = extModel.trim() || null;
-      // Normalize like the register flow: strip spaces, uppercase.
-      params.p_ext_serial = extSerial.replace(/\s/g, '').toUpperCase() || null;
+      params.p_ext_serial = extSerial || null;
     } else if (tab === 'CUSTOMER_CONTRACT' && pickedContract) {
       params.p_asset_id = pickedContract.device_id;
       params.p_contract_id = pickedContract.id;
@@ -283,13 +283,13 @@ export function RepairCreateModal({
                   </div>
                   <div className="flex flex-col flex-1">
                     <label className="form-label">{t('repair.deviceSerial')}</label>
-                    <Input
+                    <SerialInput
                       value={extSerial}
-                      onChange={(e) => setExtSerial(e.target.value)}
+                      onChange={setExtSerial}
                       className="w-full"
                       error={!!serialError}
                     />
-                    <FormErrorMessage error={serialError ? { message: t('repair.serialInvalid') } : undefined} />
+                    <FormErrorMessage error={serialError ? { message: t(`identifierFormat.${serialError}`) } : undefined} />
                   </div>
                 </div>
               </div>

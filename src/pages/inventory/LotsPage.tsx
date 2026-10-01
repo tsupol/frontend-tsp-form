@@ -5,6 +5,7 @@ import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tansta
 import {
   PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, NumberSpinner,
   DataTable, PopOver, Tooltip, LabeledCheckbox, useSnackbarContext,
+  FormErrorMessage,
 } from 'tsp-form';
 import {
   ArrowLeft, ArrowRight, ArrowRightFromLine, Boxes, CheckCircle, XCircle, ChevronDown, Wrench, Plus, Trash2, ExternalLink, SlidersHorizontal, AlertCircle, ListChecks,
@@ -19,6 +20,8 @@ import { getBucketLabel, getBucketColor, fmtNum, codeDisplay } from './inventory
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { ColorAutocomplete, ColorMatchBadge } from '../../components/ColorAutocomplete';
 import { ImeiInput } from '../../components/ImeiInput';
+import { SerialInput } from '../../components/SerialInput';
+import { identifierFormatReason, isAppleBrand } from '../../lib/validators';
 import { SearchInput } from '../../components/SearchInput';
 import { OwnerBadge } from '../../components/OwnerBadge';
 import type { OwnerType } from '../../lib/ownerTypes';
@@ -1276,8 +1279,13 @@ function LotActionModal({
     setDevices([...devices, fresh]);
   };
 
-  /** Row is "ready for submit" only when at least one identifier is filled. */
-  const rowsReady = devices.every(d => d.serial.trim() || d.imei.trim());
+  // Same rule the backend enforces (mig 1357); null = valid or left blank.
+  const isApple = isAppleBrand(lot.brand_name);
+  const serialError = (d: { serial: string }) => d.serial.trim() ? identifierFormatReason('SERIAL_NO', d.serial, isApple) : null;
+  const imeiError = (d: { imei: string }) => d.imei.trim() ? identifierFormatReason('IMEI', d.imei, isApple) : null;
+
+  /** Row is "ready for submit" only when at least one identifier is filled and none is malformed. */
+  const rowsReady = devices.every(d => (d.serial.trim() || d.imei.trim()) && !serialError(d) && !imeiError(d));
   const filledRowCount = devices.filter(d => d.serial.trim() || d.imei.trim()).length;
 
   const validateMutation = useMutation({
@@ -1543,12 +1551,14 @@ function LotActionModal({
                           <div className="flex gap-2">
                             <div className="flex-1 min-w-0 flex flex-col">
                               <label className="form-label">{t('convert.serial', { ns: 'lotActions', defaultValue: 'Serial No.' })}</label>
-                              <Input
+                              <SerialInput
                                 value={row.serial}
-                                onChange={(e) => setDevices(devices.map((r, i) => i === idx ? { ...r, serial: e.target.value } : r))}
+                                onChange={(v) => setDevices(devices.map((r, i) => i === idx ? { ...r, serial: v } : r))}
                                 placeholder={t('convert.serialPlaceholder', { ns: 'lotActions', defaultValue: 'Scan or type' })}
                                 className="w-full"
+                                error={!!serialError(row)}
                               />
+                              <FormErrorMessage error={serialError(row) ? { message: t(`identifierFormat.${serialError(row)}`) } : undefined} />
                             </div>
                             <div className="flex-1 min-w-0 flex flex-col">
                               <label className="form-label">{t('convert.imei', { ns: 'lotActions', defaultValue: 'IMEI' })}</label>
@@ -1557,7 +1567,9 @@ function LotActionModal({
                                 onChange={(v) => setDevices(devices.map((r, i) => i === idx ? { ...r, imei: v } : r))}
                                 placeholder={t('asset.imeiPlaceholder')}
                                 className="w-full"
+                                error={!!imeiError(row)}
                               />
+                              <FormErrorMessage error={imeiError(row) ? { message: t(`identifierFormat.${imeiError(row)}`) } : undefined} />
                             </div>
                           </div>
 

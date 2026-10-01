@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, keepPreviousData } from '@tanstack/react-query';
-import { Input, Button } from 'tsp-form';
+import { Button } from 'tsp-form';
 import { XCircle, CheckCircle, Circle, Check } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
-import { validateIMEI, validateiPhoneSerial } from '../../../lib/validators';
+import { identifierFormatReason, isAppleBrand } from '../../../lib/validators';
 import { ImeiInput } from '../../../components/ImeiInput';
+import { SerialInput } from '../../../components/SerialInput';
 import { getLine } from './useBuyback';
 import type { BuybackDraft } from './types';
 import { translateApiError } from '../../../lib/apiErrors';
@@ -88,30 +89,14 @@ export function PanelSubmit({
   const serialTrimmed = serial.trim();
   const haveIdentifier = imeiTrimmed.length > 0 || serialTrimmed.length > 0;
 
-  // Client-side identifier validation — catch malformed IMEI/Serial before the
-  // round-trip (backend still re-checks). Either field is optional, so only
-  // validate the ones that were actually typed. The Apple serial rule (11/12
-  // chars, no O/I) only fits Apple products — gate it on the line's brand;
-  // non-Apple serials are left as free text.
-  const isApple = /apple/i.test(line?.brand_name ?? '');
-
-  const imeiErrorKey = (() => {
-    if (!imeiTrimmed) return null;
-    const r = validateIMEI(imeiTrimmed);
-    if (r.valid) return null;
-    return imeiTrimmed.replace(/[\s-]/g, '').length === 15
-      ? 'buyback.imeiInvalidChecksum'
-      : 'buyback.imeiInvalidLength';
-  })();
-
-  const serialErrorKey = (() => {
-    if (!serialTrimmed || !isApple) return null;
-    const r = validateiPhoneSerial(serialTrimmed);
-    if (r.valid) return null;
-    return /[OI]/.test(serialTrimmed.toUpperCase()) || !/^[A-Za-z0-9]+$/.test(serialTrimmed)
-      ? 'buyback.serialInvalidChars'
-      : 'buyback.serialInvalidLength';
-  })();
+  // Client-side identifier validation — the backend's own rule (mig 1357),
+  // so a malformed IMEI/Serial is caught before the round-trip. Either field
+  // is optional, so only validate the ones that were actually typed.
+  const isApple = isAppleBrand(line?.brand_name);
+  const imeiReason = imeiTrimmed ? identifierFormatReason('IMEI', imeiTrimmed, isApple) : null;
+  const serialReason = serialTrimmed ? identifierFormatReason('SERIAL_NO', serialTrimmed, isApple) : null;
+  const imeiErrorKey = imeiReason && `identifierFormat.${imeiReason}`;
+  const serialErrorKey = serialReason && `identifierFormat.${serialReason}`;
 
   const identifiersValid = !imeiErrorKey && !serialErrorKey;
 
@@ -159,13 +144,13 @@ export function PanelSubmit({
               </div>
               <div className="flex flex-col">
                 <label className="form-label">{t('asset.serialNo')}</label>
-                <Input
+                <SerialInput
                   value={serial}
-                  onChange={(e) => setSerial(e.target.value)}
+                  onChange={setSerial}
                   placeholder={t('buyback.serialPlaceholder')}
                   className="w-full"
                   error={!!serialErrorKey}
-                  endIcon={serialTrimmed && isApple && !serialErrorKey ? <Check size={16} className="text-success" /> : undefined}
+                  endIcon={serialTrimmed && !serialErrorKey ? <Check size={16} className="text-success" /> : undefined}
                 />
                 {serialErrorKey && (
                   <span className="text-xs text-danger mt-1">{t(serialErrorKey)}</span>

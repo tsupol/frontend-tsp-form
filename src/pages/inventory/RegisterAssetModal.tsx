@@ -2,12 +2,14 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, keepPreviousData } from '@tanstack/react-query';
-import { Modal, Button, Input, Select, MaskedInput, LabeledCheckbox, InputDatePicker } from 'tsp-form';
+import { Modal, Button, Input, Select, MaskedInput, LabeledCheckbox, InputDatePicker, FormErrorMessage } from 'tsp-form';
 import { XCircle, CheckCircle, Search, Package, Keyboard, ExternalLink, RotateCcw, AlertTriangle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { makeDatePickerFormat, toLocalDateStr, fmtCurrency } from '../../lib/format';
 import { ImeiInput } from '../../components/ImeiInput';
+import { SerialInput } from '../../components/SerialInput';
+import { identifierFormatReason, isAppleBrand } from '../../lib/validators';
 import { getConditionLabel, getBucketLabel, CONDITION_VALUES } from './inventoryUtils';
 import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 
@@ -86,6 +88,9 @@ export function RegisterAssetModal({
   const [keyword, setKeyword] = useState('');
   const [debounced, setDebounced] = useState('');
   const [modelId, setModelId] = useState<number | null>(null);
+  // Kept apart from the search results (which change as the user types) — the
+  // serial rule depends on it: Apple = 10 or 12 characters.
+  const [modelBrand, setModelBrand] = useState<string | null>(null);
   const [variantId, setVariantId] = useState<number | null>(null);
   const [condition, setCondition] = useState<string>('NEW');
   const [hasBox, setHasBox] = useState(true);
@@ -129,7 +134,7 @@ export function RegisterAssetModal({
     if (open) {
       setView('form'); setResult(null);
       setBranchId(null); setKeyword(''); setDebounced('');
-      setModelId(null); setVariantId(null);
+      setModelId(null); setModelBrand(null); setVariantId(null);
       setCondition('NEW'); setHasBox(true);
       setBattery(''); setWarranty(''); setTypingWarranty(false);
       setImei(''); setSerial('');
@@ -182,8 +187,13 @@ export function RegisterAssetModal({
     return ids;
   };
 
+  // Same rule the backend enforces (mig 1357); null = valid or left blank.
+  const imeiError = imei.trim() ? identifierFormatReason('IMEI', imei, false) : null;
+  const serialError = serial.trim() ? identifierFormatReason('SERIAL_NO', serial, isAppleBrand(modelBrand)) : null;
+
   const canSubmit = !!branchId && !!modelId && !!variantId
-    && (imei.trim() !== '' || serial.trim() !== '');
+    && (imei.trim() !== '' || serial.trim() !== '')
+    && !imeiError && !serialError;
 
   // Pre-flight the identifiers as soon as the form is complete enough, so a
   // duplicate device is named before the user presses Register rather than
@@ -420,7 +430,7 @@ export function RegisterAssetModal({
                         <button
                           key={m.model_id}
                           type="button"
-                          onClick={() => setModelId(m.model_id)}
+                          onClick={() => { setModelId(m.model_id); setModelBrand(m.brand_name); }}
                           className={`w-full text-left px-3 py-2 text-sm cursor-pointer transition-colors ${
                             m.model_id === modelId ? 'bg-primary-soft' : 'hover:bg-surface-hover bg-transparent'
                           }`}
@@ -519,11 +529,13 @@ export function RegisterAssetModal({
                   {/* Identifiers — at least one required; backend enforces IMEI for iPhone models */}
                   <div className="flex flex-col">
                     <label className="form-label">{t('asset.registerImei', { defaultValue: 'IMEI' })}</label>
-                    <ImeiInput value={imei} onChange={setImei} size="sm" className="w-full" placeholder="15 digits" />
+                    <ImeiInput value={imei} onChange={setImei} size="sm" className="w-full" placeholder="15 digits" error={!!imeiError} />
+                    <FormErrorMessage error={imeiError ? { message: t(`identifierFormat.${imeiError}`) } : undefined} />
                   </div>
                   <div className="flex flex-col">
                     <label className="form-label">{t('asset.registerSerial', { defaultValue: 'Serial number' })}</label>
-                    <Input value={serial} onChange={(e) => setSerial(e.target.value)} size="sm" className="w-full" />
+                    <SerialInput value={serial} onChange={setSerial} size="sm" className="w-full" error={!!serialError} />
+                    <FormErrorMessage error={serialError ? { message: t(`identifierFormat.${serialError}`) } : undefined} />
                     <div className="text-xs text-subtle mt-1">{t('asset.registerIdHint', { defaultValue: 'Enter at least one identifier (IMEI or serial).' })}</div>
                   </div>
 

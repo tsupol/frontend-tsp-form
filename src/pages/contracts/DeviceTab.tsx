@@ -14,7 +14,8 @@ import { AssetScreenTimeSection } from '../../components/AssetScreenTimeSection'
 import { ContractDeviceTimeline } from '../../components/AssetContractTimeline';
 import { ColorSwatch } from '../../components/ColorAutocomplete';
 import { ImeiInput } from '../../components/ImeiInput';
-import { validateIMEI, validateiPhoneSerial } from '../../lib/validators';
+import { identifierFormatReason, isAppleBrand } from '../../lib/validators';
+import { SerialInput } from '../../components/SerialInput';
 import { translateApiError } from '../../lib/apiErrors';
 
 type IdentifierType = 'IMEI' | 'SERIAL_NO';
@@ -647,7 +648,7 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
             branchId={primaryAsset.branch_id}
             type={fixIdentifier?.type ?? 'IMEI'}
             oldValue={fixIdentifier?.oldValue ?? ''}
-            isApple={primaryAsset.brand_name === 'Apple'}
+            isApple={isAppleBrand(primaryAsset.brand_name)}
             onSuccess={() => {
               setFixIdentifier(null);
               queryClient.invalidateQueries({ queryKey: ['asset-summary', contract.device_id] });
@@ -920,8 +921,7 @@ function CorrectIdentifierModal({
   branchId: number;
   type: IdentifierType;
   oldValue: string;
-  // Apple serials have a strict format (11/12 chars, no O/I); only validate the
-  // serial format for Apple devices. IMEI (Luhn) is brand-agnostic.
+  // Apple serials are 10 or 12 characters; other brands 6-20 (mig 1357).
   isApple: boolean;
   onSuccess: () => void;
 }) {
@@ -944,22 +944,9 @@ function CorrectIdentifierModal({
   const isImei = type === 'IMEI';
   const trimmed = newValue.trim();
 
-  // Format validation (reuses the shared validators). IMEI → Luhn always;
-  // serial → Apple format only for Apple devices, else just non-empty.
-  const formatError: string | null = (() => {
-    if (trimmed.length === 0) return null; // don't nag on empty
-    if (isImei) {
-      return validateIMEI(trimmed).valid
-        ? null
-        : t('contract.identifierInvalidImei', { defaultValue: 'Invalid IMEI (checksum failed)' });
-    }
-    if (isApple) {
-      return validateiPhoneSerial(trimmed).valid
-        ? null
-        : t('contract.identifierInvalidSerial', { defaultValue: 'Invalid serial number' });
-    }
-    return null;
-  })();
+  // Same rule the backend enforces (mig 1357); don't nag on empty.
+  const formatReason = trimmed.length > 0 ? identifierFormatReason(type, trimmed, isApple) : null;
+  const formatError = formatReason ? t(`identifierFormat.${formatReason}`) : null;
 
   const canSave = trimmed.length > 0 && trimmed !== oldValue && !saving && formatError == null;
 
@@ -1014,9 +1001,9 @@ function CorrectIdentifierModal({
           <div className="flex flex-col">
             <label className="form-label">{t('contract.identifierCorrectNew', { defaultValue: 'New {{label}}', label })}</label>
             {isImei ? (
-              <ImeiInput value={newValue} onChange={setNewValue} className="w-full" placeholder="000000000000000" />
+              <ImeiInput value={newValue} onChange={setNewValue} className="w-full" placeholder="000000000000000" error={!!formatError} />
             ) : (
-              <Input value={newValue} onChange={(e) => setNewValue(e.target.value)} className="w-full" />
+              <SerialInput value={newValue} onChange={setNewValue} className="w-full" error={!!formatError} />
             )}
             <FormErrorMessage error={formatError ? { message: formatError } : undefined} />
           </div>

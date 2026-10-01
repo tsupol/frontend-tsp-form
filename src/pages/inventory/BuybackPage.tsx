@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, DataTable, PopOver, Tooltip, useSnackbarContext } from 'tsp-form';
+import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, TextArea, DataTable, PopOver, Tooltip, FormErrorMessage, useSnackbarContext } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine, RotateCcw, CheckCircle, XCircle, AlertTriangle, ImageOff, ChevronDown, Pencil, SlidersHorizontal } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { SearchInput } from '../../components/SearchInput';
@@ -17,6 +17,8 @@ import { useMediaUrl } from '../../hooks/useMediaUrl';
 import { normalizeKey } from '../../lib/mediaPath';
 import { MediaLightbox } from '../../components/MediaLightbox';
 import { ImeiInput } from '../../components/ImeiInput';
+import { SerialInput } from '../../components/SerialInput';
+import { identifierFormatReason, isAppleBrand } from '../../lib/validators';
 import { OwnerBadge } from '../../components/OwnerBadge';
 import type { OwnerType } from '../../lib/ownerTypes';
 import { translateApiError } from '../../lib/apiErrors';
@@ -1280,8 +1282,12 @@ function BuybackActionModal({
   const isSubmit = action === 'submit';
   const isDanger = action === 'reject' || action === 'cancel' || action === 'cancelApproved';
   const needsReason = reasonGroup !== null;
+  // Same rule the backend enforces (mig 1357); null = valid or left blank.
+  const isApple = isAppleBrand(line?.brand_name);
+  const imeiError = imei.trim() ? identifierFormatReason('IMEI', imei, isApple) : null;
+  const serialError = serial.trim() ? identifierFormatReason('SERIAL_NO', serial, isApple) : null;
   // Submit requires at least one identifier (Serial is always allowed; IMEI when applicable).
-  const submitValid = !isSubmit || imei.trim().length > 0 || serial.trim().length > 0;
+  const submitValid = !isSubmit || ((imei.trim().length > 0 || serial.trim().length > 0) && !imeiError && !serialError);
   const reasonValid = !needsReason || reasonId !== null;
   const canSubmit = submitValid && reasonValid && !mutation.isPending;
 
@@ -1318,17 +1324,21 @@ function BuybackActionModal({
                     onChange={setImei}
                     placeholder={t('buyback.imeiPlaceholder', { defaultValue: '15-digit IMEI (optional)' })}
                     className="w-full"
+                    error={!!imeiError}
                     autoFocus
                   />
+                  <FormErrorMessage error={imeiError ? { message: t(`identifierFormat.${imeiError}`) } : undefined} />
                 </div>
                 <div className="flex flex-col">
                   <label className="form-label">{t('asset.serialNo', { defaultValue: 'Serial No.' })}</label>
-                  <Input
+                  <SerialInput
                     value={serial}
-                    onChange={(e) => setSerial(e.target.value)}
+                    onChange={setSerial}
                     placeholder={t('buyback.serialPlaceholder', { defaultValue: 'Serial number (optional)' })}
                     className="w-full"
+                    error={!!serialError}
                   />
+                  <FormErrorMessage error={serialError ? { message: t(`identifierFormat.${serialError}`) } : undefined} />
                 </div>
               </>
             )}

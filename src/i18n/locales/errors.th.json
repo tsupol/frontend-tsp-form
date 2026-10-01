@@ -1278,5 +1278,7 @@
   "blockingReason.credit_not_cleared_basic": "ต้องถอนเงินเครดิตก่อน",
   "OPS.AUTH.NO_LIVE_AUTHORITY": "ยังไม่มีใบมอบอำนาจสำหรับงานนี้ — กด “พิมพ์ใบมอบอำนาจ” หนึ่งครั้ง ระบบออกใบให้ตอนพิมพ์ครั้งแรก",
   "OPS.AUTH.NO_LEGAL_GRANT": "คุณไม่มีสิทธิ์งานกฎหมายของบริษัทนี้",
-  "USER.VALIDATION.INVALID_SIGNATURE_MEDIA": "ไฟล์ลายเซ็นนี้ไม่ได้อัปโหลดในบัญชีของคุณ ลองใหม่อีกครั้ง"
+  "USER.VALIDATION.INVALID_SIGNATURE_MEDIA": "ไฟล์ลายเซ็นนี้ไม่ได้อัปโหลดในบัญชีของคุณ ลองใหม่อีกครั้ง",
+  "inv.validation.identifier_format_invalid": "{{value}}: {{reason_label}}",
+  "inv.validation.identifier_format_invalid_basic": "รูปแบบ Serial / IMEI ไม่ถูกต้อง"
 }

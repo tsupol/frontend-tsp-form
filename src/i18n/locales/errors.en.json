@@ -1278,5 +1278,7 @@
   "blockingReason.credit_not_cleared_basic": "Cash out the credit balance first",
   "OPS.AUTH.NO_LIVE_AUTHORITY": "You have no authority letter for this yet — press “Print authority sheet” once; the first print issues it.",
   "OPS.AUTH.NO_LEGAL_GRANT": "You do not have legal rights at this company.",
-  "USER.VALIDATION.INVALID_SIGNATURE_MEDIA": "That signature file wasn’t uploaded for your account. Try again."
+  "USER.VALIDATION.INVALID_SIGNATURE_MEDIA": "That signature file wasn’t uploaded for your account. Try again.",
+  "inv.validation.identifier_format_invalid": "{{value}}: {{reason_label}}",
+  "inv.validation.identifier_format_invalid_basic": "The serial / IMEI format is not valid."
 }

@@ -50,36 +50,55 @@ function luhnCheck(digits: string): boolean {
 }
 
 /**
- * Validates iPhone Serial Number
- * - 12 characters (post-2021), 11 characters (older), or 10 characters
- *   (randomized serials on 2024+ devices)
- * - Alphanumeric, typically uppercase
- * - No O or I (to avoid confusion with 0 and 1)
+ * Serial as stored: uppercase A-Z/0-9 only, max 20. Strips everything else —
+ * spaces, dashes, and the invisible Thai tone marks that ride along when the
+ * keyboard was left on Thai (AT-2609-000071-7 was registered as "๋J5923DFC3P").
  */
+export function sanitizeSerial(raw: string): string {
+  return raw.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20);
+}
+
+export type IdentifierFormatReason =
+  | 'IMEI_FORMAT'
+  | 'IMEI_LUHN_FAIL'
+  | 'APPLE_SERIAL_FORMAT'
+  | 'SERIAL_FORMAT';
+
+/**
+ * The backend's identifier format rule (mig 1357, `inv._identifier_format_reason`),
+ * mirrored exactly so the form blocks what the DB would reject:
+ *   IMEI / IMEI2 — 15 digits + Luhn
+ *   SERIAL_NO    — Apple: 10 or 12 × A-Z/0-9; any other brand: 6-20 × A-Z/0-9
+ * Other identifier types have no rule. Returns null when valid, else the same
+ * reason code the backend sends in `params.reason`, so one translation covers both.
+ */
+export function identifierFormatReason(
+  type: string | null | undefined,
+  value: string,
+  isApple: boolean,
+): IdentifierFormatReason | null {
+  const v = value.trim();
+  if (type === 'IMEI' || type === 'IMEI2') {
+    if (!/^\d{15}$/.test(v)) return 'IMEI_FORMAT';
+    return luhnCheck(v) ? null : 'IMEI_LUHN_FAIL';
+  }
+  if (type === 'SERIAL_NO') {
+    const s = v.toUpperCase();
+    if (isApple && !/^([0-9A-Z]{10}|[0-9A-Z]{12})$/.test(s)) return 'APPLE_SERIAL_FORMAT';
+    if (!/^[0-9A-Z]{6,20}$/.test(s)) return 'SERIAL_FORMAT';
+  }
+  return null;
+}
+
+/** Brand check the backend uses (`prod.ref_brands.code = 'APPLE'`), from the name the views return. */
+export function isAppleBrand(brand: string | null | undefined): boolean {
+  return (brand ?? '').trim().toUpperCase() === 'APPLE';
+}
+
+/** Apple serial check — the SERIAL_NO rule above with the brand fixed to Apple. */
 export function validateiPhoneSerial(serial: string): { valid: boolean; error?: string } {
-  // Remove spaces
-  const cleaned = serial.replace(/\s/g, '').toUpperCase();
-
-  if (cleaned.length === 0) {
-    return { valid: false, error: 'Serial number is required' };
-  }
-
-  // Check length (10, 11, or 12 characters)
-  if (cleaned.length < 10 || cleaned.length > 12) {
-    return { valid: false, error: 'Serial must be 10 to 12 characters' };
-  }
-
-  // Check alphanumeric only
-  if (!/^[A-Z0-9]+$/.test(cleaned)) {
-    return { valid: false, error: 'Serial must be alphanumeric' };
-  }
-
-  // Apple serials don't contain O or I
-  if (/[OI]/.test(cleaned)) {
-    return { valid: false, error: 'Serial cannot contain O or I' };
-  }
-
-  return { valid: true };
+  const reason = identifierFormatReason('SERIAL_NO', serial, true);
+  return reason ? { valid: false, error: reason } : { valid: true };
 }
 
 /**

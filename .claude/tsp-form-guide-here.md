@@ -20,6 +20,16 @@ of a session. Page-level nav guarding is its own doc (`.claude/nav-guard-pattern
   };
   ```
 
+- **Serial / IMEI input:** never plain `Input`. Serial → `SerialInput`, IMEI → `ImeiInput`,
+  type chosen at runtime → `IdentifierInput` (all in `src/components/`). They strip bad characters
+  as typed — a Thai tone mark from a keyboard left on Thai is invisible in a plain field and
+  shipped to prod that way (AT-2609-000071-7). Then check the format with
+  `identifierFormatReason(type, value, isAppleBrand(brand))` from `src/lib/validators.ts`
+  (the backend's mig 1357 rule: IMEI 15 digits + Luhn; Apple serial 10 or 12; other serial 6-20),
+  show `t(\`identifierFormat.${reason}\`)` in a `FormErrorMessage`, and disable submit while it
+  fails. Every place that writes a serial/IMEI needs both — a field that only accepts input but
+  doesn't check is how the bad values got in. Repeatedly missed.
+
 ## Display formatting
 
 For **read-only display** of phone numbers and citizen IDs, use the global formatters from `src/lib/format.ts`:

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams, useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, DataTable, PopOver, Tooltip, Switch, MaskedInput, InputDatePicker, LabeledCheckbox, useSnackbarContext } from 'tsp-form';
+import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Input, Button, Modal, TextArea, DataTable, PopOver, Tooltip, Switch, MaskedInput, InputDatePicker, LabeledCheckbox, FormErrorMessage, useSnackbarContext } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine, Box, SlidersHorizontal, XCircle, ChevronDown, ExternalLink, Wrench, Printer, Plus, CheckCircle, Pencil, Cloud, CloudOff, MoreVertical, Package, Keyboard, AlertTriangle, Lock } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import { apiClient, ApiError } from '../../lib/api';
@@ -21,7 +21,8 @@ import type { AssetMdmStory } from './mdm/mdmApi';
 import { AssetScreenTimeSection } from '../../components/AssetScreenTimeSection';
 import { AssetContractTimeline } from '../../components/AssetContractTimeline';
 import { getStateColor } from '../contracts/contractUtils';
-import { ImeiInput } from '../../components/ImeiInput';
+import { IdentifierInput } from '../../components/SerialInput';
+import { identifierFormatReason, isAppleBrand } from '../../lib/validators';
 import { getBucketLabel, getBucketColor, getConditionLabel, getConditionTextColor, CONDITION_VALUES, codeDisplay } from './inventoryUtils';
 import { RegisterAssetModal } from './RegisterAssetModal';
 import { AssetMdmTab } from './AssetMdmTab';
@@ -239,7 +240,10 @@ type ExtraField =
   // Boolean checkbox. Sent as true/false. NULL (unchanged) semantics handled by only
   // sending the param when the box was touched — see `booleanTouched` below.
   | { kind: 'checkbox'; name: string; labelKey: string; defaultFromAsset?: keyof Asset }
-  | { kind: 'identifier'; typeName: string; oldName: string; labelKey: string; required?: boolean };
+  | { kind: 'identifier'; typeName: string; oldName: string; labelKey: string; required?: boolean }
+  // New value for the identifier picked in the `identifier` field named by `typeFrom`.
+  // Input + format check follow that identifier's type (IMEI digits / serial A-Z0-9).
+  | { kind: 'identifierValue'; name: string; typeFrom: string; labelKey: string; required?: boolean };
 
 type SimpleActionConfig = {
   rpc: string;
@@ -367,7 +371,7 @@ const SIMPLE_ACTIONS: Record<string, SimpleActionConfig> = {
     paramShape: 'asset_no_dedupe',
     extraFields: [
       { kind: 'identifier', typeName: 'p_identifier_type', oldName: 'p_old_value', labelKey: 'identifierCorrect.existing', required: true },
-      { kind: 'text', name: 'p_new_value', labelKey: 'identifierCorrect.newValue', required: true },
+      { kind: 'identifierValue', name: 'p_new_value', typeFrom: 'p_old_value', labelKey: 'identifierCorrect.newValue', required: true },
     ],
     successKey: 'success.identifier_correct',
   },
@@ -3048,6 +3052,19 @@ function AssetActionModal({
     return !!(v && v.trim());
   };
 
+  // Type of the identifier picked in an `identifier` field (stored as JSON {type, value}).
+  const pickedIdentifierType = (oldName: string): string | null => {
+    const raw = extra[oldName];
+    if (!raw) return null;
+    try { return (JSON.parse(raw) as { type: string }).type; } catch { return null; }
+  };
+  // Same rule the backend enforces (mig 1357); null = valid or nothing typed yet.
+  const identifierValueError = (f: Extract<ExtraField, { kind: 'identifierValue' }>) => {
+    const v = extra[f.name]?.trim();
+    if (!v) return null;
+    return identifierFormatReason(pickedIdentifierType(f.typeFrom), v, isAppleBrand(asset.brand_name));
+  };
+
   const mutation = useMutation({
     mutationFn: () => {
       if (!action || !config) return Promise.reject(new Error('No action'));
@@ -3124,6 +3141,7 @@ function AssetActionModal({
   const extraValid = (config?.extraFields ?? []).every(f => {
     if (f.kind === 'checkbox' || !f.required) return true;
     if (f.kind === 'identifier') return isFieldFilled(f.oldName);
+    if (f.kind === 'identifierValue') return isFieldFilled(f.name) && !identifierValueError(f);
     return isFieldFilled(f.name);
   });
   const canSubmit = reasonValid && extraValid;
@@ -3215,6 +3233,22 @@ function AssetActionModal({
                       className="w-full"
                     />
                   )}
+                  {f.kind === 'identifierValue' && (() => {
+                    const formatError = identifierValueError(f);
+                    return (
+                      <>
+                        <IdentifierInput
+                          identifierType={pickedIdentifierType(f.typeFrom)}
+                          value={extra[f.name] ?? ''}
+                          onChange={(v) => setVal(f.name, v)}
+                          disabled={!pickedIdentifierType(f.typeFrom)}
+                          error={!!formatError}
+                          className="w-full"
+                        />
+                        <FormErrorMessage error={formatError ? { message: t(`identifierFormat.${formatError}`) } : undefined} />
+                      </>
+                    );
+                  })()}
                   {f.kind === 'number' && (
                     <Input
                       type="number"
@@ -3298,7 +3332,13 @@ function AssetActionModal({
                           label: `${id.type}: ${id.value}`,
                         }))}
                         value={extra[f.oldName] ?? null}
-                        onChange={(val) => setVal(f.oldName, (val as string) || '')}
+                        onChange={(val) => setExtra(prev => {
+                          const next = { ...prev, [f.oldName]: (val as string) || '' };
+                          config.extraFields?.forEach(g => {
+                            if (g.kind === 'identifierValue' && g.typeFrom === f.oldName) next[g.name] = '';
+                          });
+                          return next;
+                        })}
                         placeholder={t('identifierCorrect.selectIdentifier', { ns: 'assetActions', defaultValue: 'Select identifier' })}
                         showChevron
                       />
@@ -3770,7 +3810,9 @@ function AddIdentifierModal({
     },
   });
 
-  const canSubmit = !!identifierType && !!value.trim() && !mutation.isPending;
+  // Same rule the backend enforces (mig 1357); null = valid or nothing typed yet.
+  const formatError = value.trim() ? identifierFormatReason(identifierType, value, isAppleBrand(asset.brand_name)) : null;
+  const canSubmit = !!identifierType && !!value.trim() && !formatError && !mutation.isPending;
 
   const title = identifierType
     ? t('identifierAdd.title', { ns: 'assetActions', defaultValue: 'Add {{type}}', type: identifierType })
@@ -3799,23 +3841,18 @@ function AddIdentifierModal({
           <div className="form-grid gap-4">
             <div className="flex flex-col">
               <label className="form-label">{identifierType} *</label>
-              {identifierType === 'IMEI' ? (
-                <ImeiInput
-                  value={value}
-                  onChange={setValue}
-                  placeholder={t('asset.imeiPlaceholder')}
-                  className="w-full"
-                  autoFocus
-                />
-              ) : (
-                <Input
-                  value={value}
-                  onChange={(e) => setValue(e.target.value)}
-                  placeholder={t('identifierAdd.valuePlaceholder', { ns: 'assetActions', defaultValue: 'Value' })}
-                  className="w-full"
-                  autoFocus
-                />
-              )}
+              <IdentifierInput
+                identifierType={identifierType}
+                value={value}
+                onChange={setValue}
+                placeholder={identifierType === 'IMEI' || identifierType === 'IMEI2'
+                  ? t('asset.imeiPlaceholder')
+                  : t('identifierAdd.valuePlaceholder', { ns: 'assetActions', defaultValue: 'Value' })}
+                error={!!formatError}
+                className="w-full"
+                autoFocus
+              />
+              <FormErrorMessage error={formatError ? { message: t(`identifierFormat.${formatError}`) } : undefined} />
             </div>
             <div className="flex flex-col">
               <label className="form-label">{t('identifierAdd.note', { ns: 'assetActions', defaultValue: 'Note' })}</label>
