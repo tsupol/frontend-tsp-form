@@ -7634,15 +7634,15 @@
       "noSignature": "Can’t print — your profile has no signature yet. Add it under “My signature”."
     },
     "icloud": {
-      "button": "iCloud password",
+      "sectionTitle": "iCloud on this device",
       "title": "iCloud account for this device",
       "hint": "Every time this is shown it is recorded, along with who looked.",
       "appleId": "Apple ID",
       "password": "Password",
       "revealButton": "Show password",
       "revealAgain": "Show again",
-      "pickUpFirst": "Add this job to today first",
-      "pickUpAndReveal": "Add to today and show",
+      "noIcloud": "This device is not tied to an iCloud account",
+      "pickUpAndReveal": "Add to today and show password",
       "sharedAccountWarning": "This account also controls other customers’ devices. Do not pass it on.",
       "copyFailed": "Could not copy"
     },

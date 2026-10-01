@@ -7625,14 +7625,14 @@
       "noSignature": "พิมพ์ไม่ได้ ยังไม่มีลายเซ็นในโปรไฟล์ — เพิ่มที่ช่อง “ลายเซ็นของฉัน”"
     },
     "icloud": {
-      "button": "รหัส iCloud",
+      "sectionTitle": "iCloud ของเครื่อง",
       "title": "บัญชี iCloud ของเครื่องนี้",
       "hint": "ทุกครั้งที่เปิดดู ระบบจะบันทึกไว้ว่าใครเปิดดู",
       "appleId": "Apple ID",
       "password": "รหัสผ่าน",
       "revealButton": "ดูรหัสผ่าน",
       "revealAgain": "ดูอีกครั้ง",
-      "pickUpFirst": "หยิบงานนี้ก่อน",
+      "noIcloud": "เครื่องนี้ไม่ได้ผูกบัญชี iCloud",
       "pickUpAndReveal": "หยิบงานแล้วดูรหัส",
       "sharedAccountWarning": "บัญชีนี้คุมเครื่องของลูกค้ารายอื่นด้วย ห้ามส่งต่อ",
       "copyFailed": "คัดลอกไม่สำเร็จ"

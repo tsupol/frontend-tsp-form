@@ -6,7 +6,7 @@ import { Button, Badge, Tooltip, PopOver, useSnackbarContext } from 'tsp-form';
 import {
   User, Phone, Smartphone, MapPin, Loader2, ClipboardList, Scale,
   Star, StarOff, CheckCircle, Clock, AlertTriangle, Repeat, ExternalLink,
-  Printer, FileText, KeyRound, ChevronDown, PenLine,
+  Printer, FileText, KeyRound, ChevronDown, PenLine, Eye,
 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { apiClient } from '../../lib/api';
@@ -21,7 +21,7 @@ import { RepoGiveUpModal } from './RepoGiveUpModal';
 import { RepoNoteActionModal, type NoteActionConfig } from './RepoNoteActionModal';
 import { RepoPrintModal, type RepoPrintDoc } from './RepoPrintModal';
 import { beMediaRepoAuthorityPdf, beMediaRepoContractPdf, openPdfInNewTab } from '../../lib/beMedia';
-import { RepoIcloudRevealModal } from './RepoIcloudRevealModal';
+import { RepoIcloudRevealModal, CopyRow } from './RepoIcloudRevealModal';
 import { RepoHandoverModal } from './RepoHandoverModal';
 import { RepoAlbum } from './RepoAlbum';
 
@@ -138,6 +138,10 @@ export function RepoDetailPanel({ contractId, onChanged }: {
   const [moreOpen, setMoreOpen] = useState(false);
   const moreTriggerRef = useRef<HTMLDivElement>(null);
   const [icloudOpen, setIcloudOpen] = useState(false);
+  // Set when the iCloud modal learns the job has left this user's pool. The
+  // refresh waits for the close: refetching now can empty this panel, which
+  // would unmount the open modal and strand its backdrop.
+  const refreshOnIcloudClose = useRef(false);
   const [handoverOpen, setHandoverOpen] = useState(false);
 
   // Refresh the whole section, not just this contract: the worklist behind the
@@ -243,9 +247,15 @@ export function RepoDetailPanel({ contractId, onChanged }: {
   // as "the feature doesn't exist" — the reason production shows no picked-up
   // jobs at all (RECHECK 2026-09-30).
   const onFocus = detail.on_focus;
+  // Past the pool (completed, or back to ACTIVE) the password is no longer
+  // readable; the Apple ID still shows.
+  const inPool = detail.dunning_status === 'WAIT_FOR_REPO' || detail.dunning_status === 'WAIT_FOR_LEGAL';
   const focusAction = actions.find(
     (a) => a.action_code === (onFocus ? 'REPO_FOCUS_REMOVE' : 'REPO_FOCUS_ADD') && a.is_permitted,
   );
+  // Seeing the password takes the same repo/legal grant as picking the job up,
+  // so the evaluator's permission on that action decides who gets the button.
+  const canRevealIcloud = inPool && !!focusAction;
 
   const statusColor = detail.dunning_status === 'WAIT_FOR_LEGAL' ? 'warning'
     : detail.dunning_status === 'REPO_COMPLETED' || detail.dunning_status === 'LEGAL_COMPLETED' ? 'success'
@@ -270,22 +280,6 @@ export function RepoDetailPanel({ contractId, onChanged }: {
         </Link>
         <Badge color={statusColor} size="sm">{t(`repo.status.${detail.dunning_status}`, { defaultValue: detail.dunning_status })}</Badge>
         <div className="ml-auto flex items-center gap-2">
-          {/* The password is only readable on a job you've picked up, so the
-              button is shown disabled (not hidden) with the reason when not. */}
-          <Tooltip
-            content={onFocus ? t('repo.icloud.title') : t('repo.icloud.pickUpFirst')}
-            placement="top"
-          >
-            <Button
-              variant="outline"
-              size="sm"
-              startIcon={<KeyRound size={14} />}
-              disabled={!onFocus}
-              onClick={() => setIcloudOpen(true)}
-            >
-              {t('repo.icloud.button')}
-            </Button>
-          </Tooltip>
           {focusAction && (
             <Tooltip
               content={focusAction.is_available
@@ -335,6 +329,40 @@ export function RepoDetailPanel({ contractId, onChanged }: {
                 {detail.product_display_name && <div className="text-sm">{detail.product_display_name}</div>}
                 <DeviceLink deviceId={deviceId} code={detail.device_code_display} product={null} />
                 {detail.device_serial && <div className="text-xs text-subtle font-mono">{detail.device_serial}</div>}
+              </div>
+            </div>
+          )}
+          {/* The device's iCloud account. In the body, by the device, so the
+              agent sees at load whether the phone is tied to iCloud and to
+              which Apple ID. The password button is never disabled while the
+              job is in the pool: not picked up yet → the same press picks it
+              up, then reveals (DELIVERY 2026-10-01). */}
+          {detail.device_code_display && (
+            <div className="flex items-start gap-2 text-sm">
+              <KeyRound size={14} className="text-subtle shrink-0 mt-0.5" />
+              <div className="min-w-0 flex-1 flex flex-col gap-1.5">
+                <div className="text-xs text-subtle">{t('repo.icloud.sectionTitle')}</div>
+                {detail.has_icloud ? (
+                  <>
+                    {detail.device_icloud_apple_id && (
+                      <CopyRow label={t('repo.icloud.appleId')} value={detail.device_icloud_apple_id} />
+                    )}
+                    {canRevealIcloud && (
+                      <div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          startIcon={<Eye size={14} />}
+                          onClick={() => setIcloudOpen(true)}
+                        >
+                          {onFocus ? t('repo.icloud.revealButton') : t('repo.icloud.pickUpAndReveal')}
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-xs text-subtler">{t('repo.icloud.noIcloud')}</div>
+                )}
               </div>
             </div>
           )}
@@ -559,8 +587,13 @@ export function RepoDetailPanel({ contractId, onChanged }: {
         contractId={contractId}
         contractCode={contractCode}
         deviceCode={detail.device_code_display}
-        onClose={() => setIcloudOpen(false)}
+        pickUpFirst={!onFocus}
+        onClose={() => {
+          setIcloudOpen(false);
+          if (refreshOnIcloudClose.current) { refreshOnIcloudClose.current = false; refresh(); }
+        }}
         onFocusChanged={refresh}
+        onLeftPool={() => { refreshOnIcloudClose.current = true; }}
       />
     </div>
   );

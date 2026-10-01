@@ -106,6 +106,10 @@ export interface ContractRepoDetail {
   focus_pickers: Array<{ user_id: number; picked_at: string }>;
   company_id: number;
   branch_id: number | null;
+  // The device's iCloud account (mig 1369–1370). The password is in no view —
+  // only ops_repo_reveal_icloud_password returns it.
+  has_icloud: boolean;
+  device_icloud_apple_id: string | null;
 }
 
 export type RepoActionCode =
