@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, DataTableFooter, Input, Select, Button, Badge, Modal, LabeledCheckbox, FormErrorMessage, useSnackbarContext } from 'tsp-form';
@@ -611,14 +611,13 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
               {contracts.map(c => (
                 <div key={c.id} className="px-3 py-2.5 flex items-center justify-between">
                   <div>
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/admin/contracts/search/${c.id}`)}
-                      className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
+                    <Link
+                      to={`/admin/contracts/search/${c.id}`}
+                      className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1"
                     >
                       {c.code_display}
                       <ExternalLink size={12} />
-                    </button>
+                    </Link>
                     {c.branch_name && <div className="text-xs text-subtle">{c.branch_name}</div>}
                   </div>
                   <Badge size="xs" color={stateColor(c.state)}>{t(`contract.state_${c.state}`, { defaultValue: c.state })}</Badge>
