@@ -9308,7 +9308,7 @@
   "identifierFormat": {
     "IMEI_FORMAT": "IMEI ต้องเป็นตัวเลข 15 หลัก",
     "IMEI_LUHN_FAIL": "IMEI ไม่ถูกต้อง (ตรวจสอบตัวเลขอีกครั้ง)",
-    "APPLE_SERIAL_FORMAT": "Serial ของ Apple ต้องเป็นตัวอักษรอังกฤษ/ตัวเลข 10 หรือ 12 ตัว — ตรวจว่าไม่ได้พิมพ์ภาษาไทยติดมา",
+    "APPLE_SERIAL_FORMAT": "Serial ของ Apple ต้องเป็นตัวอักษรอังกฤษ/ตัวเลข 10 หรือ 12 ตัว",
     "SERIAL_FORMAT": "Serial ต้องเป็นตัวอักษรอังกฤษ/ตัวเลข 6-20 ตัว"
   }
 }

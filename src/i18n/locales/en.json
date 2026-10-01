@@ -9318,7 +9318,7 @@
   "identifierFormat": {
     "IMEI_FORMAT": "IMEI must be exactly 15 digits",
     "IMEI_LUHN_FAIL": "IMEI is not valid — check the digits again",
-    "APPLE_SERIAL_FORMAT": "An Apple serial is 10 or 12 English letters/digits — check no Thai was typed in",
+    "APPLE_SERIAL_FORMAT": "An Apple serial is 10 or 12 English letters/digits",
     "SERIAL_FORMAT": "Serial must be 6–20 English letters/digits"
   }
 }
