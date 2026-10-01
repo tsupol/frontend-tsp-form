@@ -377,7 +377,6 @@ export function CustomersPage() {
 
 function CustomerDetail({ customerId, customer }: { customerId: number; customer: Customer | null }) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
 
