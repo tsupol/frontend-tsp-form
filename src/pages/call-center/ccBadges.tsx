@@ -201,16 +201,19 @@ export function AppointmentBadge({ date }: { date: string | null }) {
 /** "Product (code)" where the code links to the asset page. Used for both the
  *  bound device and the loaner (mig 883/885). code is the clickable part. */
 export function DeviceLink({
-  deviceId, code, product, className = '',
+  deviceId, code, product, stacked = false, className = '',
 }: {
   deviceId: number | null;
   code: string | null;
   product: string | null;
+  /** Model on one line, code under it — for detail boxes with room. List rows
+   *  keep the single line. */
+  stacked?: boolean;
   className?: string;
 }) {
   if (!code && !product) return null;
   return (
-    <span className={`inline-flex items-center gap-1.5 min-w-0 ${className}`}>
+    <span className={`${stacked ? 'inline-flex flex-col items-start gap-0.5' : 'inline-flex items-center gap-1.5'} min-w-0 ${className}`}>
       {product && <span className="truncate">{product}</span>}
       {code && (
         deviceId ? (

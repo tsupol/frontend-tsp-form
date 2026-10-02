@@ -417,14 +417,16 @@ function OverviewTab({ row }: { row: BookRow }) {
       {/* Device — model + code link, context badges, loaner identity */}
       {(row.device_code_display || row.product_display_name || row.device_in_repair || row.device_deposited || row.has_loaner) && (
         <div className="flex flex-col gap-2 border border-line rounded-md p-3">
-          <div className="flex items-center gap-2 text-sm min-w-0">
-            <Smartphone size={15} className="text-subtle shrink-0" />
-            <span className="text-xs text-subtle shrink-0">{t('callCenter.boundDevice')}</span>
+          {/* Same icon / label / value columns as the status lines below. */}
+          <div className="flex items-start gap-2 text-sm min-w-0">
+            <span className="w-4 shrink-0 mt-0.5 text-subtle"><Smartphone size={14} /></span>
+            <span className="text-xs text-subtle shrink-0 w-24 mt-0.5">{t('callCenter.boundDevice')}</span>
             {(row.device_code_display || row.product_display_name) ? (
               <DeviceLink
                 deviceId={row.device_id}
                 code={row.device_code_display}
                 product={row.product_display_name}
+                stacked
                 className="text-sm"
               />
             ) : (
@@ -442,12 +444,14 @@ function OverviewTab({ row }: { row: BookRow }) {
             </div>
           )}
           {row.has_loaner && (row.loaner_code_display || row.loaner_product_display_name) && (
-            <div className="flex items-center gap-2 text-sm min-w-0">
-              <span className="text-xs text-subtle shrink-0">{t('callCenter.loanerDevice')}</span>
+            <div className="flex items-start gap-2 text-sm min-w-0">
+              <span className="w-4 shrink-0" />
+              <span className="text-xs text-subtle shrink-0 w-24 mt-0.5">{t('callCenter.loanerDevice')}</span>
               <DeviceLink
                 deviceId={row.loaner_device_id}
                 code={row.loaner_code_display}
                 product={row.loaner_product_display_name}
+                stacked
                 className="text-sm"
               />
             </div>
