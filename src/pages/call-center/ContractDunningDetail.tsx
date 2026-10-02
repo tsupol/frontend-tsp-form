@@ -28,7 +28,7 @@ import {
 } from './ccBadges';
 import { FlagChangeModal, PromiseModal, IcloudRevealButton } from './DunningActions';
 import { SendToRepoModal, type SendToRepoDirection } from './SendToRepoModal';
-import { DeviceSignalsPanel, deviceSignalsKey } from '../../components/DeviceSignalsPanel';
+import { DeviceSignalsPanel, deviceSignalsKey, useDeviceSignals } from '../../components/DeviceSignalsPanel';
 
 type DetailTab = 'overview' | 'installments' | 'contacts' | 'history';
 const TABS: DetailTab[] = ['overview', 'installments', 'contacts', 'history'];
@@ -295,6 +295,12 @@ function OverviewTab({ row }: { row: BookRow }) {
 
   const { data: appointment } = useActiveAppointment(row.contract_id);
   const { data: icloud } = useContractIcloud(row.contract_id);
+  // MDM + NNF app facts for the device the customer holds (DELIVERY 2026-10-01
+  // §1) — shown inside the device box, under whichever device they describe.
+  const { data: signals } = useDeviceSignals(row.contract_id);
+  const signalLines = signals
+    ? <DeviceSignalsPanel contractId={row.contract_id} signals={signals} bare />
+    : null;
 
   const refreshRow = () => {
     queryClient.invalidateQueries({ queryKey: ccKeys.bookRow(row.contract_id) });
@@ -425,6 +431,7 @@ function OverviewTab({ row }: { row: BookRow }) {
               <span className="text-subtler text-xs">{t('callCenter.noDevice')}</span>
             )}
           </div>
+          {signals && !signals.device_is_loaner && signalLines}
           {(row.device_in_repair || row.device_deposited || row.has_loaner) && (
             <div className="flex items-center gap-1.5 flex-wrap">
               <DeviceContextBadges
@@ -445,11 +452,9 @@ function OverviewTab({ row }: { row: BookRow }) {
               />
             </div>
           )}
+          {signals?.device_is_loaner && signalLines}
         </div>
       )}
-
-      {/* MDM + NNF app facts for the device the customer holds (§1) */}
-      <DeviceSignalsPanel contractId={row.contract_id} />
 
       {/* iCloud pool account — Apple ID + audited reveal */}
       {icloud?.device_icloud_account_id && (

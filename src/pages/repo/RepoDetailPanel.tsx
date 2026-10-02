@@ -25,6 +25,7 @@ import { RepoIcloudRevealModal, CopyRow } from './RepoIcloudRevealModal';
 import { RepoHandoverModal } from './RepoHandoverModal';
 import { RepoAlbum } from './RepoAlbum';
 import { RepoLocateSection } from './RepoLocateSection';
+import { DeviceSignalsPanel, useDeviceSignals } from '../../components/DeviceSignalsPanel';
 
 // Note-driven actions handled by the one reusable modal (keyed by action_code).
 const NOTE_ACTIONS: Partial<Record<RepoActionCode, NoteActionConfig>> = {
@@ -130,6 +131,9 @@ export function RepoDetailPanel({ contractId, onChanged }: {
     queryFn: () => fetchContractDeviceId(contractId),
     staleTime: 5 * 60_000,
   });
+
+  // MDM + NNF app facts, shown under whichever device the customer holds.
+  const { data: signals } = useDeviceSignals(contractId);
 
   const [logOpen, setLogOpen] = useState(false);
   const [giveUpOpen, setGiveUpOpen] = useState(false);
@@ -337,6 +341,7 @@ export function RepoDetailPanel({ contractId, onChanged }: {
               </div>
             </div>
           )}
+          {signals && !signals.device_is_loaner && <DeviceSignalsPanel contractId={contractId} signals={signals} bare />}
           {/* The device's iCloud account. In the body, by the device, so the
               agent sees at load whether the phone is tied to iCloud and to
               which Apple ID. The password button is never disabled while the
@@ -382,6 +387,15 @@ export function RepoDetailPanel({ contractId, onChanged }: {
               </div>
             </div>
           )}
+          {signals?.device_is_loaner && <DeviceSignalsPanel contractId={contractId} signals={signals} bare />}
+          {/* Lock + locate (DELIVERY 2026-10-01 §3), by the device it acts on */}
+          <RepoLocateSection
+            contractId={contractId}
+            contractCode={contractCode}
+            actions={actions}
+            inPool={inPool}
+            onFocus={onFocus}
+          />
           <div className="flex items-start gap-2 text-sm">
             <GeoPin precision={detail.geo_precision} />
             <div className="min-w-0 text-subtle text-xs">{detail.address_display ?? t('repo.detail.noAddress')}</div>
@@ -423,15 +437,6 @@ export function RepoDetailPanel({ contractId, onChanged }: {
             </div>
           )}
         </div>
-
-        {/* Device & app status + "lock device and locate" (DELIVERY 2026-10-01 §3) */}
-        <RepoLocateSection
-          contractId={contractId}
-          contractCode={contractCode}
-          actions={actions}
-          inPool={inPool}
-          onFocus={onFocus}
-        />
 
         <RepoAlbum contractId={contractId} contractCode={contractCode} canEdit={canEditAlbum} />
 

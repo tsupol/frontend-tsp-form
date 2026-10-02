@@ -99,31 +99,35 @@ function Line({ icon, label, children }: { icon?: React.ReactNode; label: string
 
 /** The panel for one contract. Renders nothing while loading or when the user
  *  has no access (0 rows). `signals` lets a host that already holds the row
- *  (e.g. the repo panel, which polls it) pass it in instead of re-querying. */
+ *  pass it in instead of re-querying.
+ *  `bare` drops the frame and title so the lines can sit inside a box that
+ *  already shows the device (collector overview, repo job card) — the device
+ *  is not repeated there. */
 export function DeviceSignalsPanel({
-  contractId, signals, showDeviceCode = true, className = '',
+  contractId, signals, showDeviceCode = true, bare = false, className = '',
 }: {
   contractId: number;
   signals?: ContractDeviceSignals | null;
   showDeviceCode?: boolean;
+  bare?: boolean;
   className?: string;
 }) {
   const { data: fetched } = useDeviceSignals(contractId);
   const s = signals !== undefined ? signals : fetched;
   if (!s) return null;
-  return <DeviceSignalsBody s={s} showDeviceCode={showDeviceCode} className={className} />;
+  return <DeviceSignalsBody s={s} showDeviceCode={showDeviceCode} bare={bare} className={className} />;
 }
 
-function DeviceSignalsBody({ s, showDeviceCode, className }: {
-  s: ContractDeviceSignals; showDeviceCode: boolean; className: string;
+function DeviceSignalsBody({ s, showDeviceCode, bare, className }: {
+  s: ContractDeviceSignals; showDeviceCode: boolean; bare: boolean; className: string;
 }) {
   const { t } = useTranslation();
   const loopMinutes = useMinutesLeft(s.locate_loop_ends_at);
   const battery = s.mdm_battery_level != null ? Math.round(s.mdm_battery_level * 100) : null;
 
   return (
-    <div className={`border border-line rounded-md p-3 flex flex-col gap-2 ${className}`}>
-      <div className="flex items-center gap-2 flex-wrap">
+    <div className={`${bare ? '' : 'border border-line rounded-md p-3'} flex flex-col gap-2 ${className}`}>
+      {!bare && <div className="flex items-center gap-2 flex-wrap">
         <Smartphone size={15} className="text-subtle shrink-0" />
         <span className="text-sm font-medium">{t('deviceSignals.title')}</span>
         {showDeviceCode && s.device_code_display && (
@@ -131,7 +135,7 @@ function DeviceSignalsBody({ s, showDeviceCode, className }: {
         )}
         {s.device_is_loaner && <Badge size="sm" color="warning">{t('deviceSignals.loaner')}</Badge>}
         {s.mdm_lost_mode_on && <Badge size="sm" color="danger">{t('deviceSignals.lostModeOn')}</Badge>}
-      </div>
+      </div>}
 
       {/* MDM */}
       {!s.mdm_enrolled ? (
@@ -156,6 +160,7 @@ function DeviceSignalsBody({ s, showDeviceCode, className }: {
           )}
           <Line icon={<Lock size={14} />} label={t('deviceSignals.lock')}>
             <span>{t(`deviceSignals.lockLevel.${s.mdm_lock_level ?? 0}`, { defaultValue: String(s.mdm_lock_level ?? '—') })}</span>
+            {bare && s.mdm_lost_mode_on && <Badge size="sm" color="danger">{t('deviceSignals.lostModeOn')}</Badge>}
             {s.mdm_wallpaper_on && <Badge size="sm" color="warning">{t('deviceSignals.wallpaperOn')}</Badge>}
             {s.mdm_pause_mode && <Badge size="sm" color="info">{t('deviceSignals.paused')}</Badge>}
             {s.mdm_lost_mode_pending && (

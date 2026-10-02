@@ -1,8 +1,8 @@
 // Repo job: "Lock device + locate" — DELIVERY 2026-10-01 §3.
 //
-// The section shows the device & app panel (§1), polled every 15 s while a
-// lock command or a location loop is under way (§3.2), and the three actions
-// from the evaluator:
+// The device's status lines (§1) sit in the job card under the device; this
+// section keeps them polled every 15 s while a lock command or a location loop
+// is under way (§3.2), and holds the three actions from the evaluator:
 //   REPO_LOCATE_START   → confirm, then ops_repo_locate_start (Lost Mode + loop)
 //   REPO_LOCATE_STOP    → confirm, then ops_repo_locate_stop
 //   REPO_LOCATION_TRAIL → the last 3 fixes, inline. Each call is logged as a look
@@ -24,7 +24,7 @@ import { PhoneInput } from '../../components/PhoneInput';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import {
-  DeviceSignalsPanel, useDeviceSignals, deviceSignalsKey, type ContractDeviceSignals,
+  useDeviceSignals, deviceSignalsKey, type ContractDeviceSignals,
 } from '../../components/DeviceSignalsPanel';
 import {
   repoLocateStart, repoLocateStop, repoLocationTrail,
@@ -136,8 +136,6 @@ export function RepoLocateSection({
 
   return (
     <div className="flex flex-col gap-2">
-      <DeviceSignalsPanel contractId={contractId} signals={signals ?? null} />
-
       {/* A lock command waits up to an hour for the device; if it lapses the
           panel's "waiting" line disappears with the lock still off (§3.2). */}
       {noAnswer && (
