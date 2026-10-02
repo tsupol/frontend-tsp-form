@@ -1280,5 +1280,9 @@
   "OPS.AUTH.NO_LEGAL_GRANT": "You do not have legal rights at this company.",
   "USER.VALIDATION.INVALID_SIGNATURE_MEDIA": "That signature file wasn’t uploaded for your account. Try again.",
   "inv.validation.identifier_format_invalid": "{{value}}: {{reason_label}}",
-  "inv.validation.identifier_format_invalid_basic": "The serial / IMEI format is not valid."
+  "inv.validation.identifier_format_invalid_basic": "The serial / IMEI format is not valid.",
+  "MDM.STATE.ASSET_NOT_ENROLLED": "This device has no MDM — the command cannot be sent.",
+  "MDM.VALIDATION.LOST_MODE_PHONE_REQUIRED": "Neither the branch nor the company has a phone on file — enter a phone number.",
+  "OPS.STATE.STATUS_NOT_SETTABLE": "This status cannot be set from here.",
+  "MDM.NOT_FOUND.ASSET": "Device not found."
 }

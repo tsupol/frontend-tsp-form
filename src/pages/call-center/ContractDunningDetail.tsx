@@ -10,7 +10,7 @@ import { Badge, Button, Select, TextArea, useSnackbarContext } from 'tsp-form';
 import {
   ChevronLeft, ChevronRight, Phone, Pencil, CheckCircle, XCircle,
   Smartphone, Users, ExternalLink, Save, Clock, Flag, CalendarClock,
-  MessageSquare, Cloud,
+  MessageSquare, Cloud, Truck, Undo2,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useChatDock } from '../../contexts/ChatDockContext';
@@ -27,6 +27,8 @@ import {
   DeviceContextBadges, AppointmentBadge, DeviceLink,
 } from './ccBadges';
 import { FlagChangeModal, PromiseModal, IcloudRevealButton } from './DunningActions';
+import { SendToRepoModal, type SendToRepoDirection } from './SendToRepoModal';
+import { DeviceSignalsPanel, deviceSignalsKey } from '../../components/DeviceSignalsPanel';
 
 type DetailTab = 'overview' | 'installments' | 'contacts' | 'history';
 const TABS: DetailTab[] = ['overview', 'installments', 'contacts', 'history'];
@@ -287,6 +289,9 @@ function OverviewTab({ row }: { row: BookRow }) {
   const queryClient = useQueryClient();
   const [flagOpen, setFlagOpen] = useState(false);
   const [promiseOpen, setPromiseOpen] = useState(false);
+  const [repoDirection, setRepoDirection] = useState<SendToRepoDirection | null>(null);
+  const lastRepoDirection = useRef<SendToRepoDirection>('send');
+  if (repoDirection) lastRepoDirection.current = repoDirection;
 
   const { data: appointment } = useActiveAppointment(row.contract_id);
   const { data: icloud } = useContractIcloud(row.contract_id);
@@ -296,6 +301,8 @@ function OverviewTab({ row }: { row: BookRow }) {
     queryClient.invalidateQueries({ queryKey: ccKeys.timeline(row.contract_id) });
     queryClient.invalidateQueries({ queryKey: ccKeys.appointment(row.contract_id) });
     queryClient.invalidateQueries({ queryKey: ['cc', 'book'] });
+    queryClient.invalidateQueries({ queryKey: deviceSignalsKey(row.contract_id) });
+    queryClient.invalidateQueries({ queryKey: ['repo'] });
   };
 
   // open_promise_date is the sortable column; the appointment view carries the
@@ -320,6 +327,18 @@ function OverviewTab({ row }: { row: BookRow }) {
         </Button>
         <DunningStatusBadge status={row.dunning_status} />
         <SkipReasonBadge reason={row.dunning_skip_reason} />
+        {/* Send to the repo team now (§2) — or take it back. The backend
+            decides who may; a refusal comes back as a translated error. */}
+        {row.dunning_status === 'ACTIVE' && (
+          <Button variant="outline" size="sm" startIcon={<Truck size={14} className="text-danger-fg" />} onClick={() => setRepoDirection('send')}>
+            {t('callCenter.sendToRepo.button')}
+          </Button>
+        )}
+        {row.dunning_status === 'WAIT_FOR_REPO' && (
+          <Button variant="outline" size="sm" startIcon={<Undo2 size={14} />} onClick={() => setRepoDirection('takeBack')}>
+            {t('callCenter.sendToRepo.takeBackButton')}
+          </Button>
+        )}
       </div>
 
       {/* Appointment (promise) — badge if one stands, else the "log promise" CTA */}
@@ -429,6 +448,9 @@ function OverviewTab({ row }: { row: BookRow }) {
         </div>
       )}
 
+      {/* MDM + NNF app facts for the device the customer holds (§1) */}
+      <DeviceSignalsPanel contractId={row.contract_id} />
+
       {/* iCloud pool account — Apple ID + audited reveal */}
       {icloud?.device_icloud_account_id && (
         <div className="flex flex-col gap-2 border border-line rounded-md p-3">
@@ -450,6 +472,14 @@ function OverviewTab({ row }: { row: BookRow }) {
         contractId={row.contract_id}
         currentManual={row.manual_flag_level}
         onClose={() => setFlagOpen(false)}
+        onChanged={refreshRow}
+      />
+      <SendToRepoModal
+        open={!!repoDirection}
+        direction={repoDirection ?? lastRepoDirection.current}
+        contractId={row.contract_id}
+        contractCode={row.contract_code_display}
+        onClose={() => setRepoDirection(null)}
         onChanged={refreshRow}
       />
       <PromiseModal

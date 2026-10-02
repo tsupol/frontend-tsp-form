@@ -1280,5 +1280,9 @@
   "OPS.AUTH.NO_LEGAL_GRANT": "คุณไม่มีสิทธิ์งานกฎหมายของบริษัทนี้",
   "USER.VALIDATION.INVALID_SIGNATURE_MEDIA": "ไฟล์ลายเซ็นนี้ไม่ได้อัปโหลดในบัญชีของคุณ ลองใหม่อีกครั้ง",
   "inv.validation.identifier_format_invalid": "{{value}}: {{reason_label}}",
-  "inv.validation.identifier_format_invalid_basic": "รูปแบบ Serial / IMEI ไม่ถูกต้อง"
+  "inv.validation.identifier_format_invalid_basic": "รูปแบบ Serial / IMEI ไม่ถูกต้อง",
+  "MDM.STATE.ASSET_NOT_ENROLLED": "เครื่องนี้ไม่มี MDM สั่งไม่ได้",
+  "MDM.VALIDATION.LOST_MODE_PHONE_REQUIRED": "สาขาและบริษัทไม่มีเบอร์โทรในระบบ — กรุณากรอกเบอร์โทร",
+  "OPS.STATE.STATUS_NOT_SETTABLE": "ตั้งสถานะนี้จากที่นี่ไม่ได้",
+  "MDM.NOT_FOUND.ASSET": "ไม่พบเครื่อง"
 }

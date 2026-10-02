@@ -116,9 +116,10 @@ export type RepoActionCode =
   | 'REPO_LOG_ATTEMPT' | 'REPO_GIVE_UP' | 'REPO_REVERT_ACTIVE' | 'REPO_ADD_NOTE'
   | 'REPO_FOCUS_ADD' | 'REPO_FOCUS_REMOVE' | 'REPO_SET_TARGET'
   | 'REPO_PRINT_AUTHORITY' | 'REPO_PRINT_CONTRACT'
+  | 'REPO_LOCATE_START' | 'REPO_LOCATE_STOP' | 'REPO_LOCATION_TRAIL'
   | 'LEGAL_FINISH' | 'LEGAL_RETURN_TO_REPO' | string;
 
-// fn_repo_available_actions — bare array, all 11 always present.
+// fn_repo_available_actions — bare array, all 15 always present.
 //  is_permitted = who (hide when false) · is_available = now (disable when false).
 export interface RepoAction {
   action_code: RepoActionCode;
@@ -404,4 +405,68 @@ export function invalidateRepoQueries(queryClient: {
   invalidateQueries: (f: { queryKey: unknown[] }) => unknown;
 }): void {
   queryClient.invalidateQueries({ queryKey: ['repo'] });
+}
+
+// ── Lock the device + follow its location (mig 1365) ───────────────────────
+// DELIVERY 2026-10-01 §3. One command sends Lost Mode and a 30-minute location
+// loop together — pressed separately, the customer sees the lock screen and
+// switches the phone off before a fix arrives. Safe to press again (a repeat
+// restarts the loop once it has ended). Progress is read from
+// v_contract_device_signals, never from these replies.
+
+export type RepoLostModeOutcome = 'SENT' | 'IN_FLIGHT' | 'ALREADY_ACTIVE' | 'NOT_ACTIVE' | string;
+export type RepoLoopOutcome = 'SENT' | 'IN_FLIGHT' | 'ALREADY_RUNNING' | string;
+
+export interface RepoLocateStartResult {
+  contract_id: number;
+  asset_id: number;
+  lost_mode: RepoLostModeOutcome;
+  lost_mode_intent_id: number | null;
+  loop: RepoLoopOutcome;
+  loop_intent_id: number | null;
+  loop_ends_at: string | null;
+}
+
+export interface RepoLocateStopResult {
+  contract_id: number;
+  asset_id: number;
+  lost_mode: RepoLostModeOutcome;
+}
+
+export function repoLocateStart(contractId: number, phone?: string | null): Promise<RepoLocateStartResult> {
+  return apiClient.rpc<RepoLocateStartResult>('ops_repo_locate_start', {
+    p_contract_id: contractId,
+    ...(phone ? { p_phone_number: phone } : {}),
+  });
+}
+
+export function repoLocateStop(contractId: number): Promise<RepoLocateStopResult> {
+  return apiClient.rpc<RepoLocateStopResult>('ops_repo_locate_stop', { p_contract_id: contractId });
+}
+
+// Every call is logged as one look at the customer's location (who, which
+// contract, when). Call it when the user opens the list or when
+// mdm_last_location_at moves — never on a timer.
+export type RepoStalenessBand = 'FRESH' | 'OLDER_THAN_15M' | 'OLDER_THAN_24H' | string;
+
+export interface RepoLocationFix {
+  location_id: number;
+  lat: number;
+  lon: number;
+  accuracy_m: number | null;
+  reported_at: string;
+  received_at: string;
+  staleness_band: RepoStalenessBand;
+}
+
+export interface RepoLocationTrail {
+  contract_id: number;
+  asset_id: number | null;
+  limit: number;
+  count: number;
+  fixes: RepoLocationFix[];
+}
+
+export function repoLocationTrail(contractId: number): Promise<RepoLocationTrail> {
+  return apiClient.rpc<RepoLocationTrail>('ops_repo_location_trail', { p_contract_id: contractId });
 }

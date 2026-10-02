@@ -11,6 +11,7 @@ import { getBucketLabel, getBucketColor, codeDisplay } from '../inventory/invent
 import { productName } from './contractUtils';
 import { AssignIcloudModal, ReleaseIcloudModal, IcloudPasswordRow } from './IcloudModals';
 import { AssetScreenTimeSection } from '../../components/AssetScreenTimeSection';
+import { DeviceSignalsPanel } from '../../components/DeviceSignalsPanel';
 import { ContractDeviceTimeline } from '../../components/AssetContractTimeline';
 import { ColorSwatch } from '../../components/ColorAutocomplete';
 import { ImeiInput } from '../../components/ImeiInput';
@@ -365,6 +366,11 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
               {contract.device_id != null && (
                 <AssetScreenTimeSection assetId={contract.device_id} className="mt-2" />
               )}
+
+              {/* When MDM last saw the device the customer holds, and when they
+                  last opened the NNF app. Renders only for users the view
+                  answers (collectors, the repo team while the job is theirs). */}
+              <DeviceSignalsPanel contractId={contract.id} showDeviceCode={false} className="mt-2" />
 
               {(canDo('DEVICE_REPAIR_REQUEST') || canDo('UNBIND_DEVICE') || canDo('CUSTOMER_DEPOSIT_DEVICE') || canDo('RETURN_DEPOSIT')) && (
                 <div className="flex flex-wrap gap-2 pt-2 border-t border-line mt-2">

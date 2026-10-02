@@ -24,6 +24,7 @@ import { beMediaRepoAuthorityPdf, beMediaRepoContractPdf, openPdfInNewTab } from
 import { RepoIcloudRevealModal, CopyRow } from './RepoIcloudRevealModal';
 import { RepoHandoverModal } from './RepoHandoverModal';
 import { RepoAlbum } from './RepoAlbum';
+import { RepoLocateSection } from './RepoLocateSection';
 
 // Note-driven actions handled by the one reusable modal (keyed by action_code).
 const NOTE_ACTIONS: Partial<Record<RepoActionCode, NoteActionConfig>> = {
@@ -224,6 +225,9 @@ export function RepoDetailPanel({ contractId, onChanged }: {
   const permitted = actions.filter((a) => a.is_permitted);
   const isFocusAction = (c: RepoActionCode) => c === 'REPO_FOCUS_ADD' || c === 'REPO_FOCUS_REMOVE';
   const isPrintAction = (c: RepoActionCode) => c === 'REPO_PRINT_AUTHORITY' || c === 'REPO_PRINT_CONTRACT';
+  // Lock + locate live in their own section with the device's status.
+  const isLocateAction = (c: RepoActionCode) =>
+    c === 'REPO_LOCATE_START' || c === 'REPO_LOCATE_STOP' || c === 'REPO_LOCATION_TRAIL';
 
   const primaryAction = permitted.find((a) => a.action_code === 'REPO_LOG_ATTEMPT') ?? null;
   // The good ending at the door — the customer hands the device back and
@@ -237,7 +241,8 @@ export function RepoDetailPanel({ contractId, onChanged }: {
     (a) => a.action_code !== 'REPO_LOG_ATTEMPT'
       && a.action_code !== 'REPO_HANDOVER_START'
       && !isFocusAction(a.action_code)
-      && !isPrintAction(a.action_code),
+      && !isPrintAction(a.action_code)
+      && !isLocateAction(a.action_code),
   );
 
   // Picking a job up is the gate on the iCloud password, so the control must be
@@ -418,6 +423,15 @@ export function RepoDetailPanel({ contractId, onChanged }: {
             </div>
           )}
         </div>
+
+        {/* Device & app status + "lock device and locate" (DELIVERY 2026-10-01 §3) */}
+        <RepoLocateSection
+          contractId={contractId}
+          contractCode={contractCode}
+          actions={actions}
+          inPool={inPool}
+          onFocus={onFocus}
+        />
 
         <RepoAlbum contractId={contractId} contractCode={contractCode} canEdit={canEditAlbum} />
 

@@ -1375,7 +1375,7 @@
         "title": "Lost Mode",
         "on": "On",
         "off": "Off",
-        "enableHint": "Locks the device and shows your message + phone on the lock screen. Both are required.",
+        "enableHint": "Locks the device and shows a message and a phone number on the lock screen.",
         "message": "Lock-screen message",
         "messagePlaceholder": "e.g. This device is managed by NNF. Please call to return it.",
         "phone": "Contact phone",
@@ -1388,7 +1388,9 @@
         "template": "Message template",
         "templatePlaceholder": "Choose a message",
         "noAnswer": "The device hasn't answered yet — the command is still queued. It'll update when the device comes online.",
-        "switching": "Switching…"
+        "switching": "Switching…",
+        "branchPhone": "Phone (from the branch)",
+        "noBranchPhone": "The branch and the company have no phone on file, so enter one."
       },
       "location": {
         "title": "Location",
@@ -2666,6 +2668,22 @@
       "DUE_TODAY": "Due today",
       "UPCOMING": "Upcoming",
       "FUTURE": "Future"
+    },
+    "sendToRepo": {
+      "button": "Send to repo team",
+      "takeBackButton": "Take back to follow up",
+      "title": "Send to repo team",
+      "takeBackTitle": "Take back to follow up",
+      "reason": "Reason",
+      "reasonPlaceholder": "e.g. device silent 12 days, customer not answering",
+      "takeBackPlaceholder": "e.g. customer called back",
+      "reasonCount": "{{n}} / at least {{min}} characters",
+      "hint": "The repo team reads this reason when they pick up the job.",
+      "confirm": "Send to repo team",
+      "takeBackConfirm": "Take back",
+      "sent": "Sent to the repo team",
+      "takenBack": "Back with you to follow up",
+      "unchanged": "Already in that status — nothing changed"
     }
   },
   "channel": {
@@ -7716,6 +7734,51 @@
       "removeBody": "Remove this photo from the repossession album?",
       "qrHint": "Scan to open the camera. Photos go into this album on their own.",
       "qrCount": "{{count}} / {{max}} taken"
+    },
+    "locate": {
+      "start": "Lock device + locate",
+      "startAgain": "Locate again",
+      "stop": "Release Lost Mode",
+      "trail": "Latest locations",
+      "trailRefresh": "Reload locations",
+      "pickUpFirst": "Add this job to today first.",
+      "noMdm": "This device has no MDM.",
+      "noMdmCannotSend": "This device has no MDM — it cannot be locked or located.",
+      "notInPool": "This job is no longer in your list — reload the list.",
+      "confirmStart": "Lock the device of contract {{code}}? The customer's screen locks straight away.",
+      "startExplain": "The lock screen shows the contract's branch name, the branch's phone and the contract number. The device is asked for its location every 5 minutes for 30 minutes.",
+      "confirmStartButton": "Lock and locate",
+      "confirmStop": "Release Lost Mode on this device? Locating stops too.",
+      "confirmStopButton": "Release",
+      "fallbackPhone": "Phone to show on the lock screen",
+      "phoneRequired": "Neither the branch nor the company has a phone on file — enter one to show on the lock screen.",
+      "startSent": "Lock and locate sent",
+      "stopSent": "Release sent",
+      "lostModeLabel": "Lost Mode",
+      "loopLabel": "Locating",
+      "outcome": {
+        "lost": {
+          "SENT": "Command sent",
+          "IN_FLIGHT": "Already waiting for the device",
+          "ALREADY_ACTIVE": "Already locked",
+          "NOT_ACTIVE": "Was not locked"
+        },
+        "loop": {
+          "SENT": "Started — every 5 minutes for 30 minutes",
+          "IN_FLIGHT": "Already waiting for the device",
+          "ALREADY_RUNNING": "Already running"
+        }
+      },
+      "followOnPanel": "Progress shows in the Device & app panel on the job.",
+      "noAnswer": "The device didn't answer within an hour — press again to retry.",
+      "trailEmpty": "No location yet — the device has not answered.",
+      "accuracy": "±{{m}} m",
+      "openMap": "Map",
+      "band": {
+        "FRESH": "within 15 minutes",
+        "OLDER_THAN_15M": "over 15 minutes ago",
+        "OLDER_THAN_24H": "over a day ago"
+      }
     }
   },
   "reports": {
@@ -9336,5 +9399,46 @@
     "IMEI_LUHN_FAIL": "IMEI is not valid — check the digits again",
     "APPLE_SERIAL_FORMAT": "An Apple serial is 10 or 12 English letters/digits",
     "SERIAL_FORMAT": "Serial must be 6–20 English letters/digits"
+  },
+  "deviceSignals": {
+    "title": "Device & app",
+    "loaner": "Loaner device",
+    "lostModeOn": "Lost Mode on",
+    "mdm": "MDM",
+    "noMdm": "No MDM on this device",
+    "mdmLastSeen": "MDM last saw it",
+    "neverSeen": "Never seen",
+    "seenToday": "seen today",
+    "silentDays_one": "silent {{count}} day",
+    "silentDays_other": "silent {{count}} days",
+    "battery": "Battery",
+    "batteryAsOfLastSeen": "(when last seen)",
+    "lock": "Lock",
+    "lockLevel": {
+      "0": "Not locked",
+      "1": "Light",
+      "2": "Medium",
+      "3": "Heavy"
+    },
+    "wallpaperOn": "Reminder wallpaper",
+    "paused": "Locking paused",
+    "lostModePending": "Lock sent — waiting for the device",
+    "nnfAppOnDevice": "NNF app on device",
+    "notCheckedYet": "Not checked yet",
+    "installed": "Installed",
+    "appRemoved": "Customer removed the app",
+    "checkedAt": "checked",
+    "location": "Location",
+    "locating_one": "Locating — {{count}} minute left",
+    "locating_other": "Locating — {{count}} minutes left",
+    "lastFix": "last fix",
+    "nnfApp": "NNF app",
+    "appNeverOpened": "Never opened the app",
+    "appToday": "used today",
+    "appSilentDays_one": "not opened for {{count}} day",
+    "appSilentDays_other": "not opened for {{count}} days",
+    "push": "Notifications",
+    "pushOk": "Reach the customer",
+    "pushNone": "Can't reach the customer — no phone registered"
   }
 }

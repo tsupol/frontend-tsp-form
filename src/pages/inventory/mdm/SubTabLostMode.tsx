@@ -23,7 +23,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Input, TextArea, Select } from 'tsp-form';
+import { Button, TextArea, Select } from 'tsp-form';
+import { PhoneInput } from '../../../components/PhoneInput';
+import { formatTel } from '../../../lib/format';
 import {
   MapPin, Bell, BellOff, Volume2, LocateFixed, ExternalLink, AlertTriangle,
   Repeat, Square, Loader2,
@@ -34,7 +36,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import {
   enableLostMode, enableLostModeFromTemplate, disableLostMode, playLostModeSound,
   requestLocation, readLocations, signalLocationLoop, stopLocationLoop,
-  fetchLostModeCompliance, fetchActiveLoop, fetchLastLocationAt, fetchLockTemplates, parseMdmError,
+  fetchLostModeCompliance, fetchActiveLoop, fetchLastLocationAt, fetchLockMessageOptions, parseMdmError,
   type AssetMdmStatus, type MdmLocation, type MdmActiveLoop, type ParsedMdmError,
 } from './mdmApi';
 import { useMdmCommand } from './useMdmCommand';
@@ -83,10 +85,28 @@ export function SubTabLostMode({
   const lostSwitching =
     compliance?.expected_enabled != null && compliance.expected_enabled !== lostOn;
 
-  const { data: templates = [] } = useQuery({
-    queryKey: ['mdm-lock-templates', i18n.language],
-    queryFn: () => fetchLockTemplates(i18n.language === 'th' ? 'th' : 'en'),
+  // The wordings with this device's branch, phone and contract filled in (§4).
+  const locale = i18n.language === 'th' ? 'th' : 'en';
+  const { data: msgOptions } = useQuery({
+    queryKey: ['mdm-lock-message-options', status.asset_id, locale],
+    queryFn: () => fetchLockMessageOptions(status.asset_id, locale),
+    enabled: canLostMode,
+    ...MDM_NO_CACHE,
   });
+  const templates = msgOptions?.templates ?? [];
+  const branchPhone = msgOptions?.phone_number ?? null;
+  const pickedTemplate = templates.find((tpl) => tpl.template_key === templateKey) ?? null;
+
+  // Typing your own: start from the standard wording and the branch's phone,
+  // once, without overwriting anything already typed.
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (seeded.current || !msgOptions) return;
+    seeded.current = true;
+    const def = msgOptions.templates.find((tpl) => tpl.template_key === 'DEFAULT');
+    if (def) setMessage((m) => m || def.message);
+    if (msgOptions.phone_number) setPhone((p) => p || msgOptions.phone_number!.replace(/\D/g, ''));
+  }, [msgOptions]);
 
   // Active location loop (§8.1) — polled by next_poll_at (§8.2) + the same
   // 30s keep-fresh baseline (a loop another staffer starts/stops shows up too).
@@ -181,7 +201,10 @@ export function SubTabLostMode({
     cmd.run(fire, (r) => [r.intent_id]).then((res) => { if (res) after?.(); return res; });
 
   // Enable eligibility.
-  const canEnableTemplate = !cmd.pending && actorId != null && !!templateKey && phone.trim().length > 0;
+  // The branch's phone fills the template on the server; a typed one is only
+  // needed when neither the branch nor the company has one.
+  const canEnableTemplate = !cmd.pending && actorId != null && !!templateKey
+    && (!!branchPhone || phone.trim().length > 0);
   const canEnableCustom = !cmd.pending && actorId != null && message.trim().length > 0 && phone.trim().length > 0;
 
   const loopActive = loop != null;
@@ -238,22 +261,35 @@ export function SubTabLostMode({
                     <Select
                       value={templateKey}
                       onChange={(v) => setTemplateKey(v as string)}
-                      options={templates.map((tpl) => ({ value: tpl.template_key, label: tpl.message_template }))}
+                      options={templates.map((tpl) => ({ value: tpl.template_key, label: tpl.message }))}
                       placeholder={t('asset.mdm.lost.templatePlaceholder')}
                       size="sm"
                       showChevron
                     />
+                    {pickedTemplate?.footnote && (
+                      <div className="text-xs text-subtle mt-1">{pickedTemplate.footnote}</div>
+                    )}
                   </div>
                   <div className="flex flex-col">
-                    <label className="form-label">{t('asset.mdm.lost.phone')} *</label>
-                    <Input value={phone} onChange={(e) => setPhone(e.target.value)} size="sm" className="w-full" placeholder={t('asset.mdm.lost.phonePlaceholder')} />
+                    {branchPhone ? (
+                      <>
+                        <label className="form-label">{t('asset.mdm.lost.branchPhone')}</label>
+                        <div className="text-sm">{formatTel(branchPhone)}</div>
+                      </>
+                    ) : (
+                      <>
+                        <label className="form-label">{t('asset.mdm.lost.phone')} *</label>
+                        <PhoneInput value={phone} onChange={(raw) => setPhone(raw)} size="sm" className="w-full" placeholder={t('asset.mdm.lost.phonePlaceholder')} />
+                        <div className="text-xs text-subtle mt-1">{t('asset.mdm.lost.noBranchPhone')}</div>
+                      </>
+                    )}
                   </div>
                   <div>
                     <Button color="danger" size="sm" startIcon={<Bell size={15} />} disabled={!canEnableTemplate}
                       onClick={() => actorId != null && templateKey && run(
                         () => enableLostModeFromTemplate({
                           p_asset_id: status.asset_id, p_actor_id: actorId, p_template_key: templateKey,
-                          p_phone_number: phone.trim(), p_locale: i18n.language === 'th' ? 'th' : 'en',
+                          p_phone_number: branchPhone ? '' : phone.trim(), p_locale: locale,
                         }),
                         () => lostBackoff.start(),
                       )}>
@@ -269,7 +305,7 @@ export function SubTabLostMode({
                   </div>
                   <div className="flex flex-col">
                     <label className="form-label">{t('asset.mdm.lost.phone')} *</label>
-                    <Input value={phone} onChange={(e) => setPhone(e.target.value)} size="sm" className="w-full" placeholder={t('asset.mdm.lost.phonePlaceholder')} />
+                    <PhoneInput value={phone} onChange={(raw) => setPhone(raw)} size="sm" className="w-full" placeholder={t('asset.mdm.lost.phonePlaceholder')} />
                   </div>
                   <div>
                     <Button color="danger" size="sm" startIcon={<Bell size={15} />} disabled={!canEnableCustom}

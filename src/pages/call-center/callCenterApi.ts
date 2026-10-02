@@ -494,3 +494,27 @@ export function overdueColor(days: number): 'info' | 'warning' | 'danger' {
   if (days >= 7) return 'warning';
   return 'info';
 }
+
+// ── Send to the repo team / take back (ops_contract_set_status) ─────────────
+// DELIVERY 2026-10-01 §2. Only these two targets are settable from here;
+// WAIT_FOR_REPO needs a reason of at least 10 characters (the repo team reads
+// it in v_repo_pool.status_reason). changed=false = it already was — not an error.
+export const SEND_TO_REPO_MIN_REASON = 10;
+
+export interface SetDunningStatusResult {
+  contract_id: number;
+  dunning_status: DunningStatus;
+  previous: DunningStatus;
+  changed: boolean;
+  status_reason: string | null;
+  status_reason_code: string | null;
+  status_at: string;
+  status_by: number;
+}
+
+export const setDunningStatus = (contractId: number, status: 'WAIT_FOR_REPO' | 'ACTIVE', reason: string | null) =>
+  apiClient.rpc<SetDunningStatusResult>('ops_contract_set_status', {
+    p_contract_id: contractId,
+    p_status: status,
+    p_reason: reason,
+  });

@@ -994,19 +994,28 @@ export function stopLocationLoop(assetId: number, actorId: number): Promise<MdmI
   return apiClient.rpc<MdmIntentAck>('fn_mdm_stop_location_loop', { p_asset_id: assetId, p_actor_id: actorId });
 }
 
-// v_mdm_lock_message_templates — standard lock-screen wordings, keyed by
-// template_key + locale. Filter to the UI language; the RPC re-resolves anyway.
-export interface MdmLockTemplate {
+// fn_mdm_lock_message_options (mig 1368, DELIVERY 2026-10-01 §4) — the lock-
+// screen wordings with the real branch name, the branch's phone and the
+// contract number already filled in, so the picker shows exactly what will
+// appear on the device (the raw templates above still carry {branch_name}).
+// phone_number: the branch's, else the company's, else null — only then does
+// the template mode need a typed phone.
+export interface MdmLockMessageOption {
   template_key: string;
-  locale: string;
-  message_template: string;
-  footnote_template: string | null;
-  is_active: boolean;
+  message: string;
+  footnote: string | null;
 }
-export function fetchLockTemplates(locale: string): Promise<MdmLockTemplate[]> {
-  return apiClient.get<MdmLockTemplate[]>(
-    `/v_mdm_lock_message_templates?is_active=is.true&locale=eq.${locale}&order=template_key`,
-  );
+export interface MdmLockMessageOptions {
+  asset_id: number;
+  branch_name: string | null;
+  phone_number: string | null;
+  contract_no: string | null;
+  templates: MdmLockMessageOption[];
+}
+export function fetchLockMessageOptions(assetId: number, locale: string): Promise<MdmLockMessageOptions> {
+  return apiClient.rpc<MdmLockMessageOptions>('fn_mdm_lock_message_options', {
+    p_asset_id: assetId, p_locale: locale,
+  });
 }
 
 // §8.1 — active location loop for a device (device_id === asset_id). No row =
