@@ -356,16 +356,17 @@ export function CallCenterPage() {
                       </button>
                     );
                   })}
+                  {/* Book-view "show all" hint — on the chip row, at its end,
+                      rather than a row of its own. */}
+                  {view === 'book' && focusCount > 0 && (
+                    <span className="ml-auto flex items-center gap-2 text-xs text-subtle">
+                      {!showAllInBook && <span>{t('callCenter.hiddenInFocus', { count: focusCount })}</span>}
+                      <button className="text-primary-fg hover:underline bg-transparent border-none p-0 cursor-pointer" onClick={() => { setShowAllInBook(v => !v); setPageIndex(0); }}>
+                        {showAllInBook ? t('callCenter.myBook') : t('callCenter.showAll')}
+                      </button>
+                    </span>
+                  )}
                 </div>
-                {/* Book-view "show all" hint */}
-                {view === 'book' && focusCount > 0 && (
-                  <div className="flex items-center gap-2 text-xs text-subtle">
-                    {!showAllInBook && <span>{t('callCenter.hiddenInFocus', { count: focusCount })}</span>}
-                    <button className="text-primary-fg hover:underline bg-transparent border-none p-0 cursor-pointer" onClick={() => { setShowAllInBook(v => !v); setPageIndex(0); }}>
-                      {showAllInBook ? t('callCenter.myBook') : t('callCenter.showAll')}
-                    </button>
-                  </div>
-                )}
               </div>
               )}
             </div>
