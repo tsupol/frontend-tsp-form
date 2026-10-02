@@ -7566,7 +7566,18 @@
       "noAddress": "ไม่มีที่อยู่ในระบบ",
       "lastAction": "การลงพื้นที่ล่าสุด",
       "neverActioned": "ยังไม่มีใครลงพื้นที่",
-      "noData": "ไม่พบข้อมูล"
+      "noData": "ไม่พบข้อมูล",
+      "jobTitle": "งาน",
+      "inStatus": "รอมาแล้ว",
+      "days_other": "{{count}} วัน",
+      "sentBecause": "เหตุผลที่ส่งมา",
+      "note": "บันทึก",
+      "customerTitle": "ลูกค้า",
+      "name": "ชื่อ",
+      "phone": "เบอร์โทร",
+      "address": "ที่อยู่",
+      "deviceTitle": "เครื่อง",
+      "model": "รุ่น"
     },
     "log": {
       "title": "บันทึกผลลงพื้นที่",
@@ -7665,7 +7676,8 @@
       "noIcloud": "เครื่องนี้ไม่ได้ผูกบัญชี iCloud",
       "pickUpAndReveal": "หยิบงานแล้วดูรหัส",
       "sharedAccountWarning": "บัญชีนี้คุมเครื่องของลูกค้ารายอื่นด้วย ห้ามส่งต่อ",
-      "copyFailed": "คัดลอกไม่สำเร็จ"
+      "copyFailed": "คัดลอกไม่สำเร็จ",
+      "short": "iCloud"
     },
     "authority": {
       "title": "ใบมอบอำนาจ",

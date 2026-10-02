@@ -49,7 +49,7 @@ export function CopyRow({ label, value }: { label: string; value: string }) {
     // The agent may have to type these into a device by hand, so the value wraps
     // rather than truncating — an Apple ID cut off mid-address is useless.
     <div className="flex items-start gap-2 min-w-0">
-      <span className="text-xs text-subtle shrink-0 pt-1">{label}</span>
+      {label && <span className="text-xs text-subtle shrink-0 pt-1">{label}</span>}
       <span className="font-mono text-sm flex-1 min-w-0 break-all">{value}</span>
       <Button
         variant="outline"

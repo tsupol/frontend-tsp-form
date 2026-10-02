@@ -9,7 +9,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, Select, TextArea, useSnackbarContext } from 'tsp-form';
 import {
   ChevronLeft, ChevronRight, Phone, Pencil, CheckCircle, XCircle,
-  Smartphone, Users, ExternalLink, Save, Clock, Flag, CalendarClock,
+  Users, ExternalLink, Save, Clock, Flag, CalendarClock,
   MessageSquare, Cloud, Truck, Undo2,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
@@ -29,6 +29,7 @@ import {
 import { FlagChangeModal, PromiseModal, IcloudRevealButton } from './DunningActions';
 import { SendToRepoModal, type SendToRepoDirection } from './SendToRepoModal';
 import { DeviceSignalsPanel, deviceSignalsKey, useDeviceSignals } from '../../components/DeviceSignalsPanel';
+import { DetailLine } from '../../components/DetailLine';
 
 type DetailTab = 'overview' | 'installments' | 'contacts' | 'history';
 const TABS: DetailTab[] = ['overview', 'installments', 'contacts', 'history'];
@@ -417,10 +418,8 @@ function OverviewTab({ row }: { row: BookRow }) {
       {/* Device — model + code link, context badges, loaner identity */}
       {(row.device_code_display || row.product_display_name || row.device_in_repair || row.device_deposited || row.has_loaner) && (
         <div className="flex flex-col gap-2 border border-line rounded-md p-3">
-          {/* Same icon / label / value columns as the status lines below. */}
-          <div className="flex items-start gap-2 text-sm min-w-0">
-            <span className="w-4 shrink-0 mt-0.5 text-subtle"><Smartphone size={14} /></span>
-            <span className="text-xs text-subtle shrink-0 w-24 mt-0.5">{t('callCenter.boundDevice')}</span>
+          {/* Same label / value columns as the status lines below. */}
+          <DetailLine label={t('callCenter.boundDevice')}>
             {(row.device_code_display || row.product_display_name) ? (
               <DeviceLink
                 deviceId={row.device_id}
@@ -432,7 +431,7 @@ function OverviewTab({ row }: { row: BookRow }) {
             ) : (
               <span className="text-subtler text-xs">{t('callCenter.noDevice')}</span>
             )}
-          </div>
+          </DetailLine>
           {signals && !signals.device_is_loaner && signalLines}
           {(row.device_in_repair || row.device_deposited || row.has_loaner) && (
             <div className="flex items-center gap-1.5 flex-wrap">
@@ -444,9 +443,7 @@ function OverviewTab({ row }: { row: BookRow }) {
             </div>
           )}
           {row.has_loaner && (row.loaner_code_display || row.loaner_product_display_name) && (
-            <div className="flex items-start gap-2 text-sm min-w-0">
-              <span className="w-4 shrink-0" />
-              <span className="text-xs text-subtle shrink-0 w-24 mt-0.5">{t('callCenter.loanerDevice')}</span>
+            <DetailLine label={t('callCenter.loanerDevice')}>
               <DeviceLink
                 deviceId={row.loaner_device_id}
                 code={row.loaner_code_display}
@@ -454,7 +451,7 @@ function OverviewTab({ row }: { row: BookRow }) {
                 stacked
                 className="text-sm"
               />
-            </div>
+            </DetailLine>
           )}
           {signals?.device_is_loaner && signalLines}
         </div>

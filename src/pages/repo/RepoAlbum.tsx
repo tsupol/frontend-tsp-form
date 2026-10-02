@@ -145,10 +145,10 @@ export function RepoAlbum({ contractId, contractCode, canEdit }: {
   }));
 
   return (
-    <div className="rounded-md border border-line bg-surface px-3 py-3 flex flex-col gap-2">
-      <div className="flex items-center gap-2">
+    <div className="rounded-md border border-line px-3 py-3 flex flex-col gap-2">
+      <div className="flex items-center gap-2 min-h-7">
         <ImageIcon size={14} className="text-subtle shrink-0" />
-        <span className="text-xs text-subtle">{t('repo.album.title')}</span>
+        <h3 className="text-sm font-medium">{t('repo.album.title')}</h3>
         {photos.length > 0 && <span className="text-xs text-subtler">{photos.length}</span>}
         {canEdit && (
           <Button

@@ -4,17 +4,17 @@ import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Badge, Tooltip, PopOver, useSnackbarContext } from 'tsp-form';
 import {
-  User, Phone, Smartphone, MapPin, Loader2, ClipboardList, Scale,
-  Star, StarOff, CheckCircle, Clock, AlertTriangle, Repeat, ExternalLink,
-  Printer, FileText, KeyRound, ChevronDown, PenLine, Eye,
+  User, Phone, Smartphone, Loader2, ClipboardList, Scale,
+  Star, StarOff, CheckCircle, AlertTriangle, Repeat, ExternalLink,
+  Printer, FileText, ChevronDown, PenLine, Eye,
 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { apiClient } from '../../lib/api';
 import { formatTel } from '../../lib/format';
 import { DeviceLink } from '../call-center/ccBadges';
 import {
-  fetchContractRepo, fetchRepoActions, fetchContractDeviceId, invalidateRepoQueries,
-  type RepoAction, type RepoActionCode, type GeoPrecision,
+  fetchContractRepo, fetchRepoActions, fetchContractDeviceId, fetchRepoStatusReason, invalidateRepoQueries,
+  type RepoAction, type RepoActionCode,
 } from './repoApi';
 import { RepoLogAttemptModal } from './RepoLogAttemptModal';
 import { RepoGiveUpModal } from './RepoGiveUpModal';
@@ -25,6 +25,7 @@ import { RepoIcloudRevealModal, CopyRow } from './RepoIcloudRevealModal';
 import { RepoHandoverModal } from './RepoHandoverModal';
 import { RepoAlbum } from './RepoAlbum';
 import { RepoLocateSection } from './RepoLocateSection';
+import { DetailLine, DetailSection } from '../../components/DetailLine';
 import { DeviceSignalsPanel, useDeviceSignals } from '../../components/DeviceSignalsPanel';
 
 // Note-driven actions handled by the one reusable modal (keyed by action_code).
@@ -95,17 +96,6 @@ function unavailableReason(
   return t('repo.action.notAvailableNow');
 }
 
-function GeoPin({ precision }: { precision: GeoPrecision }) {
-  const { t } = useTranslation();
-  if (precision === 'EXACT') {
-    return <Tooltip content={t('repo.geo.EXACT')} placement="top"><MapPin size={13} className="text-success-fg shrink-0" /></Tooltip>;
-  }
-  if (precision === 'CENTROID') {
-    return <Tooltip content={t('repo.geo.CENTROID')} placement="top"><MapPin size={13} className="text-warning-fg shrink-0" /></Tooltip>;
-  }
-  return <Tooltip content={t('repo.geo.NONE')} placement="top"><MapPin size={13} className="text-subtler shrink-0" /></Tooltip>;
-}
-
 export function RepoDetailPanel({ contractId, onChanged }: {
   contractId: number;
   isMobile: boolean;
@@ -132,6 +122,11 @@ export function RepoDetailPanel({ contractId, onChanged }: {
     staleTime: 5 * 60_000,
   });
 
+  const { data: statusReason = null } = useQuery({
+    queryKey: ['repo', 'statusReason', contractId],
+    queryFn: () => fetchRepoStatusReason(contractId),
+    staleTime: 15_000,
+  });
   // MDM + NNF app facts, shown under whichever device the customer holds.
   const { data: signals } = useDeviceSignals(contractId);
 
@@ -310,107 +305,64 @@ export function RepoDetailPanel({ contractId, onChanged }: {
         </div>
       </div>
 
-      {/* Body */}
-      <div className="flex-1 overflow-auto better-scroll px-4 py-3 flex flex-col gap-4">
-        {/* Baton status */}
-        <div className="flex items-center gap-2 text-sm text-subtle">
-          <Clock size={14} className="shrink-0" />
-          {t('repo.detail.inStatusFor', { days: detail.days_in_status })}
-          <span className="text-subtler">·</span>
-          {t('repo.detail.attempts', { count: detail.attempt_count })}
-        </div>
-
-        {/* Customer */}
-        <div className="rounded-md border border-line bg-surface px-3 py-3 flex flex-col gap-2">
-          <div className="flex items-center gap-2 text-sm">
-            <User size={14} className="text-subtle shrink-0" />
-            <span className="font-medium truncate">{detail.customer_name ?? '—'}</span>
-            {detail.customer_tel && (
-              <a href={`tel:${detail.customer_tel}`} className="inline-flex items-center gap-1 text-xs text-primary-fg hover:underline shrink-0 tabular-nums">
-                <Phone size={11} />{formatTel(detail.customer_tel)}
-              </a>
+      {/* Body — three plain sections, each a column of label/value rows:
+          the job (why it is here, where it stands), the customer (who and
+          where to go, the sheets to print before setting off), the device
+          (what to bring back, its status, lock + locate). Photos last. */}
+      <div className="flex-1 overflow-auto better-scroll px-4 py-3 flex flex-col gap-3">
+        <DetailSection icon={<ClipboardList size={14} />} title={t('repo.detail.jobTitle')}>
+          <DetailLine label={t('repo.detail.inStatus')}>
+            <span>{t('repo.detail.days', { count: detail.days_in_status })}</span>
+            <span className="text-xs text-subtle">{t('repo.detail.attempts', { count: detail.attempt_count })}</span>
+          </DetailLine>
+          {statusReason?.status_reason && (
+            <DetailLine label={t('repo.detail.sentBecause')}>
+              <span className="whitespace-pre-wrap">{statusReason.status_reason}</span>
+            </DetailLine>
+          )}
+          <DetailLine label={t('repo.detail.lastAction')}>
+            {detail.never_actioned ? (
+              <span className="text-subtler">{t('repo.detail.neverActioned')}</span>
+            ) : (
+              <>
+                <span>{detail.last_action_result ? t(`repo.result.${detail.last_action_result}`, { defaultValue: detail.last_action_result }) : '—'}</span>
+                <span className="text-xs text-subtle">
+                  {detail.last_action_at && <DateTime value={detail.last_action_at} showTime />}
+                  {detail.last_action_by_username && <> · {detail.last_action_by_username}</>}
+                </span>
+              </>
             )}
-          </div>
-          {detail.device_code_display && (
-            <div className="flex items-start gap-2 text-sm">
-              <Smartphone size={14} className="text-subtle shrink-0 mt-0.5" />
-              <div className="min-w-0">
-                {detail.product_display_name && <div className="text-sm">{detail.product_display_name}</div>}
-                <DeviceLink deviceId={deviceId} code={detail.device_code_display} product={null} />
-                {detail.device_serial && <div className="text-xs text-subtle font-mono">{detail.device_serial}</div>}
-              </div>
-            </div>
+          </DetailLine>
+          {detail.note && (
+            <DetailLine label={t('repo.detail.note')}>
+              <span className="whitespace-pre-wrap text-subtle">{detail.note}</span>
+            </DetailLine>
           )}
-          {signals && !signals.device_is_loaner && <DeviceSignalsPanel contractId={contractId} signals={signals} bare />}
-          {/* The device's iCloud account. In the body, by the device, so the
-              agent sees at load whether the phone is tied to iCloud and to
-              which Apple ID. The password button is never disabled while the
-              job is in the pool: not picked up yet → the same press picks it
-              up, then reveals (DELIVERY 2026-10-01). */}
-          {detail.device_code_display && (
-            <div className="flex items-start gap-2 text-sm">
-              <KeyRound size={14} className="text-subtle shrink-0 mt-0.5" />
-              <div className="min-w-0 flex-1 flex flex-col gap-1.5">
-                <div className="text-xs text-subtle">{t('repo.icloud.sectionTitle')}</div>
-                {detail.has_icloud ? (
-                  <>
-                    {detail.device_icloud_apple_id && (
-                      <CopyRow label={t('repo.icloud.appleId')} value={detail.device_icloud_apple_id} />
-                    )}
-                    {canRevealIcloud && (
-                      <div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          startIcon={<Eye size={14} />}
-                          onClick={() => setIcloudOpen(true)}
-                        >
-                          {onFocus ? t('repo.icloud.revealButton') : t('repo.icloud.pickUpAndReveal')}
-                        </Button>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="text-xs text-subtler">{t('repo.icloud.noIcloud')}</div>
-                )}
-              </div>
-            </div>
-          )}
-          {/* Loaner — prominent on the repo screen: the crew must collect it too */}
-          {detail.has_loaner && (
-            <div className="flex items-start gap-2 text-sm rounded-md bg-danger-soft border border-danger-border px-2.5 py-2">
-              <Repeat size={14} className="text-danger-fg shrink-0 mt-0.5" />
-              <div className="min-w-0">
-                <div className="text-xs font-medium text-danger-fg">{t('callCenter.loanerToCollect')}</div>
-                {detail.loaner_product_display_name && <div className="text-sm">{detail.loaner_product_display_name}</div>}
-                <DeviceLink deviceId={detail.loaner_device_id} code={detail.loaner_code_display} product={null} />
-              </div>
-            </div>
-          )}
-          {signals?.device_is_loaner && <DeviceSignalsPanel contractId={contractId} signals={signals} bare />}
-          {/* Lock + locate (DELIVERY 2026-10-01 §3), by the device it acts on */}
-          <RepoLocateSection
-            contractId={contractId}
-            contractCode={contractCode}
-            actions={actions}
-            inPool={inPool}
-            onFocus={onFocus}
-          />
-          <div className="flex items-start gap-2 text-sm">
-            <GeoPin precision={detail.geo_precision} />
-            <div className="min-w-0 text-subtle text-xs">{detail.address_display ?? t('repo.detail.noAddress')}</div>
-          </div>
-          {detail.geo_precision === 'CENTROID' && (
-            <div className="text-[11px] text-warning-fg flex items-center gap-1">
-              <AlertTriangle size={12} />{t('repo.geo.centroidWarn')}
-            </div>
-          )}
+        </DetailSection>
 
-          {/* The two sheets live here, not in the footer: they describe THIS
-              device and address, and they are printed while looking at them,
-              before setting off — not at the end of the job. */}
+        <DetailSection icon={<User size={14} />} title={t('repo.detail.customerTitle')}>
+          <DetailLine label={t('repo.detail.name')}>
+            <span className="font-medium">{detail.customer_name ?? '—'}</span>
+          </DetailLine>
+          {detail.customer_tel && (
+            <DetailLine label={t('repo.detail.phone')}>
+              <a href={`tel:${detail.customer_tel}`} className="inline-flex items-center gap-1 text-primary-fg hover:underline tabular-nums">
+                <Phone size={12} />{formatTel(detail.customer_tel)}
+              </a>
+            </DetailLine>
+          )}
+          <DetailLine label={t('repo.detail.address')}>
+            <span className={detail.address_display ? '' : 'text-subtler'}>{detail.address_display ?? t('repo.detail.noAddress')}</span>
+            {detail.geo_precision === 'CENTROID' && (
+              <span className="text-xs text-warning-fg flex items-start gap-1 basis-full">
+                <AlertTriangle size={12} className="shrink-0 mt-0.5" />{t('repo.geo.centroidWarn')}
+              </span>
+            )}
+          </DetailLine>
+          {/* The two sheets describe this customer, address and device, and are
+              printed before setting off — so here, not in the footer. */}
           {printActions.length > 0 && (
-            <div className="pt-2 mt-1 border-t border-line flex flex-wrap gap-2">
+            <div className="pt-2 mt-1 border-t border-line-subtle flex flex-wrap gap-2">
               {printActions.map((a) => (
                 <Tooltip
                   key={a.action_code}
@@ -436,31 +388,63 @@ export function RepoDetailPanel({ contractId, onChanged }: {
               ))}
             </div>
           )}
-        </div>
+        </DetailSection>
+
+        {detail.device_code_display && (
+          <DetailSection icon={<Smartphone size={14} />} title={t('repo.detail.deviceTitle')}>
+            <DetailLine label={t('repo.detail.model')}>
+              <span className="flex flex-col items-start gap-0.5 min-w-0">
+                {detail.product_display_name && <span>{detail.product_display_name}</span>}
+                <DeviceLink deviceId={deviceId} code={detail.device_code_display} product={null} />
+                {detail.device_serial && <span className="text-xs text-subtle font-mono">{detail.device_serial}</span>}
+              </span>
+            </DetailLine>
+            {signals && !signals.device_is_loaner && <DeviceSignalsPanel contractId={contractId} signals={signals} bare />}
+            {/* The password button is never disabled while the job is in the
+                pool: not picked up yet → the same press picks it up, then
+                reveals (DELIVERY 2026-10-01). */}
+            <DetailLine label={t('repo.icloud.short')}>
+              {detail.has_icloud ? (
+                <span className="flex flex-col gap-1.5 flex-1 min-w-0">
+                  {detail.device_icloud_apple_id && <CopyRow label="" value={detail.device_icloud_apple_id} />}
+                  {canRevealIcloud && (
+                    <span>
+                      <Button variant="outline" size="sm" startIcon={<Eye size={14} />} onClick={() => setIcloudOpen(true)}>
+                        {onFocus ? t('repo.icloud.revealButton') : t('repo.icloud.pickUpAndReveal')}
+                      </Button>
+                    </span>
+                  )}
+                </span>
+              ) : (
+                <span className="text-subtler">{t('repo.icloud.noIcloud')}</span>
+              )}
+            </DetailLine>
+            {/* Loaner — prominent: the crew must collect it too */}
+            {detail.has_loaner && (
+              <div className="flex items-start gap-2 text-sm rounded-md bg-danger-soft border border-danger-border px-2.5 py-2">
+                <Repeat size={14} className="text-danger-fg shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <div className="text-xs font-medium text-danger-fg">{t('callCenter.loanerToCollect')}</div>
+                  {detail.loaner_product_display_name && <div className="text-sm">{detail.loaner_product_display_name}</div>}
+                  <DeviceLink deviceId={detail.loaner_device_id} code={detail.loaner_code_display} product={null} />
+                </div>
+              </div>
+            )}
+            {signals?.device_is_loaner && <DeviceSignalsPanel contractId={contractId} signals={signals} bare />}
+            {/* Lock + locate (DELIVERY 2026-10-01 §3), by the device it acts on */}
+            <div className="pt-2 mt-1 border-t border-line-subtle">
+              <RepoLocateSection
+                contractId={contractId}
+                contractCode={contractCode}
+                actions={actions}
+                inPool={inPool}
+                onFocus={onFocus}
+              />
+            </div>
+          </DetailSection>
+        )}
 
         <RepoAlbum contractId={contractId} contractCode={contractCode} canEdit={canEditAlbum} />
-
-        {/* Last action */}
-        <div className="rounded-md border border-line bg-surface px-3 py-3 text-sm">
-          <div className="text-xs text-subtle mb-1">{t('repo.detail.lastAction')}</div>
-          {detail.never_actioned ? (
-            <div className="text-subtler">{t('repo.detail.neverActioned')}</div>
-          ) : (
-            <div className="flex flex-col gap-0.5">
-              <div className="flex items-center gap-2">
-                <ClipboardList size={13} className="text-subtle shrink-0" />
-                <span>{detail.last_action_result ? t(`repo.result.${detail.last_action_result}`, { defaultValue: detail.last_action_result }) : '—'}</span>
-              </div>
-              <div className="text-xs text-subtle pl-5">
-                {detail.last_action_at && <DateTime value={detail.last_action_at} showTime />}
-                {detail.last_action_by_username && <> · {detail.last_action_by_username}</>}
-              </div>
-            </div>
-          )}
-          {detail.note && (
-            <div className="mt-2 pt-2 border-t border-line text-xs text-subtle whitespace-pre-wrap">{detail.note}</div>
-          )}
-        </div>
       </div>
 
       {/* Actions.

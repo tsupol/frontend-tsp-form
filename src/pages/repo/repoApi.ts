@@ -470,3 +470,16 @@ export interface RepoLocationTrail {
 export function repoLocationTrail(contractId: number): Promise<RepoLocationTrail> {
   return apiClient.rpc<RepoLocationTrail>('ops_repo_location_trail', { p_contract_id: contractId });
 }
+
+// Why the job was sent here and when — typed by the collector when they sent it
+// (DELIVERY 2026-10-01 §2). The detail view doesn't carry it; the worklist row
+// does, and only while the job is in the pool.
+export function fetchRepoStatusReason(
+  contractId: number,
+): Promise<{ status_reason: string | null; status_at: string } | null> {
+  return apiClient
+    .get<Array<{ status_reason: string | null; status_at: string }>>(
+      `/v_repo_pool?contract_id=eq.${contractId}&select=status_reason,status_at`,
+    )
+    .then((rows) => rows[0] ?? null);
+}

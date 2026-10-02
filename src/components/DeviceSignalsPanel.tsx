@@ -16,9 +16,10 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Badge } from 'tsp-form';
-import { Smartphone, Radio, BatteryLow, Battery, MapPin, Loader2, BellRing, BellOff, Lock } from 'lucide-react';
+import { Smartphone, Loader2 } from 'lucide-react';
 import { apiClient } from '../lib/api';
 import { DateTime } from './DateTime';
+import { DetailLine } from './DetailLine';
 
 export interface ContractDeviceSignals {
   contract_id: number;
@@ -87,16 +88,6 @@ function useMinutesLeft(iso: string | null): number | null {
   return Number.isFinite(ms) ? Math.max(0, Math.ceil(ms / 60_000)) : null;
 }
 
-function Line({ icon, label, children }: { icon?: React.ReactNode; label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-start gap-2 text-sm min-w-0">
-      <span className="w-4 shrink-0 mt-0.5 text-subtle">{icon}</span>
-      <span className="text-xs text-subtle shrink-0 w-24 mt-0.5">{label}</span>
-      <div className="min-w-0 flex-1 flex items-center gap-1.5 flex-wrap">{children}</div>
-    </div>
-  );
-}
-
 /** The panel for one contract. Renders nothing while loading or when the user
  *  has no access (0 rows). `signals` lets a host that already holds the row
  *  pass it in instead of re-querying.
@@ -139,26 +130,26 @@ function DeviceSignalsBody({ s, showDeviceCode, bare, className }: {
 
       {/* MDM */}
       {!s.mdm_enrolled ? (
-        <Line icon={<Radio size={14} />} label={t('deviceSignals.mdm')}>
+        <DetailLine label={t('deviceSignals.mdm')}>
           <span className="text-subtler">{t('deviceSignals.noMdm')}</span>
-        </Line>
+        </DetailLine>
       ) : (
         <>
-          <Line icon={<Radio size={14} />} label={t('deviceSignals.mdmLastSeen')}>
+          <DetailLine label={t('deviceSignals.mdmLastSeen')}>
             {s.mdm_last_seen_at ? <DateTime value={s.mdm_last_seen_at} /> : <span className="text-subtler">{t('deviceSignals.neverSeen')}</span>}
             {s.mdm_silent_days != null && (
               <span className="text-xs text-subtle">
                 {s.mdm_silent_days === 0 ? t('deviceSignals.seenToday') : t('deviceSignals.silentDays', { count: s.mdm_silent_days })}
               </span>
             )}
-          </Line>
+          </DetailLine>
           {battery != null && (
-            <Line icon={battery <= 15 ? <BatteryLow size={14} /> : <Battery size={14} />} label={t('deviceSignals.battery')}>
+            <DetailLine label={t('deviceSignals.battery')}>
               <span>{battery}%</span>
               <span className="text-xs text-subtler">{t('deviceSignals.batteryAsOfLastSeen')}</span>
-            </Line>
+            </DetailLine>
           )}
-          <Line icon={<Lock size={14} />} label={t('deviceSignals.lock')}>
+          <DetailLine label={t('deviceSignals.lock')}>
             <span>{t(`deviceSignals.lockLevel.${s.mdm_lock_level ?? 0}`, { defaultValue: String(s.mdm_lock_level ?? '—') })}</span>
             {bare && s.mdm_lost_mode_on && <Badge size="sm" color="danger">{t('deviceSignals.lostModeOn')}</Badge>}
             {s.mdm_wallpaper_on && <Badge size="sm" color="warning">{t('deviceSignals.wallpaperOn')}</Badge>}
@@ -168,8 +159,8 @@ function DeviceSignalsBody({ s, showDeviceCode, bare, className }: {
                 <Loader2 size={11} className="animate-spin" />{t('deviceSignals.lostModePending')}
               </span>
             )}
-          </Line>
-          <Line label={t('deviceSignals.nnfAppOnDevice')}>
+          </DetailLine>
+          <DetailLine label={t('deviceSignals.nnfAppOnDevice')}>
             {s.mdm_nnf_app_installed == null ? (
               <span className="text-subtler">{t('deviceSignals.notCheckedYet')}</span>
             ) : s.mdm_nnf_app_installed ? (
@@ -180,9 +171,9 @@ function DeviceSignalsBody({ s, showDeviceCode, bare, className }: {
             {s.mdm_nnf_app_checked_at && (
               <span className="text-xs text-subtler">{t('deviceSignals.checkedAt')} <DateTime value={s.mdm_nnf_app_checked_at} /></span>
             )}
-          </Line>
+          </DetailLine>
           {(s.locate_loop_ends_at || s.mdm_last_location_at) && (
-            <Line icon={<MapPin size={14} />} label={t('deviceSignals.location')}>
+            <DetailLine label={t('deviceSignals.location')}>
               {s.locate_loop_ends_at && (
                 <span className="text-info-fg inline-flex items-center gap-1">
                   <Loader2 size={12} className="animate-spin" />
@@ -192,14 +183,14 @@ function DeviceSignalsBody({ s, showDeviceCode, bare, className }: {
               {s.mdm_last_location_at && (
                 <span className="text-xs text-subtle">{t('deviceSignals.lastFix')} <DateTime value={s.mdm_last_location_at} /></span>
               )}
-            </Line>
+            </DetailLine>
           )}
         </>
       )}
 
       {/* NNF app */}
       <div className="border-t border-line-subtle pt-2 flex flex-col gap-2">
-        <Line label={t('deviceSignals.nnfApp')}>
+        <DetailLine label={t('deviceSignals.nnfApp')}>
           {!s.app_ever_opened ? (
             <span className="text-subtler">{t('deviceSignals.appNeverOpened')}</span>
           ) : (
@@ -213,12 +204,12 @@ function DeviceSignalsBody({ s, showDeviceCode, bare, className }: {
               )}
             </>
           )}
-        </Line>
-        <Line icon={s.app_has_push_device ? <BellRing size={14} /> : <BellOff size={14} />} label={t('deviceSignals.push')}>
+        </DetailLine>
+        <DetailLine label={t('deviceSignals.push')}>
           {s.app_has_push_device
             ? <span>{t('deviceSignals.pushOk')}</span>
             : <span className="text-warning-fg">{t('deviceSignals.pushNone')}</span>}
-        </Line>
+        </DetailLine>
       </div>
     </div>
   );

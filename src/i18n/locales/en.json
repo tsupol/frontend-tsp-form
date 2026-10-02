@@ -7575,7 +7575,19 @@
       "noAddress": "No address on file",
       "lastAction": "Last field action",
       "neverActioned": "No one has been out yet",
-      "noData": "Not found"
+      "noData": "Not found",
+      "jobTitle": "Job",
+      "inStatus": "Waiting",
+      "days_one": "{{count}} day",
+      "days_other": "{{count}} days",
+      "sentBecause": "Sent because",
+      "note": "Note",
+      "customerTitle": "Customer",
+      "name": "Name",
+      "phone": "Phone",
+      "address": "Address",
+      "deviceTitle": "Device",
+      "model": "Model"
     },
     "log": {
       "title": "Log field result",
@@ -7674,7 +7686,8 @@
       "noIcloud": "This device is not tied to an iCloud account",
       "pickUpAndReveal": "Add to today and show password",
       "sharedAccountWarning": "This account also controls other customers’ devices. Do not pass it on.",
-      "copyFailed": "Could not copy"
+      "copyFailed": "Could not copy",
+      "short": "iCloud"
     },
     "authority": {
       "title": "Authority letters",
