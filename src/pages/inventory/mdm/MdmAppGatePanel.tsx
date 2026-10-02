@@ -46,6 +46,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from 'tsp-form';
 import { Unlock, Lock, Loader2 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
+import { ApiError } from '../../../lib/api';
 import { DateTime } from '../../../components/DateTime';
 import { MdmChallengeDialog } from './MdmChallengeDialog';
 import { MDM_NO_CACHE } from './useMdmStatus';
@@ -96,7 +97,7 @@ function GatePanelBody({
   const qc = useQueryClient();
 
   const statusKey = ['mdm-app-gate-status', serial];
-  const { data: gate, isLoading } = useQuery<MdmAppGateStatus>({
+  const { data: gate, isLoading, isError, error } = useQuery<MdmAppGateStatus>({
     queryKey: statusKey,
     queryFn: () => fetchAppGateStatus(serial!),
     enabled: !!serial,
@@ -198,6 +199,21 @@ function GatePanelBody({
       onChanged();
     }
   };
+
+  // A failed read used to fall through to the spinner below and spin forever
+  // (e.g. the session was revoked mid-visit). Say what went wrong and offer a
+  // retry instead.
+  if (isError) {
+    return (
+      <div className="border border-line rounded-md px-3 py-2.5 flex items-center gap-2 text-sm">
+        <span className="text-subtle">{t('asset.mdm.appGate.title')}</span>
+        <span className="text-danger-fg text-xs min-w-0">
+          {error instanceof ApiError && error.isAuthError ? t('auth.sessionExpired') : parseMdmError(error, t).message}
+        </span>
+        <Button variant="outline" size="sm" className="ml-auto" onClick={reloadStatus}>{t('common.retry')}</Button>
+      </div>
+    );
+  }
 
   if (isLoading || !gate) {
     return (

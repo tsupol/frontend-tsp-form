@@ -242,13 +242,18 @@ export class ApiClient {
       console.error(`[API] Non-v2 error from ${endpoint} (HTTP ${status}). Expected {ok, error}. Got:`, data);
     }
 
-    const auth = status === 401 && !isPermissionDenied;
-
     // RAISE'd business errors (RPCs) come back as raw PostgREST bodies
     // {code:"P0001", message:"AUTH.AUTH.FORBIDDEN"} — not a v2 envelope. Surface
     // the raw message so callers can branch on it (e.g. FORBIDDEN scope checks).
     const pgMessage = typeof data === 'object' && data !== null && 'message' in data
       ? (data as { message: string }).message : '';
+
+    // A revoked or expired session is raised by the request gate before any
+    // view or RPC runs, and arrives as HTTP 400 {code:"P0001", hint:"status=401",
+    // message:'{"code":"AUTH_SESSION_REVOKED",…}'} — not a 401. Treat it as the
+    // auth error it is, or the user stays on a page where every read silently
+    // fails (seen 2026-10-02: a section spinning forever after sign-in elsewhere).
+    const auth = !isPermissionDenied && (status === 401 || isAuthError('', pgMessage));
 
     const errorCode = isPermissionDenied ? 'PERMISSION_DENIED' : (pgMessage || `HTTP_${status}`);
     const errorMessage = isPermissionDenied
