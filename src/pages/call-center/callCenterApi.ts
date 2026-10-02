@@ -483,9 +483,25 @@ export function useContractIcloud(contractId: number) {
 // ── Flag-color helper ────────────────────────────────────────────────────────
 
 /** Resolve a flag code to its hex color; unknown codes get a neutral grey. */
-export function flagColor(levels: FlagLevelRef[] | undefined, code: string): string {
-  const found = levels?.find(l => l.code === code);
-  return found?.hex_color ?? '#9CA3AF';
+// Flag level → the app's own colours. The level list also carries a raw colour
+// per level, but painting with it ignored the theme (no dark/light variant) and
+// looked foreign next to every other badge, so it is not used.
+// tsp-form has no orange: Watch is amber outlined, Concern amber filled.
+export interface FlagTone {
+  badge: 'default' | 'success' | 'warning' | 'danger';
+  variant: 'solid' | 'outline';
+  /** Solid fill for swatches and chart bars. */
+  fill: string;
+}
+const FLAG_TONES: Record<string, FlagTone> = {
+  WHITE: { badge: 'default', variant: 'solid', fill: 'var(--color-subtler)' },
+  GREEN: { badge: 'success', variant: 'solid', fill: 'var(--color-success)' },
+  YELLOW: { badge: 'warning', variant: 'outline', fill: 'var(--color-warning-fade)' },
+  ORANGE: { badge: 'warning', variant: 'solid', fill: 'var(--color-warning)' },
+  RED: { badge: 'danger', variant: 'solid', fill: 'var(--color-danger)' },
+};
+export function flagTone(code: string): FlagTone {
+  return FLAG_TONES[code] ?? FLAG_TONES.WHITE;
 }
 
 /** Overdue-days badge severity color from the day count. */

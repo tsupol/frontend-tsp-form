@@ -12,7 +12,7 @@ import { ApiError } from '../../lib/api';
 import { makeDatePickerFormat } from '../../lib/format';
 import {
   ccKeys, useFlagLevels, setManualFlag, logPromiseToPay, revealIcloudPassword,
-  tradeTargets, tradeOffer, flagColor,
+  tradeTargets, tradeOffer, flagTone,
   type FlagLevelRef, type IcloudRevealResult,
 } from './callCenterApi';
 
@@ -106,7 +106,7 @@ export function FlagChangeModal({
                       selected ? 'border-primary-fg bg-primary-soft' : 'border-line hover:bg-surface-hover'
                     }`}
                   >
-                    <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: flagColor(levels, lvl.code) }} />
+                    <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: flagTone(lvl.code).fill }} />
                     {flagLabel(t, lvl.code)}
                   </button>
                 );

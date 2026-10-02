@@ -7,7 +7,7 @@ import { Link } from 'react-router-dom';
 import { Badge, Tooltip } from 'tsp-form';
 import { AlertTriangle, Cpu, User, Wrench, Store, Repeat, CalendarClock, ExternalLink } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
-import { flagColor, type FlagLevelRef } from './callCenterApi';
+import { flagTone, type FlagLevelRef } from './callCenterApi';
 
 function flagLabel(t: (k: string, o?: Record<string, unknown>) => string, code: string): string {
   const translated = t(`callCenter.flagLevel.${code}`, { defaultValue: '' });
@@ -23,19 +23,17 @@ function flagRank(levels: FlagLevelRef[] | undefined, code: string): number | nu
  *  Detail-panel style (labels visible). List rows use FlagDot instead. */
 export function FlagChip({
   code,
-  levels,
   source,
   showSourceLabel = false,
 }: {
   code: string;
-  levels: FlagLevelRef[] | undefined;
   source: 'auto' | 'manual';
   /** Also render the source word ("auto"/"manual") before the level. */
   showSourceLabel?: boolean;
 }) {
   const { t } = useTranslation();
   const Icon = source === 'auto' ? Cpu : User;
-  const color = flagColor(levels, code);
+  const color = flagTone(code).fill;
   const sourceWord = t(source === 'auto' ? 'callCenter.flagAuto' : 'callCenter.flagManual');
   return (
     <Tooltip content={`${sourceWord}: ${flagLabel(t, code)}`}>
@@ -48,11 +46,9 @@ export function FlagChip({
   );
 }
 
-/** A single flag as a filled pill carrying the level NAME, tinted with the
- *  level colour from the DB. The word is what's read — the colour only
- *  reinforces it, so the flag stays legible under CVD and at a glance.
- *  (It was a bare rank number in a dot before: "กำหนดเอง: ⓿" told the user
- *  nothing without hovering.) `emphasize` rings the Auto pill on divergence. */
+/** A single flag as a tsp-form badge carrying the level NAME. The word is
+ *  what's read — the colour only reinforces it. `emphasize` rings the Auto
+ *  badge when auto and manual disagree. */
 function FlagDot({
   code, levels, source, emphasize = false,
 }: {
@@ -62,23 +58,22 @@ function FlagDot({
   emphasize?: boolean;
 }) {
   const { t } = useTranslation();
-  const color = flagColor(levels, code);
+  const tone = flagTone(code);
   const rank = flagRank(levels, code);
   const sourceWord = t(source === 'auto' ? 'callCenter.flagAuto' : 'callCenter.flagManual');
   const full = `${sourceWord}: ${flagLabel(t, code)}${rank != null ? ` (${rank})` : ''}`;
-  // WHITE (rank 0) is a pale swatch — its label needs dark ink to read.
-  const ink = code === 'WHITE' ? '#374151' : '#ffffff';
   return (
-    <span
-      title={full}
-      aria-label={full}
-      className={`inline-flex items-center rounded-full shrink-0 px-1.5 py-0.5 text-[10px] font-medium leading-none ${
-        emphasize ? 'ring-2 ring-offset-1 ring-warning-fg' : ''
-      }`}
-      style={{ backgroundColor: color, color: ink }}
-    >
-      {flagLabel(t, code)}
-    </span>
+    <Tooltip content={full}>
+      <Badge
+        size="xs"
+        color={tone.badge}
+        variant={tone.variant}
+        aria-label={full}
+        className={`shrink-0 ${emphasize ? 'ring-2 ring-offset-1 ring-warning-fg' : ''}`}
+      >
+        {flagLabel(t, code)}
+      </Badge>
+    </Tooltip>
   );
 }
 
@@ -128,8 +123,8 @@ export function FlagPair({
 
   return (
     <span className="inline-flex items-center gap-3">
-      <FlagChip code={auto} levels={levels} source="auto" showSourceLabel={showLabels} />
-      <FlagChip code={manual} levels={levels} source="manual" showSourceLabel={showLabels} />
+      <FlagChip code={auto} source="auto" showSourceLabel={showLabels} />
+      <FlagChip code={manual} source="manual" showSourceLabel={showLabels} />
       {divergent && (
         <Tooltip content={t('callCenter.flagDivergent')}>
           <AlertTriangle size={13} className="text-warning-fg shrink-0" />

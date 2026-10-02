@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { MobileHeader } from 'tsp-form';
 import { ArrowRightFromLine, AlertTriangle } from 'lucide-react';
 import { fmtCurrency } from '../../lib/format';
-import { useFlagLevels, flagColor } from '../call-center/callCenterApi';
+import { flagTone } from '../call-center/callCenterApi';
 import { useBranchSummary, type BranchDunningSummary } from './managerApi';
 
 function StatTile({ label, value, sub, danger }: { label: string; value: React.ReactNode; sub?: React.ReactNode; danger?: boolean }) {
@@ -23,7 +23,6 @@ const FLAG_ORDER = ['white', 'green', 'yellow', 'orange', 'red'] as const;
 
 function MoneyByFlag({ row }: { row: BranchDunningSummary }) {
   const { t } = useTranslation();
-  const { data: levels } = useFlagLevels();
   const buckets = FLAG_ORDER.map(k => ({
     code: k.toUpperCase(),
     amount: row[`overdue_amount_${k}` as keyof BranchDunningSummary] as number,
@@ -36,7 +35,7 @@ function MoneyByFlag({ row }: { row: BranchDunningSummary }) {
         {buckets.map(b => b.amount > 0 && (
           <div
             key={b.code}
-            style={{ width: `${(b.amount / total) * 100}%`, backgroundColor: flagColor(levels, b.code) }}
+            style={{ width: `${(b.amount / total) * 100}%`, backgroundColor: flagTone(b.code).fill }}
             title={`${b.code}: ฿${fmtCurrency(b.amount)}`}
           />
         ))}
@@ -44,7 +43,7 @@ function MoneyByFlag({ row }: { row: BranchDunningSummary }) {
       <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
         {buckets.filter(b => b.amount > 0).map(b => (
           <span key={b.code} className="inline-flex items-center gap-1 text-xs">
-            <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: flagColor(levels, b.code) }} />
+            <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: flagTone(b.code).fill }} />
             <span className="text-subtle">{t(`callCenter.flagLevel.${b.code}`, { defaultValue: b.code })}</span>
             <span>฿{fmtCurrency(b.amount)}</span>
           </span>
