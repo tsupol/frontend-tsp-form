@@ -239,6 +239,7 @@
     /* pagination */
     --color-pagination-border: transparent;
     --color-pagination-bg: transparent;
+    --color-pagination-fg: var(--color-subtler);
     --color-pagination-hover-bg: var(--color-button-ghost-hover-bg, var(--color-surface-elevated));
     --color-pagination-hover-fg: var(--color-button-ghost-hover-fg, var(--color-fg));
     --color-pagination-hover-border: transparent;
@@ -249,6 +250,8 @@
 
     --color-badge-outline-default-border: #404040;
 
+    /* header band — a step off the page so the header reads as a header */
+    --color-table-header-bg: var(--color-surface);
     --color-table-row-tint: var(--color-primary);
     --color-table-row-bg: transparent;
     --color-table-row-selected: color-mix(in srgb, var(--color-table-row-tint) 8%, transparent);
@@ -281,20 +284,20 @@
 [data-theme="light"] {
     --color-fg: #1c2024;
     --color-fg-contrast: #ffffff;
-    --color-bg: #f3f3f6;
+    --color-bg: #faf9f5;
     --color-bg-contrast: #1c2024;
 
-    --color-line: rgba(0, 0, 0, 0.15);
-    --color-line-subtle: rgba(0, 0, 0, 0.12);
+    --color-line: rgba(26, 26, 26, 0.12);
+    --color-line-subtle: rgba(26, 26, 26, 0.1);
     --color-link: #1d4ed8;
 
     /* Soft fills read lighter on the bright bg — keep the fuller mix here.
        The @theme (dark) default is toned down to 8% so it isn't too opaque. */
     --color-success-soft: color-mix(in srgb, var(--color-success) 15%, var(--color-bg));
 
-    --color-surface: #f9f9fb;
-    --color-surface-hover: #e8e8ec;
-    --color-surface-shallow: #f0f0f3;
+    --color-surface: #fcfbf8;
+    --color-surface-hover: #f1f0ec;
+    --color-surface-shallow: #f5f4ee;
     --color-surface-elevated: #ffffff;
     --color-select-highlight: #e8e8ec;
 
@@ -339,25 +342,37 @@
     --color-button-default-bg: #eeeef1;
     --color-button-default-border: #c4c6cf;
     --color-button-outline-border: #cdced6;
-    --color-button-default-hover-bg: #d9d9e0;
+    --color-button-default-hover-bg: #e3e2de;
     --color-button-default-hover-fg: #1c2024;
-    --color-button-ghost-hover-bg: #e0e1e6;
+    --color-button-ghost-hover-bg: #ecebe8;
+    /* outline hover matches the menu-item hover; the solid default button needs the stronger step above to show against its own fill */
+    --color-button-outline-hover-bg: #ecebe8;
     --color-button-ghost-hover-fg: #1c2024;
 
     /* side menu */
-    --color-side-menu-bg: #f0f0f3;
+    --color-side-menu-bg: #faf9f5;
+
+    /* table header band — a step darker than the page */
+    --color-table-header-bg: var(--color-surface-shallow);
+    --color-table-row-hover: rgba(21, 21, 20, 0.04);
+
+    /* page numbers — same faint warm tints as the menu items, no cold grey box */
+    --color-pagination-hover-bg: var(--color-item-hover-bg);
+    --color-pagination-active-bg: var(--color-item-active-bg);
+    --color-pagination-active-border: transparent;
+    --color-pagination-active-hover-bg: #dddcd8;
 
     --color-item-bg: transparent;
     --color-item-fg: #333;
     --color-item-border: transparent;
 
-    --color-item-hover-bg: #e0e1e6;
+    --color-item-hover-bg: rgba(21, 21, 20, 0.06);
     --color-item-hover-fg: #1c2024;
-    --color-item-hover-border: #e0e1e6;
+    --color-item-hover-border: transparent;
 
-    --color-item-active-bg: #d9d9e0;
+    --color-item-active-bg: rgba(21, 21, 20, 0.1);
     --color-item-active-fg: #1c2024;
-    --color-item-active-border: #d9d9e0;
+    --color-item-active-border: transparent;
 
     /* snackbar */
     --color-snackbar-bg: #ffffff;
