@@ -604,7 +604,12 @@ export function PanelProductPlan(_props: Props) {
   // ── Handlers: pick from in-stock list (asset → derive mode by condition) ──
 
   const handleSelectAsset = (asset: StockAsset) => {
-    const isUsed = asset.condition_grade === 'USED_A' || asset.condition_grade === 'USED_B';
+    // A shop's contract must point at the shop's own device whatever its grade
+    // (mig 1235): a new one kept as model + colour only can never be submitted
+    // for approval (TARGET_ASSET_REQUIRED). So for a shop every stock pick is a
+    // device pick.
+    const isUsed = isDealPartner
+      || asset.condition_grade === 'USED_A' || asset.condition_grade === 'USED_B';
     setMode(isUsed ? 'used' : 'new');
     setSelectedAsset(asset);
     setLocalQuote(null);
