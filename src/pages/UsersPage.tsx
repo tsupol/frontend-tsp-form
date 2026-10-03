@@ -1773,6 +1773,7 @@ export function UsersPage() {
             enableRowSelection
             rowSelection={rowSelection}
             onRowSelectionChange={setRowSelection}
+            outlined
             className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}
             noResults={
               <div className="p-8 text-center text-subtle">
