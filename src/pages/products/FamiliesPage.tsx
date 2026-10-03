@@ -1277,6 +1277,7 @@ function ManageFamilyAttributesModal({ family, open, onClose, holdingId }: {
               </Button>
             </div>
             <DataTable
+              outlined
               data={unifiedAttrs}
               columns={columns}
               className={isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}
@@ -1606,6 +1607,7 @@ export function FamiliesPage() {
         {/* Desktop: DataTable */}
         {!isError && (
           <DataTable
+            outlined
             data={families}
             columns={columns}
             enableSorting

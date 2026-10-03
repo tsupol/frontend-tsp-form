@@ -783,6 +783,7 @@ export function BankAccountsPage() {
 
         {/* Desktop: DataTable */}
         <DataTable<BankAccount>
+          outlined
           data={paginated}
           columns={columns}
           sorting={sorting}

@@ -320,6 +320,7 @@ export function StaffCommissionPage() {
           <>
             {/* Desktop table */}
             <DataTable<CommissionBalance>
+              outlined
               data={balanceList}
               columns={balanceColumns}
               sorting={sorting}
@@ -385,6 +386,7 @@ export function StaffCommissionPage() {
         {tab === 'monthly' && (
           <>
             <DataTable<CommissionMonthly>
+              outlined
               data={monthlyList}
               columns={monthlyColumns}
               sorting={sorting}

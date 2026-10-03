@@ -1305,6 +1305,7 @@ export function DealPartnerRatesPage() {
         <div className="text-sm font-medium mb-2">{t('dealPartnerRate.branchConfigs')}</div>
 
         <DataTable<BranchConfigRow>
+          outlined
           data={paginated}
           columns={columns}
           sorting={sorting}

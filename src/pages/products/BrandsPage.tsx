@@ -601,6 +601,7 @@ export function BrandsPage() {
         {/* Desktop: DataTable */}
         {!isError && (
           <DataTable
+            outlined
             data={brands}
             columns={columns}
             enableSorting

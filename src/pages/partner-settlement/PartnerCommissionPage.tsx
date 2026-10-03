@@ -102,6 +102,7 @@ export function PartnerCommissionPage() {
               </div>
 
               <DataTable<PartnerCommissionRow>
+                outlined
                 data={rows}
                 columns={[
                   {

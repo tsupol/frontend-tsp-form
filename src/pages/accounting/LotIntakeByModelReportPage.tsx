@@ -429,6 +429,7 @@ export function LotIntakeByModelReportPage() {
           (no server paging), so every row renders and the summary strip adds
           up exactly what's on screen. */}
       <DataTable<ModelRow>
+        outlined
         data={rows}
         columns={columns}
         className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}

@@ -749,6 +749,7 @@ export function DiscountPoliciesPage() {
 
         {/* Desktop: DataTable */}
         <DataTable<DiscountPolicy>
+          outlined
           data={paginatedPolicies}
           columns={columns}
           sorting={sorting}

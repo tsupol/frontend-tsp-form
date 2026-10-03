@@ -1025,6 +1025,7 @@ function ManageOptionsModal({ attribute, open, onClose, holdingId }: {
               </Button>
             </div>
             <DataTable
+              outlined
               data={options}
               columns={columns}
               enableSorting
@@ -1323,6 +1324,7 @@ export function AttributesPage() {
 
         {!isError && (
           <DataTable
+            outlined
             data={attributes}
             columns={columns}
             enableSorting

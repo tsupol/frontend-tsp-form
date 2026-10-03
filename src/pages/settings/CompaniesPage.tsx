@@ -275,6 +275,7 @@ export function CompaniesPage() {
         </div>
 
         <DataTable<Company>
+          outlined
           data={filtered}
           columns={columns}
           sorting={sorting}

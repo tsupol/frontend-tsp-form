@@ -301,6 +301,7 @@ function ChangeLogTab({ branches, onSetPin }: { branches: Branch[]; onSetPin: (b
 
       {/* Desktop */}
       <DataTable<PinChangeLog>
+        outlined
         data={rows}
         columns={columns}
         sorting={sorting}
@@ -557,6 +558,7 @@ function UsageLogTab({ branches, permissionOptions }: { branches: Branch[]; perm
 
       {/* Desktop */}
       <DataTable<PinUsageLog>
+        outlined
         data={logs}
         columns={columns}
         sorting={sorting}

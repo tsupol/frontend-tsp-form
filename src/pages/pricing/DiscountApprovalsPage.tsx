@@ -577,6 +577,7 @@ export function DiscountApprovalsPage() {
 
         {/* Desktop table — row click opens drawer via expansion intercept */}
         <DataTable<ApprovalRequest>
+          outlined
           data={requests}
           columns={columns}
           enableSorting

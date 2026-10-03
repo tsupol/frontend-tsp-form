@@ -175,6 +175,7 @@ export function PermissionGrantsPage() {
         </div>
 
         <DataTable<UserPermissionGrant>
+          outlined
           data={grants}
           columns={columns}
           sorting={sorting}

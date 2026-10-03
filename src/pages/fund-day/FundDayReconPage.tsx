@@ -312,6 +312,7 @@ export function FundDayReconPage() {
         </div>
 
         <DataTable<FundReconHistoryRow>
+          outlined
           data={history.data?.data ?? []}
           columns={columns}
           enablePagination

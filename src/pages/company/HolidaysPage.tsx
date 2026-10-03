@@ -559,6 +559,7 @@ export function HolidaysPage() {
 
         {/* Desktop: DataTable */}
         <DataTable<Holiday>
+          outlined
           data={holidays}
           columns={columns}
           sorting={sorting}

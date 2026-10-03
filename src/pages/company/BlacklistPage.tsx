@@ -249,6 +249,7 @@ export function BlacklistPage() {
 
         {/* Desktop: DataTable */}
         <DataTable<BlacklistEntry>
+          outlined
           data={entries}
           columns={columns}
           sorting={sorting}

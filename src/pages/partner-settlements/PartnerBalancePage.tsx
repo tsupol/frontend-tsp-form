@@ -112,6 +112,7 @@ export function PartnerBalancePage() {
         </div>
 
         <DataTable<PartnerBalanceRow>
+          outlined
           data={rows}
           columns={columns}
           className="flex-1 min-h-0"

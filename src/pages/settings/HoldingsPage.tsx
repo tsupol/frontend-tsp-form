@@ -174,6 +174,7 @@ export function HoldingsPage() {
         </div>
 
         <DataTable<Holding>
+          outlined
           data={filtered}
           columns={columns}
           sorting={sorting}
