@@ -152,13 +152,13 @@ export function BranchSignersPage() {
 
             <div className="border border-line rounded-lg overflow-hidden">
               <table className="w-full text-sm">
-                <thead className="bg-surface">
-                  <tr>
-                    <th className="px-3 py-2 text-left w-20">{t('branchSigners.colSignature')}</th>
-                    <th className="px-3 py-2 text-left">{t('branchSigners.colName')}</th>
-                    <th className="px-3 py-2 text-left w-44">{t('branchSigners.colId')}</th>
-                    <th className="px-3 py-2 text-left w-24">{t('branchSigners.colActive')}</th>
-                    <th className="px-3 py-2 text-right w-16">{t('branchSigners.colActions')}</th>
+                <thead className="table-header">
+                  <tr className="table-row">
+                    <th className="table-head w-20">{t('branchSigners.colSignature')}</th>
+                    <th className="table-head">{t('branchSigners.colName')}</th>
+                    <th className="table-head w-44">{t('branchSigners.colId')}</th>
+                    <th className="table-head w-24">{t('branchSigners.colActive')}</th>
+                    <th className="table-head text-right w-16">{t('branchSigners.colActions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line">
