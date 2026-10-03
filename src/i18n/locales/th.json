@@ -3925,7 +3925,7 @@
       "points": "{{value}} คะแนน",
       "noHistory": "ยังไม่มีคะแนน",
       "installmentNo": "งวดที่ {{no}}",
-      "baseAmount": "ค่างวด {{amount}} บาท",
+      "installmentNoWithAmount": "งวดที่ {{no}} ({{amount}} บาท)",
       "entry_INSTALLMENT_EARN": "จ่ายงวดครบ",
       "entry_BACKFILL_EARN": "งวดที่จ่ายครบก่อนเปิดใช้",
       "entry_INSTALLMENT_REVERSAL": "ยกเลิกรายการจ่าย",

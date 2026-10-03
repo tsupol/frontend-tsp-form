@@ -3929,7 +3929,7 @@
       "points": "{{value}} pts",
       "noHistory": "No points yet",
       "installmentNo": "Installment {{no}}",
-      "baseAmount": "installment {{amount}} baht",
+      "installmentNoWithAmount": "Installment {{no}} ({{amount}} baht)",
       "entry_INSTALLMENT_EARN": "Installment paid",
       "entry_BACKFILL_EARN": "Earlier installment paid",
       "entry_INSTALLMENT_REVERSAL": "Payment reversed",

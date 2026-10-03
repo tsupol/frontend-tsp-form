@@ -112,8 +112,14 @@ export function CustomerRewardSection({ customerId }: { customerId: number }) {
                           <ExternalLink size={11} />
                         </Link>
                       )}
-                      {row.pay_no != null && <span>· {t('customer.reward.installmentNo', { no: row.pay_no })}</span>}
-                      {row.base_amount != null && <span>· {t('customer.reward.baseAmount', { amount: fmtCurrency(row.base_amount) })}</span>}
+                      {/* The installment's amount rides in brackets after its number; reversals carry none. */}
+                      {row.pay_no != null && (
+                        <span>
+                          · {row.base_amount != null
+                            ? t('customer.reward.installmentNoWithAmount', { no: row.pay_no, amount: fmtCurrency(row.base_amount) })
+                            : t('customer.reward.installmentNo', { no: row.pay_no })}
+                        </span>
+                      )}
                       {company && <span>· {company}</span>}
                     </div>
                   </div>
