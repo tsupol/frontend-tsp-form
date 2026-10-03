@@ -623,9 +623,9 @@ function FeedSection({
           {rows.length > pageSize && (
             <div className="padded-datatable px-1">
               <DataTableFooter
-                currentPage={safePage}
+                currentPage={safePage + 1}
                 totalPages={totalPages}
-                onPageChange={setPageIndex}
+                onPageChange={(p) => setPageIndex(p - 1)}
                 pageSize={pageSize}
                 pageSizeOptions={[15, 25, 50, 100]}
                 onPageSizeChange={(size) => { setPageSize(size); setPageIndex(0); }}

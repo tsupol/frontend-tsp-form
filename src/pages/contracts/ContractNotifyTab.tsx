@@ -92,9 +92,9 @@ export function ContractNotifyTab({ contractId }: { contractId: number }) {
       </div>
       {totalPages > 1 && (
         <DataTableFooter
-          currentPage={page - 1}
+          currentPage={page}
           totalPages={totalPages}
-          onPageChange={(p) => setPage(p + 1)}
+          onPageChange={setPage}
           pageSize={PAGE_SIZE}
           pageSizeOptions={[PAGE_SIZE]}
           onPageSizeChange={() => {}}

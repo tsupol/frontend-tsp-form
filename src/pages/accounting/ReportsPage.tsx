@@ -453,9 +453,9 @@ export function ReportsPage() {
       {totalCount > 0 && (
         <div className="flex-none border-t border-line px-2 py-2">
           <DataTableFooter
-            currentPage={pageIndex}
+            currentPage={pageIndex + 1}
             totalPages={Math.max(1, Math.ceil(totalCount / pageSize))}
-            onPageChange={setPageIndex}
+            onPageChange={(p) => setPageIndex(p - 1)}
             pageSize={pageSize}
             pageSizeOptions={[25, 50, 100]}
             onPageSizeChange={(size) => { setPageSize(size); setPageIndex(0); }}
