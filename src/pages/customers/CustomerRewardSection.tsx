@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
+import { DataTableFooter } from 'tsp-form';
 import { Link } from 'react-router-dom';
 import { ExternalLink } from 'lucide-react';
 import { apiClient } from '../../lib/api';
@@ -44,7 +46,7 @@ interface RewardLedgerRow {
   rate_points: number | null;
 }
 
-const HISTORY_LIMIT = 50;
+const PAGE_SIZE_OPTIONS = [10, 25, 50];
 
 export function CustomerRewardSection({ customerId }: { customerId: number }) {
   const { t, i18n } = useTranslation();
@@ -54,10 +56,24 @@ export function CustomerRewardSection({ customerId }: { customerId: number }) {
     queryFn: () => apiClient.get<RewardBalance[]>(`/v_customer_reward_balances?customer_id=eq.${customerId}&order=company_name`),
   });
 
-  const { data: history = [] } = useQuery({
-    queryKey: ['customer-reward-ledger', customerId],
-    queryFn: () => apiClient.get<RewardLedgerRow[]>(`/v_customer_reward_ledger?customer_id=eq.${customerId}&order=id.desc&limit=${HISTORY_LIMIT}`),
+  // History pages come from the server (Range + exact count), newest first.
+  const [page, setPage] = useState(1); // 1-based for getPaginated
+  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
+  useEffect(() => { setPage(1); }, [customerId]);
+
+  const { data: historyPage, isFetching: historyFetching } = useQuery({
+    queryKey: ['customer-reward-ledger', customerId, page, pageSize],
+    queryFn: () => apiClient.getPaginated<RewardLedgerRow>(
+      `/v_customer_reward_ledger?customer_id=eq.${customerId}&order=id.desc`,
+      { page, pageSize },
+    ),
+    // Keep the current page on screen while the next one loads — but never
+    // carry one customer's rows over to another.
+    placeholderData: (prev, prevQuery) => (prevQuery?.queryKey[1] === customerId ? prev : undefined),
   });
+  const history = historyPage?.data ?? [];
+  const historyTotal = historyPage?.totalCount ?? 0;
+  const totalPages = Math.max(1, Math.ceil(historyTotal / pageSize));
 
   const fmtPoints = (n: number) =>
     n.toLocaleString(i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -91,7 +107,7 @@ export function CustomerRewardSection({ customerId }: { customerId: number }) {
       </div>
 
       {/* History — newest first. */}
-      <div className="mb-4 rounded-md bg-surface border border-line">
+      <div className={`rounded-md bg-surface border border-line transition-opacity ${historyFetching ? 'opacity-60' : ''} ${historyTotal > PAGE_SIZE_OPTIONS[0] ? 'mb-2' : 'mb-4'}`}>
         {history.length === 0 ? (
           <div className="px-3 py-3 text-sm text-subtler">{t('customer.reward.noHistory')}</div>
         ) : (
@@ -135,6 +151,20 @@ export function CustomerRewardSection({ customerId }: { customerId: number }) {
           </div>
         )}
       </div>
+      {historyTotal > PAGE_SIZE_OPTIONS[0] && (
+        <div className="mb-4">
+          <DataTableFooter
+            currentPage={page} // the footer counts pages from 1, like getPaginated
+            totalPages={totalPages}
+            onPageChange={setPage}
+            pageSize={pageSize}
+            pageSizeOptions={PAGE_SIZE_OPTIONS}
+            onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+            totalRows={historyTotal}
+            controlSize="sm"
+          />
+        </div>
+      )}
     </>
   );
 }
