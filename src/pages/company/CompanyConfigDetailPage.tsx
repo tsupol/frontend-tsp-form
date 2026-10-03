@@ -3,7 +3,7 @@ import type { MutableRefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Button, Input, Switch, Select, Modal, useSnackbarContext,
+  Button, Input, Switch, Select, Modal, useSnackbarContext, FormErrorMessage,
 } from 'tsp-form';
 import { CheckCircle, XCircle, Save } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
@@ -131,6 +131,18 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config?.company_id, config?.updated_at]);
 
+  // Range check per field, run on every keystroke so a bad value shows under
+  // its own field at once (the database enforces the same ranges).
+  const rangeError = (f: EditableField): string | null => {
+    if (f.type !== 'number') return null;
+    const v = formValues[f.key] as number;
+    if ((f.min != null && v < f.min) || (f.max != null && v > f.max)) {
+      return t('settings.config.outOfRange', { field: f.label, min: f.min, max: f.max });
+    }
+    return null;
+  };
+  const hasRangeError = fields.some(f => rangeError(f) !== null);
+
   const getValue = (key: string) => formValues[key];
   const setValue = (key: string, val: number | boolean) => setFormValues(prev => ({ ...prev, [key]: val }));
 
@@ -154,21 +166,9 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
     setSaving(true);
     setErrorMessage('');
 
-    // Client-side range check for fields that declare min/max (DB enforces the
-    // same via CHECK, but reject early with a clear message).
-    const outOfRange = fields.find(f => {
-      if (f.type !== 'number') return false;
-      const v = formValues[f.key] as number;
-      return (f.min != null && v < f.min) || (f.max != null && v > f.max);
-    });
-    if (outOfRange) {
+    // Out-of-range fields already show their message and keep Save disabled.
+    if (hasRangeError) {
       setSaving(false);
-      setErrorMessage(t('settings.config.outOfRange', {
-        field: outOfRange.label,
-        min: outOfRange.min,
-        max: outOfRange.max,
-        defaultValue: '{{field}} must be between {{min}} and {{max}}',
-      }));
       return;
     }
 
@@ -293,17 +293,23 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
                               onChange={(e) => setValue(field.key, (e.target as HTMLInputElement).checked)}
                             />
                           ) : (
-                            <Input
-                              type="number"
-                              className="w-full"
-                              min={field.min}
-                              max={field.max}
-                              step={field.step}
-                              value={String(getValue(field.key) ?? '')}
-                              onChange={(e) => setValue(field.key, Number(e.target.value))}
-                            />
+                            <>
+                              <Input
+                                type="number"
+                                className="w-full"
+                                min={field.min}
+                                max={field.max}
+                                step={field.step}
+                                error={!!rangeError(field)}
+                                value={String(getValue(field.key) ?? '')}
+                                onChange={(e) => setValue(field.key, Number(e.target.value))}
+                              />
+                              {rangeError(field) && <FormErrorMessage error={{ message: rangeError(field)! }} />}
+                            </>
                           )}
-                          {field.hint && (
+                          {/* The error line takes no height of its own, so it
+                              replaces the hint rather than drawing over it. */}
+                          {field.hint && !rangeError(field) && (
                             <span className="text-xs text-subtler mt-1">{field.hint}</span>
                           )}
                         </div>
@@ -358,7 +364,7 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
           )}
           <div className="flex items-center justify-end gap-2">
             <Button size="sm" onClick={handleReset} disabled={saving || !isDirty}>{t('common.cancel')}</Button>
-            <Button size="sm" color="primary" startIcon={<Save size={14} />} onClick={handleSave} disabled={saving || !isDirty}>
+            <Button size="sm" color="primary" startIcon={<Save size={14} />} onClick={handleSave} disabled={saving || !isDirty || hasRangeError}>
               {saving ? t('common.saving') : t('common.save')}
             </Button>
           </div>
