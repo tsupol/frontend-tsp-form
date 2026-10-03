@@ -94,13 +94,19 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
       hint: t('settings.config.fin2EarlyPayoffDiscountMaxPctHint'),
       type: 'number', group: 'money', min: 0, max: 100,
     },
-    // Points a customer earns per fully-paid installment (mig 1371). Only paid
-    // out while the company's REWARD switch (Switches tab) is on.
+    // Reward rate (mig 1378): every X baht of a fully-paid installment earns
+    // Y points. Only paid out while the company's REWARD switch (Switches tab) is on.
     {
-      key: 'reward_points_per_installment',
-      label: t('settings.config.rewardPointsPerInstallmentShort'),
-      hint: t('settings.config.rewardPointsPerInstallmentHint'),
-      type: 'number', group: 'reward', min: 0, max: 10000,
+      key: 'reward_rate_baht',
+      label: t('settings.config.rewardRateBaht'),
+      hint: t('settings.config.rewardRateBahtHint'),
+      type: 'number', group: 'reward', min: 1, max: 1000000,
+    },
+    {
+      key: 'reward_rate_points',
+      label: t('settings.config.rewardRatePoints'),
+      hint: t('settings.config.rewardRatePointsHint'),
+      type: 'number', group: 'reward', min: 0, max: 1000, step: 0.01,
     },
   ];
 
@@ -292,6 +298,7 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
                               className="w-full"
                               min={field.min}
                               max={field.max}
+                              step={field.step}
                               value={String(getValue(field.key) ?? '')}
                               onChange={(e) => setValue(field.key, Number(e.target.value))}
                             />

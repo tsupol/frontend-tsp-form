@@ -4,9 +4,12 @@ import { Link } from 'react-router-dom';
 import { ExternalLink } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
+import { fmtCurrency } from '../../lib/format';
 
-// ── Reward points (mig 1371) ────────────────────────────────────────────────
-// A customer earns points per fully-paid installment, one balance per company.
+// ── Reward points (mig 1371, by amount since mig 1378) ──────────────────────
+// A customer earns points per fully-paid installment at the company's rate
+// (every X baht = Y points), one balance per company. Staff see the stored
+// 2-decimal value; the customer app sees it rounded down.
 // The system grants and takes back points itself, so this is read-only. Points
 // have no baht value yet — never format them as money.
 
@@ -35,6 +38,10 @@ interface RewardLedgerRow {
   reverses_id: number | null;
   occurred_on: string;
   created_at: string;
+  /** mig 1378 — the installment amount the points were worked out from; null on reversals/forfeits. */
+  base_amount: number | null;
+  rate_baht: number | null;
+  rate_points: number | null;
 }
 
 const HISTORY_LIMIT = 50;
@@ -52,7 +59,8 @@ export function CustomerRewardSection({ customerId }: { customerId: number }) {
     queryFn: () => apiClient.get<RewardLedgerRow[]>(`/v_customer_reward_ledger?customer_id=eq.${customerId}&order=id.desc&limit=${HISTORY_LIMIT}`),
   });
 
-  const fmtPoints = (n: number) => n.toLocaleString(i18n.language);
+  const fmtPoints = (n: number) =>
+    n.toLocaleString(i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const signed = (n: number) => (n > 0 ? `+${fmtPoints(n)}` : fmtPoints(n));
   // The ledger carries company_id only; name it from the balances, and only
   // when the customer has points with more than one company.
@@ -105,6 +113,7 @@ export function CustomerRewardSection({ customerId }: { customerId: number }) {
                         </Link>
                       )}
                       {row.pay_no != null && <span>· {t('customer.reward.installmentNo', { no: row.pay_no })}</span>}
+                      {row.base_amount != null && <span>· {t('customer.reward.baseAmount', { amount: fmtCurrency(row.base_amount) })}</span>}
                       {company && <span>· {company}</span>}
                     </div>
                   </div>

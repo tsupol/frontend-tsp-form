@@ -3925,6 +3925,7 @@
       "points": "{{value}} คะแนน",
       "noHistory": "ยังไม่มีคะแนน",
       "installmentNo": "งวดที่ {{no}}",
+      "baseAmount": "ค่างวด {{amount}} บาท",
       "entry_INSTALLMENT_EARN": "จ่ายงวดครบ",
       "entry_BACKFILL_EARN": "งวดที่จ่ายครบก่อนเปิดใช้",
       "entry_INSTALLMENT_REVERSAL": "ยกเลิกรายการจ่าย",
@@ -8313,8 +8314,10 @@
       "icloudDeviceCapHint": "1–20",
       "groupReward": "คะแนนสะสม",
       "rewardHint": "เปิด = ลูกค้าได้คะแนนทุกครั้งที่จ่ายงวดครบ · ปิด = หยุดให้คะแนนใหม่ คะแนนเดิมของลูกค้ายังอยู่",
-      "rewardPointsPerInstallmentShort": "คะแนนต่องวด",
-      "rewardPointsPerInstallmentHint": "0–10,000 · ให้เฉพาะตอนเปิดคะแนนสะสม (แท็บสวิตช์) · มีผลกับงวดที่จ่ายหลังบันทึก",
+      "rewardRateBaht": "ทุก (บาท)",
+      "rewardRateBahtHint": "1–1,000,000 · ค่างวดที่จ่ายครบทุกเท่านี้บาท…",
+      "rewardRatePoints": "ได้ (คะแนน)",
+      "rewardRatePointsHint": "0–1,000 ทศนิยมได้ 2 ตำแหน่ง · …ได้คะแนนเท่านี้ · 0 = ไม่ให้คะแนน · มีผลกับงวดที่จ่ายหลังบันทึก · ให้เฉพาะตอนเปิดคะแนนสะสม (แท็บสวิตช์)",
       "feature_REWARD": "คะแนนสะสม"
     },
     "bankAccounts": {

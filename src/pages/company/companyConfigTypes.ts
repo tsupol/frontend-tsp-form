@@ -21,8 +21,10 @@ export interface CompanyConfig {
   repair_pickup_max_days: number;
   icloud_device_cap: number;
   fin2_early_payoff_discount_max_pct: number;
-  // Points per fully-paid installment (mig 1371); 0 = none.
-  reward_points_per_installment: number;
+  // Reward rate (mig 1378): every reward_rate_baht of a fully-paid installment
+  // earns reward_rate_points (2 decimals); 0 points = none.
+  reward_rate_baht: number;
+  reward_rate_points: number;
   // Master lease form this company's NEW contracts print as (mig 1343). Edited
   // in its own section, not via the shared field list — it needs a confirm step.
   contract_template_code: string | null;
@@ -37,6 +39,7 @@ export type EditableField = {
   group: string;
   min?: number;
   max?: number;
+  step?: number;
   /** Explanation shown under the field, so the label itself stays one line. */
   hint?: string;
 };
