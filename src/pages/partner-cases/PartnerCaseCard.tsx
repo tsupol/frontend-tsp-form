@@ -19,7 +19,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   useContractPartnerCases,
   usePartnerCaseReturnReasons,
-  usePartnerCaseStatusRef,
 } from './usePartnerCases';
 import { outcomeBadgeColor, type PartnerCase } from './partnerCaseTypes';
 import { PartnerCaseSubmitModal } from './PartnerCaseSubmitModal';
@@ -65,7 +64,6 @@ export function PartnerCaseCard({
   const applies = isDealPartner && (commercialModel == null || commercialModel === 'FIN1');
 
   const { latest, history, isLoading } = useContractPartnerCases(contractId, applies);
-  const statusRef = usePartnerCaseStatusRef();
   const returnReasons = usePartnerCaseReturnReasons();
 
   // Buttons come from the backend. While a request is waiting the contract is
@@ -93,13 +91,6 @@ export function PartnerCaseCard({
     const a = findAction('PARTNER_CASE_WITHDRAW');
     return !!a && a.is_available && a.is_permitted !== false;
   })();
-
-  const label = (code: string | null | undefined) => {
-    if (!code) return '';
-    const row = statusRef.find(s => s.code === code);
-    if (!row) return code;
-    return i18n.language === 'th' ? row.name_th : row.name_en;
-  };
 
   const reasonLabel = (code: string | null | undefined) => {
     if (!code) return '';
@@ -149,7 +140,7 @@ export function PartnerCaseCard({
           <span className="font-medium text-sm flex-1 min-w-0">{t('partnerCase.cardTitle')}</span>
           {latest && (
             <Badge color={outcomeBadgeColor(latest.outcome)} size="sm">
-              {label(latest.status)}
+              {t(`partnerCase.outcome_${latest.outcome}`)}
             </Badge>
           )}
         </div>
@@ -243,7 +234,7 @@ export function PartnerCaseCard({
               <PartnerCaseHistoryRow
                 key={h.case_id}
                 row={h}
-                statusLabel={label(h.status)}
+                statusLabel={t(`partnerCase.outcome_${h.outcome}`)}
                 reasonLabel={reasonLabel(h.return_reason_code)}
               />
             ))}

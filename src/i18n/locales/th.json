@@ -6257,7 +6257,14 @@
     "myEmpty_RETURNED": "ไม่มีคำขอที่ถูกส่งกลับ",
     "myEmpty_ALL": "ยังไม่มีคำขอ",
     "lastUpdated": "อัปเดต",
-    "selectToView": "เลือกคำขอเพื่อดูสัญญา"
+    "selectToView": "เลือกคำขอเพื่อดูสัญญา",
+    "outcome_PENDING": "รออนุมัติ",
+    "outcome_IN_FORCE": "อนุมัติแล้ว",
+    "outcome_EXPIRED": "หมดอายุ",
+    "outcome_USED": "เปิดสัญญาแล้ว",
+    "outcome_ABANDONED": "ไม่ได้ใช้",
+    "outcome_RETURNED": "ส่งกลับ",
+    "outcome_WITHDRAWN": "ถอนคำขอแล้ว"
   },
   "partnerPools": {
     "title": "ผู้ตรวจร้าน deal partner",

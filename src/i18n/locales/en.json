@@ -6266,7 +6266,14 @@
     "myEmpty_RETURNED": "Nothing sent back",
     "myEmpty_ALL": "No requests yet",
     "lastUpdated": "Updated",
-    "selectToView": "Select a request to see its contract"
+    "selectToView": "Select a request to see its contract",
+    "outcome_PENDING": "Pending Approval",
+    "outcome_IN_FORCE": "Approved",
+    "outcome_EXPIRED": "Expired",
+    "outcome_USED": "Contract opened",
+    "outcome_ABANDONED": "Not used",
+    "outcome_RETURNED": "Sent back",
+    "outcome_WITHDRAWN": "Withdrawn"
   },
   "partnerPools": {
     "title": "Partner Shop Reviewers",
