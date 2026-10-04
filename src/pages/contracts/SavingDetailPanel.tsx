@@ -182,7 +182,7 @@ export function SavingDetailPanel({ contractId, isMobile }: { contractId: number
       )}
 
       {/* Tabs */}
-      <div className="flex-none border-b border-line flex px-2">
+      <div className="flex-none border-b border-line flex px-2 overflow-x-auto hidden-scroll">
         {(['overview', 'wallets', 'notes'] as SavingTab[]).map(tab => (
           <button
             key={tab}

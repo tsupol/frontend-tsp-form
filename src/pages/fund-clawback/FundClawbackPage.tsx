@@ -154,7 +154,7 @@ export function FundClawbackPage() {
 
           <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
             <PageNavPanel id="list" className="flex-1 min-w-0 min-h-0 flex flex-col">
-              <div className="flex-none border-b border-line flex px-2">
+              <div className="flex-none border-b border-line flex px-2 overflow-x-auto hidden-scroll">
                 {(['DUE', 'UPCOMING'] as TabKey[]).map(key => (
                   <button
                     key={key}

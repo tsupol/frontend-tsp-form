@@ -130,7 +130,7 @@ export function DraftDetailPanel({ contractId, isMobile }: { contractId: number;
         </div>
       )}
 
-      <div className="flex-none border-b border-line flex px-2">
+      <div className="flex-none border-b border-line flex px-2 overflow-x-auto hidden-scroll">
         {(['overview', 'notes'] as DraftTab[]).map(tab => (
           <button
             key={tab}

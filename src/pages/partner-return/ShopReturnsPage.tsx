@@ -115,7 +115,7 @@ export function ShopReturnsPage() {
                 id="list"
                 className={isMobile ? '' : 'w-1/2 xl:w-5/12 border-r border-line flex flex-col'}
               >
-                <div className="flex-none flex px-2 border-b border-line">
+                <div className="flex-none flex px-2 border-b border-line overflow-x-auto hidden-scroll">
                   {TABS.map(x => (
                     <button
                       key={x}
@@ -201,7 +201,6 @@ export function ShopReturnsPage() {
                 hasSelection={selectedId != null}
                 emptyIcon={PackageCheck}
                 emptyMessage={t('partnerReturn.selectToView')}
-                wide
               >
                 {selectedId && (
                   <ReturnDetailPanel

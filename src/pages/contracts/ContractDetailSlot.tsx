@@ -12,8 +12,6 @@ interface ContractDetailSlotProps {
   emptyIcon?: LucideIcon | ComponentType<{ size?: number; className?: string }>;
   /** Override the default "select to view" message. */
   emptyMessage?: string;
-  /** Wider layout (no min-w-0 squeeze) for panels that don't need to flex-shrink. */
-  wide?: boolean;
   children: ReactNode;
 }
 
@@ -30,14 +28,12 @@ export function ContractDetailSlot({
   hasSelection,
   emptyIcon: EmptyIcon = FileText,
   emptyMessage,
-  wide,
   children,
 }: ContractDetailSlotProps) {
   const { t } = useTranslation();
-  const desktopClass = wide ? 'flex-1 flex flex-col' : 'flex-1 min-w-0 flex flex-col';
 
   return (
-    <PageNavPanel id="detail" className={isMobile ? '' : desktopClass}>
+    <PageNavPanel id="detail" className={isMobile ? '' : 'flex-1 min-w-0 flex flex-col'}>
       {hasSelection ? (
         children
       ) : (

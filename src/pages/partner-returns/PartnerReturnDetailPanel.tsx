@@ -193,7 +193,7 @@ export function PartnerReturnDetailPanel({ returnId, isMobile, onBack, queueRow 
         )}
       </div>
 
-      <div className="flex-none border-b border-line flex px-2">
+      <div className="flex-none border-b border-line flex px-2 overflow-x-auto hidden-scroll">
         {(['detail', 'history'] as Tab[]).map(key => (
           <button
             key={key}

@@ -132,7 +132,7 @@ export function ReturnDetailPanel({ returnId, isMobile, onBack }: {
         <Badge color={returnBadgeColor(detail.status)} size="sm">{statusLabel}</Badge>
       </div>
 
-      <div className="flex-none flex px-2 border-b border-line">
+      <div className="flex-none flex px-2 border-b border-line overflow-x-auto hidden-scroll">
         {TABS.map(x => (
           <button
             key={x}

@@ -266,7 +266,7 @@ export function SavingContractsPage() {
               )}
             </PageNavPanel>
 
-            <ContractDetailSlot isMobile={isMobile} hasSelection={selectedId != null} emptyIcon={PiggyBank} wide>
+            <ContractDetailSlot isMobile={isMobile} hasSelection={selectedId != null} emptyIcon={PiggyBank}>
               {selectedId && <SavingDetailPanel contractId={selectedId} isMobile={isMobile} />}
             </ContractDetailSlot>
           </div>

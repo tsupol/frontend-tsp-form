@@ -213,7 +213,6 @@ export function SettlementMenuPage({ menu, basePath, titleKey }: SettlementMenuP
                 hasSelection={selectedId != null}
                 emptyIcon={Wallet}
                 emptyMessage={t('settlement.selectToView')}
-                wide
               >
                 {selectedId && <ContractDetailPanel contractId={selectedId} isMobile={isMobile} />}
               </ContractDetailSlot>

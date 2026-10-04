@@ -269,7 +269,7 @@ export function DraftContractsPage() {
               )}
             </PageNavPanel>
 
-            <ContractDetailSlot isMobile={isMobile} hasSelection={selectedId != null} emptyIcon={FilePlus} wide>
+            <ContractDetailSlot isMobile={isMobile} hasSelection={selectedId != null} emptyIcon={FilePlus}>
               {selectedId && <DraftDetailPanel contractId={selectedId} isMobile={isMobile} />}
             </ContractDetailSlot>
           </div>
