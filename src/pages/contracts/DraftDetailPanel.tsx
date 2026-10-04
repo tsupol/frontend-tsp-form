@@ -1,3 +1,4 @@
+import { OverflowTabs } from '../../components/OverflowTabs';
 import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
@@ -130,21 +131,12 @@ export function DraftDetailPanel({ contractId, isMobile }: { contractId: number;
         </div>
       )}
 
-      <div className="flex-none border-b border-line flex px-2 overflow-x-auto hidden-scroll">
-        {(['overview', 'notes'] as DraftTab[]).map(tab => (
-          <button
-            key={tab}
-            className={`py-2 px-3 text-sm font-medium transition-colors cursor-pointer border-b-2 whitespace-nowrap ${
-              activeTab === tab
-                ? 'border-primary-fg text-primary-fg'
-                : 'border-transparent text-fg'
-            }`}
-            onClick={() => setActiveTab(tab)}
-          >
-            {t(`contract.tab_${tab}`)}
-          </button>
-        ))}
-      </div>
+      <OverflowTabs
+        tabs={(['overview', 'notes'] as DraftTab[])}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        renderLabel={tab => t(`contract.tab_${tab}`)}
+      />
 
       <div className="flex-1 overflow-auto better-scroll">
         {activeTab === 'overview' && <DraftOverviewTab contract={contract} t={t} />}

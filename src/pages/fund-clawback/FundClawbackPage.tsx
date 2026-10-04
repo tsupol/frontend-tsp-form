@@ -12,6 +12,7 @@
 // ⛔ No amount is worked out on this screen. Every figure is the queue's own,
 // from the same calculator the issue call uses.
 
+import { OverflowTabs } from '../../components/OverflowTabs';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -154,20 +155,12 @@ export function FundClawbackPage() {
 
           <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
             <PageNavPanel id="list" className="flex-1 min-w-0 min-h-0 flex flex-col">
-              <div className="flex-none border-b border-line flex px-2 overflow-x-auto hidden-scroll">
-                {(['DUE', 'UPCOMING'] as TabKey[]).map(key => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => { setTab(key); setSelected([]); }}
-                    className={`py-2 px-3 text-sm font-medium transition-colors cursor-pointer border-b-2 whitespace-nowrap bg-transparent ${
-                      tab === key ? 'border-primary-fg text-primary-fg' : 'border-transparent text-fg'
-                    }`}
-                  >
-                    {t(`fundClawback.tab${key === 'DUE' ? 'Due' : 'Upcoming'}`)}
-                  </button>
-                ))}
-              </div>
+              <OverflowTabs
+                tabs={(['DUE', 'UPCOMING'] as TabKey[])}
+                activeTab={tab}
+                onTabChange={(key) => { setTab(key); setSelected([]); }}
+                renderLabel={key => t(`fundClawback.tab${key === 'DUE' ? 'Due' : 'Upcoming'}`)}
+              />
 
               {/* There is no reminder for the check day, so this is the only way
                *  anyone learns one has arrived. Said once, on the tab it matters. */}

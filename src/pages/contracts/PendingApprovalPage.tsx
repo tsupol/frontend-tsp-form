@@ -17,6 +17,7 @@ import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-
 import { PageNav, PageNavPanel, DataTable, MobileHeader, Badge } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine, ClipboardCheck } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
+import { OverflowTabs } from '../../components/OverflowTabs';
 import { SearchInput } from '../../components/SearchInput';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
@@ -167,22 +168,12 @@ export function PendingApprovalPage() {
                 id="list"
                 className={isMobile ? '' : 'w-1/2 xl:w-5/12 border-r border-line flex flex-col'}
               >
-                <div className="flex-none border-b border-line flex px-2 overflow-x-auto hidden-scroll">
-                  {TABS.map(key => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => switchTab(key)}
-                      className={`py-2 px-3 text-sm font-medium transition-colors cursor-pointer border-b-2 whitespace-nowrap bg-transparent ${
-                        tab === key
-                          ? 'border-primary-fg text-primary-fg'
-                          : 'border-transparent text-fg'
-                      }`}
-                    >
-                      {t(`partnerCase.myTab_${key}`)}
-                    </button>
-                  ))}
-                </div>
+                <OverflowTabs
+                  tabs={TABS}
+                  activeTab={tab}
+                  onTabChange={switchTab}
+                  renderLabel={key => t(`partnerCase.myTab_${key}`)}
+                />
 
                 <div className="flex-none p-2 border-b border-line">
                   <SearchInput

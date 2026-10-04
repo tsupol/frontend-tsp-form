@@ -1,9 +1,10 @@
+import { OverflowTabs } from '../../components/OverflowTabs';
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Badge, Button, Input, Modal, TextArea, Tooltip, useSnackbarContext, resizeToVariants } from 'tsp-form';
-import { ChevronLeft, ChevronRight, Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, Download, Pause, Play, Square, Ban, Settings2, AlertTriangle, CalendarClock, Repeat, MessageSquare, ShieldAlert } from 'lucide-react';
+import { Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, Download, Pause, Play, Square, Ban, Settings2, AlertTriangle, CalendarClock, Repeat, MessageSquare, ShieldAlert } from 'lucide-react';
 import { GenerateContractPdfModal } from './GenerateContractPdfModal';
 import type { BeMediaContractDoc } from '../../lib/beMedia';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -275,78 +276,6 @@ const MONEY_SECTIONS: MoneySection[] = ['installments', 'wallets', 'bills', 'txn
 /** Only a deal-partner contract has money between the fund and a shop (149 §9e). */
 const PARTNER_MONEY_SECTION: MoneySection = 'shopMoney';
 
-// ── Scrollable Tabs ─────────────────────────────────────────────────────────
-
-function ScrollableTabs<T extends string>({ tabs, activeTab, onTabChange, renderLabel }: {
-  tabs: readonly T[];
-  activeTab: T;
-  onTabChange: (tab: T) => void;
-  renderLabel: (tab: T) => React.ReactNode;
-}) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
-
-  const checkScroll = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 0);
-    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
-  }, []);
-
-  useEffect(() => {
-    checkScroll();
-    const el = scrollRef.current;
-    if (!el) return;
-    el.addEventListener('scroll', checkScroll, { passive: true });
-    const ro = new ResizeObserver(checkScroll);
-    ro.observe(el);
-    return () => { el.removeEventListener('scroll', checkScroll); ro.disconnect(); };
-  }, [checkScroll]);
-
-  const scroll = (dir: 'left' | 'right') => {
-    const el = scrollRef.current;
-    if (!el) return;
-    el.scrollBy({ left: dir === 'left' ? -120 : 120, behavior: 'smooth' });
-  };
-
-  return (
-    <div className="flex-none relative border-b border-line">
-      {canScrollLeft && (
-        <button
-          className="absolute left-0 top-0 bottom-0 z-10 w-7 flex items-center justify-center bg-bg border-r border-line cursor-pointer border-y-0 border-l-0"
-          onClick={() => scroll('left')}
-        >
-          <ChevronLeft size={14} className="text-subtle" />
-        </button>
-      )}
-      <div ref={scrollRef} className="flex px-2 overflow-x-auto hidden-scroll">
-        {tabs.map(tab => (
-          <button
-            key={tab}
-            className={`py-2 px-3 text-sm font-medium transition-colors cursor-pointer border-b-2 whitespace-nowrap ${
-              activeTab === tab
-                ? 'border-primary-fg text-primary-fg'
-                : 'border-transparent text-fg'
-            }`}
-            onClick={() => onTabChange(tab)}
-          >
-            {renderLabel(tab)}
-          </button>
-        ))}
-      </div>
-      {canScrollRight && (
-        <button
-          className="absolute right-0 top-0 bottom-0 z-10 w-7 flex items-center justify-center bg-bg border-l border-line cursor-pointer border-y-0 border-r-0"
-          onClick={() => scroll('right')}
-        >
-          <ChevronRight size={14} className="text-subtle" />
-        </button>
-      )}
-    </div>
-  );
-}
-
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function ContractDetailPanel({ contractId, isMobile }: { contractId: number; isMobile: boolean }) {
@@ -464,30 +393,35 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
       {/* Desktop header */}
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
-          <span className="font-semibold">{contract.code_display ?? contract.code}</span>
+          {/* The contract number never breaks; on a narrow panel the badges
+              beside it give way — whole, from the end: they wrap onto a second
+              line that the fixed height hides, so nothing shows half-cut. */}
+          <span className="font-semibold whitespace-nowrap shrink-0">{contract.code_display ?? contract.code}</span>
           <button
             type="button"
             onClick={() => handleCopyCode(contract.code_display ?? contract.code)}
-            className="p-1 rounded hover:bg-surface-hover transition-colors cursor-pointer text-subtle hover:text-fg"
+            className="shrink-0 p-1 rounded hover:bg-surface-hover transition-colors cursor-pointer text-subtle hover:text-fg"
             aria-label={t('common.copy')}
             title={copied ? t('common.copied') : t('common.copy')}
           >
             {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
           </button>
-          <Badge size="xs" color={getStateColor(contract.state)}>
-            {getStateLabel(contract.state, t)}
-          </Badge>
-          {contract.is_paused && (
-            <Badge size="xs" color="warning">{t('contract.paused')}</Badge>
-          )}
-          <OwnerBadge size="sm" ownerType={contract.owner_type as OwnerType | null} ownerName={contract.owner_name} />
-          {contract.commercial_model && (
-            <span className="text-xs text-subtle">{contract.commercial_model}</span>
-          )}
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-4 max-h-5 min-w-0 overflow-hidden">
+            <Badge size="xs" color={getStateColor(contract.state)}>
+              {getStateLabel(contract.state, t)}
+            </Badge>
+            {contract.is_paused && (
+              <Badge size="xs" color="warning">{t('contract.paused')}</Badge>
+            )}
+            <OwnerBadge size="sm" ownerType={contract.owner_type as OwnerType | null} ownerName={contract.owner_name} />
+            {contract.commercial_model && (
+              <span className="text-xs text-subtle whitespace-nowrap">{contract.commercial_model}</span>
+            )}
+          </div>
           {/* Chat with the customer without leaving the contract — opens the
               floating dock on this contract's thread (doc 66 §④). Contracts
               with no chat yet open an empty room; the first message starts it. */}
-          <div className="ml-auto">
+          <div className="ml-auto shrink-0">
             <Button
               variant="ghost"
               size="sm"
@@ -501,8 +435,8 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
         </div>
       )}
 
-      {/* Tabs with scroll arrows */}
-      <ScrollableTabs
+      {/* Tabs — the ones that don't fit fold into the More dropdown */}
+      <OverflowTabs
         tabs={TABS}
         activeTab={activeTab}
         onTabChange={handleTabChange}
@@ -1344,7 +1278,7 @@ function MoneyTab({ contractId, contract, t, requestedSection, onSectionConsumed
       <div className="flex-none px-4 pt-3">
         <ContractCapitalStrip contractId={contractId} />
       </div>
-      <ScrollableTabs
+      <OverflowTabs
         tabs={sections}
         activeTab={section}
         onTabChange={setSection}

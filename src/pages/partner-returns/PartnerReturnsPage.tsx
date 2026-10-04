@@ -11,6 +11,7 @@
 //
 // No count badges on the menu: the backend has no counter RPC for returns yet.
 
+import { OverflowTabs } from '../../components/OverflowTabs';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
@@ -169,22 +170,14 @@ export function PartnerReturnsPage() {
                 id="list"
                 className={isMobile ? '' : 'w-1/2 xl:w-5/12 border-r border-line flex flex-col'}
               >
-                <div className="flex-none border-b border-line flex px-2 overflow-x-auto hidden-scroll">
-                  {tabs.map(key => (
-                    <button
-                      key={key || 'all'}
-                      type="button"
-                      onClick={() => setTab(key)}
-                      className={`py-2 px-3 text-sm font-medium transition-colors cursor-pointer border-b-2 whitespace-nowrap bg-transparent ${
-                        tab === key ? 'border-primary-fg text-primary-fg' : 'border-transparent text-fg'
-                      }`}
-                    >
-                      {key
+                <OverflowTabs
+                  tabs={tabs}
+                  activeTab={tab}
+                  onTabChange={setTab}
+                  renderLabel={key => <>{key
                         ? t(`partnerReturn.nextStep_${key}`)
-                        : t('partnerReturn.tabAll')}
-                    </button>
-                  ))}
-                </div>
+                        : t('partnerReturn.tabAll')}</>}
+                />
 
                 <div className="flex-none flex items-center gap-2 p-2 border-b border-line">
                   <div className="flex-1 min-w-0 md:max-w-56">

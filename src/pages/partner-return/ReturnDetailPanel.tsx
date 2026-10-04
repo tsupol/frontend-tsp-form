@@ -14,6 +14,7 @@
 // reads the slot list from the backend and freezes a group when the backend
 // says so.
 
+import { OverflowTabs } from '../../components/OverflowTabs';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -132,22 +133,15 @@ export function ReturnDetailPanel({ returnId, isMobile, onBack }: {
         <Badge color={returnBadgeColor(detail.status)} size="sm">{statusLabel}</Badge>
       </div>
 
-      <div className="flex-none flex px-2 border-b border-line overflow-x-auto hidden-scroll">
-        {TABS.map(x => (
-          <button
-            key={x}
-            className={`py-2 px-3 text-sm font-medium transition-colors cursor-pointer border-b-2 whitespace-nowrap bg-transparent ${
-              tab === x ? 'border-primary-fg text-primary-fg' : 'border-transparent text-fg'
-            }`}
-            onClick={() => setTab(x)}
-          >
-            <span className="inline-flex items-center gap-1.5">
+      <OverflowTabs
+        tabs={TABS}
+        activeTab={tab}
+        onTabChange={setTab}
+        renderLabel={x => <><span className="inline-flex items-center gap-1.5">
               {x === 'history' ? <History size={14} /> : <Info size={14} />}
               {t(`partnerReturn.tab_${x}`)}
-            </span>
-          </button>
-        ))}
-      </div>
+            </span></>}
+      />
 
       <div className="flex-1 overflow-auto better-scroll px-4 py-3">
         {tab === 'detail' ? (

@@ -1,7 +1,7 @@
 // ============================================================================
 // OverflowTabs — a tab strip that shows as many tabs as fit the container and
-// folds the rest into a "More ▾" popover. Built for the MDM sub-tabs (up to 7)
-// in a narrow detail panel where a plain strip would always be cramped.
+// folds the rest into a "More ▾" popover. The standard for any tab row that can run out of room;
+// first used for the MDM sub-tabs in a narrow detail panel.
 //
 // How it fits: an off-screen measurement pass renders every tab once to learn
 // its width, then a ResizeObserver on the container decides how many fit
@@ -14,8 +14,6 @@ import { useRef, useState, useLayoutEffect, useCallback } from 'react';
 import { PopOver } from 'tsp-form';
 import { ChevronDown, Check } from 'lucide-react';
 
-const MORE_BTN_WIDTH = 52; // px reserved for the "More ▾" trigger
-const GAP = 0;
 
 export function OverflowTabs<T extends string>({
   tabs, activeTab, onTabChange, renderLabel,
@@ -29,6 +27,12 @@ export function OverflowTabs<T extends string>({
   const measureRef = useRef<HTMLDivElement>(null);
   const moreTriggerRef = useRef<HTMLButtonElement>(null);
   const widthsRef = useRef<number[]>([]);
+  // The More button is a square as wide as a plain one-line tab is tall —
+  // measured, so it follows the font. Taller tabs (a label with a badge) stretch
+  // the button's height, never its width.
+  const probeRef = useRef<HTMLButtonElement>(null);
+  const squareRef = useRef(38);
+  const [square, setSquare] = useState(38);
   const [visibleCount, setVisibleCount] = useState(tabs.length);
   const [moreOpen, setMoreOpen] = useState(false);
 
@@ -37,6 +41,11 @@ export function OverflowTabs<T extends string>({
     const m = measureRef.current;
     if (!m) return;
     widthsRef.current = Array.from(m.children).map((c) => (c as HTMLElement).offsetWidth);
+    const probeH = probeRef.current?.getBoundingClientRect().height;
+    if (probeH) {
+      squareRef.current = probeH;
+      setSquare(squareRef.current);
+    }
     recompute();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -45,20 +54,22 @@ export function OverflowTabs<T extends string>({
     const container = containerRef.current;
     const widths = widthsRef.current;
     if (!container || widths.length === 0) return;
-    const avail = container.offsetWidth;
+    // The row has no side padding: tabs start at the panel edge and the More
+    // square sits flush against the other edge.
+    const inner = container.offsetWidth;
 
     // Everything fits → no More button.
-    const total = widths.reduce((s, w) => s + w + GAP, 0);
-    if (total <= avail) {
+    const total = widths.reduce((s, w) => s + w, 0);
+    if (total <= inner) {
       setVisibleCount(widths.length);
       return;
     }
-    // Otherwise fit as many as possible, leaving room for the More button.
+    // Otherwise fit as many as possible, leaving room for the square button.
     let used = 0;
     let count = 0;
     for (let i = 0; i < widths.length; i++) {
-      if (used + widths[i] + MORE_BTN_WIDTH > avail) break;
-      used += widths[i] + GAP;
+      if (used + widths[i] + squareRef.current > inner) break;
+      used += widths[i];
       count++;
     }
     setVisibleCount(Math.max(1, count));
@@ -119,8 +130,10 @@ export function OverflowTabs<T extends string>({
           <span key={tab} className="py-2 px-3 text-sm font-medium whitespace-nowrap">{renderLabel(tab)}</span>
         ))}
       </div>
+      {/* A plain one-line tab, same element and classes as a real one, to size the More square. */}
+      <button ref={probeRef} type="button" tabIndex={-1} className="absolute opacity-0 pointer-events-none py-2 px-3 text-sm font-medium border-b-2" aria-hidden style={{ top: -9999, left: 0 }}>M</button>
 
-      <div ref={containerRef} className="flex items-stretch px-2">
+      <div ref={containerRef} className="flex items-stretch">
         {visible.map((tab) => (
           <button
             key={tab}
@@ -134,20 +147,17 @@ export function OverflowTabs<T extends string>({
         ))}
 
         {overflow.length > 0 && (
-          <div className="ml-auto self-center pl-1 pr-0.5">
-            <button
-              ref={moreTriggerRef}
-              className={`h-7 w-7 flex items-center justify-center rounded-md border transition-colors cursor-pointer ${
-                activeInOverflow || moreOpen
-                  ? 'border-primary-fg text-primary-fg'
-                  : 'border-line text-subtle hover:bg-surface-hover'
-              }`}
-              onClick={() => setMoreOpen((v) => !v)}
-              aria-label="More tabs"
-            >
-              <ChevronDown size={15} />
-            </button>
-          </div>
+          <button
+            ref={moreTriggerRef}
+            style={{ width: square }}
+            className={`ml-auto shrink-0 flex items-center justify-center border-l border-line transition-colors cursor-pointer ${
+              activeInOverflow || moreOpen ? 'text-primary-fg' : 'text-subtle hover:bg-surface-hover'
+            } ${moreOpen ? 'bg-surface-hover' : ''}`}
+            onClick={() => setMoreOpen((v) => !v)}
+            aria-label="More tabs"
+          >
+            <ChevronDown size={16} />
+          </button>
         )}
       </div>
 

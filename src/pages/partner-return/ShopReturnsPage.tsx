@@ -17,6 +17,7 @@ import { DateTime } from '../../components/DateTime';
 import { SearchInput } from '../../components/SearchInput';
 import { useAuth } from '../../contexts/AuthContext';
 import { ContractDetailSlot } from '../contracts/ContractDetailSlot';
+import { OverflowTabs } from '../../components/OverflowTabs';
 import { ReturnDetailPanel } from './ReturnDetailPanel';
 import { usePartnerMyReturns, useReturnStatuses } from './usePartnerReturn';
 import { returnBadgeColor, type PartnerReturn, type ReturnStatusRef } from './partnerReturnTypes';
@@ -115,19 +116,12 @@ export function ShopReturnsPage() {
                 id="list"
                 className={isMobile ? '' : 'w-1/2 xl:w-5/12 border-r border-line flex flex-col'}
               >
-                <div className="flex-none flex px-2 border-b border-line overflow-x-auto hidden-scroll">
-                  {TABS.map(x => (
-                    <button
-                      key={x}
-                      className={`py-2 px-3 text-sm font-medium transition-colors cursor-pointer border-b-2 whitespace-nowrap bg-transparent ${
-                        tab === x ? 'border-primary-fg text-primary-fg' : 'border-transparent text-fg'
-                      }`}
-                      onClick={() => setTab(x)}
-                    >
-                      {t(`partnerReturn.tabMenu_${x}`)}
-                    </button>
-                  ))}
-                </div>
+                <OverflowTabs
+                  tabs={TABS}
+                  activeTab={tab}
+                  onTabChange={setTab}
+                  renderLabel={x => t(`partnerReturn.tabMenu_${x}`)}
+                />
 
                 <div className="flex-none p-2 border-b border-line">
                   <SearchInput

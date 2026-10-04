@@ -6506,8 +6506,8 @@
     "suggested": "suggested",
     "tabAll": "All",
     "tabMenu_ALL": "All",
-    "tabMenu_OPEN": "Waiting for signature",
-    "tabMenu_RECEIVED": "Received, waiting on the fund",
+    "tabMenu_OPEN": "To sign",
+    "tabMenu_RECEIVED": "At the fund",
     "tab_detail": "Details",
     "tab_history": "History",
     "timeline": {

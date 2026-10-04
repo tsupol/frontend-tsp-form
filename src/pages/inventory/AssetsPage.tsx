@@ -27,7 +27,7 @@ import { getBucketLabel, getBucketColor, getConditionLabel, getConditionTextColo
 import { RegisterAssetModal } from './RegisterAssetModal';
 import { AssetMdmTab } from './AssetMdmTab';
 import { AssetEvidenceTab } from './AssetEvidenceTab';
-import { ScrollableTabs } from './ScrollableTabs';
+import { OverflowTabs } from '../../components/OverflowTabs';
 import { SellExternalModal } from './SellExternalModal';
 import { SellOutRequestModal } from './SellOutRequestModal';
 import { OwnerBadge } from '../../components/OwnerBadge';
@@ -1143,7 +1143,7 @@ function AssetDetailPanel({
       )}
 
       {/* Tabs */}
-      <ScrollableTabs
+      <OverflowTabs
         tabs={ASSET_TABS}
         activeTab={activeTab}
         onTabChange={handleTabChange}

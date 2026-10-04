@@ -11,6 +11,7 @@
 // waiting for the warehouse) show it disabled with the reason on its tooltip,
 // because those are things the user can act on.
 
+import { OverflowTabs } from '../../components/OverflowTabs';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -193,20 +194,12 @@ export function PartnerReturnDetailPanel({ returnId, isMobile, onBack, queueRow 
         )}
       </div>
 
-      <div className="flex-none border-b border-line flex px-2 overflow-x-auto hidden-scroll">
-        {(['detail', 'history'] as Tab[]).map(key => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setTab(key)}
-            className={`py-2 px-3 text-sm font-medium transition-colors cursor-pointer border-b-2 whitespace-nowrap bg-transparent ${
-              tab === key ? 'border-primary-fg text-primary-fg' : 'border-transparent text-fg'
-            }`}
-          >
-            {t(`partnerReturn.tab_${key}`)}
-          </button>
-        ))}
-      </div>
+      <OverflowTabs
+        tabs={(['detail', 'history'] as Tab[])}
+        activeTab={tab}
+        onTabChange={setTab}
+        renderLabel={key => t(`partnerReturn.tab_${key}`)}
+      />
 
       <div className="flex-1 overflow-auto better-scroll px-4 py-3">
         {isLoading && !detail && (

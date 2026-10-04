@@ -10,6 +10,7 @@
 // exception and still routes away — building a document is a task with its own
 // ticklist and totals, not something to read at half width.
 
+import { OverflowTabs } from '../../components/OverflowTabs';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -153,20 +154,12 @@ export function FundBillsPage() {
               id="list"
               className={isMobile ? '' : 'w-2/5 xl:w-1/3 border-r border-line flex flex-col min-h-0'}
             >
-              <div className="flex-none border-b border-line flex px-2 overflow-x-auto hidden-scroll">
-                {TABS.map(key => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setTab(key)}
-                    className={`py-2 px-3 text-sm font-medium transition-colors cursor-pointer border-b-2 whitespace-nowrap bg-transparent ${
-                      tab === key ? 'border-primary-fg text-primary-fg' : 'border-transparent text-fg'
-                    }`}
-                  >
-                    {tabLabel(key)}
-                  </button>
-                ))}
-              </div>
+              <OverflowTabs
+                tabs={TABS}
+                activeTab={tab}
+                onTabChange={setTab}
+                renderLabel={key => tabLabel(key)}
+              />
 
               {/* Paid needs a date window — the list otherwise grows forever.
                *  One range control, not two date fields: it keeps the two ends

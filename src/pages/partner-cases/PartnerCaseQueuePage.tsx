@@ -8,6 +8,7 @@
 // The two lists come from different views with different columns, so the rail
 // renders from a small shared row shape rather than pretending they are one.
 
+import { OverflowTabs } from '../../components/OverflowTabs';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
@@ -218,22 +219,12 @@ export function PartnerCaseQueuePage() {
                 className={isMobile ? '' : 'w-1/2 xl:w-5/12 border-r border-line flex flex-col'}
               >
                 {/* Tabs — the queue first, history after it. */}
-                <div className="flex-none border-b border-line flex px-2 overflow-x-auto hidden-scroll">
-                  {TABS.map(key => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => setTab(key)}
-                      className={`py-2 px-3 text-sm font-medium transition-colors cursor-pointer border-b-2 whitespace-nowrap bg-transparent ${
-                        tab === key
-                          ? 'border-primary-fg text-primary-fg'
-                          : 'border-transparent text-fg'
-                      }`}
-                    >
-                      {tabLabel(key)}
-                    </button>
-                  ))}
-                </div>
+                <OverflowTabs
+                  tabs={TABS}
+                  activeTab={tab}
+                  onTabChange={setTab}
+                  renderLabel={key => tabLabel(key)}
+                />
 
                 {/* Filters — the queue has its own pool toggle; history gets
                     branch + search, which is how anyone finds a past request. */}

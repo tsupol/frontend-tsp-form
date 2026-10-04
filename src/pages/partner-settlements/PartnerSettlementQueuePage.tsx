@@ -11,6 +11,7 @@
 // No count badges on the menu: the backend has no counter RPC for this yet and
 // polling `count=exact` on every menu open was explicitly ruled out.
 
+import { OverflowTabs } from '../../components/OverflowTabs';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
@@ -144,22 +145,12 @@ export function PartnerSettlementQueuePage() {
                 id="list"
                 className={isMobile ? '' : 'w-1/2 xl:w-5/12 border-r border-line flex flex-col'}
               >
-                <div className="flex-none border-b border-line flex px-2 overflow-x-auto hidden-scroll">
-                  {TABS.map(key => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => setTab(key)}
-                      className={`py-2 px-3 text-sm font-medium transition-colors cursor-pointer border-b-2 whitespace-nowrap bg-transparent ${
-                        tab === key
-                          ? 'border-primary-fg text-primary-fg'
-                          : 'border-transparent text-fg'
-                      }`}
-                    >
-                      {t(`partnerSettlement.tab.${key}`)}
-                    </button>
-                  ))}
-                </div>
+                <OverflowTabs
+                  tabs={TABS}
+                  activeTab={tab}
+                  onTabChange={setTab}
+                  renderLabel={key => t(`partnerSettlement.tab.${key}`)}
+                />
 
                 <div className="flex-none flex items-center gap-2 p-2 border-b border-line">
                   <div className="flex-1 min-w-0 md:max-w-56">

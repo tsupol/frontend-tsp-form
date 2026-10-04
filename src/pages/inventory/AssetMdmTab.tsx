@@ -19,7 +19,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { Button } from 'tsp-form';
-import { OverflowTabs } from './mdm/OverflowTabs';
+import { OverflowTabs } from '../../components/OverflowTabs';
 import { useMdmStatus } from './mdm/useMdmStatus';
 import { EnforcementPausedBar } from './mdm/MdmSharedBits';
 import { SubTabEnroll } from './mdm/SubTabEnroll';
