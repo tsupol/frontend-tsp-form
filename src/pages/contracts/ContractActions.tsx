@@ -896,6 +896,10 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   // still offers the bill — so the request's own outcome is checked too. An
   // expired one has a different next step (withdraw and submit again), shown
   // on its approval card. Shop only — staff screens are left as they were.
+  // TEMPORARY: the backend should refuse the bill itself once the approval has
+  // expired (NOTICE 2026-10-06 partner_shop_expired_approval… §1). Remove this
+  // check, the badge override in ContractDetailPanel and the hidden rows in
+  // PendingPaymentPage when it does.
   const approvalCase = useContractPartnerCases(contract.id, isDealPartner && contract.state === 'APPROVED');
   const approvalExpired = isDealPartner && approvalCase.latest?.outcome === 'EXPIRED';
   // A shop collects in a dialog, on the contract; staff keep the opening screen.
