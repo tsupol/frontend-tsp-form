@@ -24,6 +24,7 @@ import { fmtCurrency } from '../../lib/format';
 import { getStateColor, getStateLabel, productName, formatInstallment } from './contractUtils';
 import { ContractActionButtons } from './ContractActions';
 import { PartnerCaseCard } from '../partner-cases/PartnerCaseCard';
+import { useContractPartnerCases } from '../partner-cases/usePartnerCases';
 import { ContractCapitalStrip } from './ContractCapitalStrip';
 import { SettlementCard } from '../partner-settlement/SettlementCard';
 import { ContractMoneyPanel } from '../fund-bills/ContractMoneyPanel';
@@ -380,6 +381,11 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
     placeholderData: keepPreviousData,
   });
 
+  // The contract stays "approved" after its approval runs out; the badge says
+  // what the approval card below it says.
+  const approvalCase = useContractPartnerCases(contractId, contract?.state === 'APPROVED');
+  const approvalExpired = contract?.state === 'APPROVED' && approvalCase.latest?.outcome === 'EXPIRED';
+
   if (isLoading && !contract) {
     return <div className="flex-1 flex items-center justify-center text-subtler">{t('common.loading')}</div>;
   }
@@ -407,8 +413,8 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
             {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
           </button>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-4 max-h-5 min-w-0 overflow-hidden">
-            <Badge size="xs" color={getStateColor(contract.state)}>
-              {getStateLabel(contract.state, t)}
+            <Badge size="xs" color={approvalExpired ? 'danger' : getStateColor(contract.state)}>
+              {approvalExpired ? t('partnerCase.outcome_EXPIRED') : getStateLabel(contract.state, t)}
             </Badge>
             {contract.is_paused && (
               <Badge size="xs" color="warning">{t('contract.paused')}</Badge>
@@ -779,7 +785,7 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
   deliveryModalOpen: boolean;
   setDeliveryModalOpen: (open: boolean) => void;
 }) {
-  const { user } = useAuth();
+  const { user, isDealPartner } = useAuth();
   const isFin2 = contract.commercial_model === 'FIN2';
   const isActive = contract.state === 'ACTIVE' || contract.state === 'COMPLETED' || contract.state === 'TERMINATED';
   // Device can be bound before activation too — fn_contract_bind_device only
@@ -790,7 +796,13 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
     (contract.state === 'ACTIVE' || contract.state === 'WAIT_LEGAL_PROCESS' || contract.state === 'ON_LEGAL_PROCESS'
       || contract.state === 'PENDING_SIGN' || contract.state === 'PENDING_PAYMENT_AND_SIGN' || contract.state === 'PENDING_PAYMENT') &&
     contract.device_id == null &&
-    !contract.is_used_asset;
+    !contract.is_used_asset &&
+    // A shop never binds by hand: the device its contract was approved with is
+    // bound when the customer signs, so the reminder would ask for a wrong step.
+    !isDealPartner;
+  // The backend's own "awaiting delivery" rule (v_branch_action_required):
+  // active, device bound, hand-over not recorded yet.
+  const needsHandover = contract.state === 'ACTIVE' && contract.device_id != null && contract.shipped_at == null;
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [commissionModalOpen, setCommissionModalOpen] = useState(false);
 
@@ -848,6 +860,31 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
 
   return (
     <div className="p-4 flex flex-col gap-4">
+      {/* Hand-over reminder — the step that takes the contract off the
+          "awaiting delivery" list. Opens the same dialog as the delivery card
+          further down. First on the tab: the cards below it are tall,
+          and under them the button was off the screen. */}
+      {needsHandover && (
+        <div className="border rounded-md px-4 py-3 border-warning-border bg-warning-soft">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <Truck size={14} className="text-warning-fg shrink-0" />
+              <div className="min-w-0">
+                <div className="text-xs font-semibold uppercase tracking-wider text-warning-fg">
+                  {t('contract.handoverNotRecorded')}
+                </div>
+                <div className="text-sm text-warning-fg mt-0.5">
+                  {t('contract.handoverReminder')}
+                </div>
+              </div>
+            </div>
+            <Button size="sm" color="primary" onClick={() => setDeliveryModalOpen(true)} className="shrink-0" data-action="RECORD_HANDOVER">
+              {t('contract.action_record_handover')}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Deal-partner FIN1 credit request — renders nothing for every other
           shop/contract, and drops away once the contract goes active. */}
       <PartnerCaseCard
@@ -909,7 +946,7 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
               </div>
             </div>
             <Button size="sm" color="primary" onClick={onNavigateSigning} className="shrink-0">
-              {t('contract.goToSigning')}
+              {t('contract.action_go_to_signing')}
             </Button>
           </div>
         </div>

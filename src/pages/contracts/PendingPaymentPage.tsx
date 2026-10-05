@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../lib/api';
@@ -29,6 +29,18 @@ export function PendingPaymentPage() {
     staleTime: 10 * 1000,
   });
 
+  // A shop contract stays "approved" after its approval runs out, so the state
+  // alone would keep it here. It belongs under "Sent back / Expired" only.
+  const { data: expiredApprovals } = useQuery({
+    queryKey: ['partner-cases', 'mine', 'expired-contract-ids'],
+    queryFn: () => apiClient.get<{ contract_id: number }[]>(
+      '/v_partner_my_cases?is_latest=eq.true&outcome=eq.EXPIRED&select=contract_id',
+    ),
+    enabled: isDealPartner,
+    staleTime: 30 * 1000,
+  });
+  const hideIds = useMemo(() => (expiredApprovals ?? []).map(r => r.contract_id), [expiredApprovals]);
+
   const totalByContract = new Map<number, number>();
   // What is still owed, as the bill says — a part-paid bill shows its remainder.
   for (const b of openBills ?? []) totalByContract.set(b.contract_id, b.remaining ?? b.total_amount);
@@ -56,6 +68,7 @@ export function PendingPaymentPage() {
         ? ['APPROVED', 'PENDING_PAYMENT_AND_SIGN', 'PENDING_PAYMENT', 'PENDING_SIGN']
         : ['PENDING_PAYMENT_AND_SIGN', 'PENDING_PAYMENT', 'PENDING_SIGN']}
       showStateFilter={false}
+      hideIds={hideIds}
       renderRowRight={renderRowRight}
       emptyMessage={t('contract.noPendingPayment')}
       onContractsChange={(rows) => {

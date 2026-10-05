@@ -56,6 +56,7 @@ import { useContractOpenReturn } from '../partner-return/usePartnerReturn';
 import { buildSavingSeededPayments, savingApplied, unusedSaving } from './savingAutoFill';
 import { SavingRowNote, SavingUnusedWarning, SavingUnusedConfirmDialog } from './SavingAppliedNotice';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { useContractPartnerCases } from '../partner-cases/usePartnerCases';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -890,7 +891,14 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   // the button leads there; it shows only when the backend says the bill can be
   // opened now (and stays hidden until the actions have loaded).
   const openBillAction = (actionsResp?.actions ?? []).find(a => a.action_code === 'OPEN_CONTRACT_BILL');
+  // The contract stays "approved" after its approval runs out, and the backend
+  // still offers the bill — so the request's own outcome is checked too. An
+  // expired one has a different next step (withdraw and submit again), shown
+  // on its approval card.
+  const approvalCase = useContractPartnerCases(contract.id, contract.state === 'APPROVED');
+  const approvalExpired = approvalCase.latest?.outcome === 'EXPIRED';
   const canCollectDown = contract.state === 'APPROVED'
+    && !approvalCase.isLoading && !approvalExpired
     && !!openBillAction?.is_available && openBillAction.is_permitted !== false;
   // Paying the opening bill is offered by the backend (PAY_OPEN_BILL) — also on a
   // contract already awaiting signature whose bill was left part-paid.
