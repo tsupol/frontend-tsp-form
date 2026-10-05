@@ -159,6 +159,12 @@ POST /rpc/fn_contract_set_rate
 { "p_contract_id": <id>, "p_term_months": 6, "p_down_percent": 10 }
 ```
 
+> ⚠️ **FIN1 no longer uses `fn_contract_set_rate`** (refused with
+> `SALE.VALIDATION.FIN1_USE_NEW_ENGINE`, verified 2026-10-06). Set the plan with
+> `POST /rpc/fn_contract_set_fin1_plan {p_contract_id, p_term_months, p_down_percent, p_uplift: null, p_dry_run: false}`;
+> a dry run with `p_down_percent: 0` is refused with the allowed down range in its params.
+> Model 854 / variant 1543 (iPad 7th gen 128GB Gold) is priced on DEV; 15% down works.
+
 `fn_contract_set_rate` also accepts `p_down_amount` (use instead of `p_down_percent`
 for a fixed down). It returns the snapshot: `down_amount`, `installment_amount`,
 `installment_total`, `rate_card_id`.
