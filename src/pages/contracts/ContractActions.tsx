@@ -57,6 +57,7 @@ import { buildSavingSeededPayments, savingApplied, unusedSaving } from './saving
 import { SavingRowNote, SavingUnusedWarning, SavingUnusedConfirmDialog } from './SavingAppliedNotice';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { useContractPartnerCases } from '../partner-cases/usePartnerCases';
+import { ShopCollectDownModal } from './ShopCollectDownModal';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -894,9 +895,12 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   // The contract stays "approved" after its approval runs out, and the backend
   // still offers the bill — so the request's own outcome is checked too. An
   // expired one has a different next step (withdraw and submit again), shown
-  // on its approval card.
-  const approvalCase = useContractPartnerCases(contract.id, contract.state === 'APPROVED');
-  const approvalExpired = approvalCase.latest?.outcome === 'EXPIRED';
+  // on its approval card. Shop only — staff screens are left as they were.
+  const approvalCase = useContractPartnerCases(contract.id, isDealPartner && contract.state === 'APPROVED');
+  const approvalExpired = isDealPartner && approvalCase.latest?.outcome === 'EXPIRED';
+  // A shop collects in a dialog, on the contract; staff keep the opening screen.
+  const [collectDownOpen, setCollectDownOpen] = useState(false);
+  const refreshAfterCollect = useContractInvalidate(contract.id);
   const canCollectDown = contract.state === 'APPROVED'
     && !approvalCase.isLoading && !approvalExpired
     && !!openBillAction?.is_available && openBillAction.is_permitted !== false;
@@ -1119,12 +1123,24 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
               size="sm"
               color="primary"
               startIcon={<Receipt size={14} />}
-              onClick={() => navigate(`/admin/contracts/new/${contract.id}${contractMenuFrom(location.pathname)}`)}
+              data-action="COLLECT_DOWN"
+              onClick={() => (isDealPartner
+                ? setCollectDownOpen(true)
+                : navigate(`/admin/contracts/new/${contract.id}${contractMenuFrom(location.pathname)}`))}
             >
               {t('contract.collectDownPayment')}
             </Button>
           </div>
         )}
+        {/* Always mounted; `open` shows it. Outside the button's own block so
+            it outlives the button, which goes once the contract is paid. */}
+        <ShopCollectDownModal
+          open={collectDownOpen}
+          contractId={contract.id}
+          contractCode={contract.code_display ?? contract.code}
+          onClose={() => setCollectDownOpen(false)}
+          onChanged={refreshAfterCollect}
+        />
         {isWizardState && (
           <div className="flex flex-wrap items-center gap-2">
             <Button

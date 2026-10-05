@@ -67,6 +67,9 @@ interface Props {
   onChange: (next: DraftCartLine[]) => void;
   /** Right-aligned action on the "+ add line" row (e.g. print invoice). */
   rowAction?: ReactNode;
+  /** Drop the empty remove-button column while no row has a remove button,
+   *  so the amounts sit flush with the right edge. */
+  flushAmounts?: boolean;
 }
 
 const SELLABLE_CHARGE_TYPES = new Set(['ACCESSORY_SALE', 'GIFT']);
@@ -80,7 +83,8 @@ const CHARGE_ICONS: Record<string, ReactNode> = {
 let cartIdCounter = 0;
 const nextCartId = () => `cart-${Date.now()}-${++cartIdCounter}`;
 
-export function BillCart({ branchId, systemLines, lines, onChange, rowAction }: Props) {
+export function BillCart({ branchId, systemLines, lines, onChange, rowAction, flushAmounts }: Props) {
+  const spacerColumn = !(flushAmounts && lines.length === 0);
   const { t, i18n } = useTranslation();
 
   const [addOpen, setAddOpen] = useState(false);
@@ -209,7 +213,7 @@ export function BillCart({ branchId, systemLines, lines, onChange, rowAction }: 
               <tr key={l.key} className="bg-surface/40">
                 <td className="px-3 py-2">{l.description}</td>
                 <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">{fmtCurrency(l.amount)}</td>
-                <td className="px-3 py-2 w-10" />
+                {spacerColumn && <td className="px-3 py-2 w-10" />}
               </tr>
             ))}
             {lines.map(line => {
@@ -269,7 +273,7 @@ export function BillCart({ branchId, systemLines, lines, onChange, rowAction }: 
             <tr className="bg-surface font-medium">
               <td className="px-3 py-2">{t('workspace.total')}</td>
               <td className="px-3 py-2 text-right tabular-nums">{fmtCurrency(total)}</td>
-              <td />
+              {spacerColumn && <td />}
             </tr>
           </tbody>
         </table>
