@@ -10,7 +10,9 @@ export function CardReviewPay({ onEdit, active, disabled }: { onEdit?: () => voi
 
   const downPayment = contract?.down_payment ?? 0;
   const insuranceDeposit = contract?.insurance_deposit ?? 0;
-  const total = downPayment + insuranceDeposit;
+  // Same lines the payment panel lists — the contract fee is on the opening bill.
+  const docFee = contract?.doc_fee_amount ?? 0;
+  const total = downPayment + docFee + insuranceDeposit;
 
   return (
     <SummaryCard

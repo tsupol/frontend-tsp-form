@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Button } from 'tsp-form';
 import { QRCodeSVG } from 'qrcode.react';
-import { Smartphone, XCircle, Copy, Check, PenLine, CheckCircle } from 'lucide-react';
+import { Smartphone, XCircle, Copy, Check, PenLine, CheckCircle, ExternalLink } from 'lucide-react';
 import { useMobileCaptureSession } from './useMobileCaptureSession';
 
 /**
@@ -133,6 +133,18 @@ export function ContractSignQrModal({
                     defaultValue: 'Scan with the iPad, hand it to the customer to read and sign.',
                   })}
                 </p>
+
+                {/* Already on the iPad the customer will sign on — there is no
+                    second device to scan with, so open the page right here. */}
+                <a
+                  href={session.qr_payload}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-primary w-full inline-flex items-center justify-center gap-2"
+                >
+                  <ExternalLink size={16} />
+                  {t('workspace.signQrOpenHere')}
+                </a>
 
                 <div className="w-full flex items-center gap-2">
                   <input

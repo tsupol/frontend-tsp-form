@@ -89,17 +89,22 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
   // ── System (auto) lines — shown read-only at the top of the cart ─────
   const downPayment = contract?.down_payment ?? 0;
   const insuranceDeposit = contract?.insurance_deposit ?? 0;
+  // The contract fee (FIN1) is a line the backend puts on the opening bill
+  // itself. Leaving it off this list made the screen collect the down payment
+  // only and the bill stayed part-paid.
+  const docFee = contract?.doc_fee_amount ?? 0;
   const systemLines = useMemo(() => {
     const items: Array<{ key: string; description: string; amount: number }> = [];
     if (downPayment > 0) items.push({ key: 'down', description: t('contract.downPayment'), amount: downPayment });
+    if (docFee > 0) items.push({ key: 'docFee', description: t('fin1Plan.rowDocFee'), amount: docFee });
     if (insuranceDeposit > 0) items.push({ key: 'insurance', description: t('contract.insuranceDeposit'), amount: insuranceDeposit });
     return items;
-  }, [downPayment, insuranceDeposit, t]);
+  }, [downPayment, docFee, insuranceDeposit, t]);
 
   // ── Draft cart (client-side only, until Confirm) ─────────────────────
   const [cartLines, setCartLines] = useState<DraftCartLine[]>([]);
   const cartChargeTotal = cartLines.reduce((sum, l) => sum + (l.as_gift ? 0 : l.amount), 0);
-  const totalAmount = downPayment + insuranceDeposit + cartChargeTotal;
+  const totalAmount = downPayment + docFee + insuranceDeposit + cartChargeTotal;
 
   // Zero-open (BE mig 971): down 0 + no insurance deposit + empty cart = a
   // contract that collects nothing today. fn_bill_contract_open now opens a
@@ -399,8 +404,24 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
         : isNoCharge;
 
       if (!noChargeBill) {
+        // The bill's own total is the figure to collect — the screen's sum is
+        // only a preview. With a single payment line, pay what the bill says;
+        // with several, a mismatch means the split is wrong, so stop before
+        // recording anything rather than leave the bill part-paid.
+        let toRecord = payments;
+        if (bill.total_amount != null && Math.abs(bill.total_amount - totalPayment) >= 0.01) {
+          if (payments.length === 1) {
+            toRecord = [{ ...payments[0], amount: bill.total_amount }];
+          } else {
+            throw new Error(t('wizard.billTotalMismatch', {
+              total: fmtCurrency(bill.total_amount),
+              entered: fmtCurrency(totalPayment),
+            }));
+          }
+        }
+
         // 4. Record payments.
-        for (const payment of payments) {
+        for (const payment of toRecord) {
           await apiClient.rpc('fn_bill_payment_add', {
             p_bill_id: bill.bill_id,
             p_method: payment.method,
@@ -469,14 +490,18 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
     );
   }
 
-  // Bill opened but a later step (payment / staff-sign) failed. Recovery view —
-  // the bill exists and still needs payment on the Pending Payment page.
-  if (billOpenFailed && data.billId) {
+  // Bill opened but a later step (payment / staff-sign) failed — or the user
+  // came back to a contract whose bill is issued but not fully paid. Either way
+  // the bill exists, so the form (which would try to issue a second one and be
+  // refused) gives way to the recovery view that says where to pay the rest.
+  const billAwaitingPayment = !loading && !!data.billId
+    && (contract?.state === 'PENDING_PAYMENT' || contract?.state === 'PENDING_PAYMENT_AND_SIGN');
+  if ((billOpenFailed || billAwaitingPayment) && data.billId) {
     return (
       <PostFailView
         billCode={data.billCode || null}
         contractId={data.contractId ?? null}
-        contractState={data.billData?.contract_state}
+        contractState={data.billData?.contract_state ?? (contract?.state as BillOpenResult['contract_state'])}
         error={error}
         onNavigate={navigate}
         t={t}

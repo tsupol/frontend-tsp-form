@@ -892,7 +892,11 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   const openBillAction = (actionsResp?.actions ?? []).find(a => a.action_code === 'OPEN_CONTRACT_BILL');
   const canCollectDown = contract.state === 'APPROVED'
     && !!openBillAction?.is_available && openBillAction.is_permitted !== false;
-  const isPendingPayment = contract.state === 'PENDING_PAYMENT';
+  // Paying the opening bill is offered by the backend (PAY_OPEN_BILL) — also on a
+  // contract already awaiting signature whose bill was left part-paid.
+  const payOpenBillAction = (actionsResp?.actions ?? []).find(a => a.action_code === 'PAY_OPEN_BILL');
+  const isPendingPayment = contract.state === 'PENDING_PAYMENT'
+    || (contract.state === 'PENDING_PAYMENT_AND_SIGN' && !!payOpenBillAction?.is_available && payOpenBillAction.is_permitted !== false);
   // Awaiting the customer signature (paid, or paid-and-awaiting). The only action
   // is to go sign, which lives in the Signing tab — surface a button so the footer
   // isn't empty here.
@@ -935,6 +939,8 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
     setActiveAction(null);
     onRefresh();
     queryClient.invalidateQueries({ queryKey: ['contract-actions', contract.id] });
+    // The Pending Pay & Sign list shows what each opening bill still owes.
+    queryClient.invalidateQueries({ queryKey: ['pending-payment-open-bills'] });
     addSnackbar({
       message: override ?? (
         <div className="alert alert-success">
@@ -2719,7 +2725,7 @@ function VoidBillModal({ open, contract, onClose, onSuccess }: {
 
 // ── Pending Payment Modal ────────────────────────────────────────────────────
 
-type PaymentMethod = 'CASH' | 'TRANSFER' | 'SAVING_WALLET';
+type PaymentMethod = 'CASH' | 'TRANSFER' | 'SAVING_WALLET' | 'PARTNER_COLLECT';
 
 interface PaymentLine {
   method: PaymentMethod;
@@ -2727,7 +2733,7 @@ interface PaymentLine {
   bank_account_id: number | null;
 }
 
-const BASE_METHOD_VALUES = ['CASH', 'TRANSFER'] as const;
+const BASE_METHOD_VALUES = ['CASH', 'TRANSFER', 'PARTNER_COLLECT'] as const;
 
 function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
   open: boolean;
@@ -2738,25 +2744,51 @@ function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
   const { t } = useTranslation();
   const savingBalance = contract.saving_balance ?? 0;
 
-  // Fetch open bill
+  // Fetch the opening bill — unpaid or part-paid. A part-paid one is what a
+  // shop is left with when the first payment fell short; it still needs the rest.
   const { data: bills } = useQuery({
     queryKey: ['contract-open-bills', contract.id],
-    queryFn: () => apiClient.get<Array<{ bill_id: number; bill_code_display: string; total_amount: number }>>(
-      `/v_bill_detail?contract_id=eq.${contract.id}&status=eq.OPEN&bill_purpose=eq.CONTRACT_OPEN&select=bill_id,bill_code_display,total_amount&limit=1`
+    queryFn: () => apiClient.get<Array<{ bill_id: number; bill_code_display: string; total_amount: number; remaining: number | null }>>(
+      `/v_bill_detail?contract_id=eq.${contract.id}&status=in.(OPEN,PARTIAL)&bill_purpose=eq.CONTRACT_OPEN&select=bill_id,bill_code_display,total_amount,remaining&limit=1`
     ),
     enabled: open,
   });
 
   const bill = bills?.[0];
-  const totalAmount = bill?.total_amount ?? 0;
+  // What is left to collect, as the bill itself says.
+  const totalAmount = bill?.remaining ?? bill?.total_amount ?? 0;
+  const isPartPaid = bill != null && bill.remaining != null && bill.remaining < bill.total_amount;
+
+  // Channels the opening bill accepts. A shop takes only "collected at the
+  // shop" (147 §2) — and a shop session can't read the method catalogue, so it
+  // gets that one channel directly, the same rule the opening screen uses.
+  // Staff read the catalogue for the contract's branch.
+  const { isDealPartner } = useAuth();
+  const { isPartnerBranch, isFundBranch } = useBranchIsPartner(open && !isDealPartner ? contract.branch_id : null);
+  const { codes: allowedCodes, isLoading: catalogueLoading } = useAllowedPaymentMethods(
+    isDealPartner ? null : 'CONTRACT_OPEN',
+    isPartnerBranch,
+    { enabled: open && !isDealPartner, isFundBranch },
+  );
+  const methodsLoading = !isDealPartner && catalogueLoading;
+  // Keyed on the codes' contents: the helper hands back a fresh list each
+  // render while its query is off, which would re-run the reset below forever.
+  const allowedKey = allowedCodes.join(',');
+  const methodAllowed = useCallback(
+    (m: string) => (isDealPartner ? m === 'PARTNER_COLLECT' : !catalogueLoading && allowedKey.split(',').includes(m)),
+    [isDealPartner, allowedKey, catalogueLoading],
+  );
+  const firstMethod = (BASE_METHOD_VALUES.find(m => methodAllowed(m)) ?? 'CASH') as PaymentMethod;
 
   const methodOptions = useMemo(() => {
-    const opts = BASE_METHOD_VALUES.map(v => ({ value: v as string, label: t(`paymentMethod.${v}`) }));
-    if (savingBalance > 0) {
+    const opts = BASE_METHOD_VALUES
+      .filter(v => methodAllowed(v))
+      .map(v => ({ value: v as string, label: t(`paymentMethod.${v}`) }));
+    if (savingBalance > 0 && methodAllowed('SAVING_WALLET')) {
       opts.push({ value: 'SAVING_WALLET', label: `${t('workspace.savingWallet')} (${fmtCurrency(savingBalance)})` });
     }
     return opts;
-  }, [savingBalance, t]);
+  }, [savingBalance, t, methodAllowed]);
 
   const [payments, setPayments] = useState<PaymentLine[]>([]);
   const [loading, setLoading] = useState(false);
@@ -2771,13 +2803,15 @@ function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
 
   // Reset when opened
   useEffect(() => {
-    if (open && totalAmount > 0) {
-      setPayments(buildSavingSeededPayments(savingBalance, totalAmount) as PaymentLine[]);
+    if (open && totalAmount > 0 && !methodsLoading) {
+      const usableSaving = methodAllowed('SAVING_WALLET') ? savingBalance : 0;
+      setPayments((buildSavingSeededPayments(usableSaving, totalAmount) as PaymentLine[])
+        .map(p => (p.method === 'SAVING_WALLET' || methodAllowed(p.method) ? p : { ...p, method: firstMethod })));
       setError('');
       setSavingConfirmOpen(false);
       setRemovePaymentIdx(null);
     }
-  }, [open, totalAmount, savingBalance]);
+  }, [open, totalAmount, savingBalance, methodsLoading, methodAllowed, firstMethod]);
 
   const totalPayment = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
   const isBalanced = totalAmount > 0 && Math.abs(totalPayment - totalAmount) < 0.01;
@@ -2855,10 +2889,18 @@ function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
           <div className="text-sm text-subtle py-4">{t('common.loading')}</div>
         ) : (
           <div className="flex flex-col gap-4">
-            {/* Bill total */}
-            <div className="flex justify-between items-center p-3 rounded-lg border border-line bg-surface">
-              <span className="text-sm font-medium">{t('workspace.total')}</span>
-              <span className="font-semibold tabular-nums">{fmtCurrency(totalAmount)}</span>
+            {/* Bill total — and, on a part-paid bill, what is still owed */}
+            <div className="flex flex-col gap-1 p-3 rounded-lg border border-line bg-surface">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium">{t('workspace.total')}</span>
+                <span className="font-semibold tabular-nums">{fmtCurrency(bill.total_amount)}</span>
+              </div>
+              {isPartPaid && (
+                <div className="flex justify-between items-center text-warning-fg">
+                  <span className="text-sm font-medium">{t('contract.stillToCollect')}</span>
+                  <span className="font-semibold tabular-nums">{fmtCurrency(totalAmount)}</span>
+                </div>
+              )}
             </div>
 
             {/* Payment lines */}
@@ -2928,7 +2970,7 @@ function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
               ))}
               <Button size="sm" onClick={() => {
                 const remaining = totalAmount - totalPayment;
-                setPayments(prev => [...prev, { method: 'CASH', amount: remaining > 0 ? remaining : 0, bank_account_id: null }]);
+                setPayments(prev => [...prev, { method: firstMethod, amount: remaining > 0 ? remaining : 0, bank_account_id: null }]);
               }} startIcon={<Plus size={14} />}>
                 {t('wizard.addPayment')}
               </Button>

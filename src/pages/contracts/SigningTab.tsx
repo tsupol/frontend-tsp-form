@@ -27,6 +27,7 @@ import {
   Printer, Smartphone, Trash2, XCircle,
 } from 'lucide-react';
 import { ContractSignQrModal } from './workspace/ContractSignQrModal';
+import { useAuth } from '../../contexts/AuthContext';
 import { WitnessSlotPicker } from './WitnessSlotPicker';
 import type { BeMediaContractDoc } from '../../lib/beMedia';
 import { apiClient } from '../../lib/api';
@@ -40,6 +41,7 @@ import { ContractAttachments } from './ContractAttachments';
 type SigningStatus = 'COLLECTING' | 'SEALED' | 'SUPERSEDED' | 'VOIDED';
 type SigningCategory = 'CONTRACT' | 'AMENDMENT' | 'RECEIPT' | null;
 type PartyRole = 'LESSOR' | 'LESSEE' | 'OUTGOING_LESSEE' | 'CO_LESSEE' | 'WITNESS';
+const CUSTOMER_ROLES: ReadonlySet<string> = new Set(['LESSEE', 'OUTGOING_LESSEE', 'CO_LESSEE']);
 
 interface SigningHistoryRow {
   signing_id: number;
@@ -187,6 +189,10 @@ export function SigningTab({
   onRenderPdf?: (target: SigningPdfTarget) => void;
 }) {
   const { t } = useTranslation();
+  // A shop can't sign for the customer inside the app (it can't read the
+  // signing preview); its customers sign on the signing page — so a customer's
+  // Sign button opens that page's dialog instead of a dead end.
+  const { isDealPartner } = useAuth();
   const [voidTarget, setVoidTarget] = useState<{ signingId: number; isSealedAddendum: boolean } | null>(null);
   const [signTarget, setSignTarget] = useState<SignTarget | null>(null);
   const [signQrOpen, setSignQrOpen] = useState(false);
@@ -364,7 +370,7 @@ export function SigningTab({
             onRequestPrint={onRenderPdf ? () => onRenderPdf({ signingId: s.signing_id }) : undefined}
             onRequestSignQr={() => setSignQrOpen(true)}
             onWitnessAssigned={() => { historyQuery.refetch(); partyQuery.refetch(); }}
-            onRequestSign={(party) => setSignTarget({
+            onRequestSign={(party) => (isDealPartner && CUSTOMER_ROLES.has(party.party_role)) ? setSignQrOpen(true) : setSignTarget({
               signing_id: s.signing_id,
               party_role: party.party_role,
               party_index: party.party_index,

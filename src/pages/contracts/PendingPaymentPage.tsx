@@ -9,6 +9,7 @@ import { ContractListPane, type ContractSearchResult } from './ContractListPane'
 interface OpenBillRow {
   contract_id: number;
   total_amount: number;
+  remaining: number | null;
 }
 
 export function PendingPaymentPage() {
@@ -22,14 +23,15 @@ export function PendingPaymentPage() {
   const { data: openBills } = useQuery({
     queryKey: ['pending-payment-open-bills', sortedIds.join(',')],
     queryFn: () => apiClient.get<OpenBillRow[]>(
-      `/v_bill_detail?contract_id=in.(${sortedIds.join(',')})&status=eq.OPEN&bill_purpose=eq.CONTRACT_OPEN&select=contract_id,total_amount`,
+      `/v_bill_detail?contract_id=in.(${sortedIds.join(',')})&status=in.(OPEN,PARTIAL)&bill_purpose=eq.CONTRACT_OPEN&select=contract_id,total_amount,remaining`,
     ),
     enabled: sortedIds.length > 0,
     staleTime: 10 * 1000,
   });
 
   const totalByContract = new Map<number, number>();
-  for (const b of openBills ?? []) totalByContract.set(b.contract_id, b.total_amount);
+  // What is still owed, as the bill says — a part-paid bill shows its remainder.
+  for (const b of openBills ?? []) totalByContract.set(b.contract_id, b.remaining ?? b.total_amount);
 
   const renderRowRight = (c: ContractSearchResult) => {
     const due = totalByContract.get(c.id);

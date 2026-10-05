@@ -276,6 +276,9 @@ export function BillCart({ branchId, systemLines, lines, onChange, rowAction }: 
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        {/* Nothing to add — e.g. a shop's opening bill, which may hold only the
+            down payment and the contract fee — means no button at all. */}
+        {addable.length > 0 && (
         <PopOver
           isOpen={addOpen}
           onClose={() => setAddOpen(false)}
@@ -307,6 +310,7 @@ export function BillCart({ branchId, systemLines, lines, onChange, rowAction }: 
             ))}
           </div>
         </PopOver>
+        )}
         {rowAction && <div className="ml-auto">{rowAction}</div>}
       </div>
 
