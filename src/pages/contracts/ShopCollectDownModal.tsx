@@ -24,6 +24,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Modal } from 'tsp-form';
 import { CheckCircle, Loader2, Pencil } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { useBillSettle, readBillStatus } from '../../hooks/useBillSettle';
 import { translateApiError } from '../../lib/apiErrors';
 import { fmtCurrency } from '../../lib/format';
 import { contractMenuFrom } from '../../lib/contractMenuPath';
@@ -49,7 +50,8 @@ interface ContractFigures {
   insurance_deposit: number | null;
 }
 
-type View = 'form' | 'done' | 'billOpen';
+// paidUnconfirmed: the bill is paid but confirm failed — only confirm is retried.
+type View = 'form' | 'done' | 'billOpen' | 'paidUnconfirmed';
 
 export function ShopCollectDownModal({ open, contractId, contractCode, onClose, onChanged }: {
   open: boolean;
@@ -71,6 +73,8 @@ export function ShopCollectDownModal({ open, contractId, contractCode, onClose, 
   const [openBlockers, setOpenBlockers] = useState<ReadinessItem[] | null>(null);
   const [bill, setBill] = useState<BillOpenResult | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [paidBillId, setPaidBillId] = useState<number | null>(null);
+  const { settle, reset: resetSettle } = useBillSettle();
 
   // A fresh dialog every time it opens.
   useEffect(() => {
@@ -82,6 +86,8 @@ export function ShopCollectDownModal({ open, contractId, contractCode, onClose, 
     setOpenBlockers(null);
     setBill(null);
     setConfirmDiscard(false);
+    setPaidBillId(null);
+    resetSettle();
   }, [open, contractId]);
 
   // Same row the contract panel behind the dialog reads — already in the cache.
@@ -131,6 +137,34 @@ export function ShopCollectDownModal({ open, contractId, contractCode, onClose, 
     forceClose();
   };
 
+  /** Confirm a bill that is already paid; on failure stay on a retry view. */
+  const finishConfirm = async (billId: number) => {
+    setLoading(true);
+    setError(null);
+    try {
+      await settle({ billId, tenders: [], confirm: { p_contract_id: contractId } });
+      setPaidBillId(null);
+      onChanged();
+      setView('done');
+    } catch (err) {
+      setError(err instanceof ApiError ? (translateApiError(err, t) || err.message) : (err instanceof Error ? err.message : String(err)));
+      setPaidBillId(billId);
+      setView('paidUnconfirmed');
+      onChanged();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const recoverOpenedBill = async (billId: number) => {
+    if (await readBillStatus(billId) === 'PAID') {
+      await finishConfirm(billId);
+      return;
+    }
+    onChanged();
+    setView('billOpen');
+  };
+
   const confirm = async () => {
     if (!canConfirm) return;
     setLoading(true);
@@ -143,10 +177,10 @@ export function ShopCollectDownModal({ open, contractId, contractCode, onClose, 
       setBill(opened);
 
       // The bill was already open from an earlier try — don't add to it again.
-      // The contract's own "Continue payment" button collects what is left.
+      // Paid already: it only needs confirming. Otherwise the contract's own
+      // "Continue payment" button collects what is left.
       if (opened.already_open) {
-        onChanged();
-        setView('billOpen');
+        await recoverOpenedBill(opened.bill_id);
         return;
       }
 
@@ -177,15 +211,10 @@ export function ShopCollectDownModal({ open, contractId, contractCode, onClose, 
 
       // 4 + 5. Collect what the bill says — a bill with nothing on it is born paid.
       if (opened.total_amount != null ? opened.total_amount > 0 : previewTotal > 0) {
-        await apiClient.rpc('fn_bill_payment_add', {
-          p_bill_id: opened.bill_id,
-          p_method: 'PARTNER_COLLECT',
-          p_amount: opened.total_amount ?? previewTotal,
-          p_bank_account_id: null,
-        });
-        await apiClient.rpc('fn_bill_payment_confirm', {
-          p_bill_id: opened.bill_id,
-          p_contract_id: contractId,
+        await settle({
+          billId: opened.bill_id,
+          tenders: [{ method: 'PARTNER_COLLECT', amount: opened.total_amount ?? previewTotal }],
+          confirm: { p_contract_id: contractId },
         });
       }
 
@@ -202,11 +231,9 @@ export function ShopCollectDownModal({ open, contractId, contractCode, onClose, 
         setError(err instanceof Error ? err.message : String(err));
       }
       // The bill exists but a later step failed: pressing Confirm again would
-      // be refused. Say so, and point at the button that finishes the job.
-      if (opened) {
-        onChanged();
-        setView('billOpen');
-      }
+      // be refused. A paid bill only needs confirming; an unpaid one is
+      // finished with the contract's "Continue payment" button.
+      if (opened) await recoverOpenedBill(opened.bill_id);
     } finally {
       setLoading(false);
     }
@@ -255,6 +282,34 @@ export function ShopCollectDownModal({ open, contractId, contractCode, onClose, 
               }
               onClose={forceClose}
             />
+          )}
+
+          {view === 'paidUnconfirmed' && (
+            <>
+              <div className="modal-content min-w-0">
+                <div className="flex flex-col gap-3">
+                  <div className="px-3 py-2.5 rounded-md bg-surface border border-line">
+                    <div className="font-medium text-sm">{contractCode}</div>
+                  </div>
+                  <div className="font-medium">{t('wizard.paidUnconfirmed_title')}</div>
+                  <div className="text-sm text-subtle">
+                    {t('wizard.paidUnconfirmed_body', { billCode: bill?.bill_code_display ?? bill?.bill_code ?? '' })}
+                  </div>
+                </div>
+              </div>
+              <ModalErrorBand message={loading ? null : error} />
+              <div className="modal-footer">
+                <Button variant="ghost" onClick={handleClose} disabled={loading}>{t('common.close')}</Button>
+                <Button
+                  color="primary"
+                  disabled={loading || paidBillId == null}
+                  startIcon={loading ? <Loader2 size={16} className="animate-spin" /> : undefined}
+                  onClick={() => { if (paidBillId != null) void finishConfirm(paidBillId); }}
+                >
+                  {t('wizard.paidUnconfirmed_retry')}
+                </Button>
+              </div>
+            </>
           )}
 
           {view === 'form' && (

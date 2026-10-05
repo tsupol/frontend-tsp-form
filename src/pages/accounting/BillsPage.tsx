@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { FilterBar } from '../../components/FilterBar';
 import { apiClient, ApiError } from '../../lib/api';
+import { useBillSettle } from '../../hooks/useBillSettle';
 import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
 import { BranchPinInput } from '../../components/BranchPinInput';
@@ -457,6 +458,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
   // Pay state
   const [payments, setPayments] = useState<PaymentLine[]>([]);
   const [paying, setPaying] = useState(false);
+  const { settle } = useBillSettle();
   const [payError, setPayError] = useState('');
 
   // Whether THIS user must type a branch PIN to cancel/void the bill. mig 1278
@@ -626,17 +628,13 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
     setPaying(true);
     setPayError('');
     try {
-      for (const payment of payments) {
-        await apiClient.rpc('fn_bill_payment_add', {
-          p_bill_id: billId,
-          p_method: payment.method,
-          p_amount: payment.amount,
-          p_bank_account_id: payment.method === 'TRANSFER' ? payment.bank_account_id : null,
-        });
-      }
-      const confirmParams: Record<string, unknown> = { p_bill_id: billId };
-      if (detail.contract_id) confirmParams.p_contract_id = detail.contract_id;
-      await apiClient.rpc('fn_bill_payment_confirm', confirmParams);
+      // Pressing Pay again after a failure carries on from where it stopped:
+      // only the payments not yet on the bill are added, then confirm.
+      await settle({
+        billId,
+        tenders: payments.map(p => ({ method: p.method, amount: p.amount, bank_account_id: p.bank_account_id })),
+        confirm: detail.contract_id ? { p_contract_id: detail.contract_id } : undefined,
+      });
       setPayments([]);
       invalidateAfterBillChange();
       onBillChanged();

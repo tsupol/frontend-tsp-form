@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, Modal, MaskedInput, Select, TextArea, useSnackbarContext } from 'tsp-form';
 import { CheckCircle, XCircle, PiggyBank, CreditCard, ShieldCheck, ArrowRight, ChevronsRight, ExternalLink, Loader2, Plus, Trash2, Receipt } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { useBillSettle } from '../../hooks/useBillSettle';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { BranchPaymentAccountField } from '../../components/BranchPaymentAccountField';
 import { fmtCurrency } from '../../lib/format';
@@ -255,6 +256,10 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
 
   // Captured for the done view (success detail)
   const [payoffBill, setPayoffBill] = useState<PayoffBillInfo | null>(null);
+  // Adds only the payments the bill doesn't have yet, then confirms — so a
+  // press after a part-way failure finishes the payment instead of repeating it.
+  const { settle, reset: resetSettle } = useBillSettle();
+  const payTenders = () => payments.map(p => ({ method: p.method, amount: p.amount, bank_account_id: p.bank_account_id }));
   const [completeResult, setCompleteResult] = useState<CompleteResult | TerminateResult | null>(null);
   const [beforeSnapshot, setBeforeSnapshot] = useState<CompleteBeforeSnapshot | null>(null);
 
@@ -276,6 +281,7 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
       setPayoffDiscountReason('');
       setPendingDiscount(false);
       setPayoffBill(null);
+      resetSettle();
       setCompleteResult(null);
       setBeforeSnapshot(null);
     }
@@ -341,6 +347,8 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
     // A payoff bill may already be open — most often because a discount was
     // asked for on it and then refused or taken back. That bill is the one to
     // pay; asking for a second one is refused outright.
+    // The same goes for the bill this dialog made on an earlier press whose
+    // payment then stopped part-way: pressing again finishes that bill.
     const existing = preview?.open_bill;
     const collectResult: PayoffBillInfo & { needs_approval?: boolean } = existing
       ? {
@@ -349,7 +357,7 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
           bill_total: existing.total_amount,
           installments_count: preview?.installments.count_unpaid ?? 0,
         }
-      : await apiClient.rpc<PayoffBillInfo & { needs_approval?: boolean }>(
+      : payoffBill ?? await apiClient.rpc<PayoffBillInfo & { needs_approval?: boolean }>(
         'fn_bill_early_payoff_collect',
         {
           p_contract_id: contract.id,
@@ -382,17 +390,7 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
     }
 
     setStep('payment');
-    for (const payment of payments) {
-      await apiClient.rpc('fn_bill_payment_add', {
-        p_bill_id: billId,
-        p_method: payment.method,
-        p_amount: payment.amount,
-        p_bank_account_id: payment.method === 'TRANSFER' ? payment.bank_account_id : null,
-      });
-    }
-
-    setStep('confirm');
-    await apiClient.rpc('fn_bill_payment_confirm', { p_bill_id: billId });
+    await settle({ billId, tenders: payTenders() });
     setStep('');
   };
 
@@ -451,16 +449,7 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
       const bill = preview?.open_bill;
       if (!bill) throw new Error('no open bill');
       setStep('payment');
-      for (const payment of payments) {
-        await apiClient.rpc('fn_bill_payment_add', {
-          p_bill_id: bill.bill_id,
-          p_method: payment.method,
-          p_amount: payment.amount,
-          p_bank_account_id: payment.method === 'TRANSFER' ? payment.bank_account_id : null,
-        });
-      }
-      setStep('confirm');
-      await apiClient.rpc('fn_bill_payment_confirm', { p_bill_id: bill.bill_id });
+      await settle({ billId: bill.bill_id, tenders: payTenders() });
       setStep('');
     },
     onSuccess: () => {

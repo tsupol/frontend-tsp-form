@@ -12,6 +12,7 @@ import { apiClient, ApiError } from '../../../lib/api';
 import { fmtCurrency } from '../../../lib/format';
 import { printWithMarker } from '../../../lib/printDoc';
 import { useWorkspace } from './WorkspaceContext';
+import { useBillSettle, usePaidOpenBillConfirm, readBillStatus } from '../../../hooks/useBillSettle';
 import type { PaymentMethod, PaymentLine, BillOpenResult, ContractOpenState } from './WorkspaceTypes';
 import { ReadinessChecklist, type ReadinessItem } from './ReadinessChecklist';
 import { readinessErrorsFromApiError } from './readinessFromError';
@@ -300,6 +301,56 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
   // fail on the existing bill). Instead we show a recovery view pointing at the
   // bill. billId is already stored in workspace data at step 1.
   const [billOpenFailed, setBillOpenFailed] = useState(false);
+  // The bill is PAID but confirm hasn't gone through — the contract has not
+  // moved on. Only confirm is retried; the screen stays here until it succeeds
+  // (BUG 2026-10-04_payment_confirm_not_retried_after_add §3.4–3.5).
+  const [paidUnconfirmedBillId, setPaidUnconfirmedBillId] = useState<number | null>(null);
+  // Set once this screen starts taking the payment itself, so the come-back
+  // self-repair below never races the screen's own confirm.
+  const [submittedHere, setSubmittedHere] = useState(false);
+  const { settle } = useBillSettle();
+  // Came back to a contract whose opening bill is paid but never confirmed —
+  // confirm it now (§3.6).
+  const selfRepair = usePaidOpenBillConfirm({
+    contractId: data.contractId,
+    contractState: contract?.state,
+    enabled: !submittedHere,
+    onConfirmed: () => { updateData({ billConfirmed: true }); invalidateContract(); },
+  });
+
+  const apiErrorText = (err: unknown) => {
+    if (err instanceof ApiError) return translateApiError(err, t) || err.message;
+    return err instanceof Error ? err.message : String(err);
+  };
+
+  /** Confirm a bill that is already paid; stay on the retry view if it fails. */
+  const finishConfirm = async (billId: number) => {
+    if (!data.contractId) return;
+    setLoading(true);
+    setError('');
+    try {
+      await settle({ billId, tenders: [], confirm: { p_contract_id: data.contractId } });
+      setPaidUnconfirmedBillId(null);
+      updateData({ billConfirmed: true });
+      invalidateContract();
+    } catch (err) {
+      setError(apiErrorText(err));
+      setPaidUnconfirmedBillId(billId);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /** After the bill exists but the sequence stopped: a PAID bill only needs
+   *  confirming; an unpaid one goes to the recovery view. */
+  const recoverOpenedBill = async (billId: number) => {
+    if (await readBillStatus(billId) === 'PAID') {
+      await finishConfirm(billId);
+      return;
+    }
+    setBillOpenFailed(true);
+    invalidateContract();
+  };
   // Task #4: 2-step confirm before opening a no-charge contract (down 0 + no
   // insurance). Guards against a staff member opening a contract that collects
   // no money without meaning to. Only shown when isNoCharge.
@@ -327,6 +378,7 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
     setConfirmNoCharge(false);
     setSavingConfirmOpen(false);
     if (!canConfirm || !data.contractId) return;
+    setSubmittedHere(true);
     setLoading(true);
     setError('');
     setOpenBlockers(null);
@@ -347,9 +399,11 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
       // NOT re-run the add-lines / payment sequence against the existing bill;
       // send the user onward by the returned contract_state instead. This is the
       // recovery for the old "stuck at PENDING_PAYMENT_AND_SIGN" dead-end.
+      //
+      // A bill that is already PAID only needs confirming — the payment went in
+      // but confirm never did (BUG 2026-10-04 §3.5). Confirm it here.
       if (bill.already_open) {
-        setBillOpenFailed(true);
-        invalidateContract();
+        await recoverOpenedBill(bill.bill_id);
         return;
       }
 
@@ -420,22 +474,13 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
           }
         }
 
-        // 4. Record payments.
-        for (const payment of toRecord) {
-          await apiClient.rpc('fn_bill_payment_add', {
-            p_bill_id: bill.bill_id,
-            p_method: payment.method,
-            p_amount: payment.amount,
-            p_bank_account_id: payment.method === 'TRANSFER' ? payment.bank_account_id : null,
-          });
-        }
-
-        // 5. Confirm payment. Contract moves to PENDING_SIGN (paid, awaiting the
-        //    customer signature on the bridge) — it activates only after the
-        //    snapshot seals once the customer has signed.
-        await apiClient.rpc('fn_bill_payment_confirm', {
-          p_bill_id: bill.bill_id,
-          p_contract_id: data.contractId,
+        // 4 + 5. Record payments, then confirm. Contract moves to PENDING_SIGN
+        //    (paid, awaiting the customer signature on the bridge) — it
+        //    activates only after the snapshot seals once the customer has signed.
+        await settle({
+          billId: bill.bill_id,
+          tenders: toRecord.map(p => ({ method: p.method, amount: p.amount, bank_account_id: p.bank_account_id })),
+          confirm: { p_contract_id: data.contractId },
         });
       }
 
@@ -449,21 +494,15 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
       if (blockers && blockers.length > 0) {
         setOpenBlockers(blockers);
         queryClient.invalidateQueries({ queryKey: ['contract-readiness', data.contractId] });
-      } else if (err instanceof ApiError) {
-        const translated = translateApiError(err, t);
-        setError(translated || err.message);
       } else {
-        setError(err instanceof Error ? err.message : String(err));
+        setError(apiErrorText(err));
       }
       // If the bill was already opened before the failure (payment or staff-sign
-      // step threw), the contract is stuck at PENDING_PAYMENT_AND_SIGN with an
-      // open bill. Switch to the recovery view — re-clicking Confirm here would
-      // re-open a second bill and dead-end. The bill still needs payment, which
-      // happens on the Pending Payment page.
-      if (openedBillId != null) {
-        setBillOpenFailed(true);
-        invalidateContract();
-      }
+      // step threw), the contract is stuck at PENDING_PAYMENT_AND_SIGN. A bill
+      // that got paid only needs confirming — retried here, never skipped. An
+      // unpaid one goes to the recovery view (re-clicking Confirm would re-open
+      // the bill); it is paid on the Pending Payment page.
+      if (openedBillId != null) await recoverOpenedBill(openedBillId);
     } finally {
       setLoading(false);
     }
@@ -498,6 +537,24 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
   // refused) gives way to the recovery view that says where to pay the rest.
   const billAwaitingPayment = !loading && !!data.billId
     && (contract?.state === 'PENDING_PAYMENT' || contract?.state === 'PENDING_PAYMENT_AND_SIGN');
+
+  // The bill is paid but confirm hasn't gone through — this screen's own
+  // attempt, or a contract left that way earlier. Retry confirm only; nothing
+  // moves on until it succeeds.
+  if (paidUnconfirmedBillId != null || selfRepair.stuckBillId != null || (billAwaitingPayment && selfRepair.checking)) {
+    const own = paidUnconfirmedBillId != null;
+    const repairError = selfRepair.error ? apiErrorText(selfRepair.error) : '';
+    return (
+      <PaidUnconfirmedView
+        billCode={data.billCode || null}
+        busy={own ? loading : (selfRepair.checking || selfRepair.confirming)}
+        error={own ? error : repairError}
+        onRetry={own ? () => void finishConfirm(paidUnconfirmedBillId) : selfRepair.retry}
+        t={t}
+      />
+    );
+  }
+
   if ((billOpenFailed || billAwaitingPayment) && data.billId) {
     return (
       <PostFailView
@@ -852,6 +909,41 @@ function PostConfirmView({ billId, contractId, needsBindDevice, noCharge, onNavi
         </div>,
         document.body,
       )}
+    </div>
+  );
+}
+
+// The bill is fully paid but confirming it failed, so the contract has not
+// moved on. Only confirm is retried — the money is already on the bill.
+function PaidUnconfirmedView({ billCode, busy, error, onRetry, t }: {
+  billCode: string | null;
+  busy: boolean;
+  error: string;
+  onRetry: () => void;
+  t: ReturnType<typeof useTranslation>['t'];
+}) {
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex-1 overflow-y-auto better-scroll p-6 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3 text-center max-w-sm">
+          {busy
+            ? <Loader2 size={56} className="text-subtle animate-spin" />
+            : <AlertTriangle size={56} className="text-warning-fg" />}
+          <div className="text-lg font-semibold">{t('wizard.paidUnconfirmed_title')}</div>
+          <div className="text-sm text-subtle">{t('wizard.paidUnconfirmed_body', { billCode: billCode ?? '' })}</div>
+          {error && !busy && (
+            <div className="alert alert-danger w-full text-left">
+              <XCircle size={16} />
+              <div><div className="alert-description">{error}</div></div>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="shrink-0 border-t border-line bg-bg px-4 py-3 flex justify-end gap-2 print:hidden">
+        <Button color="primary" onClick={onRetry} disabled={busy} startIcon={busy ? <Loader2 size={16} className="animate-spin" /> : undefined}>
+          {t('wizard.paidUnconfirmed_retry')}
+        </Button>
+      </div>
     </div>
   );
 }

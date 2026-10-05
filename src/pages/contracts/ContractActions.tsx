@@ -7,6 +7,7 @@ import { Button, Modal, Input, Select, TextArea, MaskedInput, Badge, Tooltip, Po
 import type { UploadedImage } from 'tsp-form';
 import { CheckCircle, XCircle, Pencil, Plus, Trash2, Loader2, ChevronsRight, ChevronDown, ExternalLink, Wrench, ArrowRight, Info, Receipt, Paperclip, MessageSquare, PenLine, AlertTriangle, PackageOpen } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { useBillSettle } from '../../hooks/useBillSettle';
 import { useAllowedPaymentMethods, useBranchIsPartner } from '../../hooks/useAllowedPaymentMethods';
 import { getRoleLabel } from '../../lib/roleLabel';
 import { fmtCurrency } from '../../lib/format';
@@ -2771,6 +2772,7 @@ function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
 }) {
   const { t } = useTranslation();
   const savingBalance = contract.saving_balance ?? 0;
+  const { settle } = useBillSettle();
 
   // Fetch the opening bill — unpaid or part-paid. A part-paid one is what a
   // shop is left with when the first payment fell short; it still needs the rest.
@@ -2873,17 +2875,12 @@ function PendingPaymentModal({ open, contract, onClose, onSuccess }: {
     setLoading(true);
     setError('');
     try {
-      for (const payment of payments) {
-        await apiClient.rpc('fn_bill_payment_add', {
-          p_bill_id: bill.bill_id,
-          p_method: payment.method,
-          p_amount: payment.amount,
-          p_bank_account_id: payment.method === 'TRANSFER' ? payment.bank_account_id : null,
-        });
-      }
-      await apiClient.rpc('fn_bill_payment_confirm', {
-        p_bill_id: bill.bill_id,
-        p_contract_id: contract.id,
+      // Pressing again after a failure adds only what the bill doesn't have
+      // yet, then confirms (a paid bill is only confirmed).
+      await settle({
+        billId: bill.bill_id,
+        tenders: payments.map(p => ({ method: p.method, amount: p.amount, bank_account_id: p.bank_account_id })),
+        confirm: { p_contract_id: contract.id },
       });
       onSuccess('contract.action_continue_pay_success');
     } catch (err) {

@@ -13,6 +13,7 @@ import { ApiError } from '../../lib/api';
 import { getUploadSpec, mimeFromKey } from '../../lib/upload';
 import { printWithMarker } from '../../lib/printDoc';
 import { useBillPdfDownload } from '../../hooks/useBillPdfDownload';
+import { usePaidOpenBillConfirm } from '../../hooks/useBillSettle';
 import { beMediaUploadFromImage, beMediaDelete } from '../../lib/beMedia';
 import { toStoragePath, normalizeKey } from '../../lib/mediaPath';
 import { useAuth } from '../../contexts/AuthContext';
@@ -388,6 +389,22 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
   const approvalCase = useContractPartnerCases(contractId, isDealPartner && contract?.state === 'APPROVED');
   const approvalExpired = isDealPartner && contract?.state === 'APPROVED' && approvalCase.latest?.outcome === 'EXPIRED';
 
+  // An opening bill paid in full but never confirmed leaves the contract
+  // waiting for payment. Confirm it as soon as the contract is shown
+  // (BUG 2026-10-04 §3.6); if that fails, say so and offer a retry.
+  const paidRepair = usePaidOpenBillConfirm({
+    contractId,
+    contractState: contract?.state,
+    onConfirmed: () => {
+      queryClient.invalidateQueries({ queryKey: ['contract-detail', contractId] });
+      queryClient.invalidateQueries({ queryKey: ['contract-search'] });
+      queryClient.invalidateQueries({ queryKey: ['contract-actions', contractId] });
+      queryClient.invalidateQueries({ queryKey: ['contract-bills', contractId] });
+      queryClient.invalidateQueries({ queryKey: ['contract-txns', contractId] });
+      queryClient.invalidateQueries({ queryKey: ['contract-signings', contractId] });
+    },
+  });
+
   if (isLoading && !contract) {
     return <div className="flex-1 flex items-center justify-center text-subtler">{t('common.loading')}</div>;
   }
@@ -450,6 +467,22 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
         onTabChange={handleTabChange}
         renderLabel={(tab) => t(`contract.tab_${tab}`)}
       />
+
+      {paidRepair.stuckBillId != null && !!paidRepair.error && !paidRepair.confirming && (
+        <div className="flex-none px-4 pt-3">
+          <div className="alert alert-warning">
+            <AlertTriangle size={16} />
+            <div className="flex-1 min-w-0">
+              <div className="alert-title">{t('wizard.paidUnconfirmed_title')}</div>
+              <div className="alert-description">
+                {(paidRepair.error instanceof ApiError ? translateApiError(paidRepair.error, t) : '')
+                  || (paidRepair.error instanceof Error ? paidRepair.error.message : String(paidRepair.error))}
+              </div>
+            </div>
+            <Button size="sm" variant="outline" onClick={paidRepair.retry}>{t('wizard.paidUnconfirmed_retry')}</Button>
+          </div>
+        </div>
+      )}
 
       {/* Blacklisted party — sits above the tab content so it shows on every
           tab. Management lives on the customer page (one place to add/lift),

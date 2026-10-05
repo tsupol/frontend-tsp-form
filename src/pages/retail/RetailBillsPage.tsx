@@ -12,6 +12,7 @@ import {
   Printer, Download, Loader2, ExternalLink,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { useBillSettle } from '../../hooks/useBillSettle';
 import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
 import { BranchPinInput } from '../../components/BranchPinInput';
@@ -553,9 +554,11 @@ function TakePaymentModal({
   const [bankAccountId, setBankAccountId] = useState<number | null>(null);
   const [reference, setReference] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const { settle, reset: resetSettle } = useBillSettle();
 
   useEffect(() => {
     if (open) {
+      resetSettle();
       setMethod('CASH');
       setAmountStr(String(remaining));
       setBankAccountId(null);
@@ -572,14 +575,17 @@ function TakePaymentModal({
 
   const mutation = useMutation({
     mutationFn: async () => {
-      await apiClient.rpc('fn_bill_payment_add', {
-        p_bill_id: billId,
-        p_method: method,
-        p_amount: amount,
-        p_bank_account_id: method === 'TRANSFER' ? bankAccountId : null,
-        p_reference: reference.trim() || null,
+      // Pressing again after a failure doesn't add the payment twice: a bill
+      // that already has it (or is paid) is only confirmed.
+      await settle({
+        billId,
+        tenders: [{
+          method,
+          amount,
+          bank_account_id: bankAccountId,
+          extra: { p_reference: reference.trim() || null },
+        }],
       });
-      await apiClient.rpc('fn_bill_payment_confirm', { p_bill_id: billId });
     },
     onSuccess: () => {
       addSnackbar({

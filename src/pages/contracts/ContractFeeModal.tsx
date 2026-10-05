@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Modal, Button, Select, MaskedInput, Input, Badge, PopOver } from 'tsp-form';
 import { Plus, Trash2, XCircle, AlertCircle, ChevronsRight, Loader2, CheckCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { useBillSettle } from '../../hooks/useBillSettle';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { BranchPaymentAccountField } from '../../components/BranchPaymentAccountField';
@@ -111,6 +112,8 @@ export function ContractFeeModal({ open, contract, onClose, onSuccess }: {
   const [payments, setPayments] = useState<PaymentRow[]>([{ method: 'CASH', amount: 0, bank_account_id: null }]);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const createdBill = useRef<BillCreateResult | null>(null);
+  const { settle, reset: resetSettle } = useBillSettle();
   const [result, setResult] = useState<{ billId: number; code: string } | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
 
@@ -121,6 +124,8 @@ export function ContractFeeModal({ open, contract, onClose, onSuccess }: {
   const [draftAmount, setDraftAmount] = useState('');
 
   const resetForm = () => {
+    createdBill.current = null;
+    resetSettle();
     setView('form');
     setLines([]);
     setPayments([{ method: defaultMethod, amount: 0, bank_account_id: null }]);
@@ -260,7 +265,9 @@ export function ContractFeeModal({ open, contract, onClose, onSuccess }: {
     setError('');
     try {
       // 1. Open bill with all lines (mixed owner OK).
-      const created = await apiClient.rpc<BillCreateResult>('fn_bill_create', {
+      // A bill made on an earlier press whose payment then failed is finished,
+      // not made again.
+      const created = createdBill.current ?? await apiClient.rpc<BillCreateResult>('fn_bill_create', {
         p_branch_id: contract.branch_id,
         p_customer_id: contract.customer_id ?? null,
         p_contract_id: contract.id,
@@ -277,26 +284,21 @@ export function ContractFeeModal({ open, contract, onClose, onSuccess }: {
         })),
         p_created_by: user?.user_id ?? null,
       });
+      createdBill.current = created;
       const billId = created.bill_id;
 
       // 2. Record each payment. Wallet methods must carry p_contract_id.
-      for (const p of payments) {
-        if (p.amount <= 0) continue;
-        await apiClient.rpc('fn_bill_payment_add', {
-          p_bill_id: billId,
-          p_method: p.method,
-          p_amount: p.amount,
-          p_bank_account_id: p.method === 'TRANSFER' ? p.bank_account_id : null,
-          p_added_by: user?.user_id ?? null,
-          p_contract_id: walletMethods.has(p.method) ? contract.id : null,
-        });
-      }
-
+      //    Pressing again after a failure adds only what the bill doesn't have yet.
       // 3. Confirm — server splits revenue + builds wallet JOURNAL companion.
-      await apiClient.rpc('fn_bill_payment_confirm', {
-        p_bill_id: billId,
-        p_contract_id: contract.id,
-        p_confirmed_by: user?.user_id ?? null,
+      await settle({
+        billId,
+        tenders: payments.map(p => ({
+          method: p.method,
+          amount: p.amount,
+          bank_account_id: p.bank_account_id,
+          extra: { p_added_by: user?.user_id ?? null, p_contract_id: walletMethods.has(p.method) ? contract.id : null },
+        })),
+        confirm: { p_contract_id: contract.id, p_confirmed_by: user?.user_id ?? null },
       });
 
       setResult({ billId, code: created.code_display ?? created.bill_code ?? String(billId) });
