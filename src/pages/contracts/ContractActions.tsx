@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { contractMenuFrom } from '../../lib/contractMenuPath';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Modal, Input, Select, TextArea, MaskedInput, Badge, Tooltip, PopOver, useSnackbarContext } from 'tsp-form';
@@ -817,6 +818,7 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const { openChat } = useChatDock();
   const { isDealPartner } = useAuth();
@@ -883,6 +885,13 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   );
 
   const isWizardState = WIZARD_STATES.has(contract.state);
+  // An approved shop contract waits for its opening bill — the down payment the
+  // shop collects. The opening screen is the same one the draft was built on, so
+  // the button leads there; it shows only when the backend says the bill can be
+  // opened now (and stays hidden until the actions have loaded).
+  const openBillAction = (actionsResp?.actions ?? []).find(a => a.action_code === 'OPEN_CONTRACT_BILL');
+  const canCollectDown = contract.state === 'APPROVED'
+    && !!openBillAction?.is_available && openBillAction.is_permitted !== false;
   const isPendingPayment = contract.state === 'PENDING_PAYMENT';
   // Awaiting the customer signature (paid, or paid-and-awaiting). The only action
   // is to go sign, which lives in the Signing tab — surface a button so the footer
@@ -1090,13 +1099,25 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   return (
     <>
       <div className="flex-none border-t border-line flex flex-col gap-2 px-4 py-3">
+        {canCollectDown && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              color="primary"
+              startIcon={<Receipt size={14} />}
+              onClick={() => navigate(`/admin/contracts/new/${contract.id}${contractMenuFrom(location.pathname)}`)}
+            >
+              {t('contract.collectDownPayment')}
+            </Button>
+          </div>
+        )}
         {isWizardState && (
           <div className="flex flex-wrap items-center gap-2">
             <Button
               size="sm"
               color="primary"
               startIcon={<Pencil size={14} />}
-              onClick={() => navigate(`/admin/contracts/new/${contract.id}`)}
+              onClick={() => navigate(`/admin/contracts/new/${contract.id}${contractMenuFrom(location.pathname)}`)}
             >
               {t('contract.continueDraft')}
             </Button>

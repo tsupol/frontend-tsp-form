@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
+import { useAuth } from '../../contexts/AuthContext';
 import { ContractListPane, type ContractSearchResult } from './ContractListPane';
 
 interface OpenBillRow {
@@ -12,6 +13,7 @@ interface OpenBillRow {
 
 export function PendingPaymentPage() {
   const { t } = useTranslation();
+  const { isDealPartner } = useAuth();
   const [contractIds, setContractIds] = useState<number[]>([]);
 
   // Fetch the open CONTRACT_OPEN bill totals for the contracts currently shown
@@ -46,7 +48,11 @@ export function PendingPaymentPage() {
     <ContractListPane
       title={t('nav.pendingPayment')}
       routePrefix="/admin/contracts/pending-payment"
-      states={['PENDING_PAYMENT_AND_SIGN', 'PENDING_PAYMENT', 'PENDING_SIGN']}
+      // A shop's approved contract is the step right before: its next move is
+      // the same one — collect the money, then sign.
+      states={isDealPartner
+        ? ['APPROVED', 'PENDING_PAYMENT_AND_SIGN', 'PENDING_PAYMENT', 'PENDING_SIGN']
+        : ['PENDING_PAYMENT_AND_SIGN', 'PENDING_PAYMENT', 'PENDING_SIGN']}
       showStateFilter={false}
       renderRowRight={renderRowRight}
       emptyMessage={t('contract.noPendingPayment')}

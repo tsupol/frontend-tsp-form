@@ -3291,6 +3291,7 @@
     "complete_wallets_blocker": "Clear remaining wallet balances from the Wallets tab, then return here.",
     "complete_wallets_hint": "All three wallets must be empty before completing the contract.",
     "continueDraft": "Continue Draft",
+    "collectDownPayment": "Collect down payment",
     "createdAt": "Created",
     "createdBy": "Created by",
     "creditBalance": "Credit Balance",

@@ -77,6 +77,7 @@ import { useMyPermissions } from './hooks/useMyPermissions';
 import { useChatDock } from './contexts/ChatDockContext';
 import { NotificationMenuItem } from './components/NotificationMenu';
 import { SystemSignalSection, SystemSignalDialog, type SignalRow } from './components/SystemSignalSection';
+import { contractMenuActivePath } from './lib/contractMenuPath';
 
 const lgQuery = window.matchMedia('(min-width: 1024px)');
 const subscribeLg = (cb: () => void) => { lgQuery.addEventListener('change', cb); return () => lgQuery.removeEventListener('change', cb); };
@@ -870,7 +871,7 @@ export const AppSideNav = () => {
             <div className="side-menu-content better-scroll">
               <SideMenuItems
                 items={visibleItems}
-                activePath={location.pathname}
+                activePath={contractMenuActivePath(location.pathname, location.search)}
                 collapsed={menuCollapsed}
                 isMobile={isMobile}
                 onSelect={handleSelect}

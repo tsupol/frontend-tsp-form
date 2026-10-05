@@ -351,6 +351,10 @@ function WorkspaceContent() {
         const allCardsComplete = data.contractId != null && requiredCards.every(isCardSatisfied);
         const reviewPayReady = allCardsComplete || !!data.billId;
 
+        // An approved shop contract comes here to collect its down payment — the
+        // screen is not "new contract" for it, so the title says the job.
+        const pageTitle = contract?.state === 'APPROVED' ? t('contract.collectDownPayment') : t('wizard.title');
+
         return (
           <>
             {/* Mobile header */}
@@ -368,7 +372,7 @@ function WorkspaceContent() {
                   )}
                 </div>
                 <div className="mobile-header-title mobile-header-title-truncate">
-                  {isRoot ? t('wizard.title') : (openModal ? panelTitle[openModal] ?? t('wizard.title') : t('wizard.title'))}
+                  {isRoot ? pageTitle : (openModal ? panelTitle[openModal] ?? pageTitle : pageTitle)}
                 </div>
                 <div className="mobile-header-end min-w-nav">
                   {data.contractCode && (
@@ -381,7 +385,7 @@ function WorkspaceContent() {
             {/* Desktop header */}
             {!isMobile && (
               <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
-                <h1 className="heading-2 shrink-0">{t('wizard.title')}</h1>
+                <h1 className="heading-2 shrink-0">{pageTitle}</h1>
                 {data.contractCode && (
                   <div className="flex items-center gap-1">
                     <Badge size="sm" color="default" className="font-mono">{data.contractCode}</Badge>

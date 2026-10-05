@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
+import { contractMenuActivePath } from '../../lib/contractMenuPath';
 import { useTranslation } from 'react-i18next';
 import { Badge } from 'tsp-form';
 import { Search, PiggyBank, FilePlus, Link2, FileEdit, CreditCard, Archive, Repeat2, PauseCircle, ClipboardCheck, PackageCheck, PackageOpen, Hourglass, Banknote, Percent } from 'lucide-react';
@@ -10,6 +11,8 @@ import { shopMenuAllows } from '../../lib/shopMenu';
 export function ContractsLayout({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const { isDealPartner } = useAuth();
+  const location = useLocation();
+  const activePath = contractMenuActivePath(location.pathname, location.search);
   const { savingContractsCount, draftContractsCount, pendingPairingCount, pendingPaymentCount, depositOverdueCount, pausedContractsCount } = useNavCounts();
 
   const allItems = [
@@ -52,7 +55,9 @@ export function ContractsLayout({ children }: { children: ReactNode }) {
           <NavLink
             key={path}
             to={path}
-            className={({ isActive }) =>
+            className={() => {
+              const isActive = activePath === path || activePath.startsWith(`${path}/`);
+              return (
               accent
                 ? `flex items-center gap-2 px-2 py-2 rounded-md text-sm font-medium transition-colors ${
                     isActive
@@ -64,7 +69,8 @@ export function ContractsLayout({ children }: { children: ReactNode }) {
                       ? 'bg-item-active-bg text-item-active-fg font-medium'
                       : 'text-item-fg hover:bg-item-hover-bg hover:text-item-hover-fg'
                   }`
-            }
+              );
+            }}
           >
             <Icon size={15} />
             <span className="flex-1">{t(labelKey)}</span>

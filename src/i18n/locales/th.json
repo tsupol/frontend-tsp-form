@@ -3288,6 +3288,7 @@
     "complete_wallets_blocker": "เคลียร์ยอดในกระเป๋าจากแท็บ Wallets ก่อน แล้วค่อยกลับมาที่นี่",
     "complete_wallets_hint": "ต้องเคลียร์กระเป๋าทั้ง 3 ใบให้ว่างก่อนปิดสัญญา",
     "continueDraft": "แก้ไขร่าง",
+    "collectDownPayment": "เก็บเงินดาวน์",
     "createdAt": "สร้างเมื่อ",
     "createdBy": "สร้างโดย",
     "creditBalance": "เครดิตคงเหลือ",
