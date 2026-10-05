@@ -159,7 +159,7 @@ export function usePartnerCaseHistory({
 }
 
 /** Which slice of its own requests the shop is looking at. */
-export type PartnerMyCaseTab = 'PENDING' | 'IN_FORCE' | 'EXPIRED' | 'RETURNED' | 'ALL';
+export type PartnerMyCaseTab = 'PENDING' | 'IN_FORCE' | 'EXPIRED' | 'RETURNED' | 'RETURNED_OR_EXPIRED' | 'ALL';
 
 export interface PartnerMyCaseListOptions {
   tab: PartnerMyCaseTab;
@@ -184,6 +184,8 @@ const MY_CASE_TAB_FILTER: Record<PartnerMyCaseTab, string[]> = {
   IN_FORCE: ['is_latest=eq.true', 'outcome=eq.IN_FORCE', 'order=approved_at.desc'],
   EXPIRED: ['is_latest=eq.true', 'outcome=eq.EXPIRED', 'order=approved_at.desc'],
   RETURNED: ['is_latest=eq.true', 'outcome=eq.RETURNED', 'order=returned_at.desc'],
+  // The shop's "act again" list: sent back to fix, or approved and left to lapse.
+  RETURNED_OR_EXPIRED: ['is_latest=eq.true', 'outcome=in.(RETURNED,EXPIRED)', 'order=updated_at.desc'],
   ALL: ['order=submitted_at.desc'],
 };
 

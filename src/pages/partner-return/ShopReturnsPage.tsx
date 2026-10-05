@@ -15,6 +15,8 @@ import { PageNav, PageNavPanel, DataTable, MobileHeader, Badge } from 'tsp-form'
 import { ArrowLeft, ArrowRightFromLine, PackageCheck } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { SearchInput } from '../../components/SearchInput';
+import { useStageSearch } from '../../lib/stageSearch';
+import { useDropMissingPick } from '../../lib/stagePick';
 import { useAuth } from '../../contexts/AuthContext';
 import { ContractDetailSlot } from '../contracts/ContractDetailSlot';
 import { OverflowTabs } from '../../components/OverflowTabs';
@@ -36,17 +38,18 @@ export function ShopReturnsPage() {
   const selectedId = returnIdParam ? Number(returnIdParam) : null;
 
   const [tab, setTab] = useState<ReturnMenu>('OPEN');
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useStageSearch();
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
 
   useEffect(() => { setPageIndex(0); }, [debouncedSearch, tab]);
 
-  const { rows, totalCount, isFetching } = usePartnerMyReturns({
+  const { rows, totalCount, isFetching, isSuccess } = usePartnerMyReturns({
     menu: tab, search: debouncedSearch, pageIndex, pageSize,
   });
   const statuses: ReturnStatusRef[] = useReturnStatuses();
+  useDropMissingPick(selectedId, rows.map(r => r.return_id), isSuccess && !isFetching, () => navigate(BASE_PATH, { replace: true }));
 
   // Shop-only: these views answer 403 for a staff session, which reads its own
   // queue instead. After the hooks so hook order stays stable.

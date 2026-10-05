@@ -15,6 +15,8 @@ import { ContractDetailSlot } from './ContractDetailSlot';
 import { OwnerBadge } from '../../components/OwnerBadge';
 import type { OwnerType } from '../../lib/ownerTypes';
 import { SearchInput } from '../../components/SearchInput';
+import { useStageSearch } from '../../lib/stageSearch';
+import { useDropMissingPick } from '../../lib/stagePick';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -94,6 +96,8 @@ interface Props {
   renderRowRight?: (contract: ContractSearchResult) => ReactNode;
   /** Empty-state label override. */
   emptyMessage?: string;
+  /** Contracts the state filter returns but this list must not show. */
+  hideIds?: number[];
   /** Fires whenever the visible contracts change — lets pages do their own
    *  per-row enrichment queries (e.g. fetch open bills for pending-payment). */
   onContractsChange?: (contracts: ContractSearchResult[]) => void;
@@ -108,6 +112,7 @@ export function ContractListPane({
   showNewButton = false,
   renderRowRight,
   emptyMessage,
+  hideIds,
   onContractsChange,
 }: Props) {
   const { t } = useTranslation();
@@ -117,7 +122,7 @@ export function ContractListPane({
   const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
   const defaultBranchId = isBranchUser && user?.branch_id ? user.branch_id : null;
 
-  const [keyword, setKeyword] = useState('');
+  const [keyword, setKeyword] = useStageSearch();
   const [debouncedKeyword, setDebouncedKeyword] = useState('');
   const [filterState, setFilterState] = useState<string | null>(null);
   const [filterBranchId, setFilterBranchId] = useState<number | null>(defaultBranchId);
@@ -214,8 +219,13 @@ export function ContractListPane({
     placeholderData: keepPreviousData,
   });
 
-  const contracts = searchData?.contracts ?? [];
-  const totalCount = searchData?.count ?? 0;
+  const contracts = useMemo(() => {
+    const all = searchData?.contracts ?? [];
+    return hideIds?.length ? all.filter(c => !hideIds.includes(c.id)) : all;
+  }, [searchData, hideIds]);
+  const totalCount = (searchData?.count ?? 0) - ((searchData?.contracts.length ?? 0) - contracts.length);
+
+  useDropMissingPick(selectedId, contracts.map(c => c.id), !!searchData && !isFetching, () => setSelectedId(null));
 
   useEffect(() => {
     onContractsChange?.(contracts);

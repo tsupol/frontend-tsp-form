@@ -5,6 +5,8 @@ import { PageNav, PageNavPanel, MobileHeader, Select, Button, DataTableFooter, P
 import { ArrowLeft, ArrowRightFromLine, FilePlus, SlidersHorizontal } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { SearchInput } from '../../components/SearchInput';
+import { useStageSearch } from '../../lib/stageSearch';
+import { useStagePick } from '../../lib/stagePick';
 import { useAuth } from '../../contexts/AuthContext';
 import { DraftDetailPanel } from './DraftDetailPanel';
 import { ContractDetailSlot } from './ContractDetailSlot';
@@ -51,12 +53,12 @@ export function DraftContractsPage() {
   const isBranchUser = BRANCH_ROLES.includes(user?.role_code ?? '');
   const defaultBranchId = isBranchUser && user?.branch_id ? user.branch_id : null;
 
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useStageSearch();
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterBranchId, setFilterBranchId] = useState<number | null>(defaultBranchId);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedId, setSelectedId] = useStagePick('draft-contracts');
   const [filterOpen, setFilterOpen] = useState(false);
 
   const extraFilterCount = filterBranchId !== null ? 1 : 0;

@@ -22,6 +22,8 @@ import { PageNav, PageNavPanel, DataTable, MobileHeader, Badge } from 'tsp-form'
 import { ArrowLeft, ArrowRightFromLine, Wallet } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { SearchInput } from '../../components/SearchInput';
+import { useStageSearch } from '../../lib/stageSearch';
+import { useDropMissingPick } from '../../lib/stagePick';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { ContractDetailPanel } from '../contracts/ContractDetailPanel';
@@ -51,19 +53,20 @@ export function SettlementMenuPage({ menu, basePath, titleKey }: SettlementMenuP
 
   const selectedId = contractIdParam ? Number(contractIdParam) : null;
 
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useStageSearch();
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
 
   useEffect(() => { setPageIndex(0); }, [debouncedSearch, menu]);
 
-  const { rows, totalCount, isFetching } = usePartnerMySettlements({
+  const { rows, totalCount, isFetching, isSuccess } = usePartnerMySettlements({
     menu, search: debouncedSearch, pageIndex, pageSize,
   });
   const statusRef = useSettlementStatusRef();
   const returnReasons = useSettlementReturnReasons();
   const refLabel = useRefLabel();
+  useDropMissingPick(selectedId, rows.map(r => r.contract_id), isSuccess && !isFetching, () => navigate(basePath, { replace: true }));
 
   // Shop-only. Staff read the same requests through their finance queue, and
   // these views answer 403 for them. After the hooks, so hook order is stable.

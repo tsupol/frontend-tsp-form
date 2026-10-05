@@ -1,40 +1,31 @@
-import type { ReactNode } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { useEffect, type ReactNode } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { contractMenuActivePath } from '../../lib/contractMenuPath';
 import { useTranslation } from 'react-i18next';
 import { Badge } from 'tsp-form';
-import { Search, PiggyBank, FilePlus, Link2, FileEdit, CreditCard, Archive, Repeat2, PauseCircle, ClipboardCheck, PackageCheck, PackageOpen, Hourglass, Banknote, Percent } from 'lucide-react';
+import { Search, PiggyBank, FilePlus, Link2, FileEdit, CreditCard, Archive, Repeat2, PauseCircle, type LucideIcon } from 'lucide-react';
 import { useNavCounts } from '../../hooks/useNavCounts';
 import { useAuth } from '../../contexts/AuthContext';
-import { shopMenuAllows } from '../../lib/shopMenu';
+import { SHOP_STAGES, SHOP_STAGE_GROUP_LABEL, shopStageForPath } from '../../lib/shopStages';
+import { ShopStageTabs } from './ShopStageTabs';
+import { rememberStagePath, stageDestination } from '../../lib/stagePick';
 
 export function ContractsLayout({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const { isDealPartner } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const activePath = contractMenuActivePath(location.pathname, location.search);
   const { savingContractsCount, draftContractsCount, pendingPairingCount, pendingPaymentCount, depositOverdueCount, pausedContractsCount } = useNavCounts();
 
-  const allItems = [
+  type NavRow =
+    | { group: string }
+    | { path: string; labelKey: string; icon: LucideIcon; count: number; accent?: boolean };
+
+  const staffItems: NavRow[] = [
     { path: '/admin/contracts/search', labelKey: 'nav.contractSearch', icon: Search, count: 0 },
     { path: '/admin/contracts/saving', labelKey: 'nav.savingContracts', icon: PiggyBank, count: savingContractsCount },
     { path: '/admin/contracts/draft', labelKey: 'nav.draftContracts', icon: FileEdit, count: draftContractsCount },
-    // Shop-only — the view behind it holds the shop's own requests, and staff
-    // have their own reviewer queue. No badge until BE adds a counter key
-    // (NOTICE 2026-09-17 §3 — don't count the view on every menu open).
-    ...(isDealPartner
-      ? [
-        { path: '/admin/contracts/pending-approval', labelKey: 'nav.pendingApproval', icon: ClipboardCheck, count: 0 },
-        // The shop's money (140 §2, 145 §8). No badges: BE asked us not to
-        // count these views on every menu open — counters come later.
-        { path: '/admin/contracts/settlement-close', labelKey: 'nav.settlementClose', icon: PackageCheck, count: 0 },
-        { path: '/admin/contracts/settlement-payment', labelKey: 'nav.settlementPayment', icon: Hourglass, count: 0 },
-        { path: '/admin/contracts/partner-payouts', labelKey: 'nav.partnerPayoutsShop', icon: Banknote, count: 0 },
-        { path: '/admin/contracts/partner-commission', labelKey: 'nav.partnerCommission', icon: Percent, count: 0 },
-        // The shop's device-return documents (146 §2).
-        { path: '/admin/contracts/returns', labelKey: 'nav.partnerReturns', icon: PackageOpen, count: 0 },
-      ]
-      : []),
     { path: '/admin/contracts/pending-payment', labelKey: 'nav.pendingPayment', icon: CreditCard, count: pendingPaymentCount },
     { path: '/admin/contracts/pending-pairing', labelKey: 'nav.pendingPairing', icon: Link2, count: pendingPairingCount },
     { path: '/admin/contracts/deposited', labelKey: 'nav.depositedDevices', icon: Archive, count: depositOverdueCount },
@@ -42,8 +33,32 @@ export function ContractsLayout({ children }: { children: ReactNode }) {
     { path: '/admin/contracts/paused', labelKey: 'nav.pausedContracts', icon: PauseCircle, count: pausedContractsCount },
     { path: '/admin/contracts/new', labelKey: 'nav.newContract', icon: FilePlus, count: 0, accent: true },
   ];
-  // Deal-partner shops: only the shop menu set (dual-nav rule — mirrors AppSideNav).
-  const navItems = isDealPartner ? allItems.filter(i => shopMenuAllows(i.path)) : allItems;
+  // Deal-partner shops get their own list, in the order a shop works, under
+  // two headings (dual-nav rule — AppSideNav builds from the same list). Only
+  // two stages have a backend counter; the rest carry no badge (BE asked us not
+  // to count the shop views on every menu open).
+  const shopCounts = { draft: draftContractsCount, pendingPayment: pendingPaymentCount };
+  const shopItems: NavRow[] = [];
+  let shopGroup: string | undefined;
+  for (const s of SHOP_STAGES) {
+    if (s.group && s.group !== shopGroup) shopItems.push({ group: SHOP_STAGE_GROUP_LABEL[s.group] });
+    shopGroup = s.group;
+    shopItems.push({ path: s.path, labelKey: s.labelKey, icon: s.icon, count: s.count ? shopCounts[s.count] : 0, accent: s.accent });
+  }
+  const navItems = isDealPartner ? shopItems : staffItems;
+
+  // The stage tab row sits above every shop stage list. Not above the
+  // contract-opening screen: that is a workspace, and it needs the height.
+  const shopStage = isDealPartner && !location.pathname.startsWith('/admin/contracts/new')
+    ? shopStageForPath(location.pathname)
+    : undefined;
+
+  // Each stage remembers the row that was open in it, for when its tab or
+  // menu entry is pressed again.
+  const shopStageKey = shopStage?.key;
+  useEffect(() => {
+    if (shopStageKey) rememberStagePath(shopStageKey, location.pathname);
+  }, [shopStageKey, location.pathname]);
 
   return (
     <div className="flex h-dvh overflow-hidden">
@@ -51,10 +66,24 @@ export function ContractsLayout({ children }: { children: ReactNode }) {
         <span className="subnav-group-label mb-1">
           {t('nav.contracts')}
         </span>
-        {navItems.map(({ path, labelKey, icon: Icon, count, accent }) => (
+        {navItems.map((item) => {
+          if ('group' in item) {
+            return <span key={item.group} className="subnav-group-label mt-3 mb-1">{t(item.group)}</span>;
+          }
+          const { path, labelKey, icon: Icon, count, accent } = item;
+          return (
           <NavLink
             key={path}
             to={path}
+            // A plain press on a shop stage lands on the row that was open
+            // there. Ctrl/middle click keeps the link's own address.
+            onClick={(e) => {
+              if (!isDealPartner || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+              const dest = stageDestination(path);
+              if (dest === path) return;
+              e.preventDefault();
+              navigate(dest);
+            }}
             className={() => {
               const isActive = activePath === path || activePath.startsWith(`${path}/`);
               return (
@@ -78,11 +107,26 @@ export function ContractsLayout({ children }: { children: ReactNode }) {
               <Badge size="xs" color="warning">{count > 99 ? '99+' : count}</Badge>
             )}
           </NavLink>
-        ))}
+          );
+        })}
       </nav>
-      <div className="flex-1 min-w-0 h-full min-h-0 overflow-y-auto better-scroll">
-        {children}
-      </div>
+      {shopStage ? (
+        // The page below is built to fill the screen; with the tab row above
+        // it, it fills what is left instead. The row is hidden on a phone,
+        // where the page puts its own header at the top.
+        <div className="flex-1 min-w-0 h-full min-h-0 flex flex-col">
+          <div className="hidden md:block flex-none">
+            <ShopStageTabs active={shopStage} />
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto better-scroll [&>.pagenav]:h-full!">
+            {children}
+          </div>
+        </div>
+      ) : (
+        <div className="flex-1 min-w-0 h-full min-h-0 overflow-y-auto better-scroll">
+          {children}
+        </div>
+      )}
     </div>
   );
 }

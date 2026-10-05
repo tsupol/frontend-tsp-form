@@ -39,7 +39,7 @@ import {
   // Fanout child icons — Contracts
   Search, PiggyBank, Link2, FileEdit, FilePlus, CreditCard, Archive, Repeat2, PauseCircle,
   // Fanout child icons — Commission
-  UserCheck, ClipboardCheck, PackageCheck, PackageOpen,
+  UserCheck, ClipboardCheck, PackageCheck,
   // Fanout child icons — Accounting
   CalendarCheck, Receipt, ShieldAlert, Banknote, FileSpreadsheet, Coins, ArrowUpRight, ListChecks, ShoppingBag,
   // Fanout child icons — Branch expense
@@ -67,6 +67,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
 import { filterSideNavForShop } from './lib/shopMenu';
+import { SHOP_STAGES, SHOP_STAGE_GROUP_LABEL } from './lib/shopStages';
+import { stageDestination } from './lib/stagePick';
 import { getRoleLabel } from './lib/roleLabel';
 import { useTheme } from './contexts/ThemeContext';
 import { useNavGuard } from './contexts/NavGuardContext';
@@ -329,30 +331,41 @@ export const AppSideNav = () => {
     };
   };
 
+  // A deal-partner shop's contract menu: its own list, in the order a shop
+  // works, under two headings. ContractsLayout builds from the same list.
+  const shopCounts = { draft: draftContractsCount, pendingPayment: pendingPaymentCount };
+  const shopContractChildren: SideMenuItemData[] = [];
+  let shopGroup: string | undefined;
+  for (const s of SHOP_STAGES) {
+    if (s.group && s.group !== shopGroup) {
+      shopContractChildren.push({ type: 'group', key: `grp-shop-${s.group}`, label: t(SHOP_STAGE_GROUP_LABEL[s.group]) });
+    }
+    shopGroup = s.group;
+    const Icon = s.icon;
+    shopContractChildren.push(s.accent
+      ? {
+        key: s.key,
+        icon: <Icon size="1rem" className="text-primary-fg" />,
+        label: <span className="text-primary-fg font-medium">{t(s.labelKey)}</span>,
+        path: s.path,
+      }
+      : {
+        key: s.key,
+        ...(s.count ? iconWithCount(<Icon size="1rem" />, shopCounts[s.count]) : { icon: <Icon size="1rem" /> }),
+        label: t(s.labelKey),
+        path: s.path,
+      });
+  }
+
   const menuItems: SideMenuItemData[] = [
     { key: 'dashboard', icon: <LayoutDashboard size="1rem" />, label: t('nav.dashboard'), path: '/admin' },
     {
       key: 'contracts', icon: <FileText size="1rem" />, label: t('nav.contracts'),
       path: '/admin/contracts',
-      children: [
+      children: isDealPartner ? shopContractChildren : [
         { key: 'contract-search', icon: <Search size="1rem" />, label: t('nav.contractSearch'), path: '/admin/contracts/search' },
         { key: 'saving-contracts', ...iconWithCount(<PiggyBank size="1rem" />, savingContractsCount), label: t('nav.savingContracts'), path: '/admin/contracts/saving' },
         { key: 'draft-contracts', ...iconWithCount(<FileEdit size="1rem" />, draftContractsCount), label: t('nav.draftContracts'), path: '/admin/contracts/draft' },
-        // Shop-only — the shop menu set keeps it, and it is added only for a
-        // shop session so staff never see a page whose view they can't read.
-        // No badge until BE adds a counter key (NOTICE 2026-09-17 §3).
-        ...(isDealPartner
-          ? [
-            { key: 'pending-approval', icon: <ClipboardCheck size="1rem" />, label: t('nav.pendingApproval'), path: '/admin/contracts/pending-approval' },
-            // The shop's money (140 §2, 145 §8). Same no-badge rule.
-            { key: 'settlement-close', icon: <PackageCheck size="1rem" />, label: t('nav.settlementClose'), path: '/admin/contracts/settlement-close' },
-            { key: 'settlement-payment', icon: <Hourglass size="1rem" />, label: t('nav.settlementPayment'), path: '/admin/contracts/settlement-payment' },
-            { key: 'partner-payouts', icon: <Banknote size="1rem" />, label: t('nav.partnerPayoutsShop'), path: '/admin/contracts/partner-payouts' },
-            { key: 'partner-commission', icon: <Percent size="1rem" />, label: t('nav.partnerCommission'), path: '/admin/contracts/partner-commission' },
-            // The shop's device-return documents (146 §2). Same no-badge rule.
-            { key: 'partner-returns', icon: <PackageOpen size="1rem" />, label: t('nav.partnerReturns'), path: '/admin/contracts/returns' },
-          ]
-          : []),
         { key: 'pending-payment', ...iconWithCount(<CreditCard size="1rem" />, pendingPaymentCount), label: t('nav.pendingPayment'), path: '/admin/contracts/pending-payment' },
         { key: 'pending-pairing', ...iconWithCount(<Link2 size="1rem" />, pendingPairingCount), label: t('nav.pendingPairing'), path: '/admin/contracts/pending-pairing' },
         { key: 'deposited-devices', ...iconWithCount(<Archive size="1rem" />, depositOverdueCount), label: t('nav.depositedDevices'), path: '/admin/contracts/deposited' },
@@ -820,7 +833,9 @@ export const AppSideNav = () => {
   const visibleItems = isDealPartner ? filterSideNavForShop(menuItems) : menuItems;
 
   const handleSelect = (_key: string, path?: string) => {
-    if (path) navGuard ? navGuard.guardedNavigate(path) : navigate(path);
+    // A shop stage reopens on the row that was open in it (no-op for any other path).
+    const to = path ? stageDestination(path) : undefined;
+    if (to) navGuard ? navGuard.guardedNavigate(to) : navigate(to);
   };
 
   const handleCloseMobile = () => {
@@ -832,7 +847,7 @@ export const AppSideNav = () => {
       <SideMenu
         isCollapsed={menuCollapsed}
         onToggleCollapse={(collapsed) => { setMenuCollapsed(collapsed); localStorage.setItem('sidebar-collapsed', String(collapsed)); }}
-        linkFn={(to) => navGuard ? navGuard.guardedNavigate(to) : navigate(to)}
+        linkFn={(to) => { const dest = stageDestination(to); return navGuard ? navGuard.guardedNavigate(dest) : navigate(dest); }}
         autoCloseMobileOnClick={false}
         mobileToggleRenderer={(handleToggle) => (
           <button

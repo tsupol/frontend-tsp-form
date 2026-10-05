@@ -4,21 +4,24 @@
 // one request stands, but there was nowhere to see "which of my contracts are
 // waiting on the reviewer" — the ask in NOTICE 2026-09-17. This is that list.
 //
-// Tabs are slices of one view, not separate sources: waiting, approved and
-// still usable, lapsed, sent back, and the full history. Picking a row opens
-// the contract itself, because every action a shop can take on a request lives
-// on the contract page, not here.
+// Two menu entries read it, each one slice of the same view: the requests
+// still waiting, and the ones the shop has to act on again (sent back to fix,
+// or approved and left to lapse). An approval still in force has moved on — it
+// is under "Pending Pay & Sign". Picking a row opens the contract itself,
+// because every action a shop can take on a request lives on the contract
+// page, not here.
 //
 // Shop-only. Staff read the same requests through their reviewer queue.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { PageNav, PageNavPanel, DataTable, MobileHeader, Badge } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine, ClipboardCheck } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
-import { OverflowTabs } from '../../components/OverflowTabs';
 import { SearchInput } from '../../components/SearchInput';
+import { useStageSearch } from '../../lib/stageSearch';
+import { useDropMissingPick } from '../../lib/stagePick';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -30,15 +33,14 @@ import { outcomeBadgeColor, type PartnerCase } from '../partner-cases/partnerCas
 import { ContractDetailPanel } from './ContractDetailPanel';
 import { ContractDetailSlot } from './ContractDetailSlot';
 
-const TABS: PartnerMyCaseTab[] = ['PENDING', 'IN_FORCE', 'EXPIRED', 'RETURNED', 'ALL'];
-const BASE_PATH = '/admin/contracts/pending-approval';
+export type PendingApprovalView = 'waiting' | 'returned';
 
-// The tab lives in the address (?tab=) so back/forward and a shared link land
-// on the same tab; the waiting tab is the default and carries no param.
-const pathFor = (contractId: number | null, tab: PartnerMyCaseTab) =>
-  `${BASE_PATH}${contractId != null ? `/${contractId}` : ''}${tab === 'PENDING' ? '' : `?tab=${tab}`}`;
+const VIEWS: Record<PendingApprovalView, { tab: PartnerMyCaseTab; basePath: string; titleKey: string }> = {
+  waiting: { tab: 'PENDING', basePath: '/admin/contracts/pending-approval', titleKey: 'nav.pendingApproval' },
+  returned: { tab: 'RETURNED_OR_EXPIRED', basePath: '/admin/contracts/approval-returned', titleKey: 'nav.approvalReturned' },
+};
 
-export function PendingApprovalPage() {
+export function PendingApprovalPage({ view }: { view: PendingApprovalView }) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { isDealPartner } = useAuth();
@@ -46,17 +48,8 @@ export function PendingApprovalPage() {
 
   const selectedId = contractIdParam ? Number(contractIdParam) : null;
 
-  const [searchParams] = useSearchParams();
-  const tabParam = searchParams.get('tab') as PartnerMyCaseTab | null;
-  const tab: PartnerMyCaseTab = tabParam && TABS.includes(tabParam) ? tabParam : 'PENDING';
-
-  // Each tab remembers its own pick, like folders in a mail app: coming back to
-  // a tab reopens what was open there. `verifyPick` is raised on a tab switch so
-  // that, once the new tab's rows arrive, a pick that isn't among them is
-  // dropped — the panel never shows a contract the list beside it doesn't hold.
-  const pickByTab = useRef<Partial<Record<PartnerMyCaseTab, number | null>>>({});
-  const verifyPick = useRef(false);
-  const [search, setSearch] = useState('');
+  const { tab, basePath, titleKey } = VIEWS[view];
+  const [search, setSearch] = useStageSearch();
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
@@ -64,21 +57,14 @@ export function PendingApprovalPage() {
   useEffect(() => { setPageIndex(0); }, [tab, debouncedSearch]);
 
   const returnReasons = usePartnerCaseReturnReasons();
-  const { rows, totalCount, isFetching, isPlaceholderData } = usePartnerMyCases({
+  const { rows, totalCount, isFetching, isSuccess } = usePartnerMyCases({
     tab,
     search: debouncedSearch,
     pageIndex,
     pageSize,
   });
 
-  useEffect(() => {
-    if (!verifyPick.current || isFetching || isPlaceholderData) return;
-    verifyPick.current = false;
-    if (selectedId != null && !rows.some(r => r.contract_id === selectedId)) {
-      pickByTab.current[tab] = null;
-      navigate(pathFor(null, tab), { replace: true });
-    }
-  }, [isFetching, isPlaceholderData, rows, selectedId, tab, navigate]);
+  useDropMissingPick(selectedId, rows.map(r => r.contract_id), isSuccess && !isFetching, () => navigate(basePath, { replace: true }));
 
   // Only a shop has "my requests" — staff see every shop's, which is their
   // queue page. The menu never offers this path to them, but it is typeable.
@@ -99,18 +85,7 @@ export function PendingApprovalPage() {
   };
 
   const select = (contractId: number) => {
-    pickByTab.current[tab] = contractId;
-    navigate(pathFor(contractId, tab), { replace: true });
-  };
-
-  const switchTab = (next: PartnerMyCaseTab) => {
-    if (next === tab) return;
-    pickByTab.current[tab] = selectedId;
-    // The new tab's own pick wins; with none, keep the current contract if the
-    // new list holds it too (e.g. "All") — the check above drops it otherwise.
-    const candidate = pickByTab.current[next] ?? selectedId;
-    verifyPick.current = candidate != null;
-    navigate(pathFor(candidate, next));
+    navigate(`${basePath}/${contractId}`, { replace: true });
   };
 
   return (
@@ -148,7 +123,7 @@ export function PendingApprovalPage() {
                   )}
                 </div>
                 <div className="mobile-header-title mobile-header-title-truncate">
-                  {t('nav.pendingApproval')}
+                  {t(titleKey)}
                 </div>
                 <div className="mobile-header-end w-nav" />
               </MobileHeader>
@@ -156,7 +131,7 @@ export function PendingApprovalPage() {
 
             {!isMobile && (
               <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
-                <h1 className="heading-2 shrink-0">{t('nav.pendingApproval')}</h1>
+                <h1 className="heading-2 shrink-0">{t(titleKey)}</h1>
                 <span className="text-sm text-subtle">
                   {t('partnerCase.foundCount', { count: totalCount })}
                 </span>
@@ -168,13 +143,6 @@ export function PendingApprovalPage() {
                 id="list"
                 className={isMobile ? '' : 'w-1/2 xl:w-5/12 border-r border-line flex flex-col'}
               >
-                <OverflowTabs
-                  tabs={TABS}
-                  activeTab={tab}
-                  onTabChange={switchTab}
-                  renderLabel={key => t(`partnerCase.myTab_${key}`)}
-                />
-
                 <div className="flex-none p-2 border-b border-line">
                   <SearchInput
                     value={search}

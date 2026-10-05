@@ -26,6 +26,8 @@ export const SHOP_ALLOWED_PATHS = new Set<string>([
   // The shop's own credit-approval requests (NOTICE 2026-09-17) — reads the
   // same shop view the per-contract approval card already uses.
   '/admin/contracts/pending-approval',
+  // The same requests, the ones that came back or lapsed — the shop has to act.
+  '/admin/contracts/approval-returned',
   // The shop's money (140 / 145): contracts it still has to close out, ones
   // waiting on the fund, transfers received, and the commission report.
   '/admin/contracts/settlement-close',

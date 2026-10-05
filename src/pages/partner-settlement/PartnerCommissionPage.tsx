@@ -12,6 +12,7 @@ import { PageNav, PageNavPanel, DataTable, MobileHeader } from 'tsp-form';
 import { ArrowRightFromLine } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { SearchInput } from '../../components/SearchInput';
+import { useStageSearch } from '../../lib/stageSearch';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePartnerCommissionReport, usePartnerCommissionMonthly } from './usePartnerSettlement';
@@ -21,7 +22,7 @@ export function PartnerCommissionPage() {
   const { t } = useTranslation();
   const { isDealPartner } = useAuth();
 
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useStageSearch();
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(25);

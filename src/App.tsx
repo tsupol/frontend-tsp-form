@@ -732,7 +732,19 @@ function App() {
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <ContractsLayout><PendingApprovalPage /></ContractsLayout>
+              <ContractsLayout><PendingApprovalPage view="waiting" /></ContractsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      {/* The same requests, the ones the shop has to act on again: sent back
+          to fix, or approved and left to lapse. */}
+      <Route
+        path="/admin/contracts/approval-returned/:contractId?"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <ContractsLayout><PendingApprovalPage view="returned" /></ContractsLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

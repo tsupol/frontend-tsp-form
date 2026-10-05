@@ -20,6 +20,8 @@ import { PageNav, PageNavPanel, DataTable, MobileHeader, Badge } from 'tsp-form'
 import { ArrowLeft, ArrowRightFromLine, Banknote } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { SearchInput } from '../../components/SearchInput';
+import { useStageSearch } from '../../lib/stageSearch';
+import { useStagePick } from '../../lib/stagePick';
 import { fmtCurrency, formatEntityCode } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { PartnerBalanceHeader } from './PartnerBalanceHeader';
@@ -38,8 +40,8 @@ export function ShopPayoutsPage() {
   const { t } = useTranslation();
   const { isDealPartner } = useAuth();
 
-  const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [search, setSearch] = useState('');
+  const [selectedId, setSelectedId] = useStagePick('partner-payouts');
+  const [search, setSearch] = useStageSearch();
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
