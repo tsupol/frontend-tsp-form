@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { SHOP_STAGES } from './shopStages';
 
 // Each shop stage remembers what was open in it, like folders in a mail app:
-// leaving a stage and coming back — by its tab or by either side menu —
+// leaving a stage and coming back, by either side menu,
 // reopens the same row, if that stage's list still holds it. A row that has
 // moved on (submitted, paid, closed) is dropped, so the panel never shows
 // something the list beside it doesn't have. Kept for the session only; a reload starts clean.
@@ -12,7 +12,7 @@ import { SHOP_STAGES } from './shopStages';
 // gets remembered. Two keep it in their own state and use `useStagePick`.
 
 const paths: Record<string, string> = {};
-// The address a menu or tab has just sent the user back to. The page that
+// The address a menu has just sent the user back to. The page that
 // opens on it checks, once, that its list still holds the row.
 let restored: string | null = null;
 const localPicks: Record<string, number | null> = {};
@@ -23,7 +23,7 @@ export function rememberStagePath(stageKey: string, pathname: string) {
 }
 
 /**
- * Where a press on a stage's menu entry or tab should land: the address the
+ * Where a press on a stage's menu entry should land: the address the
  * stage was left on, or the stage's own. Call it at press time, not while
  * drawing — it arms the one-time check on the page that opens.
  */

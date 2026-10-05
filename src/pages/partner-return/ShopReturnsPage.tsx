@@ -15,7 +15,6 @@ import { PageNav, PageNavPanel, DataTable, MobileHeader, Badge } from 'tsp-form'
 import { ArrowLeft, ArrowRightFromLine, PackageCheck } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { SearchInput } from '../../components/SearchInput';
-import { useStageSearch } from '../../lib/stageSearch';
 import { useDropMissingPick } from '../../lib/stagePick';
 import { useAuth } from '../../contexts/AuthContext';
 import { ContractDetailSlot } from '../contracts/ContractDetailSlot';
@@ -38,7 +37,7 @@ export function ShopReturnsPage() {
   const selectedId = returnIdParam ? Number(returnIdParam) : null;
 
   const [tab, setTab] = useState<ReturnMenu>('OPEN');
-  const [search, setSearch] = useStageSearch();
+  const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);

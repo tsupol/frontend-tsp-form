@@ -15,7 +15,6 @@ import { ContractDetailSlot } from './ContractDetailSlot';
 import { OwnerBadge } from '../../components/OwnerBadge';
 import type { OwnerType } from '../../lib/ownerTypes';
 import { SearchInput } from '../../components/SearchInput';
-import { useStageSearch } from '../../lib/stageSearch';
 import { useDropMissingPick } from '../../lib/stagePick';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -117,12 +116,12 @@ export function ContractListPane({
 }: Props) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isDealPartner } = useAuth();
 
   const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
   const defaultBranchId = isBranchUser && user?.branch_id ? user.branch_id : null;
 
-  const [keyword, setKeyword] = useStageSearch();
+  const [keyword, setKeyword] = useState('');
   const [debouncedKeyword, setDebouncedKeyword] = useState('');
   const [filterState, setFilterState] = useState<string | null>(null);
   const [filterBranchId, setFilterBranchId] = useState<number | null>(defaultBranchId);
@@ -297,7 +296,7 @@ export function ContractListPane({
               {showNewButton && (
                 <div className="ml-auto">
                   <Button size="sm" color="primary" onClick={() => navigate('/admin/contracts/new')} startIcon={<Plus size={14} />}>
-                    {t('wizard.newContract')}
+                    {t(isDealPartner ? 'nav.shopNewContract' : 'wizard.newContract')}
                   </Button>
                 </div>
               )}

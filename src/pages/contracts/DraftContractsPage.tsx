@@ -5,7 +5,6 @@ import { PageNav, PageNavPanel, MobileHeader, Select, Button, DataTableFooter, P
 import { ArrowLeft, ArrowRightFromLine, FilePlus, SlidersHorizontal } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { SearchInput } from '../../components/SearchInput';
-import { useStageSearch } from '../../lib/stageSearch';
 import { useStagePick } from '../../lib/stagePick';
 import { useAuth } from '../../contexts/AuthContext';
 import { DraftDetailPanel } from './DraftDetailPanel';
@@ -53,7 +52,7 @@ export function DraftContractsPage() {
   const isBranchUser = BRANCH_ROLES.includes(user?.role_code ?? '');
   const defaultBranchId = isBranchUser && user?.branch_id ? user.branch_id : null;
 
-  const [search, setSearch] = useStageSearch();
+  const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterBranchId, setFilterBranchId] = useState<number | null>(defaultBranchId);
   const [pageIndex, setPageIndex] = useState(0);

@@ -7,7 +7,6 @@ import { Search, PiggyBank, FilePlus, Link2, FileEdit, CreditCard, Archive, Repe
 import { useNavCounts } from '../../hooks/useNavCounts';
 import { useAuth } from '../../contexts/AuthContext';
 import { SHOP_STAGES, SHOP_STAGE_GROUP_LABEL, shopStageForPath } from '../../lib/shopStages';
-import { ShopStageTabs } from './ShopStageTabs';
 import { rememberStagePath, stageDestination } from '../../lib/stagePick';
 
 export function ContractsLayout({ children }: { children: ReactNode }) {
@@ -47,15 +46,11 @@ export function ContractsLayout({ children }: { children: ReactNode }) {
   }
   const navItems = isDealPartner ? shopItems : staffItems;
 
-  // The stage tab row sits above every shop stage list. Not above the
-  // contract-opening screen: that is a workspace, and it needs the height.
-  const shopStage = isDealPartner && !location.pathname.startsWith('/admin/contracts/new')
-    ? shopStageForPath(location.pathname)
+  // Each stage remembers the row that was open in it, for when its menu
+  // entry is pressed again. The contract-opening screen is not a stage list.
+  const shopStageKey = isDealPartner && !location.pathname.startsWith('/admin/contracts/new')
+    ? shopStageForPath(location.pathname)?.key
     : undefined;
-
-  // Each stage remembers the row that was open in it, for when its tab or
-  // menu entry is pressed again.
-  const shopStageKey = shopStage?.key;
   useEffect(() => {
     if (shopStageKey) rememberStagePath(shopStageKey, location.pathname);
   }, [shopStageKey, location.pathname]);
@@ -110,23 +105,9 @@ export function ContractsLayout({ children }: { children: ReactNode }) {
           );
         })}
       </nav>
-      {shopStage ? (
-        // The page below is built to fill the screen; with the tab row above
-        // it, it fills what is left instead. The row is hidden on a phone,
-        // where the page puts its own header at the top.
-        <div className="flex-1 min-w-0 h-full min-h-0 flex flex-col">
-          <div className="hidden md:block flex-none">
-            <ShopStageTabs active={shopStage} />
-          </div>
-          <div className="flex-1 min-h-0 overflow-y-auto better-scroll [&>.pagenav]:h-full!">
-            {children}
-          </div>
-        </div>
-      ) : (
-        <div className="flex-1 min-w-0 h-full min-h-0 overflow-y-auto better-scroll">
-          {children}
-        </div>
-      )}
+      <div className="flex-1 min-w-0 h-full min-h-0 overflow-y-auto better-scroll">
+        {children}
+      </div>
     </div>
   );
 }

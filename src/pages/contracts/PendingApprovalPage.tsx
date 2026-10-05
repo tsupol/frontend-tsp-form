@@ -20,7 +20,6 @@ import { PageNav, PageNavPanel, DataTable, MobileHeader, Badge } from 'tsp-form'
 import { ArrowLeft, ArrowRightFromLine, ClipboardCheck } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { SearchInput } from '../../components/SearchInput';
-import { useStageSearch } from '../../lib/stageSearch';
 import { useDropMissingPick } from '../../lib/stagePick';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
@@ -49,7 +48,7 @@ export function PendingApprovalPage({ view }: { view: PendingApprovalView }) {
   const selectedId = contractIdParam ? Number(contractIdParam) : null;
 
   const { tab, basePath, titleKey } = VIEWS[view];
-  const [search, setSearch] = useStageSearch();
+  const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);

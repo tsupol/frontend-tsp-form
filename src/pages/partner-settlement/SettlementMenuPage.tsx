@@ -22,7 +22,6 @@ import { PageNav, PageNavPanel, DataTable, MobileHeader, Badge } from 'tsp-form'
 import { ArrowLeft, ArrowRightFromLine, Wallet } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { SearchInput } from '../../components/SearchInput';
-import { useStageSearch } from '../../lib/stageSearch';
 import { useDropMissingPick } from '../../lib/stagePick';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
@@ -53,7 +52,7 @@ export function SettlementMenuPage({ menu, basePath, titleKey }: SettlementMenuP
 
   const selectedId = contractIdParam ? Number(contractIdParam) : null;
 
-  const [search, setSearch] = useStageSearch();
+  const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
