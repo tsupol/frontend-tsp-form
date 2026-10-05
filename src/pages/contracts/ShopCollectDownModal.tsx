@@ -199,6 +199,15 @@ export function ShopCollectDownModal({ open, contractId, contractCode, onClose, 
           await apiClient.rpc('fn_bill_line_convert_to_gift', { p_line_id: added.line_item_id });
         }
       }
+      // The open RPC's total is from before those lines went on — read it again,
+      // or the payment comes up short by their price and confirm is refused.
+      if (cartLines.length > 0) {
+        const rows = await apiClient.get<Array<{ total_amount: number }>>(
+          `/v_bills?id=eq.${opened.bill_id}&select=total_amount`,
+        );
+        opened = { ...opened, total_amount: rows[0]?.total_amount ?? opened.total_amount };
+        setBill(opened);
+      }
 
       // 3. Bind the staff signatures on the contract document the bill created.
       const signed = await signContractOpenParties(contractId);

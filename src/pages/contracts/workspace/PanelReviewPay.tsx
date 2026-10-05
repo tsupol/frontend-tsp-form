@@ -462,6 +462,8 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
           `/v_bills?id=eq.${bill.bill_id}&select=total_amount`,
         );
         billTotal = rows[0]?.total_amount ?? null;
+        // The paid screen reads this too ("nothing charged" vs a receipt).
+        if (billTotal != null) updateData({ billData: { ...bill, total_amount: billTotal } });
       }
       const noChargeBill = billTotal != null
         ? billTotal <= 0
