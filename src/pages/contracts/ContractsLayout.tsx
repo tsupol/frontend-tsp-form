@@ -3,7 +3,8 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { contractMenuActivePath } from '../../lib/contractMenuPath';
 import { useTranslation } from 'react-i18next';
 import { Badge } from 'tsp-form';
-import { Search, PiggyBank, FilePlus, Link2, FileEdit, CreditCard, Archive, Repeat2, PauseCircle, type LucideIcon } from 'lucide-react';
+import { type LucideIcon } from 'lucide-react';
+import { STAFF_CONTRACT_MENU, STAFF_CONTRACT_GROUP_LABEL } from '../../lib/staffContractMenu';
 import { useNavCounts } from '../../hooks/useNavCounts';
 import { useAuth } from '../../contexts/AuthContext';
 import { SHOP_STAGES, SHOP_STAGE_GROUP_LABEL, shopStageForPath } from '../../lib/shopStages';
@@ -21,17 +22,19 @@ export function ContractsLayout({ children }: { children: ReactNode }) {
     | { group: string }
     | { path: string; labelKey: string; icon: LucideIcon; count: number; accent?: boolean };
 
-  const staffItems: NavRow[] = [
-    { path: '/admin/contracts/search', labelKey: 'nav.contractSearch', icon: Search, count: 0 },
-    { path: '/admin/contracts/saving', labelKey: 'nav.savingContracts', icon: PiggyBank, count: savingContractsCount },
-    { path: '/admin/contracts/draft', labelKey: 'nav.draftContracts', icon: FileEdit, count: draftContractsCount },
-    { path: '/admin/contracts/pending-payment', labelKey: 'nav.pendingPayment', icon: CreditCard, count: pendingPaymentCount },
-    { path: '/admin/contracts/pending-pairing', labelKey: 'nav.pendingPairing', icon: Link2, count: pendingPairingCount },
-    { path: '/admin/contracts/deposited', labelKey: 'nav.depositedDevices', icon: Archive, count: depositOverdueCount },
-    { path: '/admin/contracts/loaners', labelKey: 'nav.loanersOut', icon: Repeat2, count: 0 },
-    { path: '/admin/contracts/paused', labelKey: 'nav.pausedContracts', icon: PauseCircle, count: pausedContractsCount },
-    { path: '/admin/contracts/new', labelKey: 'nav.newContract', icon: FilePlus, count: 0, accent: true },
-  ];
+  // Staff's list, in work order with one heading (dual-nav rule — AppSideNav
+  // builds from the same list).
+  const staffCounts = {
+    saving: savingContractsCount, draft: draftContractsCount, pendingPayment: pendingPaymentCount,
+    pendingPairing: pendingPairingCount, deposited: depositOverdueCount, paused: pausedContractsCount,
+  };
+  const staffItems: NavRow[] = [];
+  let staffGroup: string | undefined;
+  for (const s of STAFF_CONTRACT_MENU) {
+    if (s.group && s.group !== staffGroup) staffItems.push({ group: STAFF_CONTRACT_GROUP_LABEL[s.group] });
+    staffGroup = s.group;
+    staffItems.push({ path: s.path, labelKey: s.labelKey, icon: s.icon, count: s.count ? staffCounts[s.count] : 0, accent: s.accent });
+  }
   // Deal-partner shops get their own list, in the order a shop works, under
   // two headings (dual-nav rule — AppSideNav builds from the same list). Only
   // two stages have a backend counter; the rest carry no badge (BE asked us not

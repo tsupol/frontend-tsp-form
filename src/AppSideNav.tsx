@@ -36,8 +36,6 @@ import {
   Store,
   // Fanout child icons — Company
   MapPin, KeyRound, Landmark, CalendarDays, AlertTriangle, ShieldBan, Cloud,
-  // Fanout child icons — Contracts
-  Search, PiggyBank, Link2, FileEdit, FilePlus, CreditCard, Archive, Repeat2, PauseCircle,
   // Fanout child icons — Commission
   UserCheck, ClipboardCheck, PackageCheck,
   // Fanout child icons — Accounting
@@ -68,6 +66,7 @@ import {
 import { useAuth } from './contexts/AuthContext';
 import { filterSideNavForShop } from './lib/shopMenu';
 import { SHOP_STAGES, SHOP_STAGE_GROUP_LABEL } from './lib/shopStages';
+import { STAFF_CONTRACT_MENU, STAFF_CONTRACT_GROUP_LABEL } from './lib/staffContractMenu';
 import { stageDestination } from './lib/stagePick';
 import { getRoleLabel } from './lib/roleLabel';
 import { useTheme } from './contexts/ThemeContext';
@@ -357,27 +356,41 @@ export const AppSideNav = () => {
       });
   }
 
+  // Staff's contract menu: same shape as the shop's, from its own list.
+  // ContractsLayout builds from the same list.
+  const staffCounts = {
+    saving: savingContractsCount, draft: draftContractsCount, pendingPayment: pendingPaymentCount,
+    pendingPairing: pendingPairingCount, deposited: depositOverdueCount, paused: pausedContractsCount,
+  };
+  const staffContractChildren: SideMenuItemData[] = [];
+  let staffGroup: string | undefined;
+  for (const s of STAFF_CONTRACT_MENU) {
+    if (s.group && s.group !== staffGroup) {
+      staffContractChildren.push({ type: 'group', key: `grp-staff-${s.group}`, label: t(STAFF_CONTRACT_GROUP_LABEL[s.group]) });
+    }
+    staffGroup = s.group;
+    const Icon = s.icon;
+    staffContractChildren.push(s.accent
+      ? {
+        key: s.key,
+        icon: <Icon size="1rem" className="text-primary-fg" />,
+        label: <span className="text-primary-fg font-medium">{t(s.labelKey)}</span>,
+        path: s.path,
+      }
+      : {
+        key: s.key,
+        ...(s.count ? iconWithCount(<Icon size="1rem" />, staffCounts[s.count]) : { icon: <Icon size="1rem" /> }),
+        label: t(s.labelKey),
+        path: s.path,
+      });
+  }
+
   const menuItems: SideMenuItemData[] = [
     { key: 'dashboard', icon: <LayoutDashboard size="1rem" />, label: t('nav.dashboard'), path: '/admin' },
     {
       key: 'contracts', icon: <FileText size="1rem" />, label: t('nav.contracts'),
       path: '/admin/contracts',
-      children: isDealPartner ? shopContractChildren : [
-        { key: 'contract-search', icon: <Search size="1rem" />, label: t('nav.contractSearch'), path: '/admin/contracts/search' },
-        { key: 'saving-contracts', ...iconWithCount(<PiggyBank size="1rem" />, savingContractsCount), label: t('nav.savingContracts'), path: '/admin/contracts/saving' },
-        { key: 'draft-contracts', ...iconWithCount(<FileEdit size="1rem" />, draftContractsCount), label: t('nav.draftContracts'), path: '/admin/contracts/draft' },
-        { key: 'pending-payment', ...iconWithCount(<CreditCard size="1rem" />, pendingPaymentCount), label: t('nav.pendingPayment'), path: '/admin/contracts/pending-payment' },
-        { key: 'pending-pairing', ...iconWithCount(<Link2 size="1rem" />, pendingPairingCount), label: t('nav.pendingPairing'), path: '/admin/contracts/pending-pairing' },
-        { key: 'deposited-devices', ...iconWithCount(<Archive size="1rem" />, depositOverdueCount), label: t('nav.depositedDevices'), path: '/admin/contracts/deposited' },
-        { key: 'loaners-out', icon: <Repeat2 size="1rem" />, label: t('nav.loanersOut'), path: '/admin/contracts/loaners' },
-        { key: 'paused-contracts', ...iconWithCount(<PauseCircle size="1rem" />, pausedContractsCount), label: t('nav.pausedContracts'), path: '/admin/contracts/paused' },
-        {
-          key: 'new-contract',
-          icon: <FilePlus size="1rem" className="text-primary-fg" />,
-          label: <span className="text-primary-fg font-medium">{t('nav.newContract')}</span>,
-          path: '/admin/contracts/new',
-        },
-      ],
+      children: isDealPartner ? shopContractChildren : staffContractChildren,
     },
     {
       key: 'customers', icon: <UserSearch size="1rem" />, label: t('nav.customers'),

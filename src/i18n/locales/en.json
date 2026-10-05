@@ -5796,6 +5796,7 @@
     "approvalReturned": "Sent back / Expired",
     "shopContractSearch": "Search contracts",
     "shopNewContract": "New Contract",
+    "groupContractsRunning": "During the plan",
     "groupShopMoney": "Shop money",
     "pendingPayment": "Pending Pay & Sign",
     "permissionGrants": "Permission grants",
