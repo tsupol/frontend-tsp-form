@@ -41,22 +41,31 @@ export function PendingPaymentPage() {
   });
   const hideIds = useMemo(() => (expiredApprovals ?? []).map(r => r.contract_id), [expiredApprovals]);
 
-  // A shop contract that is already active can still have a paper to sign:
-  // going active binds the phone, and the bind creates the device-receipt
-  // paper. The backend's badge for this menu counts those; the state filter
-  // alone would leave them with no list to appear in.
+  // A contract that is already active can still have a paper to sign: binding
+  // a phone creates the device-receipt paper, and later changes (a co-lessee,
+  // a swap) create their own. The backend's badge for this menu counts every
+  // contract with a paper waiting; the state filter alone leaves the active
+  // ones out, so the list and the badge disagreed — for staff and shops alike.
   const { data: papersToSign } = useQuery({
     queryKey: ['contract-search', 'papers-to-sign'],
-    queryFn: () => apiClient.get<{ contract_id: number }[]>(
-      '/v_contract_signing_visible?status=eq.COLLECTING&select=contract_id',
+    queryFn: () => apiClient.get<{ contract_id: number; change_reason: string | null }[]>(
+      '/v_contract_signing_visible?status=eq.COLLECTING&select=contract_id,change_reason&order=created_at.desc&limit=200',
     ),
-    enabled: isDealPartner,
     staleTime: 30 * 1000,
   });
   const extraIds = useMemo(
     () => [...new Set((papersToSign ?? []).map(r => r.contract_id))].filter(id => !hideIds.includes(id)),
     [papersToSign, hideIds],
   );
+  // Contracts whose only waiting paper is the device receipt — named on the row.
+  const receiptOnly = useMemo(() => {
+    const reasons = new Map<number, Set<string>>();
+    for (const r of papersToSign ?? []) {
+      if (!reasons.has(r.contract_id)) reasons.set(r.contract_id, new Set());
+      reasons.get(r.contract_id)!.add(r.change_reason ?? '');
+    }
+    return new Set([...reasons].filter(([, set]) => set.size === 1 && set.has('BIND')).map(([id]) => id));
+  }, [papersToSign]);
 
   const totalByContract = new Map<number, number>();
   // What is still owed, as the bill says — a part-paid bill shows its remainder.
@@ -65,7 +74,11 @@ export function PendingPaymentPage() {
   const renderRowRight = (c: ContractSearchResult) => {
     const due = totalByContract.get(c.id);
     if (due == null && c.state === 'ACTIVE') {
-      return <div className="text-xs text-warning-fg">{t('contract.receiptPaperToSign')}</div>;
+      return (
+        <div className="text-xs text-warning-fg">
+          {t(receiptOnly.has(c.id) ? 'contract.receiptPaperToSign' : 'contract.paperToSign')}
+        </div>
+      );
     }
     if (due == null) {
       return <div className="text-xs text-subtle">—</div>;

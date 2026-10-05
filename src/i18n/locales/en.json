@@ -3329,6 +3329,7 @@
     "draftNote": "Note",
     "due": "Due",
     "receiptPaperToSign": "Device receipt to sign",
+    "paperToSign": "Paper to sign",
     "dueAmount": "Due Amount",
     "dueDate": "Due Date",
     "earlyPayoff_amount": "Payoff Amount",
