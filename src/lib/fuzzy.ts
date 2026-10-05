@@ -40,3 +40,41 @@ export function fuzzyThreshold(queryLen: number): number {
   if (queryLen < 3) return 0.8;
   return 0.6;
 }
+
+/**
+ * Filter + rank items client-side for a picker. Every typed word must match
+ * (token-AND); per word, word-prefix beats substring beats in-order subsequence
+ * ("aple" → apple) beats a close typo (edit distance, `fuzzyThreshold`).
+ * Lower total first; ties keep the original order. Empty query → items as-is.
+ * Same tiers as the FinanceRatesPage brand/family picker, plus the typo tier.
+ */
+export function fuzzyRank<T>(items: T[], query: string, hay: (item: T) => string): T[] {
+  const tokens = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return items;
+
+  const tokenScore = (h: string, words: string[], tk: string): number | null => {
+    if (words.some(w => w.startsWith(tk))) return 0;
+    if (h.includes(tk)) return 1;
+    let i = 0;
+    for (const ch of h) { if (ch === tk[i]) i++; if (i === tk.length) return 2; }
+    const sim = fuzzyScore(tk, h);
+    if (sim >= fuzzyThreshold(tk.length)) return 3 + (1 - sim);   // closer typo first
+    return null;
+  };
+
+  return items
+    .map((item, index) => {
+      const h = hay(item).toLowerCase();
+      const words = h.split(/\s+/);
+      let score = 0;
+      for (const tk of tokens) {
+        const s = tokenScore(h, words, tk);
+        if (s == null) return null;
+        score += s;
+      }
+      return { item, index, score };
+    })
+    .filter((e): e is { item: T; index: number; score: number } => e != null)
+    .sort((a, b) => a.score - b.score || a.index - b.index)
+    .map(e => e.item);
+}

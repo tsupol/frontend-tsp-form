@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Modal, Button, Select, TextArea, Badge, Tooltip } from 'tsp-form';
@@ -10,6 +10,7 @@ import { ActionDoneView } from '../contracts/ActionDoneView';
 import { fmtCurrency } from '../../lib/format';
 import { getBucketLabel, getBucketColor, codeDisplay, assetCodeMatches } from './inventoryUtils';
 import { translateApiError } from '../../lib/apiErrors';
+import { fuzzyRank } from '../../lib/fuzzy';
 
 // ============================================================================
 // Sell External B2B (ขายให้คู่ค้า) — sell ON_HAND_AVAILABLE assets out of stock
@@ -122,10 +123,8 @@ export function SellExternalModal({
   const [result, setResult] = useState<SellResponse | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
 
-  // Buyer picker search state (declared before the reset effect that clears it).
-  const [debouncedBuyerSearch, setDebouncedBuyerSearch] = useState('');
-  const [selectedBuyer, setSelectedBuyer] = useState<ExternalBuyerBranch | null>(null);
-  const buyerDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Buyer picker search text (declared before the reset effect that clears it).
+  const [buyerSearch, setBuyerSearch] = useState('');
 
   const branchId = seedAsset?.branch_id ?? null;
 
@@ -134,8 +133,7 @@ export function SellExternalModal({
     if (open) {
       setView('form');
       setBuyerId(null);
-      setSelectedBuyer(null);
-      setDebouncedBuyerSearch('');
+      setBuyerSearch('');
       setAssetIds(seedAsset ? [seedAsset.asset_id] : []);
       setPrices({});
       setNote('');
@@ -148,41 +146,29 @@ export function SellExternalModal({
     }
   }, [open, seedAsset]);
 
-  // Buyer picker — EXTERNAL partner branches (RLS-bypass view). There can be
-  // ~100 partner branches, so search server-side by name (ILIKE) instead of
-  // loading them all. Empty term loads a first batch; the selected option is
-  // pinned so it stays visible after the results change.
-  //
-  // Deliberately has NO min-char floor, unlike every list search in the app.
-  // This is a Select narrowing ~100 rows behind limit=20, not a search over a
-  // real table: one character is a useful narrowing here, the scan is trivial,
-  // and a floor would make the first keystroke look broken with nothing gained.
-  const handleBuyerSearch = useCallback((term: string) => {
-    if (buyerDebounceRef.current) clearTimeout(buyerDebounceRef.current);
-    buyerDebounceRef.current = setTimeout(() => setDebouncedBuyerSearch(term.trim()), 300);
-  }, []);
-
+  // Buyer picker — EXTERNAL partner branches of the user's holding (RLS-bypass
+  // view). Load them ALL and fuzzy-filter on screen: a holding has tens to a
+  // low hundred, read in ~1 ms. The old server search capped at 20 hid every
+  // branch past the 20th until typed (UI_FEEDBACK 2026-10-05 BUG limit_20).
   const { data: buyers = [], isFetching: buyersFetching } = useQuery({
-    queryKey: ['external-buyer-branches', debouncedBuyerSearch],
-    queryFn: () => {
-      const term = debouncedBuyerSearch.replace(/[*,()]/g, '');
-      const filter = term ? `&name=ilike.*${encodeURIComponent(term)}*` : '';
-      // No term → first 20 by name; with a term → matches (capped).
-      return apiClient.get<ExternalBuyerBranch[]>(
-        `/v_external_buyer_branches?order=name.asc&limit=20${filter}`,
-      );
-    },
+    queryKey: ['external-buyer-branches'],
+    queryFn: () => apiClient.get<ExternalBuyerBranch[]>('/v_external_buyer_branches?order=name.asc'),
     enabled: open,
     staleTime: 60 * 1000,
   });
+  const selectedBuyer = useMemo(
+    () => buyers.find(b => String(b.id) === buyerId) ?? null,
+    [buyers, buyerId],
+  );
   const buyerOptions = useMemo(() => {
-    const base = buyers.map(b => ({ value: String(b.id), label: b.name }));
+    const base = fuzzyRank(buyers, buyerSearch, b => b.name)
+      .map(b => ({ value: String(b.id), label: b.name }));
     // Pin the selected branch so it doesn't vanish when the search narrows.
     if (selectedBuyer && !base.some(o => o.value === String(selectedBuyer.id))) {
       return [{ value: String(selectedBuyer.id), label: selectedBuyer.name }, ...base];
     }
     return base;
-  }, [buyers, selectedBuyer]);
+  }, [buyers, buyerSearch, selectedBuyer]);
 
   // Price preview for the current cart — refetches whenever the set changes.
   const { data: preview, isFetching: previewFetching } = useQuery({
@@ -315,15 +301,8 @@ export function SellExternalModal({
                   <Select
                     options={buyerOptions}
                     value={buyerId}
-                    onChange={(v) => {
-                      const val = (v as string) || null;
-                      setBuyerId(val);
-                      setSelectedBuyer(
-                        buyers.find(b => String(b.id) === val)
-                        ?? (selectedBuyer && String(selectedBuyer.id) === val ? selectedBuyer : null),
-                      );
-                    }}
-                    onSearchChange={handleBuyerSearch}
+                    onChange={(v) => setBuyerId((v as string) || null)}
+                    onSearchChange={setBuyerSearch}
                     filterOptions={false}
                     loading={buyersFetching}
                     placeholder={t('sellExternal.buyerPlaceholder', { defaultValue: 'Select partner branch' })}
