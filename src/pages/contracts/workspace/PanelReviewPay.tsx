@@ -453,8 +453,18 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
       // nothing to add or confirm. Route by the state the open RPC returned
       // instead of assuming payment-then-sign (doc task #2). For a real bill we
       // record the payments and confirm as before.
-      const noChargeBill = bill.total_amount != null
-        ? bill.total_amount <= 0
+      //
+      // The open RPC's total is from before the cart lines were added, so with
+      // any add-on it is short by their price. Read the bill's total again.
+      let billTotal = bill.total_amount;
+      if (cartLines.length > 0) {
+        const rows = await apiClient.get<Array<{ total_amount: number }>>(
+          `/v_bills?id=eq.${bill.bill_id}&select=total_amount`,
+        );
+        billTotal = rows[0]?.total_amount ?? null;
+      }
+      const noChargeBill = billTotal != null
+        ? billTotal <= 0
         : isNoCharge;
 
       if (!noChargeBill) {
@@ -463,12 +473,12 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
         // with several, a mismatch means the split is wrong, so stop before
         // recording anything rather than leave the bill part-paid.
         let toRecord = payments;
-        if (bill.total_amount != null && Math.abs(bill.total_amount - totalPayment) >= 0.01) {
+        if (billTotal != null && Math.abs(billTotal - totalPayment) >= 0.01) {
           if (payments.length === 1) {
-            toRecord = [{ ...payments[0], amount: bill.total_amount }];
+            toRecord = [{ ...payments[0], amount: billTotal }];
           } else {
             throw new Error(t('wizard.billTotalMismatch', {
-              total: fmtCurrency(bill.total_amount),
+              total: fmtCurrency(billTotal),
               entered: fmtCurrency(totalPayment),
             }));
           }
