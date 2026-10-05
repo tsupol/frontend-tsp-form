@@ -97,6 +97,9 @@ interface Props {
   emptyMessage?: string;
   /** Contracts the state filter returns but this list must not show. */
   hideIds?: number[];
+  /** Contracts this list must also show though their state is outside `states`
+   *  (a short, known set — they are read by id and put first). */
+  extraIds?: number[];
   /** Fires whenever the visible contracts change — lets pages do their own
    *  per-row enrichment queries (e.g. fetch open bills for pending-payment). */
   onContractsChange?: (contracts: ContractSearchResult[]) => void;
@@ -112,6 +115,7 @@ export function ContractListPane({
   renderRowRight,
   emptyMessage,
   hideIds,
+  extraIds,
   onContractsChange,
 }: Props) {
   const { t } = useTranslation();
@@ -218,11 +222,31 @@ export function ContractListPane({
     placeholderData: keepPreviousData,
   });
 
-  const contracts = useMemo(() => {
+  // Extra contracts, read by id. The search RPC filters by state only, so a
+  // list that follows something else (a paper still to be signed) names them.
+  const extraKey = [...(extraIds ?? [])].sort((a, b) => a - b).join(',');
+  const { data: extraRows } = useQuery({
+    queryKey: ['contract-search', 'extra', extraKey],
+    queryFn: () => apiClient.get<ContractSearchResult[]>(`/v_contract_detail?id=in.(${extraKey})&order=id.desc`),
+    enabled: extraKey !== '',
+    placeholderData: keepPreviousData,
+  });
+
+  const { contracts, totalCount } = useMemo(() => {
     const all = searchData?.contracts ?? [];
-    return hideIds?.length ? all.filter(c => !hideIds.includes(c.id)) : all;
-  }, [searchData, hideIds]);
-  const totalCount = (searchData?.count ?? 0) - ((searchData?.contracts.length ?? 0) - contracts.length);
+    const shown = hideIds?.length ? all.filter(c => !hideIds.includes(c.id)) : all;
+    const kw = debouncedKeyword.toLowerCase();
+    const extra = (extraKey === '' ? [] : extraRows ?? [])
+      .filter(c => !shown.some(s => s.id === c.id))
+      .filter(c => !filterBranchId || c.branch_id === filterBranchId)
+      .filter(c => !kw || keywordWords.every(w =>
+        `${c.code_display ?? ''} ${c.code ?? ''} ${c.customer_name ?? ''}`.toLowerCase().includes(w.toLowerCase())));
+    return {
+      // First page only: the extras are few and are the ones to act on.
+      contracts: page === 1 ? [...extra, ...shown] : shown,
+      totalCount: (searchData?.count ?? 0) - (all.length - shown.length) + extra.length,
+    };
+  }, [searchData, hideIds, extraRows, extraKey, debouncedKeyword, keywordWords, filterBranchId, page]);
 
   useDropMissingPick(selectedId, contracts.map(c => c.id), !!searchData && !isFetching, () => setSelectedId(null));
 

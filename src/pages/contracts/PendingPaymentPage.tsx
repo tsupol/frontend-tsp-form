@@ -41,12 +41,32 @@ export function PendingPaymentPage() {
   });
   const hideIds = useMemo(() => (expiredApprovals ?? []).map(r => r.contract_id), [expiredApprovals]);
 
+  // A shop contract that is already active can still have a paper to sign:
+  // going active binds the phone, and the bind creates the device-receipt
+  // paper. The backend's badge for this menu counts those; the state filter
+  // alone would leave them with no list to appear in.
+  const { data: papersToSign } = useQuery({
+    queryKey: ['contract-search', 'papers-to-sign'],
+    queryFn: () => apiClient.get<{ contract_id: number }[]>(
+      '/v_contract_signing_visible?status=eq.COLLECTING&select=contract_id',
+    ),
+    enabled: isDealPartner,
+    staleTime: 30 * 1000,
+  });
+  const extraIds = useMemo(
+    () => [...new Set((papersToSign ?? []).map(r => r.contract_id))].filter(id => !hideIds.includes(id)),
+    [papersToSign, hideIds],
+  );
+
   const totalByContract = new Map<number, number>();
   // What is still owed, as the bill says — a part-paid bill shows its remainder.
   for (const b of openBills ?? []) totalByContract.set(b.contract_id, b.remaining ?? b.total_amount);
 
   const renderRowRight = (c: ContractSearchResult) => {
     const due = totalByContract.get(c.id);
+    if (due == null && c.state === 'ACTIVE') {
+      return <div className="text-xs text-warning-fg">{t('contract.receiptPaperToSign')}</div>;
+    }
     if (due == null) {
       return <div className="text-xs text-subtle">—</div>;
     }
@@ -69,6 +89,7 @@ export function PendingPaymentPage() {
         : ['PENDING_PAYMENT_AND_SIGN', 'PENDING_PAYMENT', 'PENDING_SIGN']}
       showStateFilter={false}
       hideIds={hideIds}
+      extraIds={extraIds}
       renderRowRight={renderRowRight}
       emptyMessage={t('contract.noPendingPayment')}
       onContractsChange={(rows) => {

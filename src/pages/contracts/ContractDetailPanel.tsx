@@ -857,8 +857,34 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
     });
   };
 
+  // For a shop this is the next thing to do on the contract (the customer's
+  // signature — on the contract itself, or on the device-receipt paper made
+  // when it went active), so it leads the tab: below the tall money card it
+  // sat off the screen.
+  const signingReminder = liveCollectingCount > 0 && (
+      <div className="border rounded-md px-4 py-3 border-warning-border bg-warning-soft">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <Pencil size={14} className="text-warning-fg shrink-0" />
+            <div className="min-w-0">
+              <div className="text-xs font-semibold uppercase tracking-wider text-warning-fg">
+                {t('contract.signingNeeded')}
+              </div>
+              <div className="text-sm text-warning-fg/90 mt-0.5">
+                {t('contract.signingNeededReminder', { count: liveCollectingCount })}
+              </div>
+            </div>
+          </div>
+          <Button size="sm" color="primary" onClick={onNavigateSigning} className="shrink-0">
+            {t(isDealPartner ? 'contract.action_go_to_signing' : 'contract.goToSigning')}
+          </Button>
+        </div>
+      </div>
+  );
+
   return (
     <div className="p-4 flex flex-col gap-4">
+      {isDealPartner && signingReminder}
       {/* Deal-partner FIN1 credit request — renders nothing for every other
           shop/contract, and drops away once the contract goes active. */}
       <PartnerCaseCard
@@ -904,27 +930,9 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
         </div>
       )}
 
-      {/* Documents-need-signing reminder — live COLLECTING signing exists */}
-      {liveCollectingCount > 0 && (
-        <div className="border rounded-md px-4 py-3 border-warning-border bg-warning-soft">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 min-w-0">
-              <Pencil size={14} className="text-warning-fg shrink-0" />
-              <div className="min-w-0">
-                <div className="text-xs font-semibold uppercase tracking-wider text-warning-fg">
-                  {t('contract.signingNeeded')}
-                </div>
-                <div className="text-sm text-warning-fg/90 mt-0.5">
-                  {t('contract.signingNeededReminder', { count: liveCollectingCount })}
-                </div>
-              </div>
-            </div>
-            <Button size="sm" color="primary" onClick={onNavigateSigning} className="shrink-0">
-              {t(isDealPartner ? 'contract.action_go_to_signing' : 'contract.goToSigning')}
-            </Button>
-          </div>
-        </div>
-      )}
+      {/* Documents-need-signing reminder — live COLLECTING signing exists.
+          (A shop gets it at the top of the tab instead — see signingReminder.) */}
+      {!isDealPartner && signingReminder}
 
       {/* Bind device reminder — shown below signing; device can be bound even
           before signing/activation. */}
