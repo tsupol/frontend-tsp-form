@@ -37,7 +37,6 @@ export const SHOP_ALLOWED_PATHS = new Set<string>([
   // Device-return documents (146) — the only way an active shop contract ends.
   '/admin/contracts/returns',
   '/admin/contracts/pending-payment',
-  '/admin/contracts/pending-pairing',
   '/admin/contracts/new',
   // Customers (own branch)
   '/admin/customers',

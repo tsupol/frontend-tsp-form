@@ -1,5 +1,5 @@
 import {
-  Search, FilePlus, FileEdit, ClipboardCheck, Undo2, CreditCard, Truck,
+  Search, FilePlus, FileEdit, ClipboardCheck, Undo2, CreditCard,
   PackageCheck, Hourglass, Banknote, Percent, PackageOpen, type LucideIcon,
 } from 'lucide-react';
 
@@ -40,9 +40,8 @@ export const SHOP_STAGES: ShopStage[] = [
   { key: 'pending-approval', path: '/admin/contracts/pending-approval', labelKey: 'nav.pendingApproval', icon: ClipboardCheck, group: 'work' },
   { key: 'approval-returned', path: '/admin/contracts/approval-returned', labelKey: 'nav.approvalReturned', icon: Undo2, group: 'work' },
   { key: 'pending-payment', path: '/admin/contracts/pending-payment', labelKey: 'nav.pendingPayment', icon: CreditCard, group: 'work', count: 'pendingPayment' },
-  // No badge: the backend's counter also counts devices waiting to be bound,
-  // which a shop never does by hand and this page no longer lists for it.
-  { key: 'pending-pairing', path: '/admin/contracts/pending-pairing', labelKey: 'nav.shopHandover', icon: Truck, group: 'work' },
+  // No bind / hand-over stage: a shop's device is bound when the contract goes
+  // active, and the hand-over photos are part of close-out, the next stage.
 
   { key: 'settlement-close', path: '/admin/contracts/settlement-close', labelKey: 'nav.settlementClose', icon: PackageCheck, group: 'money' },
   { key: 'settlement-payment', path: '/admin/contracts/settlement-payment', labelKey: 'nav.settlementPayment', icon: Hourglass, group: 'money' },

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select, DataTableFooter } from 'tsp-form';
@@ -10,7 +10,6 @@ import { defaultScopeFor, scopeQuery } from '../../lib/scope';
 import { DateTime } from '../../components/DateTime';
 import { ContractDetailPanel } from './ContractDetailPanel';
 import { ContractDetailSlot } from './ContractDetailSlot';
-import { useDropMissingPick } from '../../lib/stagePick';
 
 type PairingActionType = 'PENDING_DEVICE_BIND' | 'PENDING_DELIVERY';
 
@@ -49,13 +48,7 @@ export function PendingPairingPage() {
 
   const scope = useMemo(() => defaultScopeFor(user), [user]);
 
-  // A shop never binds by hand — the device its contract was approved with is
-  // bound when the customer signs — so it gets the hand-over list alone, with
-  // no tab row, under the title its menu uses.
-  const [actionType, setActionType] = useState<PairingActionType>(
-    isDealPartner ? 'PENDING_DELIVERY' : 'PENDING_DEVICE_BIND',
-  );
-  const title = t(isDealPartner ? 'nav.shopHandover' : 'nav.pendingPairing');
+  const [actionType, setActionType] = useState<PairingActionType>('PENDING_DEVICE_BIND');
   const [filterBranchId, setFilterBranchId] = useState<number | null>(defaultBranchId);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
@@ -76,17 +69,17 @@ export function PendingPairingPage() {
     queryFn: () => apiClient.get<{ device_id: number | null; shipped_at: string | null }[]>(
       `/v_contract_detail?id=eq.${selectedId}&select=device_id,shipped_at&limit=1`,
     ).then(rows => rows[0] ?? null),
-    enabled: selectedId != null && !isDealPartner,
+    enabled: selectedId != null,
     staleTime: 30 * 1000,
   });
 
   useEffect(() => {
-    if (!deepLinkContract || isDealPartner) return;
+    if (!deepLinkContract) return;
     const targetTab: PairingActionType = deepLinkContract.device_id == null
       ? 'PENDING_DEVICE_BIND'
       : 'PENDING_DELIVERY';
     setActionType(prev => (prev === targetTab ? prev : targetTab));
-  }, [deepLinkContract, isDealPartner]);
+  }, [deepLinkContract]);
 
   // Branch lookup (skip for BS/BM — they only see their own branch)
   const { data: branches } = useQuery({
@@ -121,8 +114,6 @@ export function PendingPairingPage() {
   const totalCount = listData?.totalCount ?? 0;
   const totalPages = Math.ceil(totalCount / pageSize);
 
-  useDropMissingPick(selectedId, list.map(r => r.contract_id), !!listData && !isFetching, () => setSelectedId(null));
-
   // Per-tab counts. Honors the active branch filter so the badges match what
   // the user would see if they switched tabs.
   const { data: tabCountsData } = useQuery({
@@ -143,7 +134,6 @@ export function PendingPairingPage() {
         PENDING_DELIVERY: delivery.totalCount ?? 0,
       }));
     },
-    enabled: !isDealPartner,
     refetchInterval: 60_000,
   });
 
@@ -153,6 +143,11 @@ export function PendingPairingPage() {
   ];
 
   const selectedRow = list.find(c => c.contract_id === selectedId) ?? null;
+
+  // Not a shop page: a shop's device is bound when its contract goes active,
+  // and its hand-over photos belong to close-out. The menu never offers this
+  // path to a shop, but it is typeable. After the hooks, so their order is stable.
+  if (isDealPartner) return <Navigate to="/admin/contracts/settlement-close" replace />;
 
   return (
     <PageNav panels={['list', 'detail']} className="h-dvh">
@@ -172,7 +167,7 @@ export function PendingPairingPage() {
                 )}
               </div>
               <div className="mobile-header-title mobile-header-title-truncate">
-                {isRoot ? title : (selectedRow?.contract_code_display ?? selectedRow?.contract_code ?? '')}
+                {isRoot ? t('nav.pendingPairing') : (selectedRow?.contract_code_display ?? selectedRow?.contract_code ?? '')}
               </div>
               <div className="mobile-header-end w-12" />
             </MobileHeader>
@@ -180,14 +175,13 @@ export function PendingPairingPage() {
 
           {!isMobile && (
             <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
-              <h1 className="heading-2 shrink-0">{title}</h1>
+              <h1 className="heading-2 shrink-0">{t('nav.pendingPairing')}</h1>
             </div>
           )}
 
           <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
             <PageNavPanel id="list" className={isMobile ? '' : 'w-5/12 xl:w-4/12 border-r border-line flex flex-col'}>
               {/* Tabs */}
-              {!isDealPartner && (
               <div className="flex-none flex border-b border-line">
                 {tabOptions.map(opt => {
                   const Icon = opt.icon;
@@ -212,7 +206,6 @@ export function PendingPairingPage() {
                   );
                 })}
               </div>
-              )}
 
               {/* Filters */}
               {!isBranchUser && (
