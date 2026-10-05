@@ -10,7 +10,7 @@ import {
 // one name and one position in both. Staff keep their own list; nothing here applies to them.
 //
 // Which pages a shop may reach at all is still decided by shopMenu.ts.
-export type ShopStageGroup = 'work' | 'money';
+export type ShopStageGroup = 'money';
 export type ShopStageCount = 'draft' | 'pendingPayment';
 
 export interface ShopStage {
@@ -18,7 +18,9 @@ export interface ShopStage {
   path: string;
   labelKey: string;
   icon: LucideIcon;
-  /** Heading it sits under; the any-stage search sits above both, with none. */
+  /** Heading it sits under. Search and the contract stages sit under the menu's
+   *  own "Contracts" title with none — a second heading there would read as a
+   *  group of one followed by a near-duplicate. */
   group?: ShopStageGroup;
   /** Menu badge, where the backend has a counter for the stage. */
   count?: ShopStageCount;
@@ -27,7 +29,6 @@ export interface ShopStage {
 }
 
 export const SHOP_STAGE_GROUP_LABEL: Record<ShopStageGroup, string> = {
-  work: 'nav.groupShopContractWork',
   money: 'nav.groupShopMoney',
 };
 
@@ -35,11 +36,11 @@ export const SHOP_STAGES: ShopStage[] = [
   // Every contract at any stage — first, above the stages themselves.
   { key: 'contract-search', path: '/admin/contracts/search', labelKey: 'nav.shopContractSearch', icon: Search },
 
-  { key: 'new-contract', path: '/admin/contracts/new', labelKey: 'nav.shopNewContract', icon: FilePlus, group: 'work', accent: true },
-  { key: 'draft-contracts', path: '/admin/contracts/draft', labelKey: 'nav.draftContracts', icon: FileEdit, group: 'work', count: 'draft' },
-  { key: 'pending-approval', path: '/admin/contracts/pending-approval', labelKey: 'nav.pendingApproval', icon: ClipboardCheck, group: 'work' },
-  { key: 'approval-returned', path: '/admin/contracts/approval-returned', labelKey: 'nav.approvalReturned', icon: Undo2, group: 'work' },
-  { key: 'pending-payment', path: '/admin/contracts/pending-payment', labelKey: 'nav.pendingPayment', icon: CreditCard, group: 'work', count: 'pendingPayment' },
+  { key: 'new-contract', path: '/admin/contracts/new', labelKey: 'nav.shopNewContract', icon: FilePlus, accent: true },
+  { key: 'draft-contracts', path: '/admin/contracts/draft', labelKey: 'nav.draftContracts', icon: FileEdit, count: 'draft' },
+  { key: 'pending-approval', path: '/admin/contracts/pending-approval', labelKey: 'nav.pendingApproval', icon: ClipboardCheck },
+  { key: 'approval-returned', path: '/admin/contracts/approval-returned', labelKey: 'nav.approvalReturned', icon: Undo2 },
+  { key: 'pending-payment', path: '/admin/contracts/pending-payment', labelKey: 'nav.pendingPayment', icon: CreditCard, count: 'pendingPayment' },
   // No bind / hand-over stage: a shop's device is bound when the contract goes
   // active, and the hand-over photos are part of close-out, the next stage.
 
