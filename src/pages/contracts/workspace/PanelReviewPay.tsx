@@ -474,7 +474,9 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
   // createPortal(.print-only-receipt, body) pattern as BillsPage /
   // ContractDetailPanel so the 80mm @page resolves cleanly.
   if (data.billConfirmed && data.billId) {
-    const needsBindDevice = contract != null && contract.device_id == null;
+    // A shop never binds by hand: the device its contract was approved with is
+    // bound when the customer signs, so the button would send it on a detour.
+    const needsBindDevice = !isDealPartner && contract != null && contract.device_id == null;
     const noChargeBill = data.billData?.total_amount != null
       ? data.billData.total_amount <= 0
       : isNoCharge;
@@ -813,7 +815,7 @@ function PostConfirmView({ billId, contractId, needsBindDevice, noCharge, onNavi
       </div>
       <div className="shrink-0 border-t border-line bg-bg px-4 py-3 flex justify-end gap-2 print:hidden">
         <Button variant="outline" startIcon={<Printer size={16} />} onClick={handlePrint}>
-          {t('wizard.receipt_print')}
+          {t('wizard.receipt_printReceipt')}
         </Button>
         {needsBindDevice && contractId != null && (
           <Button
