@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Modal, Button, ImageUploader, resizeToVariants } from 'tsp-form';
+import { Modal, Button, resizeToVariants } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
 import { QRCodeSVG } from 'qrcode.react';
 import { XCircle, Plus, X, Smartphone, ImageOff, AlertTriangle } from 'lucide-react';
@@ -21,6 +21,7 @@ import { ConfirmDialog } from '../../../components/ConfirmDialog';
 import { MediaLightbox } from '../../../components/MediaLightbox';
 import { useMobileCaptureSession } from '../../contracts/workspace/useMobileCaptureSession';
 import { translateApiError } from '../../../lib/apiErrors';
+import { SingleImageUploader } from '../../../components/SingleImageUploader';
 
 // ============================================================================
 // Repair condition photos — album for the REPAIR_ORDER / ATTACHMENT media,
@@ -382,7 +383,9 @@ export function RepairAddPhotoModal({
               </button>
             </div>
           ) : (
-            <ImageUploader
+            <SingleImageUploader
+              previewUrl={null}
+              onRemove={() => {}}
               resizeOptions={REPAIR_CONDITION_RESIZE}
               onUpload={(imgs) => imgs[0] && setPicked(imgs[0])}
               disabled={save.isPending}

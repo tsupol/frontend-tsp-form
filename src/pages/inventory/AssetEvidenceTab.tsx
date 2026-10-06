@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Modal, Button, ImageUploader, PopOver, MenuItem, MenuSeparator, Select, Badge } from 'tsp-form';
+import { Modal, Button, PopOver, MenuItem, MenuSeparator, Select, Badge } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
 import { DndContext, DragOverlay, pointerWithin, useDroppable, type DragStartEvent, type DragOverEvent, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, rectSortingStrategy, arrayMove } from '@dnd-kit/sortable';
@@ -21,6 +21,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { MediaLightboxKeyGallery } from '../../components/MediaLightbox';
 import { useMobileCaptureSession } from '../contracts/workspace/useMobileCaptureSession';
 import { translateApiError } from '../../lib/apiErrors';
+import { SingleImageUploader } from '../../components/SingleImageUploader';
 
 // ============================================================================
 // Asset evidence album — the "รูปหลักประกัน" tab (DELIVERY 2026-09-04, mig 1141).
@@ -700,7 +701,9 @@ function AddEvidenceModal({ open, onClose, assetId, slot, onAdded }: {
               </button>
             </div>
           ) : (
-            <ImageUploader
+            <SingleImageUploader
+              previewUrl={null}
+              onRemove={() => {}}
               sizes={ASSET_EVIDENCE_RESIZE}
               onUpload={(imgs) => imgs[0] && setPicked(imgs[0])}
               disabled={save.isPending}
@@ -780,7 +783,9 @@ function ReplaceEvidenceModal({ open, onClose, assetId, data, onReplaced }: {
             </button>
           </div>
         ) : (
-          <ImageUploader
+          <SingleImageUploader
+            previewUrl={null}
+            onRemove={() => {}}
             sizes={ASSET_EVIDENCE_RESIZE}
             onUpload={(imgs) => imgs[0] && setPicked(imgs[0])}
             disabled={save.isPending}

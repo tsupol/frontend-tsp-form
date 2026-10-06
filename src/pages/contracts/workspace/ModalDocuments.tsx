@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Modal, Button } from 'tsp-form';
 import { ImageUploader } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
-import { CheckCircle, XCircle, CreditCard } from 'lucide-react';
+import { CheckCircle, XCircle, CreditCard, ImagePlus } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
 import { beMediaUploadFromImage } from '../../../lib/beMedia';
 import { toStoragePath } from '../../../lib/mediaPath';
@@ -13,6 +13,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { uploadContractPhoto } from '../uploadContractPhoto';
 import { useWorkspace } from './WorkspaceContext';
 import { IdPhotoUpload } from './IdPhotoUpload';
+import { SingleImageUploader } from '../../../components/SingleImageUploader';
 
 interface Props {
   open: boolean;
@@ -192,7 +193,9 @@ export function ModalDocuments({ open, onClose }: Props) {
               <label className="form-label mb-0">{t('workspace.docSignature')}</label>
               {uploading === 'signature' && <span className="text-xs text-subtle">{t('common.loading')}</span>}
             </div>
-            <ImageUploader
+            <SingleImageUploader
+              previewUrl={null}
+              onRemove={() => {}}
               resizeOptions={signature.resize}
               sizes={signature.sizes}
               onUpload={handleSignatureUpload}
@@ -216,6 +219,12 @@ export function ModalDocuments({ open, onClose }: Props) {
               disabled={uploading === 'evidence' || !evidence.spec}
               multiple
               maxFiles={evidence.spec?.max_files}
+              placeholder={
+                <div className="flex flex-col items-center justify-center gap-1 text-subtle">
+                  <ImagePlus size={20} className="opacity-60" />
+                  <span className="text-xs">{t('imageUploader.dropHintSingle')}</span>
+                </div>
+              }
             />
           </div>
 

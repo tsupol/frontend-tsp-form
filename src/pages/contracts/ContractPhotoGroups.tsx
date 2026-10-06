@@ -24,7 +24,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Modal, Button, ImageUploader, PopOver, MenuItem, MenuSeparator, Select, Badge } from 'tsp-form';
+import { Modal, Button, PopOver, MenuItem, MenuSeparator, Select, Badge } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
 import {
   DndContext, DragOverlay, pointerWithin, useDroppable,
@@ -45,6 +45,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { MediaLightboxKeyGallery } from '../../components/MediaLightbox';
 import { translateApiError } from '../../lib/apiErrors';
 import { uploadContractPhoto } from './uploadContractPhoto';
+import { SingleImageUploader } from '../../components/SingleImageUploader';
 
 const ENTITY_TYPE = 'CONTRACT';
 
@@ -795,7 +796,9 @@ function AddPhotoModal({ open, onClose, contractId, group, label, existingCount,
             </button>
           </div>
         ) : (
-          <ImageUploader
+          <SingleImageUploader
+            previewUrl={null}
+            onRemove={() => {}}
             sizes={CONTRACT_EVIDENCE_RESIZE}
             onUpload={(imgs) => imgs[0] && setPicked(imgs[0])}
             disabled={save.isPending}
@@ -941,7 +944,9 @@ function ReplacePhotoModal({ open, onClose, contractId, photo, onReplaced }: {
             </button>
           </div>
         ) : (
-          <ImageUploader
+          <SingleImageUploader
+            previewUrl={null}
+            onRemove={() => {}}
             sizes={CONTRACT_EVIDENCE_RESIZE}
             onUpload={(imgs) => imgs[0] && setPicked(imgs[0])}
             disabled={save.isPending}

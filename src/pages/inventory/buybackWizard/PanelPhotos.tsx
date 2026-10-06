@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button, Modal, TextArea, ImageUploader, resizeToVariants } from 'tsp-form';
+import { Button, Modal, TextArea, resizeToVariants } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
 import { QRCodeSVG } from 'qrcode.react';
 import { Plus, X, XCircle, ImageOff, Pencil, Check, Smartphone } from 'lucide-react';
@@ -24,6 +24,7 @@ import { getLine } from './useBuyback';
 import { codeDisplay } from '../inventoryUtils';
 import type { BuybackDraft } from './types';
 import { translateApiError } from '../../../lib/apiErrors';
+import { SingleImageUploader } from '../../../components/SingleImageUploader';
 
 interface EntityMedia {
   entity_media_id: number;
@@ -427,7 +428,9 @@ function AddPhotoModal({
                 </button>
               </div>
             ) : (
-              <ImageUploader
+              <SingleImageUploader
+                previewUrl={null}
+                onRemove={() => {}}
                 resizeOptions={BUYBACK_CONDITION_RESIZE}
                 onUpload={(imgs) => imgs[0] && setPicked(imgs[0])}
                 disabled={save.isPending}
