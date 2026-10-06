@@ -11,6 +11,7 @@ import type {
   PartnerContractMoney,
   PartnerContractMoneyEvent,
 } from './contractMoneyTypes';
+import type { PartnerSettlement } from '../partner-settlement/partnerSettlementTypes';
 import type {
   AssetOwnerTransfer,
   FundBill,
@@ -168,6 +169,28 @@ export function useFundBillClearings(billId: number | null) {
       `/v_fund_bill_clearings?bill_id=eq.${billId}&order=clearing_bill_id`,
     ),
     enabled: billId != null,
+    staleTime: 10 * 1000,
+  });
+  return { ...query, rows: query.data ?? [] };
+}
+
+/**
+ * The payment requests a document's lines point at — each carries the shop's
+ * net for that contract as `net_amount`. The per-contract figure comes from
+ * here, never from adding the lines: the company's commission and contract fee
+ * sit among them with signs written from the shop's end (lessons-learned §9).
+ *
+ * Looked up by the ids on the lines rather than by `fund_bill_id`, because a
+ * request taken back off a voided or credited document loses that link.
+ */
+export function useFundBillSettlements(settlementIds: number[]) {
+  const ids = [...new Set(settlementIds)].sort((a, b) => a - b);
+  const query = useQuery({
+    queryKey: ['fund-bills', 'settlements', ids],
+    queryFn: () => apiClient.get<PartnerSettlement[]>(
+      `/v_partner_settlements?settlement_id=in.(${ids.join(',')})`,
+    ),
+    enabled: ids.length > 0,
     staleTime: 10 * 1000,
   });
   return { ...query, rows: query.data ?? [] };

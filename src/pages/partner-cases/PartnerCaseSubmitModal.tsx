@@ -44,9 +44,13 @@ export function PartnerCaseSubmitModal({
   const [readyErrors, setReadyErrors] = useState<ReadyError[]>([]);
   const [result, setResult] = useState<PartnerCaseSubmitResult | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
+  // Read once per opening: sending creates the request this flag is derived
+  // from, so a live read would retitle a first send "send again" on its done view.
+  const [resubmit, setResubmit] = useState(isResubmit);
 
   useEffect(() => {
     if (!open) return;
+    setResubmit(isResubmit);
     setView('form');
     setNote('');
     setSaving(false);
@@ -54,6 +58,7 @@ export function PartnerCaseSubmitModal({
     setReadyErrors([]);
     setResult(null);
     setConfirmClose(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- isResubmit is sampled on open only
   }, [open]);
 
   const forceClose = () => { setConfirmClose(false); onClose(); };
@@ -103,7 +108,7 @@ export function PartnerCaseSubmitModal({
       >
         <div className="modal-header">
           <h2 className="modal-title">
-            {isResubmit ? t('partnerCase.resubmit') : t('partnerCase.submit')}
+            {resubmit ? t('partnerCase.resubmit') : t('partnerCase.submit')}
           </h2>
           <button type="button" className="modal-close-btn" onClick={handleClose}>&times;</button>
         </div>
@@ -152,7 +157,7 @@ export function PartnerCaseSubmitModal({
                 {t('common.cancel')}
               </Button>
               <Button color="primary" onClick={handleSubmit} disabled={saving || contractId == null}>
-                {isResubmit ? t('partnerCase.resubmit') : t('partnerCase.submit')}
+                {resubmit ? t('partnerCase.resubmit') : t('partnerCase.submit')}
               </Button>
             </div>
           </>

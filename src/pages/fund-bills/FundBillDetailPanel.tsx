@@ -39,6 +39,7 @@ import {
   useFundBillLines,
   useFundBillLog,
   useFundBillPayments,
+  useFundBillSettlements,
 } from './useFundBills';
 import {
   fundBillStatusColor,
@@ -48,6 +49,7 @@ import {
 } from './fundBillTypes';
 import { FundBillPayModal } from './FundBillPayModal';
 import { FundBillVoidModal } from './FundBillVoidModal';
+import { FundBillIssueModal } from './FundBillIssueModal';
 import { FundBillCreditNoteModal } from './FundBillCreditNoteModal';
 import { FundBillAddLineModal } from './FundBillAddLineModal';
 import { FundBillRemoveLineModal } from './FundBillRemoveLineModal';
@@ -60,7 +62,7 @@ import { FundPaymentEvidence } from './FundPaymentEvidence';
 const HIDDEN_REASONS = new Set(['status_not_allowed', 'permission_denied', 'not_in_pool']);
 
 /** Actions with a modal here. Anything else the backend adds shows as not-wired. */
-const WIRED_ACTIONS = new Set(['PAY', 'VOID', 'CREDIT_NOTE', 'ADD_LINE', 'CLAWBACK_COLLECT']);
+const WIRED_ACTIONS = new Set(['ISSUE', 'PAY', 'VOID', 'CREDIT_NOTE', 'ADD_LINE', 'CLAWBACK_COLLECT']);
 
 /** Actions driven from a row rather than the footer. */
 const ROW_ACTIONS = new Set(['ADD_SETTLEMENT', 'REMOVE_SETTLEMENT', 'REMOVE_LINE']);
@@ -72,13 +74,6 @@ interface ContractGroup {
   contract_id: number | null;
   contract_code: string | null;
   lines: FundBillLine[];
-  net: number;
-}
-
-/** A line's contribution to the document's net: toward the party, or back. */
-function signedAmount(line: FundBillLine): number {
-  if (line.direction === 'MEMO') return 0;
-  return line.direction === 'TO_PARTY' ? line.amount : -line.amount;
 }
 
 interface FundBillDetailPanelProps {
@@ -101,7 +96,11 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
   const payments = useFundBillPayments(billId);
   const log = useFundBillLog(billId);
   const transfers = useFundBillDeviceTransfers(billId);
+  const settlements = useFundBillSettlements(
+    lines.rows.flatMap(l => (l.settlement_id != null ? [l.settlement_id] : [])),
+  );
 
+  const [issueOpen, setIssueOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [voidOpen, setVoidOpen] = useState(false);
   const [creditNoteOpen, setCreditNoteOpen] = useState(false);
@@ -181,13 +180,16 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
         contract_id: line.contract_id,
         contract_code: line.contract_code,
         lines: [],
-        net: 0,
       };
       contractGroups.push(group);
     }
     group.lines.push(line);
-    group.net += signedAmount(line);
   }
+  /** Each contract's figure is its payment request's own net — what the shop
+   *  gets for it. Never the lines added up: that counts the company's
+   *  commission as going to the shop (lessons-learned §9). */
+  const settlementNet = (id: number | null) =>
+    settlements.rows.find(s => s.settlement_id === id)?.net_amount ?? null;
   const manualLines = documentLines.filter(l => l.is_manual);
 
   const footerActions = (actions?.actions ?? [])
@@ -200,7 +202,8 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
     (actions?.actions ?? []).some(a => a.action_code === code && a.is_available);
 
   const runAction = (code: string) => {
-    if (code === 'PAY') setPayOpen(true);
+    if (code === 'ISSUE') setIssueOpen(true);
+    else if (code === 'PAY') setPayOpen(true);
     else if (code === 'VOID') setVoidOpen(true);
     else if (code === 'CREDIT_NOTE') setCreditNoteOpen(true);
     else if (code === 'ADD_LINE') setAddLineOpen(true);
@@ -215,7 +218,7 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
 
     if (!wired) {
       endIcon = <Wrench size={12} />;
-      lines.push(t('actionNotImplemented', { defaultValue: 'Not yet wired in this page' }));
+      lines.push(t('contract.actionNotImplemented'));
     }
     if (!a.is_available && a.blocking_reason) {
       lines.push(blockingReasonText(a, t));
@@ -415,7 +418,7 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
                             </span>
                             <span className="flex-1" />
                             <span className="text-sm tabular-nums shrink-0 font-medium">
-                              {fmtCurrency(group.net)}
+                              {fmtCurrency(settlementNet(group.settlement_id))}
                             </span>
                           </div>
                           {/* The contract is where finance goes to check what was
@@ -642,6 +645,7 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
         </div>
       )}
 
+      <FundBillIssueModal open={issueOpen} bill={bill} onClose={() => setIssueOpen(false)} />
       <FundBillPayModal open={payOpen} bill={bill} onClose={() => setPayOpen(false)} />
       <FundBillVoidModal open={voidOpen} bill={bill} onClose={() => setVoidOpen(false)} />
       <FundBillCreditNoteModal open={creditNoteOpen} bill={bill} onClose={() => setCreditNoteOpen(false)} />
@@ -660,7 +664,7 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
         settlementId={removeSettlement?.settlement_id ?? null}
         settlementCode={removeSettlement?.settlement_code ?? null}
         contractCode={removeSettlement?.contract_code ?? null}
-        netAmount={removeSettlement?.net ?? 0}
+        netAmount={settlementNet(removeSettlement?.settlement_id ?? null)}
         onClose={() => setRemoveSettlement(null)}
       />
       <FundBillRemoveLineModal

@@ -23,7 +23,8 @@ interface FundBillRemoveSettlementModalProps {
   settlementId: number | null;
   settlementCode: string | null;
   contractCode: string | null;
-  netAmount: number;
+  /** The payment request's own net, as the backend states it. */
+  netAmount: number | null;
   onClose: () => void;
 }
 

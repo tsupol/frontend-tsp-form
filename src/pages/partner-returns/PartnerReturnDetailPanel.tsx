@@ -131,7 +131,7 @@ export function PartnerReturnDetailPanel({ returnId, isMobile, onBack, queueRow 
 
     if (!wired) {
       endIcon = <Wrench size={12} />;
-      lines.push(t('actionNotImplemented', { defaultValue: 'Not yet wired in this page' }));
+      lines.push(t('contract.actionNotImplemented'));
     }
     if (!a.is_available && a.blocking_reason) {
       lines.push(blockingReasonText(a, t));

@@ -259,6 +259,26 @@ export function PanelProductPlan(_props: Props) {
 
   const assets = assetResults ?? [];
 
+  // A shop's phone already sitting in another contract's open approval request
+  // is refused only when this contract is sent (PARTNER.VALIDATION.ASSET_IN_OPEN_CASE).
+  // The shop's own requests say which phone each one holds, so mark those here
+  // instead of letting the shop find out at send. Open = the backend's
+  // _partner_case_asset_blocker: latest request still open, contract not yet
+  // active and not closed — which the view exposes as these three outcomes.
+  const { data: heldAssets } = useQuery({
+    queryKey: ['partner-held-assets', branchId],
+    queryFn: () => apiClient.get<{ contract_id: number; contract_code: string; target_asset_id: number | null }[]>(
+      '/v_partner_my_cases?is_latest=eq.true&outcome=in.(PENDING,IN_FORCE,EXPIRED)&select=contract_id,contract_code,target_asset_id',
+    ),
+    staleTime: 30_000,
+    enabled: isPartnerBranch && sourceTab === 'instock',
+  });
+  const thisContractId = contract?.id ?? wizardData.contractId;
+  const heldBy = new Map<number, string>();
+  for (const c of heldAssets ?? []) {
+    if (c.target_asset_id != null && c.contract_id !== thisContractId) heldBy.set(c.target_asset_id, c.contract_code);
+  }
+
   // ── NEW: Restore from server state ──────────────────────────────────
 
   const restoredRef = useRef(false);
@@ -407,7 +427,12 @@ export function PanelProductPlan(_props: Props) {
           financed_amount: q.financed_amount,
           cost_price: q.cost_price,
           interest_percent_total: q.interest_percent,
-          fin2_profit_amount: q.profit_percent != null ? q.cost_price * q.profit_percent / 100 : null,
+          // The quote states no profit figure, only its (rounded) total — so
+          // profit is read off that total, never re-worked from the percent,
+          // or cost + profit drifts from the total the backend will charge.
+          fin2_profit_amount: q.profit_percent != null && q.total_amount != null
+            ? q.total_amount - q.cost_price
+            : null,
         });
       }
       return rows;
@@ -1060,13 +1085,27 @@ export function PanelProductPlan(_props: Props) {
                   <div className="flex items-center justify-center h-full text-subtle text-sm">{t('wizard.noAssetsFound')}</div>
                 ) : (
                   <div className="flex flex-col">
-                    {assets.map(asset => (
-                      <button key={asset.asset_id} className="w-full text-left px-4 py-2.5 border-b border-line cursor-pointer transition-colors hover:bg-surface-hover" onClick={() => handleSelectAsset(asset)}>
+                    {assets.map(asset => {
+                      const heldByCode = heldBy.get(asset.asset_id);
+                      return (
+                      <button
+                        key={asset.asset_id}
+                        type="button"
+                        disabled={!!heldByCode}
+                        className={`w-full text-left px-4 py-2.5 border-b border-line transition-colors ${heldByCode ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-surface-hover'}`}
+                        onClick={() => handleSelectAsset(asset)}
+                      >
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-sm">{asset.asset_code}</span>
                           <span className={`text-xs font-medium ${getConditionTextColor(asset.condition_grade)}`}>
                             {getConditionLabel(asset.condition_grade, t)}
                           </span>
+                          {heldByCode && (
+                            <span className="ml-auto text-xs text-warning-fg inline-flex items-center gap-1">
+                              <AlertTriangle size={12} />
+                              {t('wizard.assetHeldByCase', { code: heldByCode })}
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-1.5 text-xs text-subtle min-w-0">
                           {asset.physical_color && (asset.master_color_hex || asset.master_color_name_en) && (
@@ -1080,7 +1119,8 @@ export function PanelProductPlan(_props: Props) {
                           {asset.serial_no && <span>S/N: {asset.serial_no}</span>}
                         </div>
                       </button>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

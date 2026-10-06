@@ -288,6 +288,11 @@ export interface FundBillPayResult {
   devices: FundBillPaidDevice[] | null;
 }
 
+export interface FundBillIssueResult {
+  bill_id: number;
+  status: FundBillStatus;
+}
+
 export interface FundBillVoidResult {
   bill_id: number;
   status: FundBillStatus;
