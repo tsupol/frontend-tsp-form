@@ -12,7 +12,7 @@ import {
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  fmtCurrency, toLocalDateStr, parseLocalDate, makeDateRangePickerFormat,
+  fmtCurrency, toLocalDateStr, parseLocalDate, makeDateRangePickerFormat, formatDateTime,
 } from '../../lib/format';
 import { downloadCsv } from '../../lib/csv';
 import { printWithMarker } from '../../lib/printDoc';
@@ -210,7 +210,7 @@ export function RetailSalesByTypeReportPage() {
   const scopeLabel = selectedBranch?.name
     ?? selectedCompany?.name
     ?? t('retailSales.allBranches');
-  const reportSubtitle = `${scopeLabel} · ${fromDate} — ${toDate}`;
+  const reportSubtitle = `${scopeLabel} · ${formatDateTime(fromDate, i18n.language, false)} — ${formatDateTime(toDate, i18n.language, false)}`;
   const hasData = rows.some((r) => r.sale_qty > 0 || r.gift_qty > 0 || r.return_qty > 0);
 
   const selectedRow = rows.find((r) => r.acc_type === selectedType) ?? null;

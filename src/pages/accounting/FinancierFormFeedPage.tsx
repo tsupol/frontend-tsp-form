@@ -14,7 +14,7 @@ import { apiClient } from '../../lib/api';
 import { ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import {
-  toLocalDateStr, parseLocalDate, makeDateRangePickerFormat, fmtCurrency,
+  toLocalDateStr, parseLocalDate, makeDateRangePickerFormat, fmtCurrency, formatDateTime,
 } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
@@ -527,10 +527,7 @@ function FormChoicePicker({
   });
   const forms = data?.forms ?? [];
 
-  const fmt = (iso: string) => {
-    const d = parseLocalDate(iso);
-    return d ? d.toLocaleDateString(i18n.language === 'th' ? 'th-TH' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : iso;
-  };
+  const fmt = (iso: string) => formatDateTime(iso, i18n.language, false);
 
   const options = [
     { value: '', label: t('financierForm.formChoiceAuto') },

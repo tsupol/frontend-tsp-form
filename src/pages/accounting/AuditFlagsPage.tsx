@@ -106,7 +106,7 @@ export function AuditFlagsPage() {
                 {isRoot
                   ? t('nav.auditFlags')
                   : selected
-                    ? `${selected.branch_name} · ${selected.close_date}`
+                    ? <>{selected.branch_name} · <DateTime value={selected.close_date} showTime={false} /></>
                     : t('nav.auditFlags')}
               </div>
               <div className="mobile-header-end w-12" />

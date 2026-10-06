@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { apiClient, ApiError } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
-import { formatSmart } from '../lib/format';
+import { formatDateTime, formatSmart } from '../lib/format';
 import { DateTime } from './DateTime';
 import { CustomerActivityModal } from './CustomerActivityModal';
 import { ResetCustomerLoginModal } from './ResetCustomerLoginModal';
@@ -37,7 +37,7 @@ interface Props {
 }
 
 export function CustomerLoginCard({ customer, onChanged, noCard = false }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { can } = useAuth();
   const allowed = can('CONTRACT.CUSTOMER_RESET_PASSWORD');
 
@@ -86,10 +86,7 @@ export function CustomerLoginCard({ customer, onChanged, noCard = false }: Props
                     <Lock size={10} className="mr-0.5" />
                     {customer.locked_until
                       ? t('customer.login.lockedUntil', {
-                          until: new Date(customer.locked_until).toLocaleString('th-TH-u-ca-gregory', {
-                            timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit',
-                            day: 'numeric', month: 'short',
-                          }),
+                          until: formatDateTime(customer.locked_until, i18n.language, true),
                         })
                       : t('customer.login.locked')}
                   </Badge>

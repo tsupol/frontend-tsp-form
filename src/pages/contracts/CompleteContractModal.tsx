@@ -8,6 +8,7 @@ import { useBillSettle } from '../../hooks/useBillSettle';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { BranchPaymentAccountField } from '../../components/BranchPaymentAccountField';
 import { fmtCurrency } from '../../lib/format';
+import { DateTime } from '../../components/DateTime';
 import { useWalletAvailable, useWalletActions } from './wallet/useWallet';
 import { WalletActionForm } from './wallet/WalletActionModal';
 import type { WalletType, WalletAction } from './wallet/types';
@@ -1878,7 +1879,7 @@ function ConflictView({
           {t('contract.earlyPayoff_conflictTotal', { defaultValue: 'Total' })}: {fmtCurrency(conflictBill.bill_total)} · {conflictBill.bill_status}
         </div>
         <div className="text-xs text-subtle">
-          {t('contract.earlyPayoff_conflictCreated', { defaultValue: 'Created' })}: {conflictBill.created_at}
+          {t('contract.earlyPayoff_conflictCreated', { defaultValue: 'Created' })}: <DateTime value={conflictBill.created_at || null} />
         </div>
       </div>
 

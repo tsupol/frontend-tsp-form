@@ -13,6 +13,7 @@ import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { translateApiError } from '../../lib/apiErrors';
 import { SearchInput } from '../../components/SearchInput';
+import { DateTime } from '../../components/DateTime';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -57,19 +58,6 @@ interface PinForm {
 }
 
 type Tab = 'change' | 'usage';
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatBangkokTime(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', {
-    timeZone: 'Asia/Bangkok',
-    day: '2-digit',
-    month: '2-digit',
-    year: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
 
 // ── Set PIN Modal ────────────────────────────────────────────────────────────
 
@@ -262,7 +250,7 @@ function ChangeLogTab({ branches, onSetPin }: { branches: Branch[]; onSetPin: (b
       accessorKey: 'set_at',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('settings.pin.setAt')} />,
       cell: ({ row }) => (
-        <span className="text-xs tabular-nums text-subtle">{formatBangkokTime(row.original.set_at)}</span>
+        <DateTime value={row.original.set_at} className="text-xs tabular-nums text-subtle" />
       ),
     },
     {
@@ -344,7 +332,7 @@ function ChangeLogTab({ branches, onSetPin }: { branches: Branch[]; onSetPin: (b
                       </Badge>
                     </div>
                     <div className="text-xs text-subtle mt-0.5">{row.set_by_name}</div>
-                    <div className="text-xs text-fg/40 mt-0.5 tabular-nums">{formatBangkokTime(row.set_at)}</div>
+                    <div className="text-xs text-fg/40 mt-0.5 tabular-nums"><DateTime value={row.set_at} /></div>
                   </div>
                   <Button
                     size="sm"
@@ -456,7 +444,7 @@ function UsageLogTab({ branches, permissionOptions }: { branches: Branch[]; perm
       accessorKey: 'used_at',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('settings.pin.usedAt')} />,
       cell: ({ row }) => (
-        <span className="text-xs tabular-nums text-subtle">{formatBangkokTime(row.original.used_at)}</span>
+        <DateTime value={row.original.used_at} className="text-xs tabular-nums text-subtle" />
       ),
     },
   ];
@@ -599,7 +587,7 @@ function UsageLogTab({ branches, permissionOptions }: { branches: Branch[]; perm
                       </Badge>
                     </div>
                     <div className="text-xs text-subtle mt-0.5">{log.branch_name} · {log.permission_code}</div>
-                    <div className="text-xs text-fg/40 mt-0.5 tabular-nums">{formatBangkokTime(log.used_at)}</div>
+                    <div className="text-xs text-fg/40 mt-0.5 tabular-nums"><DateTime value={log.used_at} /></div>
                   </div>
                 </div>
               ))}

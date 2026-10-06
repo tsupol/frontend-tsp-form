@@ -15,7 +15,7 @@ import { apiClient } from '../../lib/api';
 import { wsClient } from '../../lib/api/ws';
 import { useAuth } from '../../contexts/AuthContext';
 import { useChatDock } from '../../contexts/ChatDockContext';
-import { fmtCurrency, formatSmart } from '../../lib/format';
+import { fmtCurrency, formatDateTime, formatSmart } from '../../lib/format';
 import { DateTime } from '../../components/DateTime';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
 import { normalizeKey, toStoragePath } from '../../lib/mediaPath';
@@ -1349,7 +1349,7 @@ function Bubble({ message, isStaff, onOpenImage }: {
   isStaff: boolean;
   onOpenImage: (key: string) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const bubbleClass = isStaff
     ? 'bg-primary text-primary-contrast'
     : 'bg-surface';
@@ -1392,7 +1392,7 @@ function Bubble({ message, isStaff, onOpenImage }: {
   return (
     <div
       className={`rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap break-words ${bubbleClass}`}
-      title={new Date(message.created_at).toLocaleString()}
+      title={formatDateTime(message.created_at, i18n.language, true)}
     >
       {message.message_text ?? (
         <span className="text-subtle italic">

@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
-import { toLocalDateStr, parseLocalDate, makeDateRangePickerFormat } from '../../lib/format';
+import { toLocalDateStr, parseLocalDate, makeDateRangePickerFormat, formatDateTime } from '../../lib/format';
 import { downloadCsv } from '../../lib/csv';
 import { printWithMarker } from '../../lib/printDoc';
 import { ContractableToggle, type Contractable } from './ContractableToggle';
@@ -140,7 +140,7 @@ export function LotIntakeByModelReportPage() {
     ? t('lotIntake.kindAll')
     : contractable ? t('lotIntake.kindDevice') : t('lotIntake.kindRetail');
   const channelLabel = channel ? t(`lotIntake.channel.${channel}`) : t('lotIntake.allChannels');
-  const reportSubtitle = `${scopeLabel} · ${fromDate} — ${toDate} · ${kindLabel} · ${channelLabel}`;
+  const reportSubtitle = `${scopeLabel} · ${formatDateTime(fromDate, i18n.language, false)} — ${formatDateTime(toDate, i18n.language, false)} · ${kindLabel} · ${channelLabel}`;
 
   const companyOptions = companies.map((c) => ({ value: String(c.id), label: c.name }));
   const branchOptions = branches.map((b) => ({ value: String(b.id), label: b.name }));

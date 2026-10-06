@@ -45,12 +45,6 @@ function grandTotal(rows: ExpenseReportRow[]): number {
   return rows.reduce((sum, r) => sum + (r.amount ?? 0), 0);
 }
 
-/** Short display date DD/MM/YYYY from an ISO date string (no TZ shift). */
-function shortDate(iso: string): string {
-  const [y, m, d] = iso.slice(0, 10).split('-');
-  return `${d}/${m}/${y}`;
-}
-
 /** Recorded-by display — the view already resolves firstname/nickname/username. */
 function recordedBy(r: ExpenseReportRow): string {
   return r.recorded_by_name ?? '—';
@@ -82,7 +76,7 @@ export async function downloadExpenseReportPdf(
   content.push({ text: t('branchExpense.report.title'), fontSize: 15, bold: true });
   content.push({ text: meta.scopeLabel, fontSize: 11, margin: [0, 2, 0, 0] });
   content.push({
-    text: t('branchExpense.report.dateRange', { from: shortDate(meta.fromDate), to: shortDate(meta.toDate) }),
+    text: t('branchExpense.report.dateRange', { from: formatDateTime(meta.fromDate, meta.lang, false), to: formatDateTime(meta.toDate, meta.lang, false) }),
     fontSize: 10, color: GREY, margin: [0, 1, 0, 8],
   });
 
@@ -122,7 +116,7 @@ export async function downloadExpenseReportPdf(
         margin: [0, 1.5, 0, 1.5],
       };
       body.push([
-        { text: shortDate(r.expense_date), fontSize: 9, margin: [0, 1.5, 0, 1.5] },
+        { text: formatDateTime(r.expense_date, meta.lang, false), fontSize: 9, margin: [0, 1.5, 0, 1.5] },
         itemCell,
         recordedCell,
         { text: r.payment_method_name_th ?? '—', fontSize: 9, margin: [0, 1.5, 0, 1.5] },
@@ -270,7 +264,7 @@ export async function downloadExpenseReportFlatPdf(
   content.push({ text: t('branchExpense.report.title'), fontSize: 15, bold: true });
   content.push({ text: meta.scopeLabel, fontSize: 11, margin: [0, 2, 0, 0] });
   content.push({
-    text: t('branchExpense.report.dateRange', { from: shortDate(meta.fromDate), to: shortDate(meta.toDate) }),
+    text: t('branchExpense.report.dateRange', { from: formatDateTime(meta.fromDate, meta.lang, false), to: formatDateTime(meta.toDate, meta.lang, false) }),
     fontSize: 10, color: GREY, margin: [0, 1, 0, 8],
   });
 
@@ -286,7 +280,7 @@ export async function downloadExpenseReportFlatPdf(
 
   for (const r of rows) {
     body.push([
-      { text: shortDate(r.expense_date), fontSize: 9, margin: [0, 1.5, 0, 1.5] },
+      { text: formatDateTime(r.expense_date, meta.lang, false), fontSize: 9, margin: [0, 1.5, 0, 1.5] },
       { text: flatItemLabel(r), fontSize: 9, margin: [0, 1.5, 0, 1.5] },
       { text: fmtCurrency(r.amount), fontSize: 9, alignment: 'right', margin: [0, 1.5, 0, 1.5] },
     ]);

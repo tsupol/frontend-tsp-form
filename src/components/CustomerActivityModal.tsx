@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Modal, Badge } from 'tsp-form';
 import { CheckCircle, XCircle, User, Shield, Cog, Smartphone, Loader2 } from 'lucide-react';
 import { apiClient } from '../lib/api';
-import { formatSmart } from '../lib/format';
+import { formatDateTime, formatSmart } from '../lib/format';
 
 type AuditAction =
   | 'LOGIN_RESET' | 'USERNAME_CHANGED' | 'PASSWORD_CHANGED'
@@ -138,15 +138,12 @@ function bucketByDay<T extends { occurred_at: string }>(rows: T[], lang: string)
   const bkk = new Date(now.getTime() + 7 * 60 * 60 * 1000);
   const today = bkk.toISOString().slice(0, 10);
   const yest = new Date(bkk.getTime() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const locale = lang === 'th' ? 'th-TH-u-ca-gregory' : 'en-GB';
 
   return [...map.entries()].map(([key, items]) => {
     let label: string;
     if (key === today) label = lang === 'th' ? 'วันนี้' : 'Today';
     else if (key === yest) label = lang === 'th' ? 'เมื่อวาน' : 'Yesterday';
-    else label = new Date(`${key}T00:00:00+07:00`).toLocaleDateString(locale, {
-      day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Bangkok',
-    });
+    else label = formatDateTime(`${key}T00:00:00+07:00`, lang, false);
     return { key, label, items };
   });
 }

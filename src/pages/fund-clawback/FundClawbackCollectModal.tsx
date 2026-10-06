@@ -16,6 +16,7 @@ import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { ActionDoneView } from '../contracts/ActionDoneView';
+import { DateTime } from '../../components/DateTime';
 import { fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../../lib/format';
 import { useFundSourceAccounts } from '../fund-bills/useFundBills';
 import { useFundClawbackInvalidate } from './useFundClawback';
@@ -219,7 +220,7 @@ export function FundClawbackCollectModal({ open, bill, onClose }: FundClawbackCo
             headline={t('fundClawback.collectedHeadline')}
             contractCode={result.bill_code}
             detailRows={[
-              { label: t('fundClawback.receivedOn'), value: result.paid_date },
+              { label: t('fundClawback.receivedOn'), value: <DateTime value={result.paid_date} showTime={false} /> },
               { label: t('fundClawback.amount'), value: fmtCurrency(result.amount), emphasis: true },
             ]}
             onClose={forceClose}

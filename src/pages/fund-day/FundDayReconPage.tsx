@@ -205,7 +205,7 @@ export function FundDayReconPage() {
               onClick={() => navigate(`/admin/fund-day-money?date=${account.first_unsaved_date}`)}
               className="text-primary-fg hover:underline bg-transparent border-none p-0 cursor-pointer text-xs text-left"
             >
-              {t('fundDay.firstUnsaved')}: {account.first_unsaved_date}
+              {t('fundDay.firstUnsaved')}: <DateTime value={account.first_unsaved_date} showTime={false} />
             </button>
           )}
           <div className="flex items-center justify-between gap-2">

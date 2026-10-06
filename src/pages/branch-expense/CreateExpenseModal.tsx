@@ -8,6 +8,7 @@ import {
 import { Calendar, Keyboard, CheckCircle } from 'lucide-react';
 import { MultiImageUploader } from '../../components/MultiImageUploader';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
+import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
 import { apiClient, ApiError } from '../../lib/api';
 import {
@@ -209,7 +210,7 @@ export function CreateExpenseModal({ open, onClose, onSaved, items, branches, fi
                   )}
                 </div>
                 <div className="text-xs text-subtle">
-                  {savedEntry.expense_date}
+                  <DateTime value={savedEntry.expense_date} showTime={false} />
                   {savedEntry.image_count > 0 && ` · ${savedEntry.image_count} ${t('branchExpense.photos').toLowerCase()}`}
                 </div>
               </div>

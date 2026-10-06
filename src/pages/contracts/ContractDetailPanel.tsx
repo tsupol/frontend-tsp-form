@@ -21,7 +21,7 @@ import { useChatDock } from '../../contexts/ChatDockContext';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { ColorSwatch } from '../../components/ColorAutocomplete';
-import { fmtCurrency } from '../../lib/format';
+import { fmtCurrency, formatDateTime } from '../../lib/format';
 import { getStateColor, getStateLabel, productName, formatInstallment } from './contractUtils';
 import { ContractActionButtons } from './ContractActions';
 import { PartnerCaseCard } from '../partner-cases/PartnerCaseCard';
@@ -2650,6 +2650,7 @@ const SITUATION_PILL_COLOR: Record<string, 'success' | 'warning' | 'danger' | 'i
 };
 
 function PaymentProgressBlock({ contract, t }: { contract: ContractDetail; t: (k: string, o?: Record<string, unknown>) => string }) {
+  const { i18n } = useTranslation();
   if (contract.paid_installment_count == null || contract.total_installments == null) return null;
 
   const paid = contract.paid_installment_count;
@@ -2770,7 +2771,7 @@ function PaymentProgressBlock({ contract, t }: { contract: ContractDetail; t: (k
           <CalendarClock size={15} className="text-warning-fg shrink-0 mt-0.5" />
           <div className="text-xs">
             <div className="font-medium">
-              {t('contract.appointmentStrip', { date: contract.appointment_date })}
+              {t('contract.appointmentStrip', { date: formatDateTime(contract.appointment_date, i18n.language, false) })}
               {contract.appointment_note ? ` — "${contract.appointment_note}"` : ''}
             </div>
             <div className="text-subtle mt-0.5">{t('contract.appointmentNote')}</div>

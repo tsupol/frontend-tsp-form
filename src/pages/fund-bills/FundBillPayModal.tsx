@@ -21,6 +21,7 @@ import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { ActionDoneView } from '../contracts/ActionDoneView';
+import { DateTime } from '../../components/DateTime';
 import { fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../../lib/format';
 import { useFundBillInvalidate, useFundSourceAccounts } from './useFundBills';
 import type { FundBill, FundBillPayResult } from './fundBillTypes';
@@ -216,7 +217,7 @@ export function FundBillPayModal({ open, bill, onClose }: FundBillPayModalProps)
               toColor: 'success',
             }}
             detailRows={[
-              { label: t('fundBill.paidDate'), value: result.paid_date },
+              { label: t('fundBill.paidDate'), value: <DateTime value={result.paid_date} showTime={false} /> },
               { label: t('fundBill.branchTransferred'), value: fmtCurrency(result.branch_net), emphasis: true },
               { label: t('fundBill.companyRecorded'), value: fmtCurrency(result.company_net) },
               ...(result.source_account_display

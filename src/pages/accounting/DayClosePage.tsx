@@ -14,7 +14,7 @@ import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { defaultScopeFor, scopeKey, scopeQuery } from '../../lib/scope';
 import { DateTime } from '../../components/DateTime';
-import { toLocalDateStr, parseLocalDate, makeDatePickerFormat, fmtCurrency } from '../../lib/format';
+import { toLocalDateStr, parseLocalDate, makeDatePickerFormat, fmtCurrency, formatDateTime } from '../../lib/format';
 import {
   type Branch, type BranchTodaySummaryRow, type DayCloseHistoryRow, type DayCloseAuditRow,
   type UnclosedDayRow, type DayCloseBreakdownRow, type ReconcileChannelResult,
@@ -256,9 +256,9 @@ export function DayClosePage() {
   };
 
   const detailTitle = selectedClose
-    ? `${t('nav.dayClose')} — ${selectedClose.close_date}`
+    ? `${t('nav.dayClose')} — ${formatDateTime(selectedClose.close_date, i18n.language, false)}`
     : selectedUnclosedDate
-      ? `${t('nav.dayClose')} — ${selectedUnclosedDate}`
+      ? `${t('nav.dayClose')} — ${formatDateTime(selectedUnclosedDate, i18n.language, false)}`
       : selectedIsToday
         ? `${t('nav.dayClose')} — ${t('accounting.dayClose.todayLabel')}`
         : t('nav.dayClose');

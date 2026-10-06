@@ -9,7 +9,7 @@ import {
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  fmtCurrency, toLocalDateStr, parseLocalDate, makeDateRangePickerFormat,
+  fmtCurrency, toLocalDateStr, parseLocalDate, makeDateRangePickerFormat, formatDateTime,
 } from '../../lib/format';
 import { downloadCsv } from '../../lib/csv';
 import { printWithMarker } from '../../lib/printDoc';
@@ -133,7 +133,7 @@ export function ServiceFeeByTypeReportPage() {
   const selectedBranch = branches.find((b) => String(b.id) === branchId);
   const selectedCompany = companies.find((c) => String(c.id) === companyId);
   const scopeLabel = selectedBranch?.name ?? selectedCompany?.name ?? t('serviceFee.allBranches');
-  const reportSubtitle = `${scopeLabel} · ${fromDate} — ${toDate}`;
+  const reportSubtitle = `${scopeLabel} · ${formatDateTime(fromDate, i18n.language, false)} — ${formatDateTime(toDate, i18n.language, false)}`;
 
   const companyOptions = companies.map((c) => ({ value: String(c.id), label: c.name }));
   const branchOptions = branches.map((b) => ({ value: String(b.id), label: b.name }));
