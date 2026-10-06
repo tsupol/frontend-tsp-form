@@ -210,8 +210,9 @@ function BillExpand({ billId }: { billId: number }) {
 
   const lines = detail.line_items ?? [];
   const payments = detail.payments ?? [];
-  const lineTotal = lines.reduce((s, l) => s + l.amount, 0);
-  const payTotal = payments.reduce((s, p) => s + p.amount, 0);
+  // The bill's own figures — never the rows added up (lessons-learned §9).
+  const lineTotal = detail.total_amount;
+  const payTotal = detail.paid_amount;
   const balanced = Math.abs(lineTotal - payTotal) < 0.01;
 
   return (

@@ -583,7 +583,15 @@ export function BuybackDetailPanel({
   const navigate = useNavigate();
 
   const lines = detail.lines ?? [];
-  const totalPrice = lines.reduce((sum, l) => sum + (l.buyback_price ?? l.unit_cost), 0);
+  // The order's own total from the list view — never the lines added up here
+  // (lessons-learned §9). The detail view carries no total, and this panel is
+  // also opened from Approvals where no list row is at hand, so it asks.
+  const { data: totalPrice = null } = useQuery({
+    queryKey: ['buyback-orders', 'total', detail.po_id],
+    queryFn: () => apiClient
+      .get<Array<{ total_price: number }>>(`/v_buyback_list?id=eq.${detail.po_id}&select=total_price`)
+      .then(rows => rows[0]?.total_price ?? null),
+  });
 
   // Backend-driven action catalog (mig 114, 2026-05-27). Pattern mirrors
   // AssetsPage: show every action returned, primaries as quick buttons,
@@ -1170,7 +1178,7 @@ function BuybackActionModal({
   action: BuybackActionKind | null;
   onClose: () => void;
   detail: BuybackDetail;
-  totalPrice: number;
+  totalPrice: number | null;
   t: ReturnType<typeof useTranslation>['t'];
   onSuccess: () => void;
 }) {
@@ -1416,7 +1424,7 @@ function BuybackNoteEditModal({
   open: boolean;
   onClose: () => void;
   detail: BuybackDetail;
-  totalPrice: number;
+  totalPrice: number | null;
   t: ReturnType<typeof useTranslation>['t'];
   onSuccess: () => void;
 }) {

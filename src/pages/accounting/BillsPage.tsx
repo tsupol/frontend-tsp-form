@@ -550,8 +550,9 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
 
   const lines = detail.line_items ?? [];
   const existingPayments = detail.payments ?? [];
-  const lineTotal = lines.reduce((s, l) => s + l.extended_amount, 0);
-  const existingPayTotal = existingPayments.reduce((s, p) => s + p.amount, 0);
+  // The bill's own figures — never the rows added up (lessons-learned §9).
+  const lineTotal = detail.total_amount;
+  const existingPayTotal = detail.paid_amount;
   // Reversal rows (is_reversal) are bookkeeping mirrors — don't list them as their
   // own line. Instead, an original is "voided" when some reversal targets its id.
   const voidedPaymentIds = new Set(

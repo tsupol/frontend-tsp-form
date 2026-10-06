@@ -381,6 +381,22 @@ export function ReceivingPage() {
 // Detail panel
 // ============================================================================
 
+/**
+ * The receipt's own totals from the list view. The detail view carries none,
+ * and the lines are never added up here (lessons-learned §9).
+ */
+function useReceiptTotals(receiptId: number) {
+  const { data } = useQuery({
+    queryKey: ['receipts', 'totals', receiptId],
+    queryFn: () => apiClient
+      .get<Array<{ total_qty: number | null; total_amount: number | null }>>(
+        `/v_receipts?id=eq.${receiptId}&select=total_qty,total_amount`,
+      )
+      .then(rows => rows[0] ?? null),
+  });
+  return data ?? null;
+}
+
 function ReceiptDetailPanel({
   detail,
   loading,
@@ -403,6 +419,7 @@ function ReceiptDetailPanel({
 
   const isDraft = detail.status === 'DRAFT';
   const lines = detail.lines ?? [];
+  const totals = useReceiptTotals(detail.receipt_id);
   const hasLines = lines.length > 0;
   const canEdit = isDraft && ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
 
@@ -443,7 +460,7 @@ function ReceiptDetailPanel({
         <div>
           <div className="text-xs text-subtle mb-0.5">{t('receiving.totalAmount')}</div>
           <div className="font-semibold text-xs leading-5 tabular-nums">
-            {fmtCurrency(lines.reduce((sum, l) => sum + l.line_total, 0))}
+            {fmtCurrency(totals?.total_amount)}
           </div>
         </div>
       </div>
@@ -751,8 +768,9 @@ function ConfirmReceiptModal({
   });
 
   const lines = detail.lines ?? [];
-  const totalQty = lines.reduce((sum, l) => sum + l.qty_received, 0);
-  const totalAmount = lines.reduce((sum, l) => sum + l.line_total, 0);
+  const totals = useReceiptTotals(detail.receipt_id);
+  const totalQty = totals?.total_qty ?? null;
+  const totalAmount = totals?.total_amount ?? null;
 
   // When user dismisses the done view, fire onSuccess so parent invalidates queries
   const handleDoneClose = () => {

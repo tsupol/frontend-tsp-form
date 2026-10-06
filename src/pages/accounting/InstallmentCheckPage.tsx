@@ -141,12 +141,18 @@ export function InstallmentCheckPage() {
   };
   const rows = (data?.rows ?? []).filter(rowInSelectedChannel);
 
-  // Summary is recomputed from the filtered rows so counted/reversed and the
-  // per-channel chips reflect the front/back selection, not the raw RPC totals.
+  // The RPC's own totals whenever the front/back transfer split drops nothing.
+  // Only when it does (one transfer channel on, the other off) is there no
+  // server figure for what is left, and the shown rows are added up instead.
+  const splitDropsRows = !!data && rows.length !== data.rows.length;
   const countedRows = rows.filter(r => !r.is_reversed);
-  const countedTotal = countedRows.reduce((s, r) => s + r.amount, 0);
+  const countedTotal = splitDropsRows || !data
+    ? countedRows.reduce((s, r) => s + r.amount, 0)
+    : data.total_amount;
   const reversedRows = rows.filter(r => r.is_reversed);
-  const reversedTotal = reversedRows.reduce((s, r) => s + r.amount, 0);
+  const reversedTotal = splitDropsRows || !data
+    ? reversedRows.reduce((s, r) => s + r.amount, 0)
+    : data.reversed_total;
 
   const toggleChannel = (c: string) => {
     const current = selectedChannels ?? [...CHANNEL_OPTIONS];

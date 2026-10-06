@@ -28,6 +28,7 @@ import {
   usePartnerMyFundBills,
   usePartnerMyFundBillLines,
   usePartnerMyFundBillPayments,
+  usePartnerMyFundBillSettlements,
 } from './usePartnerSettlement';
 import {
   payoutBadgeColor,
@@ -204,18 +205,24 @@ interface ContractGroup {
   contract_id: number | null;
   contract_code: string | null;
   lines: PartnerMyFundBillLine[];
-  net: number;
 }
 
 function ShopFundBillPanel({ bill }: { bill: PartnerMyFundBill }) {
   const { t, i18n } = useTranslation();
   const lines = usePartnerMyFundBillLines(bill.bill_id);
   const payments = usePartnerMyFundBillPayments(bill.bill_id);
+  // Each contract's net comes from its payment request, not from the lines:
+  // the shop's line view leaves out company-owned lines (the contract fee)
+  // that still come off what the shop receives.
+  const settlements = usePartnerMyFundBillSettlements(
+    lines.rows.flatMap(l => (l.settlement_id != null ? [l.settlement_id] : [])),
+  );
+  const settlementNet = (id: number | null) =>
+    settlements.rows.find(s => s.settlement_id === id)?.net_amount ?? null;
 
   const byContract: ContractGroup[] = [];
   const manual: PartnerMyFundBillLine[] = [];
   for (const line of lines.rows) {
-    const signed = line.direction === 'TO_PARTY' ? line.amount : -line.amount;
     if (line.is_manual) { manual.push(line); continue; }
     let group = byContract.find(g => g.settlement_id === line.settlement_id);
     if (!group) {
@@ -225,12 +232,10 @@ function ShopFundBillPanel({ bill }: { bill: PartnerMyFundBill }) {
         contract_id: line.contract_id,
         contract_code: line.contract_code,
         lines: [],
-        net: 0,
       };
       byContract.push(group);
     }
     group.lines.push(line);
-    group.net += signed;
   }
 
   const lineLabel = (line: PartnerMyFundBillLine) =>
@@ -296,7 +301,7 @@ function ShopFundBillPanel({ bill }: { bill: PartnerMyFundBill }) {
                   </span>
                   <span className="flex-1" />
                   <span className="text-sm tabular-nums font-medium shrink-0">
-                    {fmtCurrency(group.net)}
+                    {fmtCurrency(settlementNet(group.settlement_id))}
                   </span>
                 </div>
                 <div className="px-3 pb-0.5 text-xs text-subtle">{group.settlement_code ?? '—'}</div>
