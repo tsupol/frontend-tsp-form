@@ -41,6 +41,8 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
   const [activeTab, setActiveTab] = useState<ConfigTab>('values');
   // Unsaved edits in the document-info section, which owns its own Save button.
   const [docDirty, setDocDirty] = useState(false);
+  // Changes held back while the user confirms setting app removal to 0.
+  const [confirmZero, setConfirmZero] = useState<Record<string, number | boolean> | null>(null);
 
   const { data: config, isLoading } = useQuery({
     queryKey: ['company-config-detail', companyId],
@@ -84,6 +86,15 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
       key: 'icloud_device_cap', label: t('settings.config.icloudDeviceCapShort'),
       hint: t('settings.config.icloudDeviceCapHint'),
       type: 'number', group: 'device', min: 1, max: 20,
+    },
+    // Paid installments before the customer may delete apps on the device
+    // (mig 1388). 100 = off, 0 = every device right away — so 0 asks first
+    // (see handleSave) and a blank field never saves as 0 (see rangeError).
+    {
+      key: 'app_removal_min_paid_installments',
+      label: t('settings.config.appRemovalMinPaidShort'),
+      hint: t('settings.config.appRemovalMinPaidHint'),
+      type: 'number', group: 'device', min: 0, max: 100,
     },
     // Ceiling on the discount a branch may ask for when a customer pays a FIN2
     // contract off early. 0 switches the discount off for the whole company;
@@ -136,6 +147,9 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
   const rangeError = (f: EditableField): string | null => {
     if (f.type !== 'number') return null;
     const v = formValues[f.key] as number;
+    // A cleared field holds NaN, not 0 — 0 is a real setting on some fields
+    // (on app removal it frees every device), so a blank must block Save.
+    if (Number.isNaN(v)) return t('settings.config.blank', { field: f.label });
     if ((f.min != null && v < f.min) || (f.max != null && v > f.max)) {
       return t('settings.config.outOfRange', { field: f.label, min: f.min, max: f.max });
     }
@@ -186,6 +200,21 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
       return;
     }
 
+    // 0 lets every customer of the company delete apps (the NNF app included)
+    // straight away — ask once more. No other value needs a confirm.
+    if (changes.app_removal_min_paid_installments === 0) {
+      setSaving(false);
+      setConfirmZero(changes);
+      return;
+    }
+
+    await submitChanges(changes);
+  };
+
+  const submitChanges = async (changes: Record<string, number | boolean>) => {
+    if (!config || !user) return;
+    setSaving(true);
+    setErrorMessage('');
     const start = Date.now();
     try {
       await apiClient.rpc('fn_config_update', {
@@ -301,8 +330,8 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
                                 max={field.max}
                                 step={field.step}
                                 error={!!rangeError(field)}
-                                value={String(getValue(field.key) ?? '')}
-                                onChange={(e) => setValue(field.key, Number(e.target.value))}
+                                value={Number.isNaN(getValue(field.key)) ? '' : String(getValue(field.key) ?? '')}
+                                onChange={(e) => setValue(field.key, e.target.value === '' ? NaN : Number(e.target.value))}
                               />
                               {rangeError(field) && <FormErrorMessage error={{ message: rangeError(field)! }} />}
                             </>
@@ -370,6 +399,29 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
           </div>
         </div>
       )}
+
+      <Modal open={!!confirmZero} onClose={() => setConfirmZero(null)} maxWidth="26rem" width="100%">
+        <div className="modal-header">
+          <h2 className="modal-title">{t('settings.config.appRemovalZeroConfirmTitle')}</h2>
+          <button type="button" className="modal-close-btn" onClick={() => setConfirmZero(null)}>&times;</button>
+        </div>
+        <div className="modal-content">
+          <p className="text-sm">{t('settings.config.appRemovalZeroConfirmBody', { company: config.company_name })}</p>
+        </div>
+        <div className="modal-footer">
+          <Button variant="ghost" onClick={() => setConfirmZero(null)}>{t('common.cancel')}</Button>
+          <Button
+            color="danger"
+            onClick={() => {
+              const changes = confirmZero;
+              setConfirmZero(null);
+              if (changes) submitChanges(changes);
+            }}
+          >
+            {t('common.confirm')}
+          </Button>
+        </div>
+      </Modal>
     </>
   );
 }

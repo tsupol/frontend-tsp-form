@@ -21,6 +21,9 @@ export interface CompanyConfig {
   repair_pickup_max_days: number;
   icloud_device_cap: number;
   fin2_early_payoff_discount_max_pct: number;
+  // Paid installments before the customer may delete apps on the device (mig 1388).
+  // 100 = off (default) · 0 = every device at once — never send 0 by accident.
+  app_removal_min_paid_installments: number;
   // Reward rate (mig 1378): every reward_rate_baht of a fully-paid installment
   // earns reward_rate_points (2 decimals); 0 points = none.
   reward_rate_baht: number;
