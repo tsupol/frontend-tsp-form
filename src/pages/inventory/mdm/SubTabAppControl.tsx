@@ -5,6 +5,8 @@
 //  GATE   — "ให้ลูกค้าลบแอปเอง" at the very top, because while it's open that is
 //           live state and must not be buried under sixty app rows (IMPLEMENT
 //           2026-08-13 mdm_app_removal_gate §1).
+//  ALLOW  — right under it, the permanent per-device allowance "อนุญาตให้ลบแอปเอง
+//           (ถาวร)" (IMPLEMENT 2026-10-06 §0.2): same subject, different lifetime.
 //  LIST   — the installed apps the device reported, each with a remove button
 //           behind the OTP ritual (IMPLEMENT 2026-08-13 remove_app_staff_ritual).
 //           This list used to sit in sub-tab 2; it moved here so apps are one
@@ -40,6 +42,7 @@ import { useMdmCommand } from './useMdmCommand';
 import { MdmErrorAlert, CommandAckNote, AppIcon } from './MdmSharedBits';
 import { RelativeDateTime } from './RelativeDateTime';
 import { MdmAppGatePanel } from './MdmAppGatePanel';
+import { MdmDeviceAllowancePanel } from './MdmDeviceAllowancePanel';
 import { MdmDeviceAppsSection } from './MdmDeviceAppsSection';
 
 export function SubTabAppControl({
@@ -96,6 +99,10 @@ export function SubTabAppControl({
     <div className="flex flex-col gap-4">
       {/* Live state first — see the file header on why this is at the top. */}
       <MdmAppGatePanel serial={status.serial_number} onChanged={onChanged} />
+
+      {/* Its permanent sibling — "for 30 minutes" vs "for good", side by side
+          (IMPLEMENT 2026-10-06 app_removal_min_paid_installments §0.2). */}
+      <MdmDeviceAllowancePanel serial={status.serial_number} onChanged={onChanged} />
 
       {/* What's actually on the device, with the per-app remove button. */}
       <MdmDeviceAppsSection

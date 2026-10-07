@@ -858,6 +858,8 @@
   "mdm.internal.escrow_retrieve_failed": "ดึงรหัสปลดไม่สำเร็จ ลองใหม่อีกครั้ง แล้วแจ้งทีมระบบ",
   "MDM.NOT_FOUND.ASSET_FOR_SERIAL": "ไม่พบเครื่องในระบบที่ตรงกับซีเรียลนี้",
   "mdm.not_found.asset_for_serial": "ไม่พบเครื่องในระบบที่ตรงกับซีเรียลนี้",
+  "MDM.VALIDATION.ALLOWANCE_REASON_REQUIRED": "ต้องใส่เหตุผล — เหตุผลจะถูกเก็บไว้ในประวัติของเครื่อง",
+  "mdm.validation.allowance_reason_required": "ต้องใส่เหตุผล — เหตุผลจะถูกเก็บไว้ในประวัติของเครื่อง",
   "MDM.NOT_FOUND.DEVICE_SERIAL": "ซีเรียลนี้ยังไม่ได้เข้าระบบ MDM จึงส่งคำสั่งไปที่เครื่องไม่ได้",
   "mdm.not_found.device_serial": "ซีเรียลนี้ยังไม่ได้เข้าระบบ MDM จึงส่งคำสั่งไปที่เครื่องไม่ได้",
   "MDM.VALIDATION.CHALLENGE_REQUIRED": "ต้องยืนยันคำสั่งนี้ใหม่ — ปิดแล้วเริ่มใหม่",

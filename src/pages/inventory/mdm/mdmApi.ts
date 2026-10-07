@@ -958,6 +958,73 @@ export function fetchAppGateStatus(serial: string): Promise<MdmAppGateStatus> {
   return apiClient.rpc<MdmAppGateStatus>('fn_mdm_app_gate_status', { p_serial: serial });
 }
 
+// ── Per-device permanent allowances ("อนุญาตให้ลบแอปเอง (ถาวร)") ─────────────
+// IMPLEMENT 2026-10-06 app_removal_min_paid_installments §0.2/§7-§9 ·
+// DELIVERY 2026-10-07 device_allowance_rpcs (nnf-mdm mig 348).
+// Read = MDM.APP_CONTROL (same as the gate status); set = per-allowance, told
+// to us by `can_set` — never hard-code which codes staff may set.
+
+export type MdmAllowanceStateCode =
+  | 'NOT_GRANTED' | 'ON_BY_RULE' | 'WAITING_DEVICE' | 'ON_DEVICE' | 'ESCALATED' | 'NO_ORG_LOCK'
+  | string;
+
+export interface MdmDeviceAllowance {
+  allowance_code: string;
+  /** Name from the DB — show it, don't rewrite it. */
+  label_th: string;
+  /** Engineering description (mig numbers, profile names). Not for the screen. */
+  description_th: string | null;
+  /** A person set this (a row exists) — distinct from the company rule granting it. */
+  granted: boolean;
+  state_code: MdmAllowanceStateCode;
+  rule_says_yes: boolean;
+  /** 100 = rule off. null on allowances no rule covers (FINDMY_APP, seen live). */
+  rule_threshold: number | null;
+  reason: string | null;
+  set_at: string | null;
+  set_by: number | null;
+  set_by_username: string | null;
+  requires_org_lock: boolean;
+  org_lock_applied: boolean;
+  preset_now: string | null;
+  can_set: boolean;
+}
+
+export interface MdmDeviceAllowanceLogEntry {
+  allowance_code: string;
+  action: 'GRANT' | 'REVOKE' | string;
+  reason: string | null;
+  actor_id: number | null;
+  actor_username: string | null;
+  created_at: string;
+}
+
+export interface MdmDeviceAllowanceStatus {
+  serial: string;
+  allowances: MdmDeviceAllowance[];
+  log: MdmDeviceAllowanceLogEntry[];
+}
+
+export function fetchDeviceAllowanceStatus(serial: string): Promise<MdmDeviceAllowanceStatus> {
+  return apiClient.rpc<MdmDeviceAllowanceStatus>('fn_mdm_device_allowance_status', { p_serial: serial });
+}
+
+export function setDeviceAllowance(p: {
+  serial: string;
+  actorId: number;
+  code: string;
+  allowed: boolean;
+  reason: string;
+}): Promise<unknown> {
+  return apiClient.rpc<unknown>('fn_mdm_device_allowance_set', {
+    p_serial: p.serial,
+    p_actor_id: p.actorId,
+    p_code: p.code,
+    p_allowed: p.allowed,
+    p_reason: p.reason,
+  });
+}
+
 // ── Sub-tab 6: lost mode & location (§8) ────────────────────────────────────
 // These take p_actor_id (§11.2). enable requires message + phone (both).
 export function enableLostMode(p: {
