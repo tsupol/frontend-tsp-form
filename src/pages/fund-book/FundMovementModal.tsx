@@ -28,6 +28,7 @@ import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { ActionDoneView } from '../contracts/ActionDoneView';
+import { DateTime } from '../../components/DateTime';
 import { fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../../lib/format';
 import { useFundBookInvalidate, useFundExpenseCategories } from './useFundBook';
 import { useFundSourceAccounts } from '../fund-bills/useFundBills';
@@ -371,7 +372,7 @@ export function FundMovementModal({
             contractCode={result.bill_code}
             detailRows={[
               { label: t('fundBook.amount'), value: fmtCurrency(result.amount) },
-              { label: t('fundBook.movedOn'), value: paidDate },
+              { label: t('fundBook.movedOn'), value: <DateTime value={paidDate} showTime={false} /> },
               ...(result.book
                 ? [{
                     label: t('fundBook.balanceAfter'),
