@@ -39,6 +39,7 @@ import {
   useFundBillLines,
   useFundBillLog,
   useFundBillPayments,
+  useFundBillBookLines,
   useFundBillSettlements,
 } from './useFundBills';
 import {
@@ -94,6 +95,7 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
   const lines = useFundBillLines(billId);
   const clearings = useFundBillClearings(billId);
   const payments = useFundBillPayments(billId);
+  const bookLines = useFundBillBookLines(billId);
   const log = useFundBillLog(billId);
   const transfers = useFundBillDeviceTransfers(billId);
   const settlements = useFundBillSettlements(
@@ -131,40 +133,27 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
   const documentNet = bill?.net_amount ?? 0;
 
   /**
-   * Whose money the document moved, taken from the payment rows.
+   * What the document did to each money book, read from the book's own entries.
    *
-   * ⛔ Do NOT add the document's lines up to get this. A line's sign is written
-   * from the shop's end, and the fund company's two items sit on opposite sides
-   * there — its commission reads as going toward the shop, the contract fee as
-   * deducted from it — even though both are the fund handing money to the
-   * company. Summing by that sign puts each on the wrong side of the split; it
-   * shipped that way once and disagreed with both books.
-   *
-   * The payment rows already carry the answer: the backend writes one row per
-   * owner when the document is paid, and they reconcile to the two money books
-   * exactly. So this groups what the screen has already fetched rather than
-   * recomputing anything.
+   * ⛔ Do NOT derive this from the document's lines or its payment rows. Line
+   * signs are written from the shop's end, so the company's items land on the
+   * wrong side. Payment rows looked right but leave out that the company's share
+   * also leaves the fund — on a two-contract payout (2026-10-07) they showed the
+   * fund 3,010 better off than its book. The book entries are the books, so this
+   * only groups them per book; no per-document total exists on the backend.
    */
   const ownerBreakdown = (() => {
-    const byOwner = new Map<string, number>();
-    for (const p of payments.rows) {
-      if (p.voided_at) continue;
-      // Every row on a payout is written as money leaving, because the document
-      // is the fund paying out. What differs is who ends up holding it: the
-      // fund's rows leave the fund, the company's rows are the fund settling
-      // what it owes the company — money the company gains. Reading the flow
-      // literally would show the company losing on a document that pays it.
-      const signed = p.owner_type === 'COMPANY' ? p.amount : -p.amount;
-      byOwner.set(p.owner_type, (byOwner.get(p.owner_type) ?? 0) + signed);
+    const byBook = new Map<string, number>();
+    for (const e of bookLines.rows) {
+      const owner = e.book_type === 'COMPANY' ? 'COMPANY' : 'HOLDING';
+      byBook.set(owner, (byBook.get(owner) ?? 0) + e.signed_amount);
     }
-    return [...byOwner.entries()]
+    return [...byBook.entries()]
       .filter(([, net]) => net !== 0)
       .map(([owner, net]) => ({ owner, net }));
   })();
 
-  /** Only once paid, and only when more than one owner's money is involved:
-   *  before payment there are no rows to read it from, and a split derived any
-   *  other way would be the mistake described above. */
+  /** Only once paid (no book entries before), and only when both books moved. */
   const showOwnerBreakdown = ownerBreakdown.length > 1;
 
   /** Group the contract lines by settlement; hand-entered lines belong to no

@@ -196,6 +196,19 @@ export function useFundBillSettlements(settlementIds: number[]) {
   return { ...query, rows: query.data ?? [] };
 }
 
+/** What this document did to each of the two money books, entry by entry. */
+export function useFundBillBookLines(billId: number | null) {
+  const query = useQuery({
+    queryKey: ['fund-bills', 'book-lines', billId],
+    queryFn: () => apiClient.get<{ book_type: 'FUND' | 'COMPANY'; signed_amount: number }[]>(
+      `/v_fund_book_lines?bill_id=eq.${billId}&select=book_type,signed_amount`,
+    ),
+    enabled: billId != null,
+    staleTime: 10 * 1000,
+  });
+  return { ...query, rows: query.data ?? [] };
+}
+
 /** The transfer rows — a paid payout has two, shop and company. */
 export function useFundBillPayments(billId: number | null) {
   const query = useQuery({
