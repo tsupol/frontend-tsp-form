@@ -261,6 +261,10 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
           {line.is_manual && (
             <Badge color="warning" size="sm">{t('fundBill.manualLine')}</Badge>
           )}
+          {/* Line kinds no longer say whose money it is — the owner does. */}
+          {line.owner_type === 'COMPANY' && (
+            <Badge color="info" size="sm">{t('fundBill.ownerShare_COMPANY')}</Badge>
+          )}
           <span className="flex-1" />
           <span
             className={`text-sm tabular-nums shrink-0 ${
