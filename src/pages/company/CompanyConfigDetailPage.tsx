@@ -88,13 +88,14 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
       type: 'number', group: 'device', min: 1, max: 20,
     },
     // Paid installments before the customer may delete apps on the device
-    // (mig 1388). 100 = off, 0 = every device right away — so 0 asks first
+    // (mig 1388). Owner put it in its own MDM group (IMPLEMENT 2026-10-06 §0.1)
+    // so later MDM settings have a home. 100 = off, 0 = every device right away — so 0 asks first
     // (see handleSave) and a blank field never saves as 0 (see rangeError).
     {
       key: 'app_removal_min_paid_installments',
       label: t('settings.config.appRemovalMinPaidShort'),
       hint: t('settings.config.appRemovalMinPaidHint'),
-      type: 'number', group: 'device', min: 0, max: 100,
+      type: 'number', group: 'mdm', min: 0, max: 100,
     },
     // Ceiling on the discount a branch may ask for when a customer pays a FIN2
     // contract off early. 0 switches the discount off for the whole company;
@@ -126,6 +127,7 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
     { key: 'money', label: t('settings.config.groupMoney') },
     { key: 'commission', label: t('settings.config.groupCommission') },
     { key: 'device', label: t('settings.config.groupDevice') },
+    { key: 'mdm', label: t('settings.config.groupMdm') },
     { key: 'reward', label: t('settings.config.groupReward') },
   ];
 
