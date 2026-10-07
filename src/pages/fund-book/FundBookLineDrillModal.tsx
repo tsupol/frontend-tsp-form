@@ -25,7 +25,7 @@ import { useNavigate } from 'react-router-dom';
 import { Building2, ExternalLink, Wallet } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency, formatEntityCode } from '../../lib/format';
-import { useFundBill, useFundBillLines, useFundBillPayments } from '../fund-bills/useFundBills';
+import { useFundBill, useFundBillLines, useFundBillBookLines } from '../fund-bills/useFundBills';
 import { fundBillStatusColor, type FundBillLine } from '../fund-bills/fundBillTypes';
 
 /** A line's contribution, from the document's end. Memo rows carry no money. */
@@ -55,19 +55,18 @@ export function FundBookLineDrillModal({ open, billId, onClose }: FundBookLineDr
 
   const { bill } = useFundBill(billId);
   const lines = useFundBillLines(billId);
-  // The per-owner shares live here, one row per owner, written when the
-  // document was paid. Summing the lines instead gives a wrong answer — a
-  // line's sign is written from the counterparty's end, so two rows owned by
-  // the same party can point opposite ways.
-  const payments = useFundBillPayments(billId);
+  // Each owner's share is read from the money books' own entries for this
+  // document. Not from the lines (signs are written from the counterparty's
+  // end) and not from the payment rows (they leave out the company's share
+  // leaving the fund — 3,010 off on a two-contract payout, 2026-10-07).
+  const bookLines = useFundBillBookLines(billId);
 
   /** What the books say each owner's share came to. Null before payment. */
   const ownerNet = (() => {
     const byOwner = new Map<string, number>();
-    for (const p of payments.rows) {
-      if (p.voided_at) continue;
-      const signed = p.owner_type === 'COMPANY' ? p.amount : -p.amount;
-      byOwner.set(p.owner_type, (byOwner.get(p.owner_type) ?? 0) + signed);
+    for (const e of bookLines.rows) {
+      const owner = e.book_type === 'COMPANY' ? 'COMPANY' : 'HOLDING';
+      byOwner.set(owner, (byOwner.get(owner) ?? 0) + e.signed_amount);
     }
     return byOwner;
   })();
