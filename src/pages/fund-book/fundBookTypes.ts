@@ -92,7 +92,7 @@ export interface FundBookLine {
 }
 
 /** What a movement is for. Decides which book moves and which permission applies. */
-export type FundMovementPurpose = 'FUND_TOPUP' | 'FUND_WITHDRAW' | 'FUND_EXPENSE';
+export type FundMovementPurpose = 'CAPITAL_IN' | 'CAPITAL_OUT' | 'EXPENSE';
 
 export interface FundMovementCreateResult {
   bill_id: number;

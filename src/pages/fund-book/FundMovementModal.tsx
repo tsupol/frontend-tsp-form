@@ -64,7 +64,7 @@ export function FundMovementModal({
 }: FundMovementModalProps) {
   const { t, i18n } = useTranslation();
   const invalidate = useFundBookInvalidate();
-  const categories = useFundExpenseCategories(open && purpose === 'FUND_EXPENSE' ? companyId : null);
+  const categories = useFundExpenseCategories(open && purpose === 'EXPENSE' ? companyId : null);
   const accounts = useFundSourceAccounts(open ? companyId : null);
 
   const today = toLocalDateStr(new Date());
@@ -111,8 +111,8 @@ export function FundMovementModal({
     setConfirmClose(false);
   }, [open, purpose]);
 
-  const isExpense = purpose === 'FUND_EXPENSE';
-  const isWithdraw = purpose === 'FUND_WITHDRAW';
+  const isExpense = purpose === 'EXPENSE';
+  const isWithdraw = purpose === 'CAPITAL_OUT';
 
   /** Which book this movement lands in, given the side picked. */
   const book = useMemo(

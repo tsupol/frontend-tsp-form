@@ -281,9 +281,9 @@ export function FundBookPage() {
                   size="sm"
                   variant="outline"
                   startIcon={<ArrowDownCircle size={14} className="text-success" />}
-                  onClick={() => setMovement('FUND_TOPUP')}
+                  onClick={() => setMovement('CAPITAL_IN')}
                 >
-                  {t('fundBook.movement_FUND_TOPUP')}
+                  {t('fundBook.movement_CAPITAL_IN')}
                 </Button>
               )}
               {canWithdraw && (
@@ -291,9 +291,9 @@ export function FundBookPage() {
                   size="sm"
                   variant="outline"
                   startIcon={<ArrowUpCircle size={14} className="text-warning" />}
-                  onClick={() => setMovement('FUND_WITHDRAW')}
+                  onClick={() => setMovement('CAPITAL_OUT')}
                 >
-                  {t('fundBook.movement_FUND_WITHDRAW')}
+                  {t('fundBook.movement_CAPITAL_OUT')}
                 </Button>
               )}
               {canSpend && (
@@ -301,9 +301,9 @@ export function FundBookPage() {
                   size="sm"
                   variant="outline"
                   startIcon={<Receipt size={14} />}
-                  onClick={() => setMovement('FUND_EXPENSE')}
+                  onClick={() => setMovement('EXPENSE')}
                 >
-                  {t('fundBook.movement_FUND_EXPENSE')}
+                  {t('fundBook.movement_EXPENSE')}
                 </Button>
               )}
             </div>
@@ -385,18 +385,18 @@ export function FundBookPage() {
               {isMobile && (canTopUp || canWithdraw || canSpend) && (
                 <div className="flex-none p-2 border-b border-line flex gap-2 flex-wrap">
                   {canTopUp && (
-                    <Button size="sm" variant="outline" onClick={() => setMovement('FUND_TOPUP')}>
-                      {t('fundBook.movement_FUND_TOPUP')}
+                    <Button size="sm" variant="outline" onClick={() => setMovement('CAPITAL_IN')}>
+                      {t('fundBook.movement_CAPITAL_IN')}
                     </Button>
                   )}
                   {canWithdraw && (
-                    <Button size="sm" variant="outline" onClick={() => setMovement('FUND_WITHDRAW')}>
-                      {t('fundBook.movement_FUND_WITHDRAW')}
+                    <Button size="sm" variant="outline" onClick={() => setMovement('CAPITAL_OUT')}>
+                      {t('fundBook.movement_CAPITAL_OUT')}
                     </Button>
                   )}
                   {canSpend && (
-                    <Button size="sm" variant="outline" onClick={() => setMovement('FUND_EXPENSE')}>
-                      {t('fundBook.movement_FUND_EXPENSE')}
+                    <Button size="sm" variant="outline" onClick={() => setMovement('EXPENSE')}>
+                      {t('fundBook.movement_EXPENSE')}
                     </Button>
                   )}
                 </div>
@@ -471,7 +471,7 @@ export function FundBookPage() {
 
           <FundMovementModal
             open={movement != null}
-            purpose={movement ?? 'FUND_TOPUP'}
+            purpose={movement ?? 'CAPITAL_IN'}
             companyId={companyId}
             books={books}
             onClose={() => setMovement(null)}

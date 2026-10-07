@@ -20,11 +20,11 @@ export type FundBillStatus = 'DRAFT' | 'ISSUED' | 'PARTIAL' | 'PAID' | 'VOIDED';
 export type FundBillType = 'INVOICE' | 'CREDIT_NOTE' | 'JOURNAL';
 
 export type FundBillPurpose =
-  | 'PARTNER_PAYOUT'
-  | 'PARTNER_BUYBACK'
-  | 'PARTNER_CLAWBACK'
-  | 'FUND_TOPUP'
-  | 'FUND_WITHDRAW';
+  | 'PAYOUT'
+  | 'BUYBACK'
+  | 'CLAWBACK'
+  | 'CAPITAL_IN'
+  | 'CAPITAL_OUT';
 
 /** Whose money a line is — decides which of the two books it moves. */
 export type FundOwnerType = 'HOLDING' | 'COMPANY';

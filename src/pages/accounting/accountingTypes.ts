@@ -615,6 +615,7 @@ export interface DayCloseBucketRow {
   company_wallet: number;
   company_fee: number;
   company_other: number;
+  company_share: number;      // mig 1394: company's share of instalments
   company_total: number;      // sum of the 4 company sold buckets
   total_amount: number;
   line_count: number;
@@ -624,6 +625,7 @@ export interface DayCloseBucketRow {
   company_wallet_refund: number;
   company_fee_refund: number;
   company_other_refund: number;
+  company_share_refund: number;
   company_refund_total: number;
   total_refund: number;
   // internal / wallet
