@@ -51,7 +51,7 @@ import { PauseContractModal } from './PauseContractModal';
 import { ResumeContractModal } from './ResumeContractModal';
 import { useContractInvalidate } from './useContractInvalidate';
 import { useCompanyFeatures } from '../../hooks/useCompanyFeatures';
-import { blockingReasonText, translateApiError } from '../../lib/apiErrors';
+import { bindDeniedReasons, blockingReasonText, translateApiError } from '../../lib/apiErrors';
 import { ReturnOpenModal } from '../partner-return/ReturnOpenModal';
 import { useContractOpenReturn } from '../partner-return/usePartnerReturn';
 import { buildSavingSeededPayments, savingApplied, unusedSaving } from './savingAutoFill';
@@ -1614,6 +1614,8 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
    *  onward (e.g. repair_id for DEVICE_IN_REPAIR). Kept beside errorCode
    *  because the translated string alone can't be turned back into a route. */
   const [errorParams, setErrorParams] = useState<Record<string, unknown> | null>(null);
+  /** The failed rules behind a catch-all "cannot bind" — one line each. */
+  const [errorReasons, setErrorReasons] = useState<string[]>([]);
   const [errorKey, setErrorKey] = useState(0);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const config = action ? ACTION_CONFIGS[action] : null;
@@ -1634,6 +1636,7 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
       setError('');
       setErrorCode(null);
       setErrorParams(null);
+      setErrorReasons([]);
       setResult(null);
     }
   }, [open, action]);
@@ -1653,13 +1656,16 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
 
   // Assets for bind_device — must match contract branch + model (backend enforces both).
   //
-  // A shop's contract binding for the first time may only take the device it
-  // pointed at (mig 1235 — CONTRACT.VALIDATION.DEVICE_NOT_TARGET), so offer
-  // exactly that one rather than a list where every other row fails on submit.
-  // Swapping a device that is already bound is unrestricted, so the full list
-  // stays for that case.
+  // A deal-partner shop's contract with no device bound may only take the
+  // device it pointed at (mig 1235 — CONTRACT.VALIDATION.DEVICE_NOT_TARGET), so
+  // offer exactly that one rather than a list where every other row fails on
+  // submit. The rule is the shop's alone: every contract keeps its pointed-at
+  // device after an unbind, and locking an internal branch to it sent the old,
+  // quarantined device instead of the one staff picked (CHECK 2026-10-08 Krabi).
+  const { isPartnerBranch } = useBranchIsPartner(open && config?.needsDevice ? contract.branch_id : null);
   const bindLockedToTarget =
-    !!config?.needsDevice && contract.device_id == null && contract.target_asset_id != null;
+    !!config?.needsDevice && contract.device_id == null && contract.target_asset_id != null
+    && isPartnerBranch === true;
   const { data: assets } = useQuery({
     queryKey: ['assets-available', contract.branch_id, contract.model_id, bindLockedToTarget ? contract.target_asset_id : null],
     queryFn: () => {
@@ -1675,18 +1681,22 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
       return apiClient.get<Asset[]>(`/v_assets?${params.toString()}`);
     },
     staleTime: 60 * 1000,
-    enabled: !!config?.needsDevice && (bindLockedToTarget || contract.model_id != null),
+    // Wait for the branch type: guessing either way shows the wrong list first.
+    enabled: !!config?.needsDevice && isPartnerBranch !== undefined
+      && (bindLockedToTarget || contract.model_id != null),
   });
 
   const [assetSearch, setAssetSearch] = useState('');
 
   // When only the pointed device may be bound there is nothing to choose, so
-  // fill it in rather than making the user pick the single row on offer.
+  // fill it in rather than making the user pick the single row on offer. Only
+  // when that device is actually on offer — a choice the list doesn't show
+  // would still be sent on submit.
   useEffect(() => {
-    if (bindLockedToTarget && contract.target_asset_id != null) {
+    if (bindLockedToTarget && assets?.some(a => a.asset_id === contract.target_asset_id)) {
       setDeviceId(String(contract.target_asset_id));
     }
-  }, [bindLockedToTarget, contract.target_asset_id]);
+  }, [bindLockedToTarget, assets, contract.target_asset_id]);
 
   const assetMap = useMemo(() => {
     const m = new Map<string, Asset>();
@@ -1819,10 +1829,12 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
         setError(translated || err.message);
         setErrorCode(err.code ?? err.messageKey ?? null);
         setErrorParams(err.messageParams ?? null);
+        setErrorReasons(bindDeniedReasons(err, t));
       } else {
         setError(String(err));
         setErrorCode(null);
         setErrorParams(null);
+        setErrorReasons([]);
       }
       setErrorKey(k => k + 1);
     },
@@ -1871,6 +1883,11 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
                 <XCircle size={16} />
                 <div className="flex flex-col gap-1">
                   <span>{error}</span>
+                  {errorReasons.length > 0 && (
+                    <ul className="list-disc pl-4 text-sm">
+                      {errorReasons.map((r, i) => <li key={i}>{r}</li>)}
+                    </ul>
+                  )}
                   {/* Unbind blocked by a sealed BIND addendum → point the user at
                       the Signing tab to void it first (BM + PIN). */}
                   {errorCode === 'SALE.STATE.CANNOT_UNBIND_WITH_SEALED_BIND_ADDENDUM' && onNavigateTab && (

@@ -157,6 +157,49 @@ export function translateApiError(err: unknown, t: TranslateFn): string {
 }
 
 /**
+ * `SALE.VALIDATION.BIND_DENIED` is a catch-all: the rules that actually failed
+ * travel only inside `params.detail`, as text —
+ *   `SALE.VALIDATION.BIND_DENIED [mode=BIND, errors=[{"code": …, "detail": {…}}, …]]`
+ * Pull each failed rule out and translate it, so the screen says WHY instead of
+ * the generic sentence alone (CHECK 2026-10-08 Krabi). Returns [] for any other
+ * error, or when the text can't be read.
+ */
+export function bindDeniedReasons(err: unknown, t: TranslateFn): string[] {
+  if (!(err instanceof ApiError) || err.code !== 'SALE.VALIDATION.BIND_DENIED') return [];
+  const detail = err.messageParams?.detail;
+  if (typeof detail !== 'string') return [];
+  const start = detail.indexOf('errors=[');
+  const end = detail.lastIndexOf(']]');
+  if (start < 0 || end < start) return [];
+  let rules: unknown;
+  try {
+    rules = JSON.parse(detail.slice(start + 'errors='.length, end + 1));
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(rules)) return [];
+  return rules.flatMap((rule) => {
+    const code = (rule as { code?: unknown } | null)?.code;
+    if (typeof code !== 'string') return [];
+    const ruleDetail = (rule as { detail?: unknown }).detail;
+    const params = prepareErrorParams(
+      ruleDetail && typeof ruleDetail === 'object' && !Array.isArray(ruleDetail)
+        ? ruleDetail as Record<string, unknown>
+        : undefined,
+      t,
+    );
+    const lower = code.toLowerCase();
+    return [
+      translateErrorCode(code, params, t)
+      || translateErrorCode(lower, params, t)
+      || translateErrorCode(`${code}_basic`, params, t)
+      || translateErrorCode(`${lower}_basic`, params, t)
+      || code,
+    ];
+  });
+}
+
+/**
  * Render a backend action's `blocking_reason` as a sentence, feeding it the
  * action's `blocking_params` so a reason that names a date says which one.
  *
