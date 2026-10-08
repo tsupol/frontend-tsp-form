@@ -989,7 +989,7 @@
       "enrolledSince": "In MDM since",
       "prepareError": "Couldn't send the enrollment. Please try again.",
       "step": {
-        "serial": "Record Serial/IMEI",
+        "serial": "Record the serial",
         "scan": "Scan into ABM",
         "send": "Send enrollment",
         "wipe": "Wipe after scanning",
@@ -1088,8 +1088,8 @@
       },
       "badge": {
         "NO_SERIAL": {
-          "label": "No Serial/IMEI yet",
-          "sub": "Record the Serial/IMEI first before you can enroll."
+          "label": "No serial number yet",
+          "sub": "Add the serial first to enroll (an IMEI alone isn’t enough)"
         },
         "NOT_STARTED": {
           "label": "Scan the device into ABM, then press this",
@@ -1541,8 +1541,8 @@
       },
       "band": {
         "NO_SERIAL": {
-          "title": "No Serial/IMEI yet",
-          "body": "Record the Serial/IMEI first before you can enroll."
+          "title": "No serial number — can’t enroll in MDM",
+          "body": "MDM needs the device’s serial number; an IMEI alone isn’t enough. Add the serial before the next steps."
         },
         "NOT_STARTED": {
           "title": "Scan the device into ABM, then press this",
@@ -1569,6 +1569,7 @@
           "body": "This erases everything on the device you're holding. Make sure it's the company device you meant to re-enroll, not a customer's."
         }
       },
+      "addSerial": "Add serial",
       "wipeSteps": {
         "s1": "On the device, open Settings → General",
         "s2": "Tap Transfer or Reset → Erase All Content and Settings",

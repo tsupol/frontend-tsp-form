@@ -1071,6 +1071,7 @@ function AssetDetailPanel({
   const [activeAction, setActiveAction] = useState<BackendAssetAction | null>(null);
   const [actionPreset, setActionPreset] = useState<Record<string, string> | undefined>(undefined);
   const [addIdentifierType, setAddIdentifierType] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [correctVariantOpen, setCorrectVariantOpen] = useState(false);
   const [correctModelOpen, setCorrectModelOpen] = useState(false);
   const [sellExternalOpen, setSellExternalOpen] = useState(false);
@@ -1150,6 +1151,29 @@ function AssetDetailPanel({
         renderLabel={(tab) => t(`asset.tab_${tab}`)}
       />
 
+      {/* Mounted outside the tabs: the overview's "add" buttons and the MDM
+          tab's no-serial warning both open it. */}
+      <AddIdentifierModal
+        open={!!addIdentifierType}
+        identifierType={addIdentifierType}
+        asset={asset}
+        onClose={() => setAddIdentifierType(null)}
+        onSuccess={() => {
+          setAddIdentifierType(null);
+          onRefresh();
+          // A new serial unblocks MDM enrolment — reload that status too.
+          queryClient.invalidateQueries({ queryKey: ['asset-mdm-status', asset.asset_id] });
+          addSnackbar({
+            message: (
+              <div className="alert alert-success">
+                <CheckCircle size={16} />
+                <span>{t('identifierAdd.success', { ns: 'assetActions', defaultValue: 'Identifier added' })}</span>
+              </div>
+            ),
+          });
+        }}
+      />
+
       {activeTab === 'evidence' && (
         <AssetEvidenceTab
           assetId={asset.asset_id}
@@ -1158,7 +1182,11 @@ function AssetDetailPanel({
       )}
 
       {activeTab === 'mdm' && (
-        <AssetMdmTab assetId={asset.asset_id} onRefresh={onRefresh} />
+        <AssetMdmTab
+          assetId={asset.asset_id}
+          onRefresh={onRefresh}
+          onAddSerial={() => setAddIdentifierType('SERIAL_NO')}
+        />
       )}
 
       {activeTab === 'security' && (
@@ -1274,7 +1302,7 @@ function AssetDetailPanel({
                     {t('identifierAdd.addType', {
                       ns: 'assetActions',
                       defaultValue: 'Add {{type}}',
-                      type: tp,
+                      type: t(`asset.idType.${tp}`, { defaultValue: tp }),
                     })}
                   </Button>
                 ))}
@@ -1283,25 +1311,6 @@ function AssetDetailPanel({
           </div>
         );
       })()}
-
-      <AddIdentifierModal
-        open={!!addIdentifierType}
-        identifierType={addIdentifierType}
-        asset={asset}
-        onClose={() => setAddIdentifierType(null)}
-        onSuccess={() => {
-          setAddIdentifierType(null);
-          onRefresh();
-          addSnackbar({
-            message: (
-              <div className="alert alert-success">
-                <CheckCircle size={16} />
-                <span>{t('identifierAdd.success', { ns: 'assetActions', defaultValue: 'Identifier added' })}</span>
-              </div>
-            ),
-          });
-        }}
-      />
 
 
       {/* Branch & Company */}
@@ -3814,8 +3823,9 @@ function AddIdentifierModal({
   const formatError = value.trim() ? identifierFormatReason(identifierType, value, isAppleBrand(asset.brand_name)) : null;
   const canSubmit = !!identifierType && !!value.trim() && !formatError && !mutation.isPending;
 
+  const typeLabel = identifierType ? t(`asset.idType.${identifierType}`, { defaultValue: identifierType }) : '';
   const title = identifierType
-    ? t('identifierAdd.title', { ns: 'assetActions', defaultValue: 'Add {{type}}', type: identifierType })
+    ? t('identifierAdd.title', { ns: 'assetActions', defaultValue: 'Add {{type}}', type: typeLabel })
     : '';
 
   return (
@@ -3840,7 +3850,7 @@ function AddIdentifierModal({
           </div>
           <div className="form-grid gap-4">
             <div className="flex flex-col">
-              <label className="form-label">{identifierType} *</label>
+              <label className="form-label">{typeLabel} *</label>
               <IdentifierInput
                 identifierType={identifierType}
                 value={value}

@@ -22,7 +22,7 @@ import { Button, Badge } from 'tsp-form';
 import {
   Fingerprint, ScanLine, Send, RotateCcw, Smartphone, CheckCircle,
   Loader2, XCircle, HelpCircle, ShieldCheck, CircleDashed, PackageCheck,
-  PackageOpen,
+  PackageOpen, Plus,
 } from 'lucide-react';
 import { enrollDoneCount, waitStage, type EnrollView } from './enrollView';
 import { useTicker, secondsSince, splitDuration } from './useTicker';
@@ -134,7 +134,11 @@ function bandFor(view: EnrollView): {
     return { key: 'REENROLL_READY', tone: 'warning', spin: false, instruction: true };
   }
   switch (view.mdm_status) {
-    case 'NO_SERIAL': return { key: 'NO_SERIAL', tone: 'neutral', spin: false, instruction: false };
+    // Warning, not neutral: nothing after step 1 can happen without a serial,
+    // and an IMEI alone doesn't count. In the neutral blue it read like an
+    // ordinary first step, and staff with an IMEI on screen kept retrying the
+    // later steps instead (owner chat 2026-10-08, AT-2610-000279-4).
+    case 'NO_SERIAL': return { key: 'NO_SERIAL', tone: 'warning', spin: false, instruction: false };
     case 'NOT_STARTED': return { key: 'NOT_STARTED', tone: 'neutral', spin: false, instruction: false };
     case 'PREPARING': return { key: 'PREPARING', tone: 'info', spin: true, instruction: false };
     case 'PROFILE_READY': return { key: 'PROFILE_READY', tone: 'warning', spin: false, instruction: true };
@@ -188,12 +192,16 @@ export interface EnrollChecklistProps {
    *  shows it and the token page does not — a presentation choice the host
    *  makes, not a divergence in what the flow MEANS. */
   showRawBlockedReason?: boolean;
+  /** Opens the host's add-serial window. Shown in the no-serial band; omit to
+   *  hide the button (a host that cannot edit the asset). */
+  onAddSerial?: () => void;
 }
 
 export function EnrollChecklist({
   view, onPrepare, preparing = false, errorMessage,
   serialSlot, prepareSlot, prepareDisabled = false,
   children, hideKeyBanner = false, showRawBlockedReason = false,
+  onAddSerial,
 }: EnrollChecklistProps) {
   const { t } = useTranslation();
 
@@ -233,6 +241,14 @@ export function EnrollChecklist({
 
           {/* An instruction state gets the literal steps, not a progress mood. */}
           {band.instruction && <WipeInstructions />}
+
+          {view.mdm_status === 'NO_SERIAL' && onAddSerial && (
+            <div className="mt-2">
+              <Button size="sm" startIcon={<Plus size={14} />} onClick={onAddSerial}>
+                {t('asset.mdm.addSerial')}
+              </Button>
+            </div>
+          )}
 
           {showRawBlockedReason && view.mdm_status === 'PREPARE_FAILED' && view.prepare_blocked_reason && (
             <div className="alert-description font-mono break-words mt-1">{view.prepare_blocked_reason}</div>
@@ -274,7 +290,9 @@ export function EnrollChecklist({
       <div className="border border-line rounded-md p-4">
         <div className="flex flex-col">
           {STEPS_1_5.map((step, i) => {
-            const state: StepStatus = i < doneEnroll ? 'done' : (i === doneEnroll ? 'current' : 'todo');
+            const state: StepStatus = i < doneEnroll ? 'done'
+              : i === doneEnroll ? (view.mdm_status === 'NO_SERIAL' ? 'blocked' : 'current')
+                : 'todo';
             const isSendStep = step.key === 'send';
             return (
               <StepRow

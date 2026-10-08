@@ -13,7 +13,10 @@ import type { ReactNode } from 'react';
 // circle, so a circled glyph draws a ring inside a ring.
 import { Check, type LucideIcon } from 'lucide-react';
 
-export type StepStatus = 'done' | 'current' | 'todo';
+/** `blocked` = the current step, but it cannot be done here until the user
+ *  fixes something first (e.g. a device with no serial) — drawn as a warning so
+ *  it doesn't read like an ordinary next step. */
+export type StepStatus = 'done' | 'current' | 'blocked' | 'todo';
 
 export function StepRow({
   n, icon: Icon, title, where, state, last, children,
@@ -34,8 +37,9 @@ export function StepRow({
             asked for less motion gets it instantly. */}
         <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 motion-safe:transition-colors motion-safe:duration-200 ${
           state === 'current' ? 'bg-primary border-primary text-primary-contrast'
-            : state === 'done' ? 'bg-success border-success text-success-contrast'
-              : 'bg-surface border-line text-subtle'
+            : state === 'blocked' ? 'bg-warning border-warning text-warning-contrast'
+              : state === 'done' ? 'bg-success border-success text-success-contrast'
+                : 'bg-surface border-line text-subtle'
         }`}>
           {state === 'done' ? <Check size={14} strokeWidth={3} /> : <Icon size={12} />}
         </div>
@@ -43,7 +47,9 @@ export function StepRow({
       </div>
       <div className="pb-3 min-w-0 flex-1">
         <div className={`text-sm font-medium leading-snug motion-safe:transition-colors ${
-          state === 'current' ? 'text-primary-fg' : state === 'done' ? 'text-success-fg' : 'text-fg'
+          state === 'current' ? 'text-primary-fg'
+            : state === 'blocked' ? 'text-warning-fg'
+              : state === 'done' ? 'text-success-fg' : 'text-fg'
         }`}>
           <span className="text-subtler tabular-nums">{n}. </span>{title}
         </div>

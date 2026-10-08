@@ -70,11 +70,14 @@ export function SubTabEnroll({
   isFetching,
   onRefetch,
   onRefresh,
+  onAddSerial,
 }: {
   status: EnrollStatus;
   isFetching: boolean;
   onRefetch: () => void;
   onRefresh: () => void;
+  /** Opens the asset page's add-serial window (the same one the overview uses). */
+  onAddSerial?: () => void;
 }) {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -179,6 +182,7 @@ export function SubTabEnroll({
         errorMessage={errorMsg}
         hideKeyBanner
         showRawBlockedReason
+        onAddSerial={onAddSerial}
         serialSlot={status.serial_number ? (
           <div className="flex items-center gap-2 flex-wrap mb-2">
             <span className="text-xs text-subtle">{t('asset.mdm.serialCheck.label')}</span>

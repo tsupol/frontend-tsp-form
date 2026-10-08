@@ -60,6 +60,9 @@ export const ENROLL_STRING_KEYS = [
   // the link holder is on the same ABM and can scan the device in themselves.
   'asset.mdm.band.NO_SERIAL.title',
   'asset.mdm.band.NO_SERIAL.body',
+  // The band's add-serial button. The token page passes no handler so never
+  // shows it, but the shared component names the key, and the build checks.
+  'asset.mdm.addSerial',
   'asset.mdm.band.NOT_STARTED.title',
   'asset.mdm.band.NOT_STARTED.body',
   'asset.mdm.band.PREPARING.title',

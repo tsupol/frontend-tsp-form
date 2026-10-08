@@ -49,7 +49,12 @@ function visibleSubTabs(status: AssetMdmStatus | null): MdmSubTab[] {
   return tabs;
 }
 
-export function AssetMdmTab({ assetId, onRefresh }: { assetId: number; onRefresh: () => void }) {
+export function AssetMdmTab({ assetId, onRefresh, onAddSerial }: {
+  assetId: number;
+  onRefresh: () => void;
+  /** Opens the asset page's add-serial window, offered when MDM is blocked on a missing serial. */
+  onAddSerial?: () => void;
+}) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -135,6 +140,7 @@ export function AssetMdmTab({ assetId, onRefresh }: { assetId: number; onRefresh
             isFetching={isFetching}
             onRefetch={() => refetch()}
             onRefresh={onRefresh}
+            onAddSerial={onAddSerial}
           />
         )}
 
