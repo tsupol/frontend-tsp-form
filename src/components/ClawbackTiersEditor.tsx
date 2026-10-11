@@ -105,8 +105,9 @@ export function ClawbackTiersEditor({ value, onChange, disabled }: Props) {
                 />
               ) : (
                 // Keeps the percent inputs on one column — only the last row
-                // is removable, so the other rows reserve the same width.
-                <div className="w-8 shrink-0" />
+                // is removable, so the other rows reserve exactly the width
+                // of that icon-only small button (its height token).
+                <div className="shrink-0" style={{ width: 'var(--height-control-sm, 1.75rem)' }} />
               )}
             </div>
           ))}
