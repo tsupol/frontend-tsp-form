@@ -23,6 +23,10 @@ import {
 import { DealPartnerCompanySection } from '../../components/DealPartnerCompanySection';
 import { planTranchesLabel, type PlanTranche } from '../shop-commission/shopCommissionTypes';
 import { CommissionPlanModal } from '../shop-commission/CommissionPlanModal';
+import type { SavedRow as PlanSavedRow } from '../shop-commission/CommissionPlanModal';
+import { ShopCommissionRates } from '../shop-commission/ShopCommissionRates';
+
+type PlanSaved = PlanSavedRow & { branch_id: number };
 
 // ============================================================================
 // Deal partner terms — mig 1154/1155 model, extended by migs 1173/1191/1192.
@@ -609,7 +613,9 @@ const EMPTY_CONFIG_FORM: ConfigFormData = {
   return_to_branch_id: '', clawback_check_days: '', note: '',
 };
 
-function BranchConfigModal({ open, onClose, config, warehouses, onSaved }: {
+function BranchConfigModal({ open, onClose, config, warehouses, onSaved, planSaved, onChangePlan }: {
+  planSaved: PlanSaved | null;
+  onChangePlan?: () => void;
   open: boolean;
   onClose: () => void;
   config: BranchConfigRow | null;
@@ -668,6 +674,14 @@ function BranchConfigModal({ open, onClose, config, warehouses, onSaved }: {
       setErrorMessage('');
     }
   }, [open, config, reset]);
+
+  // The plan shown here: what the plan window just saved for this shop, else
+  // what the shop had when this window opened.
+  const savedHere = planSaved && config && planSaved.branch_id === config.branch_id ? planSaved : null;
+  const currentPlan = savedHere ? savedHere.commission_plan : (config?.commission_plan ?? null);
+  const currentPlanName = savedHere
+    ? (savedHere.commission_plan_name ?? savedHere.commission_plan)
+    : (config?.commission_plan_name ?? config?.commission_plan ?? null);
 
   const vBr = parseFloat(watch('branch_rate_percent'));
   const vCo = parseFloat(watch('company_rate_percent'));
@@ -830,6 +844,24 @@ function BranchConfigModal({ open, onClose, config, warehouses, onSaved }: {
                 </div>
               </div>
 
+              {/* Commission plan (mig 1400) first: on a plan it decides the
+                  shop's share of new contracts, and the shop % below only
+                  still counts for contracts opened before the plan. */}
+              <div className="flex flex-col">
+                <label className="form-label">{t('shopCommission.plan')}</label>
+                <div className="flex items-center gap-2 text-sm min-w-0">
+                  <span className={`truncate ${currentPlan ? 'font-medium' : 'text-subtle'}`}>
+                    {currentPlan ? currentPlanName : t('shopCommission.planNoneShort')}
+                  </span>
+                  {onChangePlan && (
+                    <Button size="sm" variant="outline" className="shrink-0" onClick={onChangePlan}>
+                      {t('shopCommission.planChange')}
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-subtle mt-1">{t('shopCommission.planEffectHint')}</p>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col">
                   <label className="form-label">{t('dealPartnerRate.branchRate')}</label>
@@ -842,6 +874,9 @@ function BranchConfigModal({ open, onClose, config, warehouses, onSaved }: {
                     )}
                   />
                   <FormErrorMessage error={errors.branch_rate_percent} />
+                  {currentPlan && (
+                    <p className="text-xs text-subtle mt-1">{t('shopCommission.branchRateBeforePlan')}</p>
+                  )}
                 </div>
                 <div className="flex flex-col">
                   <label className="form-label">{t('dealPartnerRate.companyRate')}</label>
@@ -871,18 +906,6 @@ function BranchConfigModal({ open, onClose, config, warehouses, onSaved }: {
                 </p>
               )}
 
-              {/* Commission plan (mig 1400) — read here, changed from the shop
-                  list's own button: the plans need room to be explained, and a
-                  window opened from inside this one is harder to follow. */}
-              <div className="flex flex-col">
-                <label className="form-label">{t('shopCommission.plan')}</label>
-                <div className="text-sm">
-                  {config?.commission_plan
-                    ? (config.commission_plan_name ?? config.commission_plan)
-                    : t('shopCommission.planNoneShort')}
-                </div>
-                <p className="text-xs text-subtle mt-1">{t('shopCommission.planChangeFromList')}</p>
-              </div>
 
               {/* This shop's contract fee, inside the holding band (mig 1173). */}
               <div className="flex flex-col">
@@ -1088,6 +1111,9 @@ export function DealPartnerRatesPage() {
   const [editConfig, setEditConfig] = useState<BranchConfigRow | null>(null);
   const [configModalOpen, setConfigModalOpen] = useState(false);
   const [planShop, setPlanShop] = useState<BranchConfigRow | null>(null);
+  // The plan last saved from the plan window — the edit window, if open on
+  // the same shop, shows it without reloading its own (possibly edited) form.
+  const [planSaved, setPlanSaved] = useState<PlanSaved | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(10);
 
@@ -1118,6 +1144,7 @@ export function DealPartnerRatesPage() {
 
   const handleEdit = (row: BranchConfigRow) => {
     setEditConfig(row);
+    setPlanSaved(null);
     setConfigModalOpen(true);
   };
 
@@ -1158,35 +1185,10 @@ export function DealPartnerRatesPage() {
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.commissionSection')} />,
       cell: ({ row }) => (
         <div className="min-w-0 max-w-[17rem]">
-          <div className="text-sm truncate">
-            <span className="tabular-nums font-medium">{fmtPct(row.original.total_rate_percent)}</span>
-            <span className="text-xs text-subtle tabular-nums">
-              {' · '}
-              {t('dealPartnerRate.rateSplit', {
-                branch: fmtPct(row.original.branch_rate_percent),
-                company: fmtPct(row.original.company_rate_percent),
-              })}
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5 text-xs min-w-0">
-            <span className={`truncate ${
-              row.original.commission_plan_is_active === false ? 'text-warning-fg'
-                : row.original.commission_plan ? 'text-fg' : 'text-subtle'
-            }`}>
-              {row.original.commission_plan
-                ? (row.original.commission_plan_name ?? row.original.commission_plan)
-                : t('shopCommission.planNoneShort')}
-            </span>
-            {canManage && (
-              <button
-                type="button"
-                onClick={() => setPlanShop(row.original)}
-                className="shrink-0 text-primary-fg hover:underline bg-transparent border-none p-0 cursor-pointer"
-              >
-                {t('shopCommission.planChange')}
-              </button>
-            )}
-          </div>
+          <ShopCommissionRates
+            row={row.original}
+            onChangePlan={canManage ? () => setPlanShop(row.original) : undefined}
+          />
         </div>
       ),
     },
@@ -1378,13 +1380,11 @@ export function DealPartnerRatesPage() {
                       </div>
                       {riskBadge(row.risk_party)}
                     </div>
-                    <div className="flex items-center justify-between mt-1.5 text-sm">
-                      <span className="text-xs text-subtle">
-                        {t('dealPartnerRate.branchRate')} {fmtPct(row.branch_rate_percent)}
-                        {' · '}
-                        {t('dealPartnerRate.companyRate')} {fmtPct(row.company_rate_percent)}
-                      </span>
-                      <span className="tabular-nums font-medium">{fmtPct(row.total_rate_percent)}</span>
+                    <div className="mt-1.5">
+                      <ShopCommissionRates
+                        row={row}
+                        onChangePlan={canManage ? () => setPlanShop(row) : undefined}
+                      />
                     </div>
                     <div className="flex items-center gap-1 text-xs text-subtle mt-1">
                       <Receipt size={12} />
@@ -1393,22 +1393,6 @@ export function DealPartnerRatesPage() {
                     <div className="flex items-center gap-1 text-xs text-subtle mt-1">
                       <ShieldCheck size={12} />
                       <span>{t('dealPartnerRate.guaranteeFeeAmount')} {fmtBaht(row.guarantee_return_fee_amount)}</span>
-                    </div>
-                    <div className="flex items-center gap-2 mt-1.5">
-                      <span className="text-xs text-subtle truncate flex-1 min-w-0">
-                        {t('shopCommission.plan')} · {row.commission_plan
-                          ? (row.commission_plan_name ?? row.commission_plan)
-                          : t('shopCommission.planNoneShort')}
-                      </span>
-                      {canManage && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={e => { e.stopPropagation(); setPlanShop(row); }}
-                        >
-                          {t('shopCommission.planChange')}
-                        </Button>
-                      )}
                     </div>
                     {row.return_to_branch_name && (
                       <div className="flex items-center gap-1 text-xs text-subtle mt-1">
@@ -1447,18 +1431,27 @@ export function DealPartnerRatesPage() {
         policy={policy}
         onSaved={handleSaved}
       />
-      <CommissionPlanModal
-        open={!!planShop}
-        shop={planShop}
-        onClose={() => setPlanShop(null)}
-        onSaved={handleSaved}
-      />
       <BranchConfigModal
         open={configModalOpen}
         onClose={() => setConfigModalOpen(false)}
         config={editConfig}
         warehouses={warehouses}
         onSaved={handleSaved}
+        planSaved={planSaved}
+        onChangePlan={canManage && editConfig ? () => setPlanShop(
+          // A plan saved from this same window moments ago is the current one,
+          // even though the shop row it was opened with predates it.
+          planSaved && planSaved.branch_id === editConfig.branch_id
+            ? { ...editConfig, commission_plan: planSaved.commission_plan, commission_plan_name: planSaved.commission_plan_name }
+            : editConfig,
+        ) : undefined}
+      />
+      {/* After the edit window so it opens on top of it when changed from there. */}
+      <CommissionPlanModal
+        open={!!planShop}
+        shop={planShop}
+        onClose={() => setPlanShop(null)}
+        onSaved={(saved) => { handleSaved(); setPlanSaved(saved); }}
       />
     </>
   );

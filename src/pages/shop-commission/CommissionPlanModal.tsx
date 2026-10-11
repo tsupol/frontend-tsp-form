@@ -25,7 +25,7 @@ export interface CommissionPlanTarget {
   commission_plan_name: string | null;
 }
 
-interface SavedRow {
+export interface SavedRow {
   commission_plan: string | null;
   commission_plan_name: string | null;
   commission_plan_tranches: PlanTranche[] | null;
@@ -35,7 +35,8 @@ interface Props {
   open: boolean;
   shop: CommissionPlanTarget | null;
   onClose: () => void;
-  onSaved: () => void;
+  /** Called with what the backend saved, for screens showing the plan beneath. */
+  onSaved: (saved: SavedRow & { branch_id: number }) => void;
 }
 
 export function CommissionPlanModal({ open, shop: shopProp, onClose, onSaved }: Props) {
@@ -82,7 +83,7 @@ export function CommissionPlanModal({ open, shop: shopProp, onClose, onSaved }: 
       });
       setResult(saved);
       setView('done');
-      onSaved();
+      onSaved({ ...saved, branch_id: shop.branch_id });
     } catch (err) {
       setError(translateApiError(err, t));
     } finally {

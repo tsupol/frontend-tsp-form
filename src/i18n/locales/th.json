@@ -4208,7 +4208,7 @@
     "noWarehouseForCompany": "company นี้ยังไม่มีคลังรับคืน — ติ๊กเลือกคลังในส่วนระดับ company ด้านบนก่อน",
     "payoutColumn": "บัญชีรับเงินร้าน",
     "payoutMissing": "ยังไม่ตั้ง",
-    "rateSplit": "ร้าน {{branch}} · company {{company}}",
+    "rateSplit": "ร้าน {{branch}} · บริษัท {{company}}",
     "feesColumn": "ค่าทำสัญญา / ค่าคืนเครื่อง",
     "guaranteeFeeShort": "คืนเครื่อง {{value}}",
     "warehouseGroupWithCount": "เป็นคลัง {{count}}/{{total}} สาขา",
@@ -9669,7 +9669,8 @@
     "planSaved": "บันทึกแผนค่าคอมแล้ว",
     "planSteps": "จ่ายเป็นก้อน",
     "planChange": "เปลี่ยน",
-    "planChangeFromList": "เปลี่ยนได้จากปุ่ม \"เปลี่ยน\" ในรายการร้าน"
+    "ratesUnderPlan": "บริษัท {{company}} · ร้าน {{branch}} สำหรับสัญญาก่อนมีแผน",
+    "branchRateBeforePlan": "ใช้กับสัญญาที่เปิดก่อนมีแผนเท่านั้น — สัญญาใหม่ร้านได้ตามแผน"
   },
   "fundDayGuard": {
     "closedToday": "วันที่ {{date}} ปิดวันกองทุนแล้ว — บันทึกได้พรุ่งนี้",
