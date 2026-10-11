@@ -13,7 +13,7 @@
 import { OverflowTabs } from '../../components/OverflowTabs';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   PageNav, PageNavPanel, DataTable, MobileHeader, Badge, Button, InputDateRangePicker,
   createDateRangePresets,
@@ -35,6 +35,7 @@ import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { useCommissionExtraQueue, type CommissionExtraQueueRow } from '../shop-commission/useShopCommission';
 import { waitingSummary } from '../shop-commission/shopCommissionTypes';
 import { CommissionExtraCreateModal } from '../shop-commission/CommissionExtraCreateModal';
+import { CommissionExtraShopPanel } from './CommissionExtraShopPanel';
 
 /** The build queue, the commission-tranche queue, then the documents by status. */
 type TabKey = 'BUILD' | 'COMMISSION' | FundBillStatus;
@@ -83,6 +84,14 @@ export function FundBillsPage() {
   const { hasPermission } = useMyPermissions();
   const canBundle = hasPermission('PARTNER.PAYOUT_APPROVE');
   const [bundleShop, setBundleShop] = useState<CommissionExtraQueueRow | null>(null);
+  // The commission tab's rows are shops, not documents, so its selection is a
+  // shop id in the query string (`?shop=`), separate from the document id.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const extraShopId = Number(searchParams.get('shop')) || null;
+  const extraShop = tab === 'COMMISSION'
+    ? commissionQueue.rows.find(r => r.branch_id === extraShopId) ?? null
+    : null;
+  const pickExtraShop = (id: number) => setSearchParams({ shop: String(id) }, { replace: true });
   const isQueueTab = tab === 'BUILD' || tab === 'COMMISSION';
   const list = useFundBillList({
     status: isQueueTab ? 'DRAFT' : tab,
@@ -230,10 +239,22 @@ export function FundBillsPage() {
               {tab === 'COMMISSION' ? (
                 <DataTable<CommissionExtraQueueRow>
                   data={commissionQueue.rows}
+                  getRowProps={row => ({
+                    'data-state': row.original.branch_id === extraShopId ? 'selected' : undefined,
+                  })}
+                  enableKeyboardNav={!isMobile}
+                  keyboardActivateMode="manual"
+                  onRowActivate={row => pickExtraShop(row.original.branch_id)}
                   renderRow={row => {
                     const r = row.original;
                     return (
-                      <div className="w-full px-4 py-2.5 flex items-center gap-3">
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        className="w-full px-4 py-2.5 flex items-center gap-3 cursor-pointer"
+                        onClick={() => { pickExtraShop(r.branch_id); if (isMobile) goTo('detail'); }}
+                        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pickExtraShop(r.branch_id); if (isMobile) goTo('detail'); } }}
+                      >
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <Store size={14} className="text-subtle shrink-0" />
@@ -259,8 +280,8 @@ export function FundBillsPage() {
                             </div>
                           )}
                         </div>
-                        {canBundle && (
-                          <Button size="sm" variant={r.ready_count > 0 ? 'primary' : 'outline'} onClick={() => setBundleShop(r)}>
+                        {canBundle && r.ready_count > 0 && (
+                          <Button size="sm" variant="primary" onClick={e => { e.stopPropagation(); setBundleShop(r); }}>
                             {t('shopCommission.extraCreateAction')}
                           </Button>
                         )}
@@ -391,7 +412,16 @@ export function FundBillsPage() {
               id="detail"
               className={isMobile ? '' : 'flex-1 min-w-0 min-h-0 flex flex-col'}
             >
-              {selectedId ? (
+              {tab === 'COMMISSION' ? (
+                extraShop ? (
+                  <CommissionExtraShopPanel shop={extraShop} canBundle={canBundle} onBundle={() => setBundleShop(extraShop)} />
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center gap-2 text-subtler">
+                    <Store size={40} />
+                    <div className="text-sm">{t('fundBill.selectShopToView')}</div>
+                  </div>
+                )
+              ) : selectedId ? (
                 <FundBillDetailPanel billId={selectedId} isMobile={isMobile} />
               ) : (
                 <div className="flex-1 flex flex-col items-center justify-center gap-2 text-subtler">

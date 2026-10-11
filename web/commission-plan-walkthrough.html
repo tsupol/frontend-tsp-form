@@ -600,28 +600,32 @@
 </div>
 
 <div class="screen">
-  <div class="bar"><b>เอกสารเงินของกองทุน — แท็บ ค่าคอมส่วนเพิ่ม</b> <code>/admin/fund-bills</code> <span class="who fund">FINANCE</span></div>
+  <div class="bar"><b>เอกสารเงินของกองทุน — แท็บ ค่าคอมส่วนเพิ่ม</b> <code>/admin/fund-bills?shop=7</code> <span class="who fund">FINANCE</span></div>
   <div class="body">
     <ul class="sees">
-      <li>ร้านละแถว: <span class="label">พร้อมรวบ N ก้อน</span> และก้อนที่ยังรออยู่แยกเหตุผล (รอปิดวัน / รอพ้นวัน / รอครบกำหนด)</li>
-      <li>ปุ่ม <span class="label">รวบ</span> เปิดหน้าต่างยืนยัน บอกว่าจะรวมกี่ก้อนเป็นใบร่าง 1 ใบ · ถ้ายังไม่มีก้อนพร้อม หน้าต่างบอกว่ารออะไร และปุ่มรวบในนั้นกดไม่ได้</li>
+      <li>ร้านละแถว: <span class="label">พร้อมรวบ N ก้อน</span> และก้อนที่ยังรออยู่แยกเหตุผล (รอปิดวัน / รอพ้นวัน / รอครบกำหนด) · ปุ่ม <span class="label">รวบ</span> บนแถวโผล่เฉพาะร้านที่มีก้อนพร้อม</li>
+      <li>กดแถว → ด้านขวาแสดงก้อนของร้านนั้นเป็น 2 กลุ่ม: <span class="label">พร้อมรวบ</span> และ <span class="label">รออยู่</span> ก้อนละบรรทัด บอกสัญญา ก้อนไหน สถานะ วันที่ และยอด</li>
+      <li><span class="label">รวบ</span> มุมขวาบนของแผงกดได้เมื่อมีก้อนพร้อมอย่างน้อย 1 ก้อน · เปิดหน้าต่างยืนยัน → ใบร่าง 1 ใบ</li>
       <li>ใบที่รวบแล้วไปโผล่ในแท็บ ร่าง → ออกใบแล้ว → ชำระครบ เหมือนใบจ่ายร้านเดิม</li>
     </ul>
     <figure class="shot">
       <div class="pic">
-        <img src="shots/cp-07-fund-bills-extra.png" alt="เอกสารเงินของกองทุน แท็บค่าคอมส่วนเพิ่ม">
-        <button class="hs" data-n="1" style="left:20.8%;top:3.1%;width:10.1%;height:8.2%">
-          <span class="tip"><b>แท็บใหม่</b> ค่าคอมส่วนเพิ่ม — อยู่ข้าง "รอจัดใบ" ของใบขอรับเงินเดิม</span>
+        <img src="shots/cp-07-fund-bills-extra.png" alt="เอกสารเงินของกองทุน แท็บค่าคอมส่วนเพิ่ม ร้านถูกเลือก">
+        <button class="hs" data-n="1" style="left:16.7%;top:8.7%;width:28.7%;height:9.9%">
+          <span class="tip"><b>แถวร้าน</b> พร้อมรวบ 0 ก้อน · รอพ้นวัน 1 — กดแถวเพื่อดูว่าก้อนไหน</span>
         </button>
-        <button class="hs" data-n="2" style="left:17.4%;top:8.9%;width:23.9%;height:9.4%">
-          <span class="tip"><b>ร้านละแถว</b> พร้อมรวบ 0 ก้อน · รอพ้นวัน 1 — ก้อนงวด 1 ของสัญญาตัวอย่างยังรอวันของบิลผ่านไป</span>
+        <button class="hs" data-n="2" style="left:45.8%;top:10.3%;width:53.3%;height:6.2%">
+          <span class="tip"><b>พร้อมรวบ (0)</b> สิ่งที่ปุ่มรวบจะรวมตอนนี้ — ยังว่าง</span>
         </button>
-        <button class="hs" data-n="3" style="left:39.6%;top:9.6%;width:5.6%;height:8.1%">
-          <span class="tip"><b>รวบ</b> เปิดหน้าต่างยืนยัน — ตอนนี้จะบอกว่ายังไม่มีก้อนพร้อม และให้รวบไม่ได้</span>
+        <button class="hs" data-n="3" style="left:45.8%;top:25.9%;width:53.3%;height:6.8%">
+          <span class="tip"><b>รออยู่ (1)</b> สัญญา CT-2610-000444-4 งวด 1 5% = 480 · "ปลดแล้ว · รอพ้นวันของบิล" ปลดเมื่อ 11 ต.ค.</span>
+        </button>
+        <button class="hs" data-n="4" style="left:95.2%;top:3.4%;width:4.8%;height:8.1%">
+          <span class="tip"><b>รวบ</b> กดไม่ได้จนกว่าจะมีก้อนพร้อม — ชี้ค้างจะบอกว่ารออะไร</span>
         </button>
       </div>
       <p class="hint"><span class="k">1</span>เอาเมาส์ชี้กรอบ ระบบจะตัดส่วนนั้นมาขยายให้พร้อมคำอธิบาย · กดเพื่อค้างไว้</p>
-      <figcaption>วันที่ถ่าย DEV ยังไม่มีก้อนที่พร้อมรวบ — ก้อนแรกจะพร้อมวันที่ 18 ต.ค. 2026 (พ้นวันบิล + ถือ 7 วัน)</figcaption>
+      <figcaption>ร้าน DEV Deal Partner X ถูกเลือก — ยังไม่มีก้อนพร้อม ก้อนแรกจะพร้อมวันที่ 18 ต.ค. 2026 (พ้นวันบิล + ถือ 7 วัน)</figcaption>
     </figure>
 
   </div>

@@ -4961,7 +4961,8 @@
     "lineType_CAPITAL_IN": "Fund top-up",
     "lineType_CAPITAL_OUT": "Fund withdrawal",
     "lineType_OPERATING_EXPENSE": "Operating expense",
-    "purpose_COMMISSION_EXTRA": "Extra commission"
+    "purpose_COMMISSION_EXTRA": "Extra commission",
+    "selectShopToView": "Pick a shop to see which steps are ready and which are still waiting"
   },
   "fundBook": {
     "amount": "Amount",
@@ -9683,7 +9684,9 @@
     "planSaved": "Commission plan saved",
     "planSteps": "Paid in steps",
     "planChange": "Change",
-    "ratesUnderPlan": "Company {{company}}"
+    "ratesUnderPlan": "Company {{company}}",
+    "panelReady": "Ready to bundle",
+    "panelWaiting": "Still waiting"
   },
   "fundDayGuard": {
     "closedToday": "The fund's day {{date}} is already closed — this can be recorded tomorrow.",
