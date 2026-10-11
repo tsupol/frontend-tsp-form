@@ -312,6 +312,8 @@ export function useFundBillInvalidate() {
     queryClient.invalidateQueries({ queryKey: ['partner-settlements'] });
     queryClient.invalidateQueries({ queryKey: ['partner-settlement-queue'] });
     queryClient.invalidateQueries({ queryKey: ['nav', 'counters'] });
+    // Commission tranches follow the commission document through every step.
+    queryClient.invalidateQueries({ queryKey: ['shop-commission'] });
     if (billId != null) {
       queryClient.invalidateQueries({ queryKey: ['fund-bills', 'detail', billId] });
       queryClient.invalidateQueries({ queryKey: ['fund-bills', 'actions', billId] });

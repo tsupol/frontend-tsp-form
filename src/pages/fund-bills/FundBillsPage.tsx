@@ -31,13 +31,17 @@ import {
   type FundBillStatus,
 } from './fundBillTypes';
 import type { FundBillCandidateBranch } from './useFundBills';
+import { useMyPermissions } from '../../hooks/useMyPermissions';
+import { useCommissionExtraQueue, type CommissionExtraQueueRow } from '../shop-commission/useShopCommission';
+import { waitingSummary } from '../shop-commission/shopCommissionTypes';
+import { CommissionExtraCreateModal } from '../shop-commission/CommissionExtraCreateModal';
 
-/** The build queue, then the documents by status. */
-type TabKey = 'BUILD' | FundBillStatus;
+/** The build queue, the commission-tranche queue, then the documents by status. */
+type TabKey = 'BUILD' | 'COMMISSION' | FundBillStatus;
 
 /** `PARTIAL` is a real status but nothing in this flow produces one today, so it
  *  is not given a tab of its own — a document in it would still open by link. */
-const TABS: TabKey[] = ['BUILD', 'DRAFT', 'ISSUED', 'PAID', 'VOIDED'];
+const TABS: TabKey[] = ['BUILD', 'COMMISSION', 'DRAFT', 'ISSUED', 'PAID', 'VOIDED'];
 
 /** Turn a typed `DD/MM/YYYY` (Buddhist years included) into a Date. */
 function parseTypedDate(raw: string): Date | null {
@@ -75,8 +79,13 @@ export function FundBillsPage() {
   useEffect(() => { setPageIndex(0); }, [tab, dateFrom, dateTo]);
 
   const branches = useFundBillCandidateBranches();
+  const commissionQueue = useCommissionExtraQueue();
+  const { hasPermission } = useMyPermissions();
+  const canBundle = hasPermission('PARTNER.PAYOUT_APPROVE');
+  const [bundleShop, setBundleShop] = useState<CommissionExtraQueueRow | null>(null);
+  const isQueueTab = tab === 'BUILD' || tab === 'COMMISSION';
   const list = useFundBillList({
-    status: tab === 'BUILD' ? 'DRAFT' : tab,
+    status: isQueueTab ? 'DRAFT' : tab,
     dateFrom: tab === 'PAID' ? dateFrom : undefined,
     dateTo: tab === 'PAID' ? dateTo : undefined,
     pageIndex,
@@ -92,7 +101,9 @@ export function FundBillsPage() {
     t(`fundBill.status_${code}`, { defaultValue: code });
 
   const tabLabel = (key: TabKey) =>
-    key === 'BUILD' ? t('fundBill.tabBuild') : statusLabel(key);
+    key === 'BUILD' ? t('fundBill.tabBuild')
+      : key === 'COMMISSION' ? t('shopCommission.tabCommission')
+        : statusLabel(key);
 
   const rangePresets = useMemo(
     () => createDateRangePresets({
@@ -144,7 +155,9 @@ export function FundBillsPage() {
               <span className="text-sm text-subtle">
                 {tab === 'BUILD'
                   ? t('fundBill.shopsWaitingCount', { count: branches.rows.length })
-                  : t('fundBill.documentCount', { count: list.totalCount })}
+                  : tab === 'COMMISSION'
+                    ? t('fundBill.shopsWaitingCount', { count: commissionQueue.rows.length })
+                    : t('fundBill.documentCount', { count: list.totalCount })}
               </span>
             </div>
           )}
@@ -214,7 +227,52 @@ export function FundBillsPage() {
                 </div>
               )}
 
-              {tab === 'BUILD' ? (
+              {tab === 'COMMISSION' ? (
+                <DataTable<CommissionExtraQueueRow>
+                  data={commissionQueue.rows}
+                  renderRow={row => {
+                    const r = row.original;
+                    return (
+                      <div className="w-full px-4 py-2.5 flex items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <Store size={14} className="text-subtle shrink-0" />
+                            <span className="font-medium text-sm truncate">{r.branch_name ?? '—'}</span>
+                          </div>
+                          <div className="flex items-center gap-3 mt-1 text-xs text-subtle flex-wrap">
+                            <span className={r.ready_count > 0 ? 'text-success-fg font-medium' : ''}>
+                              {t('shopCommission.queueReady', { count: r.ready_count })}
+                            </span>
+                            {r.ready_count > 0 && (
+                              <span className="tabular-nums text-fg font-medium">{fmtCurrency(r.ready_amount)}</span>
+                            )}
+                          </div>
+                          {(r.wait_day_close_count > 0 || r.wait_day_end_count > 0 || r.wait_hold_count > 0) && (
+                            <div className="text-xs text-subtler mt-0.5">
+                              {t('shopCommission.queueWaiting', {
+                                parts: waitingSummary({
+                                  wait_day_close: r.wait_day_close_count,
+                                  wait_day_end: r.wait_day_end_count,
+                                  wait_hold: r.wait_hold_count,
+                                }, t),
+                              })}
+                            </div>
+                          )}
+                        </div>
+                        {canBundle && (
+                          <Button size="sm" variant={r.ready_count > 0 ? 'primary' : 'outline'} onClick={() => setBundleShop(r)}>
+                            {t('shopCommission.extraCreateAction')}
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  }}
+                  className={`flex-1 min-h-0 panel-datatable ${commissionQueue.isFetching ? 'opacity-60' : ''} transition-opacity`}
+                  noResults={
+                    <div className="p-8 text-center text-subtler">{t('shopCommission.queueEmpty')}</div>
+                  }
+                />
+              ) : tab === 'BUILD' ? (
                 <DataTable<FundBillCandidateBranch>
                   data={branches.rows}
                   enableKeyboardNav={!isMobile}
@@ -343,6 +401,17 @@ export function FundBillsPage() {
               )}
             </PageNavPanel>
           </div>
+
+          <CommissionExtraCreateModal
+            open={!!bundleShop}
+            shop={bundleShop}
+            onClose={() => setBundleShop(null)}
+            onOpenBill={id => {
+              setTab('DRAFT');
+              navigate(`/admin/fund-bills/${id}`);
+              if (isMobile) goTo('detail');
+            }}
+          />
         </>
       )}
     </PageNav>

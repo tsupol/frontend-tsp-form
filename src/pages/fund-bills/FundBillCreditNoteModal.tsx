@@ -147,16 +147,21 @@ export function FundBillCreditNoteModal({ open, bill, onClose }: FundBillCreditN
             detailRows={[
               { label: t('fundBill.creditNoteOfBill'), value: result.bill_code },
               { label: t('fundBill.creditNoteReason'), value: result.reason_code },
-              {
-                label: t('fundBill.settlementsReopened'),
-                value: String(result.released_settlements),
-              },
+              // A commission document holds tranches, not payment requests, so
+              // there is nothing to reopen; its tranches go back to ready instead.
+              ...(bill?.bill_purpose !== 'COMMISSION_EXTRA'
+                ? [{ label: t('fundBill.settlementsReopened'), value: String(result.released_settlements) }]
+                : []),
               { label: t('fundBill.netAmount'), value: fmtCurrency(result.net_amount), emphasis: true },
             ]}
             extras={
               <div className="flex flex-col gap-3">
                 <div className="alert alert-info">
-                  <span>{t('fundBill.creditNoteRecheckHint')}</span>
+                  <span>
+                    {bill?.bill_purpose === 'COMMISSION_EXTRA'
+                      ? t('shopCommission.creditNoteTranchesBack')
+                      : t('fundBill.creditNoteRecheckHint')}
+                  </span>
                 </div>
                 {devices.length > 0 && (
                   <div className="rounded-md border border-line overflow-hidden">

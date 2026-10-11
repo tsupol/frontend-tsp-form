@@ -34,6 +34,8 @@ export const SHOP_ALLOWED_PATHS = new Set<string>([
   '/admin/contracts/settlement-payment',
   '/admin/contracts/partner-payouts',
   '/admin/contracts/partner-commission',
+  // Commission by plan, tranche by tranche (work order 2026-10-10 §D).
+  '/admin/contracts/my-commission',
   // Device-return documents (146) — the only way an active shop contract ends.
   '/admin/contracts/returns',
   '/admin/contracts/pending-payment',

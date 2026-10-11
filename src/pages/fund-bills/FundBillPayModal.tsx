@@ -219,7 +219,11 @@ export function FundBillPayModal({ open, bill, onClose }: FundBillPayModalProps)
             detailRows={[
               { label: t('fundBill.paidDate'), value: <DateTime value={result.paid_date} showTime={false} /> },
               { label: t('fundBill.branchTransferred'), value: fmtCurrency(result.branch_net), emphasis: true },
-              { label: t('fundBill.companyRecorded'), value: fmtCurrency(result.company_net) },
+              // A commission document carries no company share — its line would
+              // only ever read ฿0.
+              ...(bill?.bill_purpose !== 'COMMISSION_EXTRA'
+                ? [{ label: t('fundBill.companyRecorded'), value: fmtCurrency(result.company_net) }]
+                : []),
               ...(result.source_account_display
                 ? [{ label: t('fundBill.sourceAccount'), value: result.source_account_display }]
                 : []),

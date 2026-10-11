@@ -65,6 +65,10 @@ const HIDDEN_REASONS = new Set(['status_not_allowed', 'permission_denied', 'not_
 /** Actions with a modal here. Anything else the backend adds shows as not-wired. */
 const WIRED_ACTIONS = new Set(['ISSUE', 'PAY', 'VOID', 'CREDIT_NOTE', 'ADD_LINE', 'CLAWBACK_COLLECT']);
 
+/** A commission document's lines are the released tranches and nothing else —
+ *  the backend allows no hand-entered or added rows on it (mig 1401). */
+const NO_EDIT_PURPOSE_ACTIONS = new Set(['ADD_LINE', 'ADD_SETTLEMENT', 'REMOVE_LINE', 'REMOVE_SETTLEMENT']);
+
 /** Actions driven from a row rather than the footer. */
 const ROW_ACTIONS = new Set(['ADD_SETTLEMENT', 'REMOVE_SETTLEMENT', 'REMOVE_LINE']);
 
@@ -181,14 +185,19 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
     settlements.rows.find(s => s.settlement_id === id)?.net_amount ?? null;
   const manualLines = documentLines.filter(l => l.is_manual);
 
+  const isCommissionExtra = bill?.bill_purpose === 'COMMISSION_EXTRA';
+  const purposeAllows = (code: string) => !(isCommissionExtra && NO_EDIT_PURPOSE_ACTIONS.has(code));
+
   const footerActions = (actions?.actions ?? [])
     .filter(a => !ROW_ACTIONS.has(a.action_code))
+    .filter(a => purposeAllows(a.action_code))
     .filter(a => a.is_available || !HIDDEN_REASONS.has(a.blocking_reason ?? ''))
     .sort((a, b) => a.sort_order - b.sort_order);
 
   /** Is a row-level action offered at all right now? */
   const rowActionOk = (code: string) =>
-    (actions?.actions ?? []).some(a => a.action_code === code && a.is_available);
+    purposeAllows(code)
+    && (actions?.actions ?? []).some(a => a.action_code === code && a.is_available);
 
   const runAction = (code: string) => {
     if (code === 'ISSUE') setIssueOpen(true);
@@ -375,7 +384,55 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
               )}
             </div>
 
+            {/* A commission document: one line per released tranche, each its
+             *  own contract. No payment requests, so nothing to group by. */}
+            {isCommissionExtra && (
+              <div className="rounded-md border border-line overflow-hidden">
+                <div className="px-3 py-2 bg-surface flex items-center gap-2">
+                  <Store size={14} className="text-subtle" />
+                  <span className="text-sm font-medium">
+                    {t('shopCommission.billTranches', { count: documentLines.length })}
+                  </span>
+                </div>
+                {documentLines.length === 0 ? (
+                  <div className="p-6 text-center text-subtler text-sm">{t('fundBill.noLinesYet')}</div>
+                ) : documentLines.map(line => (
+                  <div key={line.line_id} className="px-3 py-2 border-t border-line">
+                    <div className="flex items-center gap-2">
+                      {line.contract_id ? (
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/admin/contracts/search/${line.contract_id}`)}
+                          className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
+                        >
+                          {formatEntityCode(line.contract_code)}
+                          <ExternalLink size={12} />
+                        </button>
+                      ) : (
+                        <span className="text-sm">—</span>
+                      )}
+                      {line.installments_paid != null && (
+                        <Badge color="default" size="sm">
+                          {t('shopCommission.payNoN', { n: line.installments_paid })}
+                          {line.tier_pct != null && ` · ${Number(line.tier_pct)}%`}
+                        </Badge>
+                      )}
+                      <span className="flex-1" />
+                      <span className="text-sm tabular-nums shrink-0">{fmtCurrency(line.amount)}</span>
+                    </div>
+                    {line.note && <div className="text-xs text-subtle mt-0.5">{line.note}</div>}
+                  </div>
+                ))}
+                <div className="border-t border-line bg-surface px-3 py-2 flex items-center gap-2">
+                  <span className="text-sm font-medium">{t('fundBill.documentTotal')}</span>
+                  <span className="flex-1" />
+                  <span className="text-sm font-semibold tabular-nums">{fmtCurrency(documentNet)}</span>
+                </div>
+              </div>
+            )}
+
             {/* The document's lines, grouped by contract. */}
+            {!isCommissionExtra && (
             <div className="rounded-md border border-line overflow-hidden">
               <div className="px-3 py-2 bg-surface flex items-center gap-2">
                 <Store size={14} className="text-subtle" />
@@ -492,6 +549,7 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
                 </>
               )}
             </div>
+            )}
 
             {/* Documents that cleared this one — a buyback, a clawback. */}
             {clearings.rows.length > 0 && (

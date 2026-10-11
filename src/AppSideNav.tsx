@@ -510,6 +510,11 @@ export const AppSideNav = () => {
               icon: <Wallet size="1rem" />,
               label: t('nav.partnerBalance'),
               path: '/admin/partner-balance',
+            }, {
+              key: 'shop-commission',
+              icon: <Layers size="1rem" />,
+              label: t('nav.shopCommission'),
+              path: '/admin/shop-commission',
             }]
           : []),
         ...(canPayPartners

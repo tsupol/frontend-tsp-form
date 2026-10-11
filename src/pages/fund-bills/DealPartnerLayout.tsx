@@ -11,7 +11,7 @@
 import { type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Store, Receipt, Banknote, Wallet, PackageCheck, Warehouse, Undo2, type LucideIcon } from 'lucide-react';
+import { Store, Receipt, Banknote, Wallet, PackageCheck, Warehouse, Undo2, Layers, type LucideIcon } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { useAuth } from '../../contexts/AuthContext';
@@ -39,6 +39,7 @@ const NAV_ITEMS: DealPartnerNavItem[] = [
   { path: '/admin/fund-bills', labelKey: 'nav.fundBills', icon: Banknote, anyOf: ['PARTNER.PAYOUT_APPROVE'] },
   { path: '/admin/fund-clawback', labelKey: 'nav.fundClawback', icon: Undo2, anyOf: ['PARTNER.PAYOUT_APPROVE'] },
   { path: '/admin/partner-balance', labelKey: 'nav.partnerBalance', icon: Wallet, anyOf: ['PARTNER.PAYOUT_APPROVE', 'PARTNER.CREDIT_APPROVE'] },
+  { path: '/admin/shop-commission', labelKey: 'nav.shopCommission', icon: Layers, anyOf: ['PARTNER.PAYOUT_APPROVE', 'PARTNER.CREDIT_APPROVE'] },
   { path: '/admin/partner-returns', labelKey: 'nav.staffPartnerReturns', icon: PackageCheck, anyOf: ['PARTNER.PAYOUT_APPROVE'], notUnder: '/admin/partner-returns/warehouse' },
   { path: '/admin/partner-returns/warehouse', labelKey: 'nav.staffPartnerReturnWarehouse', icon: Warehouse, anyOf: ['PARTNER.PAYOUT_APPROVE'] },
 ];

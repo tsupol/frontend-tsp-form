@@ -1,6 +1,6 @@
 import {
   Search, FilePlus, FileEdit, ClipboardCheck, Undo2, CreditCard,
-  PackageCheck, Hourglass, Banknote, Percent, PackageOpen, type LucideIcon,
+  PackageCheck, Hourglass, Banknote, Percent, PackageOpen, Layers, type LucideIcon,
 } from 'lucide-react';
 
 // The deal-partner shop's contract menu, in the order a shop works: one entry
@@ -48,6 +48,7 @@ export const SHOP_STAGES: ShopStage[] = [
   { key: 'settlement-payment', path: '/admin/contracts/settlement-payment', labelKey: 'nav.settlementPayment', icon: Hourglass, group: 'money' },
   { key: 'partner-payouts', path: '/admin/contracts/partner-payouts', labelKey: 'nav.partnerPayoutsShop', icon: Banknote, group: 'money' },
   { key: 'partner-commission', path: '/admin/contracts/partner-commission', labelKey: 'nav.partnerCommission', icon: Percent, group: 'money' },
+  { key: 'my-shop-commission', path: '/admin/contracts/my-commission', labelKey: 'nav.myShopCommission', icon: Layers, group: 'money' },
   { key: 'partner-returns', path: '/admin/contracts/returns', labelKey: 'nav.partnerReturns', icon: PackageOpen, group: 'money' },
 ];
 

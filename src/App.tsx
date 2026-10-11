@@ -77,6 +77,7 @@ import { PendingApprovalPage } from './pages/contracts/PendingApprovalPage';
 import { SettlementMenuPage } from './pages/partner-settlement/SettlementMenuPage';
 import { ShopPayoutsPage } from './pages/partner-settlement/ShopPayoutsPage';
 import { PartnerCommissionPage } from './pages/partner-settlement/PartnerCommissionPage';
+import { FinanceShopCommissionPage, MyShopCommissionPage } from './pages/shop-commission/ShopCommissionPage';
 import { ShopReturnsPage } from './pages/partner-return/ShopReturnsPage';
 import { PendingPairingPage } from './pages/contracts/PendingPairingPage';
 import { DepositedDevicesPage } from './pages/contracts/DepositedDevicesPage';
@@ -804,6 +805,17 @@ function App() {
           </ProtectedRoute>
         }
       />
+      {/* The shop's commission by plan, tranche by tranche (work order 10-10 §D). */}
+      <Route
+        path="/admin/contracts/my-commission/:contractId?"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <ContractsLayout><MyShopCommissionPage /></ContractsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
       {/* The shop's device-return documents (146). The optional id keeps one
           document linkable straight from the contract page. */}
       <Route
@@ -1020,6 +1032,19 @@ function App() {
             <AdminLayout>
               <DealPartnerLayout>
                 <PartnerCaseQueuePage />
+              </DealPartnerLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      {/* Shop commission by plan — fund finance's side (work order 10-10 §C). */}
+      <Route
+        path="/admin/shop-commission/:contractId?"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <DealPartnerLayout>
+                <FinanceShopCommissionPage />
               </DealPartnerLayout>
             </AdminLayout>
           </ProtectedRoute>

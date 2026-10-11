@@ -24,7 +24,10 @@ export type FundBillPurpose =
   | 'BUYBACK'
   | 'CLAWBACK'
   | 'CAPITAL_IN'
-  | 'CAPITAL_OUT';
+  | 'CAPITAL_OUT'
+  /** Shop commission tranches released by installments (mig 1401). Built by
+   *  one press per shop from the READY tranches; its lines are never edited. */
+  | 'COMMISSION_EXTRA';
 
 /** Whose money a line is — decides which of the two books it moves. */
 export type FundOwnerType = 'HOLDING' | 'COMPANY';

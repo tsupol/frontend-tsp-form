@@ -1292,5 +1292,7 @@
   "MDM.STATE.ASSET_NOT_ENROLLED": "This device has no MDM — the command cannot be sent.",
   "MDM.VALIDATION.LOST_MODE_PHONE_REQUIRED": "Neither the branch nor the company has a phone on file — enter a phone number.",
   "OPS.STATE.STATUS_NOT_SETTABLE": "This status cannot be set from here.",
-  "MDM.NOT_FOUND.ASSET": "Device not found."
+  "MDM.NOT_FOUND.ASSET": "Device not found.",
+  "sale.partner.commission_plan_invalid": "Commission plan {{commission_plan}} does not exist or is closed. Pick one from the list.",
+  "fund.commission_extra.empty": "Nothing is ready to bundle yet. Waiting for day close {{wait_day_close}} · waiting for the day to end {{wait_day_end}} · waiting for the hold period {{wait_hold}} · already in a document {{in_bill}}"
 }

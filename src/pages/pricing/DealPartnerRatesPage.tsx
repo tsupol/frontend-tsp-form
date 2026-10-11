@@ -21,6 +21,8 @@ import {
   payoutAccountDigits, EMPTY_PAYOUT_VALUE, type DealPartnerPayoutValue,
 } from '../../components/DealPartnerPayoutAccountField';
 import { DealPartnerCompanySection } from '../../components/DealPartnerCompanySection';
+import { planTranchesLabel, type PlanTranche } from '../shop-commission/shopCommissionTypes';
+import { CommissionPlanModal } from '../shop-commission/CommissionPlanModal';
 
 // ============================================================================
 // Deal partner terms — mig 1154/1155 model, extended by migs 1173/1191/1192.
@@ -133,6 +135,15 @@ interface BranchConfigRow {
   payout_account_no: string | null;
   payout_account_name: string | null;
   has_payout_account: boolean;
+  // Commission plan (mig 1400). NULL = no plan: contracts opened at this shop
+  // take the old pay-once-plus-clawback system. `_is_active` false means the
+  // plan was closed after being set — still in force here, but no longer
+  // offered to pick.
+  commission_plan: string | null;
+  commission_plan_name: string | null;
+  commission_plan_tranches: PlanTranche[] | null;
+  commission_plan_total_pct: number | null;
+  commission_plan_is_active: boolean | null;
 }
 
 /** v_deal_partner_warehouses — every internal branch in the holding, flagged.
@@ -786,6 +797,12 @@ function BranchConfigModal({ open, onClose, config, warehouses, onSaved }: {
               { label: t('dealPartnerRate.branchRate'), value: fmtPct(result.branch_rate_percent) },
               { label: t('dealPartnerRate.companyRate'), value: fmtPct(result.company_rate_percent) },
               { label: t('dealPartnerRate.totalRate'), value: fmtPct(result.total_rate_percent), emphasis: true },
+              {
+                label: t('shopCommission.plan'),
+                value: result.commission_plan
+                  ? `${result.commission_plan_name ?? result.commission_plan} · ${planTranchesLabel(result.commission_plan_tranches, t)}`
+                  : t('shopCommission.planNoneShort'),
+              },
               { label: t('dealPartnerRate.riskParty'), value: riskLabel(result.risk_party) },
               { label: t('dealPartnerRate.docFeeAmount'), value: fmtBaht(result.doc_fee_amount) },
               { label: t('dealPartnerRate.guaranteeFeeAmount'), value: fmtBaht(result.guarantee_return_fee_amount) },
@@ -853,6 +870,19 @@ function BranchConfigModal({ open, onClose, config, warehouses, onSaved }: {
                   {t('dealPartnerRate.rangeHint', { min: config.total_min, max: config.total_max })}
                 </p>
               )}
+
+              {/* Commission plan (mig 1400) — read here, changed from the shop
+                  list's own button: the plans need room to be explained, and a
+                  window opened from inside this one is harder to follow. */}
+              <div className="flex flex-col">
+                <label className="form-label">{t('shopCommission.plan')}</label>
+                <div className="text-sm">
+                  {config?.commission_plan
+                    ? (config.commission_plan_name ?? config.commission_plan)
+                    : t('shopCommission.planNoneShort')}
+                </div>
+                <p className="text-xs text-subtle mt-1">{t('shopCommission.planChangeFromList')}</p>
+              </div>
 
               {/* This shop's contract fee, inside the holding band (mig 1173). */}
               <div className="flex flex-col">
@@ -1057,6 +1087,7 @@ export function DealPartnerRatesPage() {
   const [policyModalOpen, setPolicyModalOpen] = useState(false);
   const [editConfig, setEditConfig] = useState<BranchConfigRow | null>(null);
   const [configModalOpen, setConfigModalOpen] = useState(false);
+  const [planShop, setPlanShop] = useState<BranchConfigRow | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(10);
 
@@ -1101,37 +1132,63 @@ export function DealPartnerRatesPage() {
     </Badge>
   );
 
-  // Five columns, not nine. The three rate columns said one thing three
-  // times, and the two fees are one question ("what does this shop charge?"),
-  // so each pair shares a cell with the secondary figure under the primary.
-  // The return branch moved out entirely — it is set in the modal and is not
-  // something you scan a list for.
+  // Three columns + edit, sized to fit the narrowest width the side menus
+  // leave, so the table never scrolls sideways. A table cell grows to its
+  // text, so long names are capped with max-w + truncate rather than trusted
+  // to shrink. The plan sits under the % it decides how to pay out.
   const columns: ColumnDef<BranchConfigRow>[] = [
     {
       accessorKey: 'branch_name',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.branch')} />,
       cell: ({ row }) => (
-        <div className="min-w-0">
+        <div className="min-w-0 max-w-[15rem]">
           <div className="text-sm font-medium truncate">{row.original.branch_name}</div>
-          <div className="text-xs text-subtle truncate">{row.original.company_name ?? '—'}</div>
+          <div className="text-xs text-subtle truncate">
+            {row.original.company_name ?? '—'}
+            {' · '}
+            {row.original.has_payout_account
+              ? (row.original.payout_bank_name ?? t('common.yes'))
+              : <span className="text-warning-fg">{t('dealPartnerRate.payoutColumn')} {t('dealPartnerRate.payoutMissing')}</span>}
+          </div>
         </div>
       ),
     },
     {
       accessorKey: 'total_rate_percent',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.totalRate')} />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.commissionSection')} />,
       cell: ({ row }) => (
-        <div className="min-w-0">
-          <div className="text-sm tabular-nums font-medium">{fmtPct(row.original.total_rate_percent)}</div>
-          <div className="text-xs text-subtle tabular-nums truncate">
-            {t('dealPartnerRate.rateSplit', {
-              branch: fmtPct(row.original.branch_rate_percent),
-              company: fmtPct(row.original.company_rate_percent),
-            })}
+        <div className="min-w-0 max-w-[17rem]">
+          <div className="text-sm truncate">
+            <span className="tabular-nums font-medium">{fmtPct(row.original.total_rate_percent)}</span>
+            <span className="text-xs text-subtle tabular-nums">
+              {' · '}
+              {t('dealPartnerRate.rateSplit', {
+                branch: fmtPct(row.original.branch_rate_percent),
+                company: fmtPct(row.original.company_rate_percent),
+              })}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs min-w-0">
+            <span className={`truncate ${
+              row.original.commission_plan_is_active === false ? 'text-warning-fg'
+                : row.original.commission_plan ? 'text-fg' : 'text-subtle'
+            }`}>
+              {row.original.commission_plan
+                ? (row.original.commission_plan_name ?? row.original.commission_plan)
+                : t('shopCommission.planNoneShort')}
+            </span>
+            {canManage && (
+              <button
+                type="button"
+                onClick={() => setPlanShop(row.original)}
+                className="shrink-0 text-primary-fg hover:underline bg-transparent border-none p-0 cursor-pointer"
+              >
+                {t('shopCommission.planChange')}
+              </button>
+            )}
           </div>
         </div>
       ),
-      className: 'w-32',
     },
     {
       accessorKey: 'doc_fee_amount',
@@ -1139,30 +1196,11 @@ export function DealPartnerRatesPage() {
       cell: ({ row }) => (
         <div className="min-w-0">
           <div className="text-sm tabular-nums">{fmtBaht(row.original.doc_fee_amount)}</div>
-          <div className="text-xs text-subtle tabular-nums truncate">
+          <div className="text-xs text-subtle tabular-nums whitespace-nowrap">
             {t('dealPartnerRate.guaranteeFeeShort', { value: fmtBaht(row.original.guarantee_return_fee_amount) })}
           </div>
         </div>
       ),
-      className: 'w-32 max-md:hidden',
-    },
-    {
-      // Since mig 1217 this reflects `clawback_by_branch` — who repays the
-      // commission — rather than being inferred from a non-zero company rate.
-      accessorKey: 'risk_party',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.riskParty')} />,
-      cell: ({ row }) => riskBadge(row.original.risk_party),
-      className: 'w-28 max-md:hidden',
-    },
-    {
-      accessorKey: 'has_payout_account',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('dealPartnerRate.payoutColumn')} />,
-      cell: ({ row }) => (
-        row.original.has_payout_account
-          ? <span className="text-sm text-subtle truncate block">{row.original.payout_bank_name ?? t('common.yes')}</span>
-          : <span className="text-sm text-warning-fg">{t('dealPartnerRate.payoutMissing')}</span>
-      ),
-      className: 'w-32 max-lg:hidden',
     },
     ...(canManage ? [{
       id: 'actions',
@@ -1356,6 +1394,22 @@ export function DealPartnerRatesPage() {
                       <ShieldCheck size={12} />
                       <span>{t('dealPartnerRate.guaranteeFeeAmount')} {fmtBaht(row.guarantee_return_fee_amount)}</span>
                     </div>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className="text-xs text-subtle truncate flex-1 min-w-0">
+                        {t('shopCommission.plan')} · {row.commission_plan
+                          ? (row.commission_plan_name ?? row.commission_plan)
+                          : t('shopCommission.planNoneShort')}
+                      </span>
+                      {canManage && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={e => { e.stopPropagation(); setPlanShop(row); }}
+                        >
+                          {t('shopCommission.planChange')}
+                        </Button>
+                      )}
+                    </div>
                     {row.return_to_branch_name && (
                       <div className="flex items-center gap-1 text-xs text-subtle mt-1">
                         <Undo2 size={12} />
@@ -1391,6 +1445,12 @@ export function DealPartnerRatesPage() {
         open={policyModalOpen}
         onClose={() => setPolicyModalOpen(false)}
         policy={policy}
+        onSaved={handleSaved}
+      />
+      <CommissionPlanModal
+        open={!!planShop}
+        shop={planShop}
+        onClose={() => setPlanShop(null)}
         onSaved={handleSaved}
       />
       <BranchConfigModal
