@@ -22,7 +22,14 @@ import { apiClient } from '../../lib/api';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-export type PartnerPoolKind = 'CREDIT' | 'PAYOUT';
+/** CUSTOMER_SERVICE (mig 1410) = the fund's customer-chat team: the shops it
+ *  covers are whose customers count as "mine" in chat, and who gets pinged. */
+export type PartnerPoolKind = 'CREDIT' | 'PAYOUT' | 'CUSTOMER_SERVICE';
+
+/** Every kind a pool can be — the tabs. The backend has no list of kinds to
+ *  read (only pools that already exist), so a kind with no pool yet would
+ *  otherwise have no tab to create its first pool from. */
+export const PARTNER_POOL_KINDS: PartnerPoolKind[] = ['CREDIT', 'PAYOUT', 'CUSTOMER_SERVICE'];
 
 /** One row of v_partner_review_pools. */
 export interface PartnerPool {
@@ -67,6 +74,23 @@ export interface PartnerPoolBranch {
   payout_pool_id: number | null;
   payout_pool_name: string | null;
   has_payout_reviewer: boolean | null;
+  // mig 1410: the customer-service team, and the collection team from the
+  // separate collection-pool screen. has_* = an active team with members.
+  customer_service_pool_id: number | null;
+  customer_service_pool_name: string | null;
+  has_customer_service: boolean | null;
+  collection_pool_id: number | null;
+  collection_pool_name: string | null;
+  has_collector: boolean | null;
+}
+
+/** The pool a shop is bound to for one kind. */
+export function branchPoolOf(b: PartnerPoolBranch, kind: PartnerPoolKind): { id: number | null; name: string | null } {
+  switch (kind) {
+    case 'CREDIT': return { id: b.credit_pool_id, name: b.credit_pool_name };
+    case 'PAYOUT': return { id: b.payout_pool_id, name: b.payout_pool_name };
+    case 'CUSTOMER_SERVICE': return { id: b.customer_service_pool_id, name: b.customer_service_pool_name };
+  }
 }
 
 /** v_users picker row (member picker). */

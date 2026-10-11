@@ -72,6 +72,11 @@ export interface ChatInboxRow {
   // New 2026-07-22 — all lessees on the contract (mig 843), PRIMARY first.
   customers: ChatListCustomer[] | null;
 
+  /** mig 1410, fund-company users only: the shop is in a customer-service
+   *  team I'm in, or I hold the contract as its collector. null = the user is
+   *  not fund staff, and there is no "mine" view at all. Never re-derive it. */
+  is_mine?: boolean | null;
+
   /** FE-only, never from the view. True for a search hit that has no chat row
    *  yet — the contract exists but nobody has ever messaged about it. Opening
    *  one gives an empty room to send the first message, which is exactly what

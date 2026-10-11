@@ -28,28 +28,56 @@ import {
 } from 'tsp-form';
 import {
   ArrowRightFromLine, ArrowLeft, Plus, AlertTriangle, Users, Store,
-  UserPlus, Trash2, PowerOff, Power, CheckCircle, Pencil, ShieldCheck, Landmark,
+  UserPlus, Trash2, PowerOff, Power, CheckCircle, Pencil, ShieldCheck, Landmark, Headset,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getRoleLabel } from '../../lib/roleLabel';
 import { translateApiError } from '../../lib/apiErrors';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { ActionDoneView } from '../contracts/ActionDoneView';
+import { OverflowTabs } from '../../components/OverflowTabs';
 import {
   usePartnerPools, usePartnerPool, usePartnerPoolMembers, usePartnerPoolBranches,
   usePartnerPoolUserOptions, usePartnerCompanyOptions, partnerPoolKeys,
   createPartnerPool, renamePartnerPool, setPartnerPoolActive,
   bindPartnerPoolBranch, unbindPartnerPoolBranch, setPartnerPoolMember,
+  PARTNER_POOL_KINDS, branchPoolOf,
   type PartnerPool, type PartnerPoolKind, type PartnerPoolMember, type PartnerPoolBranch,
 } from './partnerPoolApi';
 
 const KIND_ICON: Record<PartnerPoolKind, typeof ShieldCheck> = {
   CREDIT: ShieldCheck,
   PAYOUT: Landmark,
+  CUSTOMER_SERVICE: Headset,
+};
+
+const KIND_LABEL_KEY: Record<PartnerPoolKind, string> = {
+  CREDIT: 'partnerPools.kindCredit',
+  PAYOUT: 'partnerPools.kindPayout',
+  CUSTOMER_SERVICE: 'partnerPools.kindCustomerService',
+};
+
+/** Short tab names — the full kind names run three lines tall in a narrow rail. */
+const KIND_TAB_KEY: Record<PartnerPoolKind, string> = {
+  CREDIT: 'partnerPools.tabCredit',
+  PAYOUT: 'partnerPools.tabPayout',
+  CUSTOMER_SERVICE: 'partnerPools.tabCustomerService',
+};
+
+const KIND_BADGE: Record<PartnerPoolKind, 'info' | 'secondary' | 'success'> = {
+  CREDIT: 'info',
+  PAYOUT: 'secondary',
+  CUSTOMER_SERVICE: 'success',
+};
+
+const KIND_HINT_KEY: Record<PartnerPoolKind, string> = {
+  CREDIT: 'partnerPools.pickUserHintCredit',
+  PAYOUT: 'partnerPools.pickUserHintPayout',
+  CUSTOMER_SERVICE: 'partnerPools.pickUserHintCustomerService',
 };
 
 function kindLabel(t: (k: string) => string, kind: PartnerPoolKind): string {
-  return kind === 'CREDIT' ? t('partnerPools.kindCredit') : t('partnerPools.kindPayout');
+  return t(KIND_LABEL_KEY[kind] ?? kind);
 }
 
 export function PartnerReviewPoolsPage() {
@@ -102,6 +130,16 @@ export function PartnerReviewPoolsPage() {
     () => shopBranches.filter(b => b.branch_is_active && b.has_payout_reviewer !== true),
     [shopBranches],
   );
+  // mig 1410: shops whose customers nobody owns in chat, and shops whose
+  // overdue contracts no collection team will be handed.
+  const noCustomerServiceShops = useMemo(
+    () => shopBranches.filter(b => b.branch_is_active && b.has_customer_service !== true),
+    [shopBranches],
+  );
+  const noCollectorShops = useMemo(
+    () => shopBranches.filter(b => b.branch_is_active && b.has_collector !== true),
+    [shopBranches],
+  );
 
   const selectedPoolName = selectedPool?.pool_name ?? t('partnerPools.title');
 
@@ -136,7 +174,17 @@ export function PartnerReviewPoolsPage() {
               <div className="mobile-header-title mobile-header-title-truncate">
                 {isRoot ? t('partnerPools.title') : selectedPoolName}
               </div>
-              <div className="mobile-header-end w-12" />
+              <div className="mobile-header-end w-12">
+                {isRoot && canManage && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    startIcon={<Plus size={18} />}
+                    aria-label={t('partnerPools.createPoolKind', { kind: kindLabel(t, kind) })}
+                    onClick={() => setCreateOpen(true)}
+                  />
+                )}
+              </div>
             </MobileHeader>
           )}
 
@@ -144,28 +192,31 @@ export function PartnerReviewPoolsPage() {
             <div key="header" className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
               <h1 className="heading-2 shrink-0">{t('partnerPools.title')}</h1>
               {!canManage && <span className="text-xs text-subtle">{t('partnerPools.readOnly')}</span>}
+              {canManage && (
+                <Button
+                  size="sm"
+                  variant="primary"
+                  className="ml-auto"
+                  startIcon={<Plus size={16} />}
+                  onClick={() => setCreateOpen(true)}
+                >
+                  {t('partnerPools.createPoolKind', { kind: kindLabel(t, kind) })}
+                </Button>
+              )}
             </div>
           )}
 
           <div key="panels" className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
             {/* Left — pool list */}
-            <PageNavPanel id="list" className={isMobile ? '' : 'w-1/2 xl:w-5/12 border-r border-line flex flex-col'}>
-              {/* Kind tabs — create sits at the right end of the same row */}
-              <div className="flex-none flex items-center border-b border-line px-2">
-                <TabButton active={kind === 'CREDIT'} onClick={() => setKind('CREDIT')} label={t('partnerPools.kindCredit')} />
-                <TabButton active={kind === 'PAYOUT'} onClick={() => setKind('PAYOUT')} label={t('partnerPools.kindPayout')} />
-                {canManage && (
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    className="ml-auto my-1.5"
-                    startIcon={<Plus size={16} />}
-                    onClick={() => setCreateOpen(true)}
-                  >
-                    {t('partnerPools.createPool')}
-                  </Button>
-                )}
-              </div>
+            <PageNavPanel id="list" className={isMobile ? '' : 'w-1/2 xl:w-5/12 min-w-0 border-r border-line flex flex-col'}>
+              {/* Kind tabs: short names, and what doesn't fit folds into "More".
+                  Create lives in the page header so it never fights the tabs. */}
+              <OverflowTabs
+                tabs={PARTNER_POOL_KINDS}
+                activeTab={kind}
+                onTabChange={setKind}
+                renderLabel={k => t(KIND_TAB_KEY[k])}
+              />
 
               {/* Blocked-shops warning — the whole point of this screen */}
               {kind === 'CREDIT' && blockedShops.length > 0 && (
@@ -190,6 +241,48 @@ export function PartnerReviewPoolsPage() {
                     <div className="min-w-0">
                       <div className="alert-description">
                         {t('partnerPools.noPayoutShopsInfo', { n: noPayoutShops.length })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {kind === 'CUSTOMER_SERVICE' && noCustomerServiceShops.length > 0 && (
+                <div className="flex-none px-2 pt-2">
+                  <div className="alert alert-warning">
+                    <AlertTriangle size={16} className="shrink-0" />
+                    <div className="min-w-0">
+                      <div className="alert-description">
+                        {t('partnerPools.noCustomerServiceWarn', { n: noCustomerServiceShops.length })}
+                      </div>
+                      <div className="text-xs mt-0.5 truncate">
+                        {noCustomerServiceShops.map(b => b.branch_name).join(' · ')}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {/* Collection teams live on their own screen; the shortfall is
+                  shown here because this is where a fund lines up who looks
+                  after each shop. */}
+              {kind === 'CUSTOMER_SERVICE' && noCollectorShops.length > 0 && (
+                <div className="flex-none px-2 pt-2">
+                  <div className="alert alert-info">
+                    <AlertTriangle size={16} className="shrink-0" />
+                    <div className="min-w-0">
+                      <div className="alert-description">
+                        {t('partnerPools.noCollectorInfo', { n: noCollectorShops.length })}
+                        {' '}
+                        <button
+                          type="button"
+                          onClick={() => navigate('/admin/collections/pools')}
+                          className="text-primary-fg hover:underline bg-transparent border-none p-0 cursor-pointer"
+                        >
+                          {t('partnerPools.openCollectionTeams')}
+                        </button>
+                      </div>
+                      <div className="text-xs mt-0.5 truncate">
+                        {noCollectorShops.map(b => b.branch_name).join(' · ')}
                       </div>
                     </div>
                   </div>
@@ -258,7 +351,7 @@ export function PartnerReviewPoolsPage() {
             </PageNavPanel>
 
             {/* Right — pool detail */}
-            <PageNavPanel id="detail" className="flex-1 min-h-0 flex flex-col">
+            <PageNavPanel id="detail" className="flex-1 min-w-0 min-h-0 flex flex-col">
               {!selectedPoolId && (
                 <div className="flex-1 h-full flex flex-col items-center justify-center text-subtler p-8 gap-2">
                   <Users size={32} />
@@ -293,19 +386,6 @@ export function PartnerReviewPoolsPage() {
   );
 }
 
-function TabButton({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer border-b-2 ${
-        active ? 'border-primary-fg text-primary-fg' : 'border-transparent text-fg'
-      }`}
-    >
-      {label}
-    </button>
-  );
-}
 
 /* ── Detail panel ─────────────────────────────────────────────────────────── */
 
@@ -353,8 +433,8 @@ function PartnerPoolDetailPanel({
       <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
         <KindIcon size={16} className="text-subtle shrink-0" />
         <span className="font-semibold truncate">{pool.pool_name}</span>
-        <Badge color={pool.kind === 'CREDIT' ? 'info' : 'secondary'} size="xs">
-          {kindLabel(t, pool.kind)}
+        <Badge color={KIND_BADGE[pool.kind] ?? 'secondary'} size="xs" className="shrink-0">
+          {t(KIND_TAB_KEY[pool.kind])}
         </Badge>
         {!pool.is_active && <Badge color="default" size="xs">{t('partnerPools.inactiveBadge')}</Badge>}
         {noMemberWarning && <Badge color="warning" size="xs">{t('partnerPools.noMemberBadge')}</Badge>}
@@ -436,7 +516,7 @@ function PartnerPoolDetailPanel({
             )}
           </div>
           {members.length === 0 ? (
-            <div className="text-sm text-subtler italic">{t('partnerPools.noMembers')}</div>
+            <div className="text-sm text-subtler italic">{t(pool.kind === 'CUSTOMER_SERVICE' ? 'partnerPools.noMembersCustomerService' : 'partnerPools.noMembers')}</div>
           ) : (
             <div className="border border-line rounded-md divide-y divide-line">
               {members.map(m => (
@@ -467,11 +547,14 @@ function PartnerPoolDetailPanel({
       {canManage && (
         <div className="flex-none border-t border-line px-4 py-3 flex items-center justify-between gap-2">
           <span className="text-xs text-subtler">
-            {pool.is_active ? t('partnerPools.deactivateHint') : t('partnerPools.reactivateHint')}
+            {pool.kind === 'CUSTOMER_SERVICE'
+              ? (pool.is_active ? t('partnerPools.deactivateHintCustomerService') : t('partnerPools.reactivateHintCustomerService'))
+              : (pool.is_active ? t('partnerPools.deactivateHint') : t('partnerPools.reactivateHint'))}
           </span>
           <Button
             size="sm"
             variant="outline"
+            className="shrink-0 whitespace-nowrap"
             startIcon={pool.is_active
               ? <PowerOff size={14} className="text-danger" />
               : <Power size={14} className="text-success" />}
@@ -885,8 +968,7 @@ function AddBranchModal({
   // Same company, not already in THIS pool. Bound-elsewhere shops stay in the
   // list — binding them here is a move (spec: same-kind rebind = move).
   const options = useMemo(() => {
-    const currentPoolId = (b: PartnerPoolBranch) =>
-      pool.kind === 'CREDIT' ? b.credit_pool_id : b.payout_pool_id;
+    const currentPoolId = (b: PartnerPoolBranch) => branchPoolOf(b, pool.kind).id;
     return shopBranches.filter(
       b => b.company_id === pool.company_id && b.branch_is_active && currentPoolId(b) !== pool.pool_id,
     );
@@ -894,7 +976,7 @@ function AddBranchModal({
 
   const picked = options.find(b => b.branch_id === branchId) ?? null;
   const pickedCurrentPoolName = picked
-    ? (pool.kind === 'CREDIT' ? picked.credit_pool_name : picked.payout_pool_name)
+    ? branchPoolOf(picked, pool.kind).name
     : null;
 
   useEffect(() => {
@@ -953,7 +1035,7 @@ function AddBranchModal({
                     options={options.map(b => ({
                       value: String(b.branch_id),
                       label: `${b.branch_name} · ${
-                        (pool.kind === 'CREDIT' ? b.credit_pool_name : b.payout_pool_name)
+                        branchPoolOf(b, pool.kind).name
                         ?? t('partnerPools.notBound')
                       }`,
                     }))}
@@ -1181,9 +1263,7 @@ function AddMemberModal({
                     searchable
                   />
                   <p className="text-xs text-subtle mt-1">
-                    {pool.kind === 'CREDIT'
-                      ? t('partnerPools.pickUserHintCredit')
-                      : t('partnerPools.pickUserHintPayout')}
+                    {t(KIND_HINT_KEY[pool.kind])}
                   </p>
                 </div>
               </div>

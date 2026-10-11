@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery, keepPreviousData, useQueryClient } from '@tanstack/react-query';
 import {
   PageNav, PageNavPanel, MobileHeader, DataTableFooter,
-  Button, PopOver, Select,
+  Button, PopOver, Select, Badge, Tooltip,
 } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine, ChevronDown, CheckCircle2, Circle, PictureInPicture2, SlidersHorizontal } from 'lucide-react';
 import { apiClient } from '../../lib/api';
@@ -76,11 +76,28 @@ function toStubRow(hit: ContractSearchHit): ChatInboxRow {
 export function ChatPage() {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, isFundCompany } = useAuth();
   const { openChat, showDockList } = useChatDock();
   const [searchParams, setSearchParams] = useSearchParams();
   const contractParam = searchParams.get('contract');
   const selectedContractId = contractParam ? parseInt(contractParam, 10) : null;
+
+  // Fund staff (mig 1410): "my customers" = shops in a customer-service team
+  // I'm in, plus contracts I hold as collector; "whole fund" = everything I
+  // may see. Mine is the default. Everyone else has no such split — the view
+  // sends is_mine null for them — so the switch is never drawn.
+  // Lives in the address like a tab: switching adds a history entry.
+  const scope: 'mine' | 'all' = isFundCompany && searchParams.get('scope') !== 'all' ? 'mine' : 'all';
+  const switchScope = (next: 'mine' | 'all') => {
+    if (next === scope) return;
+    setSearchParams(prev => {
+      const p = new URLSearchParams(prev);
+      if (next === 'all') p.set('scope', 'all'); else p.delete('scope');
+      p.delete('contract');
+      return p;
+    });
+  };
+  const mineOnly = isFundCompany && scope === 'mine';
 
   // Realtime: subscribe to branch channel so any new chat in the branch
   // refreshes the inbox + unread badge. This is now the primary freshness
@@ -132,7 +149,7 @@ export function ChatPage() {
   const [filterOpen, setFilterOpen] = useState(false);
   const activeFilterCount = statusFilter ? 1 : 0;
 
-  useEffect(() => { setPageIndex(0); }, [search, unreadOnly, statusFilter]);
+  useEffect(() => { setPageIndex(0); }, [search, unreadOnly, statusFilter, scope]);
   useEffect(() => { setMobileDetailsOpen(false); }, [selectedContractId]);
   // Debounce + floor both live in SearchInput. Only fire once the keyword can
   // actually be searched — a keyword under the floor makes fn_contract_search
@@ -152,6 +169,7 @@ export function ChatPage() {
   // is worth paying for a list that is never mysteriously empty.
   const queryUrl = useMemo(() => {
     const params: string[] = ['order=last_message_at.desc.nullslast'];
+    if (mineOnly) params.push('is_mine=is.true');
     if (unreadOnly) params.push('unread_count=gt.0');
     if (statusFilter === 'NONE') {
       params.push('chat_status=is.null');
@@ -159,7 +177,7 @@ export function ChatPage() {
       params.push(`chat_status=eq.${statusFilter}`);
     }
     return `/v_branch_chat_list?${params.join('&')}`;
-  }, [unreadOnly, statusFilter]);
+  }, [unreadOnly, statusFilter, mineOnly]);
 
   // No refetchInterval: new messages arrive on `chat:contract:<id>` and status
   // changes on `chat:branch:<id>`, both of which invalidate ['chat-inbox'], and
@@ -167,7 +185,7 @@ export function ChatPage() {
   // A timer on top of that was a third poller on this same view (with ChatPage's
   // own roster hook and the nav badge) — different query keys, so nothing deduped.
   const inbox = useQuery({
-    queryKey: ['chat-inbox', unreadOnly, statusFilter, pageIndex, pageSize],
+    queryKey: ['chat-inbox', mineOnly, unreadOnly, statusFilter, pageIndex, pageSize],
     queryFn: () => apiClient.getPaginated<ChatInboxRow>(
       queryUrl,
       { page: pageIndex + 1, pageSize },
@@ -222,15 +240,29 @@ export function ChatPage() {
   // memory. Inbox rows are server-paged and only re-sorted within the page.
   const allSearchRows = useMemo(() => {
     const found = searchQuery.data ?? [];
-    if (!unreadOnly && !statusFilter) return found;
-    // The filter chips still apply on top of a search.
+    if (!unreadOnly && !statusFilter && !mineOnly) return found;
+    // The filter chips still apply on top of a search. A never-chatted stub
+    // has no is_mine yet — keep it, so "mine" can still start a first chat.
     return found.filter(r => {
+      if (mineOnly && r.is_mine === false) return false;
       if (unreadOnly && r.unread_count <= 0) return false;
       if (statusFilter === 'NONE') return r.chat_status === null;
       if (statusFilter) return r.chat_status === statusFilter;
       return true;
     });
-  }, [searchQuery.data, unreadOnly, statusFilter]);
+  }, [searchQuery.data, unreadOnly, statusFilter, mineOnly]);
+
+  // "Waiting for a reply" per side of the switch, from the per-shop counts the
+  // view already keeps — mine = the rows flagged mine, whole fund = all rows.
+  const waitingCounts = useQuery({
+    queryKey: ['chat-inbox', 'fund-waiting'],
+    queryFn: () => apiClient.get<{ branch_id: number; waiting_reply_count: number; is_mine: boolean | null }[]>(
+      '/v_branch_chat_status_summary?select=branch_id,waiting_reply_count,is_mine',
+    ),
+    enabled: isFundCompany,
+  });
+  const waitingMine = (waitingCounts.data ?? []).filter(r => r.is_mine).reduce((n, r) => n + r.waiting_reply_count, 0);
+  const waitingAll = (waitingCounts.data ?? []).reduce((n, r) => n + r.waiting_reply_count, 0);
 
   const rows = useMemo(() => {
     if (isSearchMode) {
@@ -376,6 +408,33 @@ export function ChatPage() {
           {/* Filter bar — spans both panels on desktop, mirrors the
               products/models layout. The Select sits inline on >= sm; below
               that it collapses into a SlidersHorizontal PopOver. */}
+          {isFundCompany && (isRoot || !isMobile) && (
+            <div className="flex-none flex border-b border-line" role="tablist">
+              {(['mine', 'all'] as const).map(s => {
+                const n = s === 'mine' ? waitingMine : waitingAll;
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    role="tab"
+                    aria-selected={scope === s}
+                    onClick={() => switchScope(s)}
+                    className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer border-b-2 inline-flex items-center gap-1.5 ${
+                      scope === s ? 'border-primary-fg text-primary-fg' : 'border-transparent text-fg'
+                    }`}
+                  >
+                    {t(s === 'mine' ? 'chat.scopeMine' : 'chat.scopeAll')}
+                    {n > 0 && (
+                      <Tooltip content={t('chat.waitingReplyTip')}>
+                        <Badge size="xs" color="warning">{n}</Badge>
+                      </Tooltip>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           {(isRoot || !isMobile) && (
             <div className="flex-none p-2 border-b border-line flex items-center gap-2">
               <div className="flex-1 min-w-0 max-w-xs">
