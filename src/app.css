@@ -1040,3 +1040,8 @@ div:has(> .checkbox-hidden) {
     position: relative;
 }
 
+
+/* delete once on tsp-form > 0.11.0 — library fix: a small button with an icon
+   beside its text keeps its normal side padding (the icon trim halved it to
+   0.375rem and the label touched the border). */
+.btn-xs:has(> .btn-icon-slot), .btn-sm:has(> .btn-icon-slot) { padding-left: 0.5rem; padding-right: 0.5rem; }
