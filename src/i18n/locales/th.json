@@ -1582,6 +1582,7 @@
         "orgShort": "กุญแจองค์กร"
       },
       "story": {
+        "appsAllowedTitle": "แอปที่ลูกค้ายังใช้ได้ ({{count}})",
         "customerSees": "ลูกค้าเห็น",
         "reason": "เพราะ",
         "next": "ถัดไป",

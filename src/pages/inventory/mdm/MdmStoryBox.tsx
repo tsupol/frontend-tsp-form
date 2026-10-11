@@ -21,8 +21,9 @@
 // <MdmStoryBadge> = the status pill for list rows (§5).
 // ============================================================================
 
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Badge, Tooltip } from 'tsp-form';
+import { Badge, PopOver, Tooltip } from 'tsp-form';
 import {
   ShieldOff, PauseCircle, Loader2, ShieldAlert, WifiOff, CheckCircle2,
   Image as ImageIcon, Lock, AlertTriangle, Eye, ArrowRight, Clock,
@@ -76,16 +77,60 @@ export function isStoryChanging(story: AssetMdmStory | null | undefined): boolea
 }
 
 /** One "label: sentence" row; renders nothing when the DB sent no sentence. */
-function StoryLine({ icon, label, text }: { icon: React.ReactNode; label: string; text: string }) {
+function StoryLine({ icon, label, text, children }: {
+  icon: React.ReactNode; label: string; text: string; children?: React.ReactNode;
+}) {
   if (!text) return null;
   return (
     <div className="flex items-start gap-1.5">
       <span className="shrink-0 mt-0.5 opacity-70">{icon}</span>
       <div className="min-w-0">
         <span className="text-subtle">{label}: </span>
-        {text}
+        {children ?? text}
       </div>
     </div>
+  );
+}
+
+/** "Customer sees", tappable while apps are limited: the sentence opens the
+ *  list of apps still allowed. The list comes with the story row (mig 355) —
+ *  no extra request, and nothing here decides which apps those are. */
+function CustomerSeesLine({ story }: { story: AssetMdmStory }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const apps = story.apps_allowed ?? [];
+  const tappable = story.apps_allowed_count != null && apps.length > 0;
+  return (
+    <StoryLine icon={<Eye size={13} />} label={t('asset.mdm.story.customerSees')} text={story.customer_sees_th}>
+      {tappable ? (
+        <PopOver
+          isOpen={open}
+          onClose={() => setOpen(false)}
+          placement="bottom"
+          align="start"
+          maxWidth="22rem"
+          maxHeight="20rem"
+          trigger={
+            <button
+              type="button"
+              onClick={() => setOpen(v => !v)}
+              className="text-left underline decoration-dotted underline-offset-2 bg-transparent border-none p-0 cursor-pointer text-current"
+            >
+              {story.customer_sees_th}
+            </button>
+          }
+        >
+          <div className="p-3 flex flex-col gap-2">
+            <div className="text-sm font-medium">
+              {t('asset.mdm.story.appsAllowedTitle', { count: story.apps_allowed_count ?? apps.length })}
+            </div>
+            <ul className="text-sm flex flex-col gap-0.5">
+              {apps.map(a => <li key={a}>{a}</li>)}
+            </ul>
+          </div>
+        </PopOver>
+      ) : story.customer_sees_th}
+    </StoryLine>
   );
 }
 
@@ -112,11 +157,7 @@ export function MdmStoryBox({ story, onGoToEnroll }: {
         </div>
 
         <div className="alert-description flex flex-col gap-1 mt-1">
-          <StoryLine
-            icon={<Eye size={13} />}
-            label={t('asset.mdm.story.customerSees')}
-            text={story.customer_sees_th}
-          />
+          <CustomerSeesLine story={story} />
           <StoryLine
             icon={<AlertTriangle size={13} />}
             label={t('asset.mdm.story.reason')}
@@ -129,13 +170,20 @@ export function MdmStoryBox({ story, onGoToEnroll }: {
           />
         </div>
 
-        {/* Something a human must go and do — its own bar, not a detail line. */}
-        {story.action_th && (
+        {/* Something a human must go and do — its own bar, not a detail line.
+            WAIT_DEVICE is the exception: nothing to do but wait for the device
+            to come online, so it is a quiet grey note and offers no resend. */}
+        {story.action_th && (story.action_code === 'WAIT_DEVICE' ? (
+          <div className="mt-2 rounded-md border border-line bg-surface text-subtle px-2.5 py-1.5 text-sm inline-flex items-center gap-1.5">
+            <Clock size={14} className="shrink-0" />
+            <span>{story.action_th}</span>
+          </div>
+        ) : (
           <div className="mt-2 rounded-md border border-warning-border bg-warning-soft text-warning-fg px-2.5 py-1.5 text-sm inline-flex items-center gap-1.5">
             <AlertTriangle size={14} className="shrink-0" />
             <span>{story.action_th}</span>
           </div>
-        )}
+        ))}
 
         {/* Not enrolled — point at the tab that fixes it (§3). */}
         {story.status_code === 'NOT_IN_MDM' && onGoToEnroll && (

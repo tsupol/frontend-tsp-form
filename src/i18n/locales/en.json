@@ -1582,6 +1582,7 @@
         "orgShort": "Company key"
       },
       "story": {
+        "appsAllowedTitle": "Apps the customer can still open ({{count}})",
         "customerSees": "Customer sees",
         "reason": "Because",
         "next": "Next",

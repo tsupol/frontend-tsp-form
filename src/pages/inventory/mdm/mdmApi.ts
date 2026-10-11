@@ -293,8 +293,18 @@ export interface AssetMdmStory {
   as_of_at: string | null;
   as_of_th: string;
 
-  action_code: 'CALL_CUSTOMER' | 'RESEND' | 'NONE';
+  /** WAIT_DEVICE (mig 355): the device hasn't checked in since the last
+   *  command, which is queued and lands when it comes online — informational,
+   *  never a prompt to resend (resending a silent device stacks commands). */
+  action_code: 'CALL_CUSTOMER' | 'RESEND' | 'WAIT_DEVICE' | 'NONE';
   action_th: string;
+
+  /** mig 355: the apps the customer can still open while apps are limited.
+   *  All three are null when `customer_sees_level` ≤ 1 (no app limit). */
+  apps_allowed_count: number | null;
+  /** Display names, sorted; an unknown app comes as its bundle id. */
+  apps_allowed: string[] | null;
+  apps_allowed_th: string | null;
 
   /** Debug only — when the report row was last written. */
   status_updated_at: string | null;
