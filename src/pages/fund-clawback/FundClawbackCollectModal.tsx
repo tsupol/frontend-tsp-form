@@ -14,7 +14,10 @@ import { Modal, Button, Input, InputDatePicker, RadioGroup, Select, TextArea } f
 import { Keyboard } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { FundDayClosedHint, FundPayErrorBand } from '../../components/FundDayPayGuard';
-import { describeFundPayError, type FundPayError } from '../../lib/fundDayPay';
+import { amendedDoneRows } from '../../lib/fundDayPay';
+import { useFundPayAttempt } from '../../hooks/useFundPayAttempt';
+import { fundPaySlipDoneRows, useFundPaySlip } from '../../hooks/useFundPaySlip';
+import { FundPaySlipFailedNotice, FundPaySlipField } from '../../components/FundPaySlip';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../../lib/format';
@@ -56,7 +59,10 @@ export function FundClawbackCollectModal({ open, bill, onClose }: FundClawbackCo
   const [reference, setReference] = useState('');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<FundPayError | null>(null);
+  const attempt = useFundPayAttempt();
+  const slip = useFundPaySlip();
+  const { reset: resetAttempt } = attempt;
+  const { reset: resetSlip } = slip;
   const [result, setResult] = useState<FundClawbackCollectResult | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
 
@@ -74,13 +80,14 @@ export function FundClawbackCollectModal({ open, bill, onClose }: FundClawbackCo
     setReference('');
     setNote('');
     setSaving(false);
-    setError(null);
+    resetAttempt();
+    resetSlip();
     setResult(null);
     setConfirmClose(false);
-  }, [open]);
+  }, [open, resetAttempt, resetSlip]);
 
   const futureDate = !!paidDate && paidDate > today;
-  const dirty = paidDate !== today || !!accountId || !!reference.trim() || !!note.trim();
+  const dirty = paidDate !== today || !!accountId || !!reference.trim() || !!note.trim() || slip.files.length > 0;
   const canSubmit = !!paidDate && !futureDate;
 
   const forceClose = () => { setConfirmClose(false); onClose(); };
@@ -95,10 +102,10 @@ export function FundClawbackCollectModal({ open, bill, onClose }: FundClawbackCo
     label: `${a.bank_name} · ${a.account_number_display ?? a.account_number ?? ''}`,
   }));
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (amend = false) => {
     if (!shown || !canSubmit) return;
     setSaving(true);
-    setError(null);
+    attempt.setError(null);
     try {
       const res = await apiClient.rpc<FundClawbackCollectResult>('fn_fund_clawback_collect', {
         p_bill_id: shown.bill_id,
@@ -107,12 +114,16 @@ export function FundClawbackCollectModal({ open, bill, onClose }: FundClawbackCo
         p_bank_account_id: accountId ? Number(accountId) : null,
         p_reference: reference.trim() || null,
         p_note: note.trim() || null,
+        ...attempt.amendParams(amend),
       });
       setResult(res);
-      setView('done');
       invalidate();
+      // The slip goes on the movement this press wrote; a failure is reported
+      // on the done view, never rolled back.
+      await slip.attach({ billId: shown.bill_id });
+      setView('done');
     } catch (err) {
-      setError(describeFundPayError(err, t, i18n.language));
+      attempt.fail(err, amend);
     } finally {
       setSaving(false);
     }
@@ -148,7 +159,7 @@ export function FundClawbackCollectModal({ open, bill, onClose }: FundClawbackCo
                   <label className="form-label">{t('fundClawback.receivedOnRequired')}</label>
                   <InputDatePicker
                     value={parseLocalDate(paidDate)}
-                    onChange={v => setPaidDate(toLocalDateStr(v))}
+                    onChange={v => { setPaidDate(toLocalDateStr(v)); attempt.setError(null); }}
                     dateFormat={makeDatePickerFormat(i18n.language)}
                     locale={i18n.language}
                     calendar="gregorian"
@@ -201,6 +212,12 @@ export function FundClawbackCollectModal({ open, bill, onClose }: FundClawbackCo
                   />
                 </div>
 
+                <FundPaySlipField
+                  slip={slip}
+                  disabled={saving}
+                  onError={message => attempt.setError({ message, unclosedDate: null, closedDate: null })}
+                />
+
                 <div className="flex flex-col">
                   <label className="form-label">{t('fundClawback.note')}</label>
                   <TextArea value={note} onChange={e => setNote(e.target.value)} rows={2} />
@@ -208,11 +225,11 @@ export function FundClawbackCollectModal({ open, bill, onClose }: FundClawbackCo
               </div>
             </div>
 
-            <FundPayErrorBand error={error} onDismiss={() => setError(null)} />
+            <FundPayErrorBand attempt={attempt} onAmend={() => { void handleSubmit(true); }} busy={saving} />
 
             <div className="modal-footer">
               <Button variant="ghost" onClick={handleClose} disabled={saving}>{t('common.cancel')}</Button>
-              <Button color="primary" onClick={handleSubmit} disabled={saving || !canSubmit}>
+              <Button color="primary" onClick={() => { void handleSubmit(); }} disabled={saving || !canSubmit}>
                 {t('fundClawback.collectAction')}
               </Button>
             </div>
@@ -224,7 +241,10 @@ export function FundClawbackCollectModal({ open, bill, onClose }: FundClawbackCo
             detailRows={[
               { label: t('fundClawback.receivedOn'), value: <DateTime value={result.paid_date} showTime={false} /> },
               { label: t('fundClawback.amount'), value: fmtCurrency(result.amount), emphasis: true },
+              ...amendedDoneRows(result.day_close_amended, t, i18n.language),
+              ...fundPaySlipDoneRows(slip, t),
             ]}
+            extras={slip.outcome?.kind === 'failed' ? <FundPaySlipFailedNotice slip={slip} /> : undefined}
             onClose={forceClose}
           />
         )}

@@ -16,7 +16,10 @@ import { Modal, Button, Input, TextArea } from 'tsp-form';
 import { Smartphone } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { FundPayErrorBand } from '../../components/FundDayPayGuard';
-import { describeFundPayError, type FundPayError } from '../../lib/fundDayPay';
+import { amendedDoneRows } from '../../lib/fundDayPay';
+import { useFundPayAttempt } from '../../hooks/useFundPayAttempt';
+import { fundPaySlipDoneRows, useFundPaySlip } from '../../hooks/useFundPaySlip';
+import { FundPaySlipFailedNotice, FundPaySlipField } from '../../components/FundPaySlip';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { fmtCurrency } from '../../lib/format';
 import { useFundBillInvalidate } from './useFundBills';
@@ -36,7 +39,10 @@ export function FundBillCreditNoteModal({ open, bill, onClose }: FundBillCreditN
   const [reasonCode, setReasonCode] = useState('');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<FundPayError | null>(null);
+  const attempt = useFundPayAttempt();
+  const slip = useFundPaySlip();
+  const { reset: resetAttempt } = attempt;
+  const { reset: resetSlip } = slip;
   const [result, setResult] = useState<FundBillCreditNoteResult | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
 
@@ -46,12 +52,13 @@ export function FundBillCreditNoteModal({ open, bill, onClose }: FundBillCreditN
     setReasonCode('');
     setNote('');
     setSaving(false);
-    setError(null);
+    resetAttempt();
+    resetSlip();
     setResult(null);
     setConfirmClose(false);
-  }, [open]);
+  }, [open, resetAttempt, resetSlip]);
 
-  const dirty = !!reasonCode.trim() || !!note.trim();
+  const dirty = !!reasonCode.trim() || !!note.trim() || slip.files.length > 0;
   const canSubmit = reasonCode.trim().length >= 3;
 
   const forceClose = () => { setConfirmClose(false); onClose(); };
@@ -61,22 +68,26 @@ export function FundBillCreditNoteModal({ open, bill, onClose }: FundBillCreditN
     forceClose();
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (amend = false) => {
     if (!bill || !canSubmit) return;
     setSaving(true);
-    setError(null);
+    attempt.setError(null);
     try {
       const res = await apiClient.rpc<FundBillCreditNoteResult>('fn_fund_bill_credit_note', {
         p_bill_id: bill.bill_id,
         p_reason_code: reasonCode.trim(),
         p_note: note.trim() || null,
         p_bank_account_id: null,
+        ...attempt.amendParams(amend),
       });
       setResult(res);
-      setView('done');
       invalidate(bill.bill_id);
+      // The slip (the shop's transfer back) goes on the credit note's own
+      // reversal row; a failure is reported on the done view, never rolled back.
+      await slip.attach({ billId: res.credit_note_id });
+      setView('done');
     } catch (err) {
-      setError(describeFundPayError(err, t, i18n.language));
+      attempt.fail(err, amend);
     } finally {
       setSaving(false);
     }
@@ -124,6 +135,12 @@ export function FundBillCreditNoteModal({ open, bill, onClose }: FundBillCreditN
                   />
                 </div>
 
+                <FundPaySlipField
+                  slip={slip}
+                  disabled={saving}
+                  onError={message => attempt.setError({ message, unclosedDate: null, closedDate: null })}
+                />
+
                 <div className="flex flex-col">
                   <label className="form-label">{t('fundBill.note')}</label>
                   <TextArea value={note} onChange={e => setNote(e.target.value)} rows={2} />
@@ -131,11 +148,11 @@ export function FundBillCreditNoteModal({ open, bill, onClose }: FundBillCreditN
               </div>
             </div>
 
-            <FundPayErrorBand error={error} onDismiss={() => setError(null)} />
+            <FundPayErrorBand attempt={attempt} onAmend={() => { void handleSubmit(true); }} busy={saving} />
 
             <div className="modal-footer">
               <Button variant="ghost" onClick={handleClose} disabled={saving}>{t('common.cancel')}</Button>
-              <Button color="danger" onClick={handleSubmit} disabled={saving || !canSubmit}>
+              <Button color="danger" onClick={() => { void handleSubmit(); }} disabled={saving || !canSubmit}>
                 {t('fundBill.creditNoteAction')}
               </Button>
             </div>
@@ -153,9 +170,12 @@ export function FundBillCreditNoteModal({ open, bill, onClose }: FundBillCreditN
                 ? [{ label: t('fundBill.settlementsReopened'), value: String(result.released_settlements) }]
                 : []),
               { label: t('fundBill.netAmount'), value: fmtCurrency(result.net_amount), emphasis: true },
+              ...amendedDoneRows(result.day_close_amended, t, i18n.language),
+              ...fundPaySlipDoneRows(slip, t),
             ]}
             extras={
               <div className="flex flex-col gap-3">
+                <FundPaySlipFailedNotice slip={slip} />
                 <div className="alert alert-info">
                   <span>
                     {bill?.bill_purpose === 'COMMISSION_EXTRA'

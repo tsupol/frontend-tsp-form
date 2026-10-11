@@ -1,3 +1,5 @@
+import type { FundDayCloseAmended } from '../../lib/fundDayPay';
+
 // Commission clawback (UI_SUMMARY/149 §9d).
 //
 // When a customer stops paying early, the commission the fund already paid out
@@ -73,4 +75,6 @@ export interface FundClawbackCollectResult {
   status: string;
   amount: number;
   paid_date: string;
+  /** Set when this press recorded into a closed fund day (mig 1411). */
+  day_close_amended?: FundDayCloseAmended | null;
 }

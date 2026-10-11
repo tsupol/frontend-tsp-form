@@ -1,3 +1,5 @@
+import type { FundDayCloseAmended } from '../../lib/fundDayPay';
+
 // The fund's two money books (`sale.fund_book`) — UI_SUMMARY/149 §5-§6.
 //
 // A fund company keeps two books, and the difference between them is whose
@@ -115,6 +117,8 @@ export interface FundMovementConfirmResult {
   flow: 'IN' | 'OUT';
   /** The book's balance right after the movement landed. */
   book: { book_type: FundBookType; balance: number } | null;
+  /** Set when this press recorded into a closed fund day (mig 1411). */
+  day_close_amended?: FundDayCloseAmended | null;
 }
 
 /**

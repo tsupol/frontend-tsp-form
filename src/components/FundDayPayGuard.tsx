@@ -1,10 +1,19 @@
 // Fund day close §B screen pieces — the contract lives in src/lib/fundDayPay.ts.
 
+import type React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { ExternalLink } from 'lucide-react';
+import { Button } from 'tsp-form';
+import { ExternalLink, History } from 'lucide-react';
 import { formatDateTime } from '../lib/format';
-import { fundDayPagePath, useFundDayClosedOn, type FundPayError } from '../lib/fundDayPay';
+import {
+  FUND_PAY_CLOSED_DAY,
+  fundDayPagePath,
+  useFundDayClosedOn,
+} from '../lib/fundDayPay';
+import { useMyPermissions } from '../hooks/useMyPermissions';
+import type { FundPayAttempt } from '../hooks/useFundPayAttempt';
+import { BranchPinInput } from './BranchPinInput';
 import { ModalErrorBand } from './ModalErrorBand';
 
 /** "Go close {date}" — a real link, so ctrl/middle-click opens the day in a new tab
@@ -22,12 +31,60 @@ export function FundDayCloseLink({ date }: { date: string }) {
   );
 }
 
-export function FundPayErrorBand({ error, onDismiss }: { error: FundPayError | null; onDismiss: () => void }) {
+interface FundPayErrorBandProps {
+  /** The window's pay attempt (error + PIN). */
+  attempt: FundPayAttempt;
+  /** Re-send the same call into the closed day. Omit to never offer it. */
+  onAmend?: () => void;
+  busy?: boolean;
+}
+
+/**
+ * The pay window's error band. Two ways out live in it:
+ *  - previous day not closed → "Go close {date}" (the amend flag doesn't help);
+ *  - this day already closed → for holders of FUND.PAY_CLOSED_DAY, "Record on
+ *    the closed day", which re-sends with p_amend_closed_day (mig 1411). A PIN
+ *    field joins the button only once the backend asked for one.
+ */
+export function FundPayErrorBand({ attempt, onAmend, busy = false }: FundPayErrorBandProps) {
+  const { t } = useTranslation();
+  const { hasPermission } = useMyPermissions();
+  const { error, setError, pin, setPin } = attempt;
+
+  const canAmend = !!error?.closedDate && !!onAmend && hasPermission(FUND_PAY_CLOSED_DAY);
+
+  let action: React.ReactNode;
+  if (error?.unclosedDate) {
+    action = <FundDayCloseLink date={error.unclosedDate} />;
+  } else if (canAmend) {
+    action = (
+      <div className="flex flex-col gap-2 mt-1">
+        {error?.pinNeeded && (
+          <div className="max-w-60">
+            <BranchPinInput value={pin} onChange={setPin} required disabled={busy} />
+          </div>
+        )}
+        <div>
+          <Button
+            variant="outline"
+            size="sm"
+            startIcon={<History size={14} />}
+            onClick={onAmend}
+            disabled={busy || (!!error?.pinNeeded && pin.length !== 6)}
+            data-action="fund-pay-amend-closed-day"
+          >
+            {t('fundDayGuard.amendAction')}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <ModalErrorBand
       message={error?.message}
-      onDismiss={onDismiss}
-      action={error?.unclosedDate ? <FundDayCloseLink date={error.unclosedDate} /> : undefined}
+      onDismiss={() => setError(null)}
+      action={action}
     />
   );
 }

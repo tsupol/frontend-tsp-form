@@ -14,24 +14,21 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Modal, resizeToVariants } from 'tsp-form';
+import { Button, Modal } from 'tsp-form';
 import { ImageIcon, Loader2, Plus, Trash2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { translateApiError } from '../../lib/apiErrors';
-import { normalizeKey, toStoragePath } from '../../lib/mediaPath';
+import { normalizeKey } from '../../lib/mediaPath';
 import { MediaLightboxKeyGallery } from '../../components/MediaLightbox';
 import { MultiImageUploader } from '../../components/MultiImageUploader';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
+import { FUND_PAYMENT_EVIDENCE_MAX } from '../../lib/beMedia';
 import {
-  beMediaUpload,
-  FUND_PAYMENT_EVIDENCE_MAX,
-  FUND_PAYMENT_EVIDENCE_RESIZE,
-  FUND_PAYMENT_EVIDENCE_TYPE,
-} from '../../lib/beMedia';
-
-const ENTITY_TYPE = 'FUND_BILL_PAYMENT';
-const USAGE_TYPE = 'TRANSFER_EVIDENCE';
+  FUND_PAYMENT_EVIDENCE_ENTITY_TYPE as ENTITY_TYPE,
+  FUND_PAYMENT_EVIDENCE_USAGE_TYPE as USAGE_TYPE,
+  uploadFundPaymentEvidenceFile,
+} from '../../lib/fundPaymentEvidence';
 
 interface EvidenceRow {
   entity_media_id: number;
@@ -97,48 +94,7 @@ export function FundPaymentEvidence({ paymentId, canEdit = true }: FundPaymentEv
     setError(null);
     try {
       for (const file of staged) {
-        const variants = await resizeToVariants(file, FUND_PAYMENT_EVIDENCE_RESIZE);
-        const small = variants.sm?.file;
-        const large = variants.lg?.file;
-        if (!small || !large) continue;
-
-        // Uploaded so a thumbnail exists at the service; the key is not kept,
-        // because the variants column only accepts public paths and this album
-        // is private — the registry row carries the large key alone.
-        await beMediaUpload({
-          type: FUND_PAYMENT_EVIDENCE_TYPE,
-          file: small,
-          size: 'sm',
-          params: { payment_id: paymentId },
-        });
-        const lgRes = await beMediaUpload({
-          type: FUND_PAYMENT_EVIDENCE_TYPE,
-          file: large,
-          size: 'lg',
-          params: { payment_id: paymentId },
-        });
-
-        await apiClient.rpc('fn_media_attach', {
-          p_holding_id: user.holding_id,
-          p_storage_path: toStoragePath(lgRes.key),
-          // Private keys only — the variants column rejects private paths, so
-          // both sizes live on the one row through `storage_path`.
-          p_variants_json: null,
-          p_media_type: 'IMAGE',
-          // This album has no PRIVATE level; RESTRICTED is the closest the
-          // registry offers and what the work order specifies.
-          p_access_level: 'RESTRICTED',
-          // The mime follows the bytes: a browser that cannot encode webp gives
-          // JPEG, so this is read back from the upload rather than assumed.
-          p_mime_type: lgRes.content_type,
-          p_file_size_bytes: large.size,
-          p_original_filename: file.name || null,
-          p_entity_type: ENTITY_TYPE,
-          p_entity_id: paymentId,
-          p_usage_type: USAGE_TYPE,
-          p_sort_order: 0,
-          p_caption: null,
-        });
+        await uploadFundPaymentEvidenceFile(paymentId, file, user.holding_id);
       }
       setStaged([]);
       await refetch();

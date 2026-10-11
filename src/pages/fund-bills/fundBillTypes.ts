@@ -1,3 +1,5 @@
+import type { FundDayCloseAmended } from '../../lib/fundDayPay';
+
 // Shapes of the fund-money document (`FB-…` / `FC-…`) — mig 1284-1295.
 //
 // One family covers five jobs, told apart by `bill_purpose`: paying a shop,
@@ -289,6 +291,8 @@ export interface FundBillPayResult {
   source_account_display: string | null;
   reference: string | null;
   devices: FundBillPaidDevice[] | null;
+  /** Set when this press recorded into a closed fund day (mig 1411). */
+  day_close_amended?: FundDayCloseAmended | null;
 }
 
 export interface FundBillIssueResult {
@@ -310,6 +314,8 @@ export interface FundBillCreditNoteResult {
   net_amount: number;
   released_settlements: number;
   devices: FundBillPaidDevice[] | null;
+  /** Set when this press recorded into a closed fund day (mig 1411). */
+  day_close_amended?: FundDayCloseAmended | null;
 }
 
 export interface FundBillAddLineResult {

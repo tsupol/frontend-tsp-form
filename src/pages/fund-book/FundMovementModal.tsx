@@ -26,7 +26,10 @@ import {
 import { Keyboard } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { FundDayClosedHint, FundPayErrorBand } from '../../components/FundDayPayGuard';
-import { describeFundPayError, type FundPayError } from '../../lib/fundDayPay';
+import { amendedDoneRows } from '../../lib/fundDayPay';
+import { useFundPayAttempt } from '../../hooks/useFundPayAttempt';
+import { fundPaySlipDoneRows, useFundPaySlip } from '../../hooks/useFundPaySlip';
+import { FundPaySlipFailedNotice, FundPaySlipField } from '../../components/FundPaySlip';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../../lib/format';
@@ -88,7 +91,10 @@ export function FundMovementModal({
   const [receiptNo, setReceiptNo] = useState('');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<FundPayError | null>(null);
+  const attempt = useFundPayAttempt();
+  const slip = useFundPaySlip();
+  const { reset: resetAttempt } = attempt;
+  const { reset: resetSlip } = slip;
   /** The document issued by an earlier press whose confirmation was refused. */
   const createdRef = useRef<{ signature: string; bill_id: number } | null>(null);
   const [result, setResult] = useState<FundMovementConfirmResult | null>(null);
@@ -109,11 +115,12 @@ export function FundMovementModal({
     setReceiptNo('');
     setNote('');
     setSaving(false);
-    setError(null);
+    resetAttempt();
+    resetSlip();
     setResult(null);
     setConfirmClose(false);
     createdRef.current = null;
-  }, [open, purpose]);
+  }, [open, purpose, resetAttempt, resetSlip]);
 
   const isExpense = purpose === 'EXPENSE';
   const isWithdraw = purpose === 'CAPITAL_OUT';
@@ -130,7 +137,7 @@ export function FundMovementModal({
   const overCeiling = isWithdraw && !!book && amountValue > book.can_withdraw;
 
   const dirty = !!amount || !!reference.trim() || !!payeeName.trim()
-    || !!receiptNo.trim() || !!note.trim() || !!categoryId || paidDate !== today;
+    || !!receiptNo.trim() || !!note.trim() || !!categoryId || paidDate !== today || slip.files.length > 0;
 
   const canSubmit = amountValue > 0
     && !futureDate
@@ -163,10 +170,10 @@ export function FundMovementModal({
    * a draft and the error says so, which is the honest outcome rather than a
    * silent rollback the backend never promised.
    */
-  const handleSubmit = async () => {
+  const handleSubmit = async (amend = false) => {
     if (companyId == null || !canSubmit) return;
     setSaving(true);
-    setError(null);
+    attempt.setError(null);
     try {
       const createParams = {
         p_company_id: companyId,
@@ -194,13 +201,17 @@ export function FundMovementModal({
         p_bank_account_id: accountId ? Number(accountId) : null,
         p_reference: reference.trim() || null,
         p_note: note.trim() || null,
+        ...attempt.amendParams(amend),
       });
 
       setResult(confirmed);
-      setView('done');
       invalidate();
+      // The confirm returns the movement it wrote, so the slip goes straight
+      // onto it; a failure is reported on the done view, never rolled back.
+      await slip.attach({ paymentId: confirmed.payment_id });
+      setView('done');
     } catch (err) {
-      setError(describeFundPayError(err, t, i18n.language));
+      attempt.fail(err, amend);
       // The document may already exist as a draft, so refresh either way.
       invalidate();
     } finally {
@@ -310,7 +321,7 @@ export function FundMovementModal({
                   <label className="form-label">{t('fundBook.movedOnRequired')}</label>
                   <InputDatePicker
                     value={parseLocalDate(paidDate)}
-                    onChange={v => setPaidDate(toLocalDateStr(v))}
+                    onChange={v => { setPaidDate(toLocalDateStr(v)); attempt.setError(null); }}
                     dateFormat={makeDatePickerFormat(i18n.language)}
                     locale={i18n.language}
                     calendar="gregorian"
@@ -363,6 +374,12 @@ export function FundMovementModal({
                   />
                 </div>
 
+                <FundPaySlipField
+                  slip={slip}
+                  disabled={saving}
+                  onError={message => attempt.setError({ message, unclosedDate: null, closedDate: null })}
+                />
+
                 <div className="flex flex-col">
                   <label className="form-label">{t('fundBook.note')}</label>
                   <TextArea value={note} onChange={e => setNote(e.target.value)} rows={2} />
@@ -370,11 +387,11 @@ export function FundMovementModal({
               </div>
             </div>
 
-            <FundPayErrorBand error={error} onDismiss={() => setError(null)} />
+            <FundPayErrorBand attempt={attempt} onAmend={() => { void handleSubmit(true); }} busy={saving} />
 
             <div className="modal-footer">
               <Button variant="ghost" onClick={handleClose} disabled={saving}>{t('common.cancel')}</Button>
-              <Button color="primary" onClick={handleSubmit} disabled={saving || !canSubmit}>
+              <Button color="primary" onClick={() => { void handleSubmit(); }} disabled={saving || !canSubmit}>
                 {t('common.save')}
               </Button>
             </div>
@@ -393,7 +410,10 @@ export function FundMovementModal({
                     emphasis: true,
                   }]
                 : []),
+              ...amendedDoneRows(result.day_close_amended, t, i18n.language),
+              ...fundPaySlipDoneRows(slip, t),
             ]}
+            extras={slip.outcome?.kind === 'failed' ? <FundPaySlipFailedNotice slip={slip} /> : undefined}
             onClose={forceClose}
           />
         )}

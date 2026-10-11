@@ -1,3 +1,5 @@
+import type { FundDayCloseAmended } from '../../lib/fundDayPay';
+
 // Shapes of the shop return document (`PR-…`) — mig 1273 / 1274 / 1276 / 1277.
 //
 // A return is the ONLY way an ACTIVE deal-partner contract ends: the customer
@@ -240,6 +242,8 @@ export interface ReturnBuybackPaidResult {
   settles_bill_code: string | null;
   amount: number;
   close_block: PartnerReturnCloseBlock | null;
+  /** Set when this press recorded into a closed fund day (mig 1411). */
+  day_close_amended?: FundDayCloseAmended | null;
 }
 
 export interface ReturnShipResult {

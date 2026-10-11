@@ -15,7 +15,10 @@ import { Modal, Button, Input, InputDatePicker, Select, TextArea } from 'tsp-for
 import { ExternalLink, Info, Keyboard } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { FundDayClosedHint, FundPayErrorBand } from '../../components/FundDayPayGuard';
-import { describeFundPayError, type FundPayError } from '../../lib/fundDayPay';
+import { amendedDoneRows } from '../../lib/fundDayPay';
+import { useFundPayAttempt } from '../../hooks/useFundPayAttempt';
+import { fundPaySlipDoneRows, useFundPaySlip } from '../../hooks/useFundPaySlip';
+import { FundPaySlipFailedNotice, FundPaySlipField } from '../../components/FundPaySlip';
 import { DateTime } from '../../components/DateTime';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../../lib/format';
@@ -62,7 +65,10 @@ export function ReturnBuybackPaidModal({ open, detail, actions, onClose }: Props
   // blank, the row lands under "ไม่ระบุบัญชี" on the daily money summary (148).
   const [accountId, setAccountId] = useState('');
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<FundPayError | null>(null);
+  const attempt = useFundPayAttempt();
+  const slip = useFundPaySlip();
+  const { reset: resetAttempt } = attempt;
+  const { reset: resetSlip } = slip;
   const [result, setResult] = useState<ReturnBuybackPaidResult | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
 
@@ -75,12 +81,13 @@ export function ReturnBuybackPaidModal({ open, detail, actions, onClose }: Props
     setNote('');
     setAccountId('');
     setSaving(false);
-    setError(null);
+    resetAttempt();
+    resetSlip();
     setResult(null);
     setConfirmClose(false);
-  }, [open]);
+  }, [open, resetAttempt, resetSlip]);
 
-  const dirty = paidDate !== today || !!reference.trim() || !!note.trim() || !!accountId;
+  const dirty = paidDate !== today || !!reference.trim() || !!note.trim() || !!accountId || slip.files.length > 0;
   const futureDate = !!paidDate && paidDate > today;
   const canSubmit = !!paidDate && !futureDate;
 
@@ -99,10 +106,10 @@ export function ReturnBuybackPaidModal({ open, detail, actions, onClose }: Props
     label: `${a.bank_name} · ${a.account_number_display ?? a.account_number ?? ''}`,
   }));
 
-  const handleSave = async () => {
+  const handleSave = async (amend = false) => {
     if (!detail || !canSubmit) return;
     setSaving(true);
-    setError(null);
+    attempt.setError(null);
     try {
       const res = await apiClient.rpc<ReturnBuybackPaidResult>('fn_partner_return_buyback_paid', {
         p_return_id: detail.return_id,
@@ -110,12 +117,16 @@ export function ReturnBuybackPaidModal({ open, detail, actions, onClose }: Props
         p_reference: reference.trim() || null,
         p_note: note.trim() || null,
         p_bank_account_id: accountId ? Number(accountId) : null,
+        ...attempt.amendParams(amend),
       });
       setResult(res);
-      setView('done');
       invalidate(detail.return_id);
+      // The slip (the shop's transfer) goes on the buyback document's one
+      // movement; a failure is reported on the done view, never rolled back.
+      await slip.attach({ billId: res.buyback_bill_id });
+      setView('done');
     } catch (err) {
-      setError(describeFundPayError(err, t, i18n.language));
+      attempt.fail(err, amend);
     } finally {
       setSaving(false);
     }
@@ -168,7 +179,7 @@ export function ReturnBuybackPaidModal({ open, detail, actions, onClose }: Props
                   <label className="form-label">{t('partnerReturn.paidDateRequired')}</label>
                   <InputDatePicker
                     value={parseLocalDate(paidDate)}
-                    onChange={v => setPaidDate(toLocalDateStr(v))}
+                    onChange={v => { setPaidDate(toLocalDateStr(v)); attempt.setError(null); }}
                     dateFormat={makeDatePickerFormat(i18n.language)}
                     locale={i18n.language}
                     calendar="gregorian"
@@ -210,6 +221,12 @@ export function ReturnBuybackPaidModal({ open, detail, actions, onClose }: Props
                   <span className="text-xs text-subtle mt-1">{t('partnerReturn.bankAccountHint')}</span>
                 </div>
 
+                <FundPaySlipField
+                  slip={slip}
+                  disabled={saving}
+                  onError={message => attempt.setError({ message, unclosedDate: null, closedDate: null })}
+                />
+
                 <div className="flex flex-col">
                   <label className="form-label">{t('partnerReturn.note')}</label>
                   <TextArea value={note} onChange={e => setNote(e.target.value)} rows={2} />
@@ -217,11 +234,11 @@ export function ReturnBuybackPaidModal({ open, detail, actions, onClose }: Props
               </div>
             </div>
 
-            <FundPayErrorBand error={error} onDismiss={() => setError(null)} />
+            <FundPayErrorBand attempt={attempt} onAmend={() => { void handleSave(true); }} busy={saving} />
 
             <div className="modal-footer">
               <Button variant="ghost" onClick={handleClose} disabled={saving}>{t('common.cancel')}</Button>
-              <Button color="primary" onClick={handleSave} disabled={saving || !canSubmit}>
+              <Button color="primary" onClick={() => { void handleSave(); }} disabled={saving || !canSubmit}>
                 {t('common.save')}
               </Button>
             </div>
@@ -240,7 +257,10 @@ export function ReturnBuybackPaidModal({ open, detail, actions, onClose }: Props
                 ? [{ label: t('partnerReturn.payoutDocument'), value: result.settles_bill_code }]
                 : []),
               { label: t('partnerReturn.buybackTotal'), value: fmtCurrency(result.amount), emphasis: true },
+              ...amendedDoneRows(result.day_close_amended, t, i18n.language),
+              ...fundPaySlipDoneRows(slip, t),
             ]}
+            extras={slip.outcome?.kind === 'failed' ? <FundPaySlipFailedNotice slip={slip} /> : undefined}
             secondaryAction={billId != null ? {
               label: t('partnerReturn.openPayout'),
               endIcon: <ExternalLink size={14} />,

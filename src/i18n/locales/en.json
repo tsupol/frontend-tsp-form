@@ -9691,7 +9691,24 @@
     "previousNotClosed": "The fund's day {{date}} has entries but isn't closed yet — close that day first, then press again.",
     "goClose": "Go close {{date}}",
     "pickedDayClosed": "The fund's day {{date}} is closed — recording on it will be refused. Pick another date.",
-    "fundDayCloseAdjusted": "Fund day close recomputed"
+    "fundDayCloseAdjusted": "Fund day close recomputed",
+    "amendAction": "Record on the closed day (creates a new version of that day's close)",
+    "amendDenied": "Recording on the closed day {{date}} needs the right to record into a closed fund day — ask a company admin.",
+    "amendedLabel": "Fund day close",
+    "amendedValue": "Day {{date}} re-closed as v{{version}}"
+  },
+  "fundPaySlip": {
+    "doneLabel": "Payment slip",
+    "label": "Payment slip (optional)",
+    "hint": "Attached to this payment after it is saved. Saving works without a slip.",
+    "uploading": "Attaching the slip…",
+    "attached_one": "{{count}} photo attached",
+    "attached_other": "{{count}} photos attached",
+    "failed": "The payment is recorded, but the slip didn't attach: {{reason}}",
+    "partlyAttached": "{{attached}} of {{total}} photos did attach.",
+    "addLater": "You can add it from the payment list on the document.",
+    "noMovement": "this payment has no bank transfer row to attach a slip to",
+    "noHolding": "your session has no holding"
   },
   "billDay": {
     "reason_FUND_DAY_CLOSED": "the fund closed its day",

@@ -16,9 +16,15 @@
 // where the plain ModalErrorBand used to be. The band carries a "Go close
 // {date}" link for the previous-day case.
 //
-// Later (work order fund_pools_chat_scope_dashboard §E): an admin may re-send
-// with p_amend_closed_day. That button belongs in the same band — the
-// `closedDate` field is kept for it.
+// Record into a closed day (work order fund_pools_chat_scope_dashboard §E,
+// mig 1411): after DAY_ALREADY_CLOSED, a holder of FUND.PAY_CLOSED_DAY may
+// re-send the same call with p_amend_closed_day: true (+ p_pin when the backend
+// asks — COMPANY_ADMIN is exempt). The band carries that button; the success
+// response then has `day_close_amended` and the day's close gets a new version.
+// The amend press can fail with:
+//   • SALE.AUTH.PERMISSION_DENIED {required: FUND.PAY_CLOSED_DAY, …day params}
+//   • CORE.AUTH.PIN_REQUIRED / CORE.AUTH.INVALID_PIN (auth.pin_check_err)
+//   • FUND.STATE.PREVIOUS_DAY_NOT_CLOSED — the flag does not help; close first.
 // ============================================================================
 
 import { useQuery } from '@tanstack/react-query';
@@ -32,9 +38,26 @@ export interface FundPayError {
   message: string;
   /** FUND.STATE.PREVIOUS_DAY_NOT_CLOSED — the day that has to be closed first. */
   unclosedDate: string | null;
-  /** FUND.STATE.DAY_ALREADY_CLOSED — the closed day the payment landed on. */
+  /** FUND.STATE.DAY_ALREADY_CLOSED — the closed day the payment landed on.
+   *  Set = the band may offer "record on the closed day". */
   closedDate: string | null;
+  /** The amend press was refused for its PIN — the band asks for one. */
+  pinNeeded?: boolean;
 }
+
+/** `day_close_amended` on a pay RPC's success response (mig 1411). */
+export interface FundDayCloseAmended {
+  fund_day_close_id: number;
+  close_date: string;
+  version: number;
+  money_net_before: number | null;
+  money_net_after: number | null;
+}
+
+/** The permission that lets a user record into a closed fund day. */
+export const FUND_PAY_CLOSED_DAY = 'FUND.PAY_CLOSED_DAY';
+
+const PIN_CODES = new Set(['CORE.AUTH.PIN_REQUIRED', 'CORE.AUTH.INVALID_PIN']);
 
 /** The daily-money page (UI_SUMMARY/148), opened on one day. */
 export function fundDayPagePath(date: string): string {
@@ -45,9 +68,36 @@ function str(v: unknown): string | null {
   return typeof v === 'string' && v ? v : null;
 }
 
-export function describeFundPayError(err: unknown, t: TranslateFn, lang: string): FundPayError {
+/**
+ * `amending` = this error came back from the "record on the closed day" press;
+ * it carries the closed day forward so a PIN refusal keeps the button.
+ */
+export function describeFundPayError(
+  err: unknown,
+  t: TranslateFn,
+  lang: string,
+  amending?: { closedDate: string | null },
+): FundPayError {
   if (err instanceof ApiError) {
     const p = err.messageParams ?? {};
+    if (amending && PIN_CODES.has(err.code)) {
+      return {
+        message: translateApiError(err, t),
+        unclosedDate: null,
+        closedDate: amending.closedDate,
+        pinNeeded: true,
+      };
+    }
+    if (err.code === 'SALE.AUTH.PERMISSION_DENIED' && p.required === FUND_PAY_CLOSED_DAY) {
+      const closeDate = str(p.close_date) ?? str(p.paid_date) ?? amending?.closedDate ?? null;
+      return {
+        message: t('fundDayGuard.amendDenied', {
+          date: closeDate ? formatDateTime(closeDate, lang, false) : '',
+        }),
+        unclosedDate: null,
+        closedDate: null,
+      };
+    }
     if (err.code === 'FUND.STATE.DAY_ALREADY_CLOSED') {
       const closeDate = str(p.close_date) ?? str(p.paid_date);
       const date = closeDate ? formatDateTime(closeDate, lang, false) : '';
@@ -101,3 +151,19 @@ export function useFundDayClosedOn(companyId: number | null | undefined, date: s
   });
 }
 
+
+/** The done-view row for a payment recorded into a closed day — none otherwise. */
+export function amendedDoneRows(
+  amended: FundDayCloseAmended | null | undefined,
+  t: TranslateFn,
+  lang: string,
+): { label: string; value: string }[] {
+  if (!amended) return [];
+  return [{
+    label: t('fundDayGuard.amendedLabel'),
+    value: t('fundDayGuard.amendedValue', {
+      date: formatDateTime(amended.close_date, lang, false),
+      version: amended.version,
+    }),
+  }];
+}

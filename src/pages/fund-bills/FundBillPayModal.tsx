@@ -19,7 +19,10 @@ import { Modal, Button, Input, InputDatePicker, Select, TextArea } from 'tsp-for
 import { Keyboard, Smartphone } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { FundDayClosedHint, FundPayErrorBand } from '../../components/FundDayPayGuard';
-import { describeFundPayError, type FundPayError } from '../../lib/fundDayPay';
+import { amendedDoneRows } from '../../lib/fundDayPay';
+import { useFundPayAttempt } from '../../hooks/useFundPayAttempt';
+import { fundPaySlipDoneRows, useFundPaySlip } from '../../hooks/useFundPaySlip';
+import { FundPaySlipFailedNotice, FundPaySlipField } from '../../components/FundPaySlip';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../../lib/format';
@@ -58,7 +61,10 @@ export function FundBillPayModal({ open, bill, onClose }: FundBillPayModalProps)
   const [reference, setReference] = useState('');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<FundPayError | null>(null);
+  const attempt = useFundPayAttempt();
+  const slip = useFundPaySlip();
+  const { reset: resetAttempt } = attempt;
+  const { reset: resetSlip } = slip;
   const [result, setResult] = useState<FundBillPayResult | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
 
@@ -71,12 +77,13 @@ export function FundBillPayModal({ open, bill, onClose }: FundBillPayModalProps)
     setReference('');
     setNote('');
     setSaving(false);
-    setError(null);
+    resetAttempt();
+    resetSlip();
     setResult(null);
     setConfirmClose(false);
-  }, [open]);
+  }, [open, resetAttempt, resetSlip]);
 
-  const dirty = paidDate !== today || !!accountId || !!reference.trim() || !!note.trim();
+  const dirty = paidDate !== today || !!accountId || !!reference.trim() || !!note.trim() || slip.files.length > 0;
   const futureDate = !!paidDate && paidDate > today;
   const canSubmit = !!paidDate && !futureDate;
 
@@ -92,10 +99,10 @@ export function FundBillPayModal({ open, bill, onClose }: FundBillPayModalProps)
     label: `${a.bank_name} · ${a.account_number_display ?? a.account_number ?? ''}`,
   }));
 
-  const handlePay = async () => {
+  const handlePay = async (amend = false) => {
     if (!bill || !canSubmit) return;
     setSaving(true);
-    setError(null);
+    attempt.setError(null);
     try {
       const res = await apiClient.rpc<FundBillPayResult>('fn_fund_bill_pay', {
         p_bill_id: bill.bill_id,
@@ -103,12 +110,16 @@ export function FundBillPayModal({ open, bill, onClose }: FundBillPayModalProps)
         p_source_bank_account_id: accountId ? Number(accountId) : null,
         p_reference: reference.trim() || null,
         p_note: note.trim() || null,
+        ...attempt.amendParams(amend),
       });
       setResult(res);
-      setView('done');
       invalidate(bill.bill_id);
+      // The pay is recorded; the slip goes on the shop's transfer row and its
+      // failure is reported on the done view, never rolled back.
+      await slip.attach({ billId: bill.bill_id });
+      setView('done');
     } catch (err) {
-      setError(describeFundPayError(err, t, i18n.language));
+      attempt.fail(err, amend);
     } finally {
       setSaving(false);
     }
@@ -152,7 +163,7 @@ export function FundBillPayModal({ open, bill, onClose }: FundBillPayModalProps)
                   <label className="form-label">{t('fundBill.paidDateRequired')}</label>
                   <InputDatePicker
                     value={parseLocalDate(paidDate)}
-                    onChange={v => setPaidDate(toLocalDateStr(v))}
+                    onChange={v => { setPaidDate(toLocalDateStr(v)); attempt.setError(null); }}
                     dateFormat={makeDatePickerFormat(i18n.language)}
                     locale={i18n.language}
                     calendar="gregorian"
@@ -193,6 +204,12 @@ export function FundBillPayModal({ open, bill, onClose }: FundBillPayModalProps)
                   />
                 </div>
 
+                <FundPaySlipField
+                  slip={slip}
+                  disabled={saving}
+                  onError={message => attempt.setError({ message, unclosedDate: null, closedDate: null })}
+                />
+
                 <div className="flex flex-col">
                   <label className="form-label">{t('fundBill.note')}</label>
                   <TextArea value={note} onChange={e => setNote(e.target.value)} rows={2} />
@@ -200,11 +217,11 @@ export function FundBillPayModal({ open, bill, onClose }: FundBillPayModalProps)
               </div>
             </div>
 
-            <FundPayErrorBand error={error} onDismiss={() => setError(null)} />
+            <FundPayErrorBand attempt={attempt} onAmend={() => { void handlePay(true); }} busy={saving} />
 
             <div className="modal-footer">
               <Button variant="ghost" onClick={handleClose} disabled={saving}>{t('common.cancel')}</Button>
-              <Button color="primary" onClick={handlePay} disabled={saving || !canSubmit}>
+              <Button color="primary" onClick={() => { void handlePay(); }} disabled={saving || !canSubmit}>
                 {t('fundBill.payAction')}
               </Button>
             </div>
@@ -232,19 +249,26 @@ export function FundBillPayModal({ open, bill, onClose }: FundBillPayModalProps)
               ...(result.reference
                 ? [{ label: t('fundBill.reference'), value: result.reference }]
                 : []),
+              ...amendedDoneRows(result.day_close_amended, t, i18n.language),
+              ...fundPaySlipDoneRows(slip, t),
             ]}
-            extras={devices.length > 0 ? (
-              <div className="rounded-md border border-line overflow-hidden">
-                <div className="px-3 py-2 bg-surface text-sm font-medium flex items-center gap-2">
-                  <Smartphone size={14} className="text-subtle" />
-                  {t('fundBill.devicesMovedToHolding', { count: devices.length })}
-                </div>
-                {devices.map(d => (
-                  <div key={d.transfer_id} className="px-3 py-2 border-t border-line flex items-center justify-between text-sm">
-                    <span className="text-subtle">#{d.asset_id}</span>
-                    <span className="tabular-nums">{fmtCurrency(d.cost_basis)}</span>
+            extras={devices.length > 0 || slip.outcome?.kind === 'failed' ? (
+              <div className="flex flex-col gap-3">
+                <FundPaySlipFailedNotice slip={slip} />
+                {devices.length > 0 && (
+                <div className="rounded-md border border-line overflow-hidden">
+                  <div className="px-3 py-2 bg-surface text-sm font-medium flex items-center gap-2">
+                    <Smartphone size={14} className="text-subtle" />
+                    {t('fundBill.devicesMovedToHolding', { count: devices.length })}
                   </div>
-                ))}
+                  {devices.map(d => (
+                    <div key={d.transfer_id} className="px-3 py-2 border-t border-line flex items-center justify-between text-sm">
+                      <span className="text-subtle">#{d.asset_id}</span>
+                      <span className="tabular-nums">{fmtCurrency(d.cost_basis)}</span>
+                    </div>
+                  ))}
+                </div>
+                )}
               </div>
             ) : undefined}
             onClose={forceClose}
