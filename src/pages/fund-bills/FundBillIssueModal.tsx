@@ -10,6 +10,7 @@ import { Modal, Button, TextArea } from 'tsp-form';
 import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
+import { Banknote } from 'lucide-react';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { fmtCurrency } from '../../lib/format';
 import { useFundBillInvalidate } from './useFundBills';
@@ -19,9 +20,11 @@ interface FundBillIssueModalProps {
   open: boolean;
   bill: FundBill | null;
   onClose: () => void;
+  /** The issued bill's next job is recording the payment; the done step offers it as the primary button. Called after this modal closes. */
+  onPay?: () => void;
 }
 
-export function FundBillIssueModal({ open, bill, onClose }: FundBillIssueModalProps) {
+export function FundBillIssueModal({ open, bill, onClose, onPay }: FundBillIssueModalProps) {
   const { t } = useTranslation();
   const invalidate = useFundBillInvalidate();
 
@@ -119,9 +122,16 @@ export function FundBillIssueModal({ open, bill, onClose }: FundBillIssueModalPr
               from: t('fundBill.status_DRAFT'),
               to: t('fundBill.status_ISSUED'),
             }}
-            detailRows={[
+            detailRows={onPay ? undefined : [
               { label: t('fundBill.issuedNext'), value: t('fundBill.action_PAY') },
             ]}
+            secondaryAction={onPay ? {
+              label: t('fundBill.action_PAY'),
+              startIcon: <Banknote size={16} />,
+              isNextStep: true,
+              onClick: () => { forceClose(); onPay(); },
+            } : undefined}
+            doneLabel={onPay ? t('common.later') : undefined}
             onClose={forceClose}
           />
         )}

@@ -174,7 +174,7 @@ export function CommissionExtraCreateModal({ open, shop: shopProp, onClose, onOp
               isNextStep: true,
               onClick: () => { const id = result.bill_id; forceClose(); onOpenBill(id); },
             }}
-            doneLabel={t('shopCommission.later')}
+            doneLabel={t('common.later')}
             onClose={forceClose}
           />
         )}

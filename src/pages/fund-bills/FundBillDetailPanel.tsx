@@ -696,7 +696,7 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
         </div>
       )}
 
-      <FundBillIssueModal open={issueOpen} bill={bill} onClose={() => setIssueOpen(false)} />
+      <FundBillIssueModal open={issueOpen} bill={bill} onClose={() => setIssueOpen(false)} onPay={() => setPayOpen(true)} />
       <FundBillPayModal open={payOpen} bill={bill} onClose={() => setPayOpen(false)} />
       <FundBillVoidModal open={voidOpen} bill={bill} onClose={() => setVoidOpen(false)} />
       <FundBillCreditNoteModal open={creditNoteOpen} bill={bill} onClose={() => setCreditNoteOpen(false)} />
