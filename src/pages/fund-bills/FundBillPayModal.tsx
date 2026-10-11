@@ -153,10 +153,14 @@ export function FundBillPayModal({ open, bill, onClose }: FundBillPayModalProps)
               </div>
 
               {/* The bank will only ever show the shop's transfer. Saying so here
-               *  stops the company's own line being hunted for on a statement. */}
-              <div className="mt-3 alert alert-info">
-                <span>{t('fundBill.payTwoRowsHint')}</span>
-              </div>
+               *  stops the company's own line being hunted for on a statement.
+               *  A commission document has no company side, so the band would
+               *  only confuse there. */}
+              {bill?.bill_purpose !== 'COMMISSION_EXTRA' && (
+                <div className="mt-3 alert alert-info">
+                  <span>{t('fundBill.payTwoRowsHint')}</span>
+                </div>
+              )}
 
               <div className="form-grid mt-4">
                 <div className="flex flex-col">
@@ -252,9 +256,12 @@ export function FundBillPayModal({ open, bill, onClose }: FundBillPayModalProps)
               ...amendedDoneRows(result.day_close_amended, t, i18n.language),
               ...fundPaySlipDoneRows(slip, t),
             ]}
-            extras={devices.length > 0 || slip.outcome?.kind === 'failed' ? (
+            extras={devices.length > 0 || slip.outcome?.kind === 'failed' || bill?.bill_purpose === 'COMMISSION_EXTRA' ? (
               <div className="flex flex-col gap-3">
                 <FundPaySlipFailedNotice slip={slip} />
+                {bill?.bill_purpose === 'COMMISSION_EXTRA' && (
+                  <div className="alert alert-info"><span>{t('shopCommission.paidTranchesHint')}</span></div>
+                )}
                 {devices.length > 0 && (
                 <div className="rounded-md border border-line overflow-hidden">
                   <div className="px-3 py-2 bg-surface text-sm font-medium flex items-center gap-2">

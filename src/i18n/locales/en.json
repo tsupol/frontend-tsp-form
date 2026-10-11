@@ -9694,7 +9694,8 @@
     "sumUnpaid": "Released, not yet paid",
     "panelWaitingHint": "These move to \"Ready to bundle\" on their own once the bill day has ended and the hold period has passed. Nothing to do here.",
     "sliceCount": "{{count}} step(s)",
-    "goToDraft": "Go to the draft"
+    "goToDraft": "Go to the draft",
+    "paidTranchesHint": "The steps in this document are now \"paid\" · the shop sees them on its \"My commission\" page."
   },
   "fundDayGuard": {
     "closedToday": "The fund's day {{date}} is already closed — this can be recorded tomorrow.",
