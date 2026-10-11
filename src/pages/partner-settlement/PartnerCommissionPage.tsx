@@ -19,8 +19,8 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useSearchParams } from 'react-router-dom';
-import { PageNav, PageNavPanel, DataTable, MobileHeader } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine } from 'lucide-react';
+import { PageNav, PageNavPanel, DataTable, MobileHeader, Button } from 'tsp-form';
+import { ArrowLeft, ArrowRightFromLine, ChevronLeft, ChevronRight } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { SearchInput } from '../../components/SearchInput';
 import { fmtCurrency } from '../../lib/format';
@@ -28,11 +28,22 @@ import { useAuth } from '../../contexts/AuthContext';
 import { usePartnerCommissionReport, usePartnerCommissionMonthly } from './usePartnerSettlement';
 import type { PartnerCommissionMonth, PartnerCommissionRow } from './partnerSettlementTypes';
 
-const ALL = 'all';
-
 /** `2026-09-01` → `2026-09`, the form the address carries. */
 const monthKey = (month: string) => month.slice(0, 7);
 
+/** This month in Bangkok, `YYYY-MM`. */
+const currentMonthKey = () =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit' }).format(new Date());
+
+const nextMonthKey = (key: string) => {
+  const [y, m] = key.split('-').map(Number);
+  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
+};
+
+/** What the right side shows: one year as a whole, or one month of it. */
+type Pick = { kind: 'year'; year: number } | { kind: 'month'; key: string };
+
+/** A rail row: one month of the picked year (null data = nothing paid). */
 type RailRow = { key: string; month: PartnerCommissionMonth | null };
 
 export function PartnerCommissionPage() {
@@ -41,54 +52,105 @@ export function PartnerCommissionPage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const monthParam = searchParams.get('month');
-  const picked = monthParam && /^\d{4}-\d{2}$/.test(monthParam) ? monthParam : ALL;
+  const yearParam = searchParams.get('year');
 
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(25);
 
-  useEffect(() => { setPageIndex(0); }, [debouncedSearch, picked]);
-
   const { months, isFetched: monthsFetched } = usePartnerCommissionMonthly();
-  // A month the list doesn't hold (old link, typo) falls back to all months.
+  const withData = new Set(months.map(m => monthKey(m.month)));
+  // Years that have money, newest first. The arrows step through these only.
+  const years = [...new Set(months.map(m => Number(m.month.slice(0, 4))))].sort((a, b) => b - a);
+
+  // The address decides; with nothing in it, the latest month with money —
+  // "how much did I get last month" is the question the shop comes with.
+  const pick: Pick | null =
+    monthParam && /^\d{4}-\d{2}$/.test(monthParam) ? { kind: 'month', key: monthParam }
+    : yearParam && /^\d{4}$/.test(yearParam) ? { kind: 'year', year: Number(yearParam) }
+    : months.length > 0 ? { kind: 'month', key: monthKey(months[0].month) }
+    : null;
+  const activeYear = pick ? (pick.kind === 'year' ? pick.year : Number(pick.key.slice(0, 4))) : null;
+  const pickKey = pick ? (pick.kind === 'year' ? String(pick.year) : pick.key) : '';
+
+  // A month or year the list doesn't hold (old link, typo, a month with
+  // nothing paid) falls back: the month to its year, the year to the default.
   useEffect(() => {
-    if (monthsFetched && picked !== ALL && !months.some(m => monthKey(m.month) === picked)) {
+    if (!monthsFetched || !pick) return;
+    if (pick.kind === 'month' && monthParam && !withData.has(pick.key)) {
+      const y = pick.key.slice(0, 4);
+      setSearchParams(years.includes(Number(y)) ? { year: y } : {}, { replace: true });
+    } else if (pick.kind === 'year' && !years.includes(pick.year)) {
       setSearchParams({}, { replace: true });
     }
-  }, [monthsFetched, months, picked, setSearchParams]);
+  }, [monthsFetched, pickKey, months.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const searching = debouncedSearch.trim() !== '';
+  useEffect(() => { setPageIndex(0); }, [debouncedSearch, pickKey]);
+
+  // Search looks in every month: a contract is found without knowing when it was paid.
+  const range = searching || !pick ? null
+    : pick.kind === 'month' ? { from: `${pick.key}-01`, to: `${nextMonthKey(pick.key)}-01` }
+    : { from: `${pick.year}-01-01`, to: `${pick.year + 1}-01-01` };
   const { rows, totalCount, isFetching } = usePartnerCommissionReport({
     search: debouncedSearch,
-    month: picked === ALL ? null : picked,
+    paidFrom: range?.from,
+    paidTo: range?.to,
     pageIndex,
     pageSize,
   });
 
   if (!isDealPartner) return <Navigate to="/admin/contracts/search" replace />;
 
-  const monthLabel = (month: string) =>
-    new Date(`${monthKey(month)}-01T00:00:00`).toLocaleDateString(
+  const monthLabel = (key: string) =>
+    new Date(`${monthKey(key)}-01T00:00:00`).toLocaleDateString(
       i18n.language === 'th' ? 'th-TH-u-ca-gregory' : 'en-GB',
       { month: 'long', year: 'numeric' },
     );
 
-  // Picking a month is a selection, not a navigation: replace the address.
-  const pickMonth = (key: string) => {
-    setSearchParams(key === ALL ? {} : { month: key }, { replace: true });
+  // Picking a month, or the year itself, is a selection: replace the
+  // address. The arrows move to another year's list, like a tab: a new
+  // history entry, landing on that year as a whole.
+  const pickRow = (row: RailRow) => {
+    if (!row.month) return;
+    setSearchParams({ month: row.key }, { replace: true });
   };
+  const pickYear = (year: number) => setSearchParams({ year: String(year) }, { replace: true });
+  const goYear = (year: number) => setSearchParams({ year: String(year) });
 
-  const pickedMonth = picked === ALL ? null : months.find(m => monthKey(m.month) === picked) ?? null;
+  // The picked year's months, newest first: up to this month for the current
+  // year, from the shop's first paid month for its first year. A month with
+  // nothing paid is listed greyed, so a gap reads as "nothing" not "missing".
+  const railRows: RailRow[] = [];
+  if (activeYear != null) {
+    const now = currentMonthKey();
+    const first = months.length ? monthKey(months[months.length - 1].month) : now;
+    const last = activeYear === Number(now.slice(0, 4)) ? Number(now.slice(5)) : 12;
+    const firstM = activeYear === Number(first.slice(0, 4)) ? Number(first.slice(5)) : 1;
+    for (let m = last; m >= firstM; m--) {
+      const key = `${activeYear}-${String(m).padStart(2, '0')}`;
+      railRows.push({ key, month: months.find(x => monthKey(x.month) === key) ?? null });
+    }
+  }
+  const yearIdx = activeYear != null ? years.indexOf(activeYear) : -1;
+  const olderYear = yearIdx >= 0 && yearIdx < years.length - 1 ? years[yearIdx + 1] : null;
+  const newerYear = yearIdx > 0 ? years[yearIdx - 1] : null;
+
+  const pickedMonth = pick?.kind === 'month' ? months.find(m => monthKey(m.month) === pick.key) ?? null : null;
   const title = t('nav.partnerCommission');
-  const panelTitle = picked === ALL ? t('settlement.allMonths') : monthLabel(picked);
+  const panelTitle = searching ? t('settlement.searchAllMonths')
+    : !pick ? title
+    : pick.kind === 'year' ? t('settlement.allOfYear', { year: pick.year })
+    : monthLabel(pick.key);
   // This month's total holds money from contracts listed under earlier months.
-  const fromEarlier = !!pickedMonth && (!!pickedMonth.commission_extra_total || !!pickedMonth.commission_clawback_total);
-
-  const railRows: RailRow[] = [{ key: ALL, month: null }, ...months.map(m => ({ key: monthKey(m.month), month: m }))];
+  const fromEarlier = !searching && !!pickedMonth
+    && (!!pickedMonth.commission_extra_total || !!pickedMonth.commission_clawback_total);
 
   return (
     <PageNav
       panels={['list', 'detail']}
-      defaultPanel={monthParam ? 'detail' : undefined}
+      defaultPanel={monthParam || yearParam ? 'detail' : undefined}
       className="h-dvh overflow-hidden"
     >
       {({ isMobile, isRoot, goTo, goBack }) => (
@@ -125,28 +187,64 @@ export function PartnerCommissionPage() {
               id="list"
               className={isMobile ? '' : 'w-64 shrink-0 border-r border-line flex flex-col min-h-0'}
             >
+              {activeYear != null && (
+                <div className="flex-none flex items-center gap-1 px-2 py-1.5 border-b border-line">
+                  <Button
+                    variant="ghost" size="sm" startIcon={<ChevronLeft size={16} />}
+                    aria-label={t('settlement.olderYear')}
+                    disabled={olderYear == null}
+                    onClick={() => olderYear != null && goYear(olderYear)}
+                  />
+                  {/* The year is the "whole year" choice: no separate row for it. */}
+                  <button
+                    type="button"
+                    aria-label={t('settlement.allOfYear', { year: activeYear })}
+                    aria-pressed={!searching && pick?.kind === 'year'}
+                    onClick={() => {
+                      pickYear(activeYear);
+                      if (isMobile) goTo('detail');
+                    }}
+                    className={`flex-1 h-8 rounded-md text-sm font-semibold tabular-nums cursor-pointer transition-colors ${
+                      !searching && pick?.kind === 'year'
+                        ? 'bg-item-active-bg text-item-active-fg'
+                        : 'text-item-fg hover:bg-item-hover-bg hover:text-item-hover-fg'
+                    }`}
+                  >
+                    {activeYear}
+                  </button>
+                  <Button
+                    variant="ghost" size="sm" startIcon={<ChevronRight size={16} />}
+                    aria-label={t('settlement.newerYear')}
+                    disabled={newerYear == null}
+                    onClick={() => newerYear != null && goYear(newerYear)}
+                  />
+                </div>
+              )}
               <DataTable<RailRow>
                 data={railRows}
                 getRowProps={row => ({
-                  'data-state': row.original.key === picked ? 'selected' : undefined,
+                  'data-state': !searching && row.original.key === pickKey ? 'selected' : undefined,
                 })}
                 enableKeyboardNav={!isMobile}
-                onRowActivate={row => pickMonth(row.original.key)}
+                onRowActivate={row => pickRow(row.original)}
                 renderRow={row => {
-                  const { key, month: m } = row.original;
+                  const r = row.original;
+                  const m = r.month;
+                  const empty = !m;
                   return (
                     <button
                       type="button"
-                      className="w-full text-left px-4 py-2.5 transition-colors cursor-pointer"
+                      disabled={empty}
+                      className={`w-full text-left px-4 py-2.5 transition-colors ${empty ? 'cursor-default' : 'cursor-pointer'} ${searching ? 'opacity-50' : ''}`}
                       onClick={() => {
-                        pickMonth(key);
+                        pickRow(r);
                         if (isMobile) goTo('detail');
                       }}
                     >
                       {m ? (
                         <>
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-sm">{monthLabel(m.month)}</span>
+                            <span className="font-medium text-sm">{monthLabel(r.key)}</span>
                             <span className="flex-1" />
                             <span className="text-sm tabular-nums font-semibold shrink-0">
                               {fmtCurrency(m.commission_received_total ?? m.commission_total ?? 0)}
@@ -166,15 +264,17 @@ export function PartnerCommissionPage() {
                           )}
                         </>
                       ) : (
-                        <>
-                          <div className="font-medium text-sm">{t('settlement.allMonths')}</div>
-                          <div className="text-xs text-subtle mt-0.5">{t('settlement.allMonthsHint')}</div>
-                        </>
+                        <div className="flex items-center gap-2 text-subtler">
+                          <span className="text-sm">{monthLabel(r.key)}</span>
+                          <span className="flex-1" />
+                          <span className="text-sm">—</span>
+                        </div>
                       )}
                     </button>
                   );
                 }}
                 className="flex-1 min-h-0 panel-datatable"
+                noResults={<div className="p-8 text-center text-subtler">{t('settlement.emptyCommission')}</div>}
               />
             </PageNavPanel>
 

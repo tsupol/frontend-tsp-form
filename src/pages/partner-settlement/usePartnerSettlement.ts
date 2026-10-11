@@ -312,15 +312,13 @@ export function usePartnerMyFundBillPayments(billId: number | null) {
 }
 
 /** Commission report — one row per contract the shop has been paid for.
- *  `month` (`YYYY-MM`) keeps the contracts whose payment document was paid in
- *  that month — the same month the monthly view files their opening-day part. */
-export function usePartnerCommissionReport({ search, month, pageIndex, pageSize }: PayoutListOptions & { month?: string | null }) {
+ *  `paidFrom` / `paidTo` (`YYYY-MM-DD`, end exclusive) keep the contracts
+ *  whose payment document was paid in that span — the month or year the
+ *  monthly view files their opening-day part under. */
+export function usePartnerCommissionReport({ search, paidFrom, paidTo, pageIndex, pageSize }: PayoutListOptions & { paidFrom?: string | null; paidTo?: string | null }) {
   const params = ['order=paid_date.desc'];
-  if (month) {
-    const [y, m] = month.split('-').map(Number);
-    const next = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
-    params.push(`paid_date=gte.${month}-01`, `paid_date=lt.${next}-01`);
-  }
+  if (paidFrom) params.push(`paid_date=gte.${paidFrom}`);
+  if (paidTo) params.push(`paid_date=lt.${paidTo}`);
   const term = search.trim();
   if (term) {
     const esc = term.replace(/[(),]/g, ' ');
@@ -328,7 +326,7 @@ export function usePartnerCommissionReport({ search, month, pageIndex, pageSize 
   }
 
   const query = useQuery({
-    queryKey: ['partner-commission', 'report', month ?? '', term, pageIndex, pageSize],
+    queryKey: ['partner-commission', 'report', paidFrom ?? '', paidTo ?? '', term, pageIndex, pageSize],
     queryFn: () => apiClient.getPaginated<PartnerCommissionRow>(
       `/v_partner_my_commission_report?${params.join('&')}`,
       { page: pageIndex + 1, pageSize },
