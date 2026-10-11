@@ -169,10 +169,12 @@ export function CommissionExtraCreateModal({ open, shop: shopProp, onClose, onOp
             ]}
             extras={<p className="text-sm text-subtle">{t('shopCommission.extraCreatedNext')}</p>}
             secondaryAction={{
-              label: t('shopCommission.openBill'),
+              label: t('shopCommission.goToDraft'),
               startIcon: <FileText size={16} />,
+              isNextStep: true,
               onClick: () => { const id = result.bill_id; forceClose(); onOpenBill(id); },
             }}
+            doneLabel={t('shopCommission.later')}
             onClose={forceClose}
           />
         )}

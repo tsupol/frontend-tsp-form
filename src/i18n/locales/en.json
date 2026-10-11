@@ -9631,7 +9631,7 @@
     "wait_hold": "waiting for the hold period {{count}}",
     "wait_inBill": "already in a document {{count}}",
     "extraCreatedHeadline": "Commission document created",
-    "extraCreatedNext": "It is a draft. Open it to issue and pay.",
+    "extraCreatedNext": "The draft is under the \"Draft\" tab · this shop left the queue because its steps moved into the document. Next: issue, then pay.",
     "trancheCount": "Tranches",
     "contracts": "Contracts",
     "nextRound": "Next round",
@@ -9692,7 +9692,9 @@
     "filterReadyNow": "Ready to bundle now",
     "sumUnpaid": "Released, not yet paid",
     "panelWaitingHint": "These move to \"Ready to bundle\" on their own once the bill day has ended and the hold period has passed. Nothing to do here.",
-    "sliceCount": "{{count}} step(s)"
+    "sliceCount": "{{count}} step(s)",
+    "goToDraft": "Go to the draft",
+    "later": "Later"
   },
   "fundDayGuard": {
     "closedToday": "The fund's day {{date}} is already closed — this can be recorded tomorrow.",

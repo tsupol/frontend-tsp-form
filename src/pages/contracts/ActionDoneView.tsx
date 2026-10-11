@@ -34,6 +34,8 @@ export interface ActionDoneSecondaryAction {
   onClick: () => void;
   startIcon?: ReactNode;
   endIcon?: ReactNode;
+  /** When the action only produced something that still needs work (a draft), the secondary IS the next step: it takes the primary colour and Done drops to outline. */
+  isNextStep?: boolean;
 }
 
 export interface ActionDoneViewProps {
@@ -173,7 +175,7 @@ export function ActionDoneView({
         {extras && <div className="mt-3">{extras}</div>}
       </div>
 
-      <div className="modal-footer">
+      <div className={`modal-footer${secondaryAction?.isNextStep ? ' flex-row-reverse justify-start' : ''}`}>
         {billId != null ? (
           <>
             <Button
@@ -190,7 +192,8 @@ export function ActionDoneView({
           </>
         ) : secondaryAction && (
           <Button
-            variant="outline"
+            variant={secondaryAction.isNextStep ? 'solid' : 'outline'}
+            color={secondaryAction.isNextStep ? 'primary' : undefined}
             onClick={secondaryAction.onClick}
             startIcon={secondaryAction.startIcon}
             endIcon={secondaryAction.endIcon}
@@ -198,7 +201,7 @@ export function ActionDoneView({
             {secondaryAction.label}
           </Button>
         )}
-        <Button color={doneColor} onClick={onClose}>
+        <Button color={doneColor} variant={secondaryAction?.isNextStep ? 'outline' : undefined} onClick={onClose}>
           {doneLabel ?? t('common.done', { defaultValue: 'Done' })}
         </Button>
       </div>
