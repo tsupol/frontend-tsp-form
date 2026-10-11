@@ -4217,7 +4217,9 @@
     "guaranteeFeeShort": "Guarantee {{value}}",
     "warehouseGroupWithCount": "{{count}}/{{total}} set as warehouse",
     "warehouseGroupNone": "none of {{total}} branches",
-    "warehouseGroupHasPartner": "has deal partner"
+    "warehouseGroupHasPartner": "has deal partner",
+    "payoutAdd": "Add account",
+    "payoutHidden": "Account set · details not visible to you"
   },
   "deposit": {
     "chip_all": "All",

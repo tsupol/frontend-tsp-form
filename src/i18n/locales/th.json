@@ -4213,7 +4213,9 @@
     "guaranteeFeeShort": "คืนเครื่อง {{value}}",
     "warehouseGroupWithCount": "เป็นคลัง {{count}}/{{total}} สาขา",
     "warehouseGroupNone": "ยังไม่มีคลัง (จาก {{total}} สาขา)",
-    "warehouseGroupHasPartner": "มีร้าน deal partner"
+    "warehouseGroupHasPartner": "มีร้าน deal partner",
+    "payoutAdd": "เพิ่มบัญชี",
+    "payoutHidden": "ตั้งบัญชีแล้ว · คุณไม่มีสิทธิ์ดูรายละเอียด"
   },
   "deposit": {
     "chip_all": "ทั้งหมด",

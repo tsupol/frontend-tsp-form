@@ -637,6 +637,7 @@ function BranchConfigModal({ open, onClose, config, warehouses, onSaved, planSav
   const [seededByBranch, setSeededByBranch] = useState(true);
   const [payout, setPayout] = useState<DealPartnerPayoutValue>(EMPTY_PAYOUT_VALUE);
   const [payoutCleared, setPayoutCleared] = useState(false);
+  const [payoutEditing, setPayoutEditing] = useState(false);
   const { data: banks = [] } = useRefBanks();
 
   const { handleSubmit, control, formState: { errors, isDirty }, reset, watch, setValue } = useForm<ConfigFormData>({
@@ -669,6 +670,7 @@ function BranchConfigModal({ open, onClose, config, warehouses, onSaved, planSav
         account_name: config?.payout_account_name ?? '',
       });
       setPayoutCleared(false);
+      setPayoutEditing(false);
       setView('form');
       setResult(null);
       setErrorMessage('');
@@ -1069,6 +1071,7 @@ function BranchConfigModal({ open, onClose, config, warehouses, onSaved, planSav
                 hasExistingAccount={config?.has_payout_account ?? false}
                 cleared={payoutCleared}
                 onClearedChange={setPayoutCleared}
+                onEditingChange={setPayoutEditing}
               />
 
               <div className="flex flex-col">
@@ -1086,7 +1089,7 @@ function BranchConfigModal({ open, onClose, config, warehouses, onSaved, planSav
           <ModalErrorBand message={errorMessage} onDismiss={() => setErrorMessage('')} />
           <div className="modal-footer">
             <Button variant="outline" onClick={handleClose} type="button">{t('common.cancel')}</Button>
-            <Button color="primary" type="submit" disabled={isSaving || outOfRange || feeOutOfRange || grtOutOfRange || tiersErrorKey !== null || tiersIncomplete || payoutErrorKey !== null}>
+            <Button color="primary" type="submit" disabled={isSaving || outOfRange || feeOutOfRange || grtOutOfRange || tiersErrorKey !== null || tiersIncomplete || payoutErrorKey !== null || payoutEditing}>
               {isSaving ? t('pricing.saving') : t('common.save')}
             </Button>
           </div>
