@@ -53,7 +53,7 @@ export function CommissionExtraShopPanel({ shop, canBundle, onBundle }: {
     ? (r.hold_until ? <>{t('shopCommission.holdUntil')} <DateTime value={r.hold_until} showTime={false} /></> : null)
     : (r.unlocked_on ? <>{t('shopCommission.unlockedOn')} <DateTime value={r.unlocked_on} showTime={false} /></> : null);
 
-  const list = (title: string, items: Row[], total: number | null) => (
+  const list = (title: string, items: Row[], total: number | null, hint?: string) => (
     <div className="rounded-md border border-line overflow-hidden">
       <div className="px-3 py-2 bg-surface text-sm font-medium flex items-center gap-2">
         <span>{title}</span>
@@ -61,6 +61,9 @@ export function CommissionExtraShopPanel({ shop, canBundle, onBundle }: {
         <span className="flex-1" />
         {total != null && <span className="tabular-nums">{fmtCurrency(total)}</span>}
       </div>
+      {hint && items.length > 0 && (
+        <div className="px-3 py-1.5 text-xs text-subtle border-t border-line">{hint}</div>
+      )}
       {items.length === 0 ? (
         <div className="px-3 py-3 text-sm text-subtler">{t('common.noData')}</div>
       ) : items.map(r => (
@@ -110,7 +113,7 @@ export function CommissionExtraShopPanel({ shop, canBundle, onBundle }: {
           ) : (
             <>
               {list(t('shopCommission.panelReady'), ready, shop.ready_amount)}
-              {list(t('shopCommission.panelWaiting'), waiting, null)}
+              {list(t('shopCommission.panelWaiting'), waiting, null, t('shopCommission.panelWaitingHint'))}
             </>
           )}
         </div>
