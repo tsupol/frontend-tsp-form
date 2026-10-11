@@ -263,6 +263,15 @@ export interface PartnerCommissionRow {
   payout_code: string;
   paid_date: string | null;
   paid_at: string | null;
+  // mig 1408. `commission_amount` is the opening-day part only (the whole
+  // commission under the old system); these add the installment parts paid
+  // since and what was clawed back, and `commission_received` nets them.
+  commission_extra_paid: number | null;
+  commission_clawback: number | null;
+  commission_received: number | null;
+  plan_code: string | null;
+  plan_opening_pct: number | null;
+  plan_total_pct: number | null;
 }
 
 /** `v_partner_my_commission_monthly`. */
@@ -273,6 +282,12 @@ export interface PartnerCommissionMonth {
   commission_total: number | null;
   net_total: number;
   adjustment_total: number | null;
+  /** mig 1408: installment parts paid that month, clawbacks collected that
+   *  month, and the net of all three. A month can carry only installment
+   *  parts, with `contract_count` 0. */
+  commission_extra_total: number | null;
+  commission_clawback_total: number | null;
+  commission_received_total: number | null;
 }
 
 /** Badge colour per request status, so every screen agrees. */
