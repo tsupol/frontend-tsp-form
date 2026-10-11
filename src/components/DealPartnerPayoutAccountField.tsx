@@ -142,8 +142,8 @@ export function DealPartnerPayoutAccountField({
     <div className="flex flex-col gap-3">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="form-label">{t('dealPartnerRate.payoutSection')}</div>
-          <p className="text-xs text-subtle">{t('dealPartnerRate.payoutSectionHint')}</p>
+          <div className="text-sm font-medium">{t('dealPartnerRate.payoutSection')}</div>
+          <p className="text-xs text-subtle mt-0.5">{t('dealPartnerRate.payoutSectionHint')}</p>
         </div>
         {hasExistingAccount && !cleared && (
           <Button
