@@ -97,6 +97,19 @@ export function CommissionExtraCreateModal({ open, shop: shopProp, onClose, onOp
     forceClose();
   };
 
+  // Nothing ready: say what the steps are waiting for and keep the button off,
+  // instead of letting a click round-trip to the backend's EMPTY answer.
+  const nothingReady = (shop?.ready_count ?? 0) === 0;
+  const waitingLine = shop && nothingReady
+    ? t('shopCommission.extraEmpty', {
+        parts: waitingSummary({
+          wait_day_close: shop.wait_day_close_count,
+          wait_day_end: shop.wait_day_end_count,
+          wait_hold: shop.wait_hold_count,
+        }, t),
+      })
+    : null;
+
   const skipped = result?.skipped;
   const skippedTotal = skipped ? skipped.wait_day_close + (skipped.wait_day_end ?? 0) + skipped.wait_hold + skipped.in_bill : 0;
 
@@ -115,8 +128,12 @@ export function CommissionExtraCreateModal({ open, shop: shopProp, onClose, onOp
                 <div className="px-3 py-2.5 rounded-md bg-surface border border-line">
                   <div className="font-medium text-sm">{shop?.branch_name ?? '—'}</div>
                   <div className="text-xs text-subtle">
-                    {t('shopCommission.queueReady', { count: shop?.ready_count ?? 0 })}
-                    {' · '}{fmtCurrency(shop?.ready_amount ?? 0)}
+                    {waitingLine ?? (
+                      <>
+                        {t('shopCommission.queueReady', { count: shop?.ready_count ?? 0 })}
+                        {' · '}{fmtCurrency(shop?.ready_amount ?? 0)}
+                      </>
+                    )}
                   </div>
                 </div>
                 <p className="text-sm text-subtle -mt-2">{t('shopCommission.extraCreateHint')}</p>
@@ -130,7 +147,7 @@ export function CommissionExtraCreateModal({ open, shop: shopProp, onClose, onOp
             <ModalErrorBand message={error} onDismiss={() => setError(null)} />
             <div className="modal-footer">
               <Button variant="ghost" onClick={handleClose} disabled={saving}>{t('common.cancel')}</Button>
-              <Button color="primary" onClick={handleCreate} disabled={saving || !shop}>
+              <Button color="primary" onClick={handleCreate} disabled={saving || !shop || nothingReady}>
                 {t('shopCommission.extraCreateAction')}
               </Button>
             </div>

@@ -1,0 +1,884 @@
+<!doctype html>
+<html lang="th" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ค่าคอมร้านตามแผน — เดินทั้งเส้น</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel-2: #1e222b;
+    --line: #2b313d;
+    --text: #e7eaf0;
+    --dim: #9aa3b2;
+    --accent: #6aa9ff;
+    --shop: #f0a13c;
+    --fund: #63c9a8;
+    --warn: #e0705f;
+    --ok: #63c9a8;
+  }
+  :root[data-theme="light"] {
+    --bg: #f6f7f9;
+    --panel: #ffffff;
+    --panel-2: #f0f2f6;
+    --line: #dde1e8;
+    --text: #1a1e26;
+    --dim: #5d6672;
+    --accent: #1f6fd6;
+    --shop: #b96d10;
+    --fund: #17805f;
+    --warn: #b23b2a;
+    --ok: #17805f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.65 "Segoe UI", "Noto Sans Thai", system-ui, sans-serif;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 20px 100px; }
+  header.top {
+    padding: 42px 0 26px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 32px;
+  }
+  h1 { font-size: 30px; margin: 0 0 10px; letter-spacing: -0.4px; }
+  .sub { color: var(--dim); font-size: 15px; max-width: 70ch; }
+  .themebtn {
+    position: fixed; top: 14px; right: 14px; z-index: 50;
+    background: var(--panel); color: var(--dim); border: 1px solid var(--line);
+    border-radius: 8px; padding: 6px 12px; cursor: pointer; font-size: 13px;
+  }
+  .themebtn:hover { color: var(--text); }
+
+  /* --- easy / detailed switch --- */
+  .modebar {
+    display: flex; gap: 0; margin: 22px 0 6px;
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 4px; width: max-content;
+  }
+  .modebar button {
+    background: transparent; border: 0; cursor: pointer;
+    color: var(--dim); padding: 7px 18px; border-radius: 7px;
+    font: 500 14px/1.3 "Segoe UI", "Noto Sans Thai", system-ui, sans-serif;
+  }
+  .modebar button:hover { color: var(--text); }
+  .modebar button.sel { background: var(--accent); color: #07101f; font-weight: 600; }
+  .modenote { color: var(--dim); font-size: 13px; margin: 8px 0 0; }
+
+  /* story blocks */
+  .story {
+    border-left: 3px solid var(--shop); background: rgba(240,161,60,.07);
+    padding: 14px 18px; border-radius: 0 10px 10px 0; margin: 18px 0 8px;
+    font-size: 15px; line-height: 1.75;
+  }
+  .story.fund { border-left-color: var(--fund); background: rgba(99,201,168,.07); }
+  .story p { margin: 0 0 10px; }
+  .story p:last-child { margin-bottom: 0; }
+  .story b { color: var(--text); }
+  .story .beat {
+    display: block; color: var(--dim); font-size: 12.5px;
+    text-transform: uppercase; letter-spacing: .7px; margin-bottom: 7px;
+  }
+  .story .said {
+    display: block; margin: 10px 0; padding-left: 14px;
+    border-left: 2px solid var(--line); color: var(--dim); font-style: italic;
+  }
+
+  body[data-mode="easy"] .screen > .body > ul.sees,
+  body[data-mode="easy"] .screen > .body > .note,
+  body[data-mode="easy"] .screen > .body > p,
+  body[data-mode="easy"] .screen > .body > .tablewrap,
+  body[data-mode="easy"] .three,
+  body[data-mode="easy"] .lead,
+  body[data-mode="easy"] nav.toc { display: none; }
+  body[data-mode="easy"] .screen > .body > figure.shot { margin-top: 0; }
+  body[data-mode="detail"] .story { display: none; }
+  body[data-mode="easy"] h2.step { margin-top: 44px; }
+  /* screens that carry no picture are pure detail — drop them in easy mode */
+  body[data-mode="easy"] .screen.nopic { display: none; }
+
+  /* actor chips */
+  .who.dpx { background: rgba(240,161,60,.16); color: var(--shop); border: 1px solid rgba(240,161,60,.35); }
+
+  /* --- role mode --- */
+  body[data-mode="role"] > .wrap > h2.step,
+  body[data-mode="role"] > .wrap > .story,
+  body[data-mode="role"] > .wrap > .screen,
+  body[data-mode="role"] > .wrap > .lead,
+  body[data-mode="role"] > .wrap > .three,
+  body[data-mode="role"] > .wrap > .tablewrap,
+  body[data-mode="role"] > .wrap > .note,
+  body[data-mode="role"] > .wrap > nav.toc,
+  body[data-mode="role"] > .wrap > .map,
+  body[data-mode="role"] > .wrap > figure.shot { display: none; }
+  body[data-mode="role"] #rolemode { display: block; }
+  #rolemode { display: none; }
+
+  .roleblock { margin-top: 44px; padding-top: 16px; border-top: 1px solid var(--line); }
+  .roleblock > h2 {
+    font-size: 23px; margin: 0 0 4px; letter-spacing: -.2px;
+    display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  }
+  .roleblock > h2 .tag {
+    font: 600 12px/1 system-ui; letter-spacing: 1px; padding: 5px 10px; border-radius: 6px;
+  }
+  .roleblock.shop > h2 .tag { background: rgba(240,161,60,.16); color: var(--shop); border: 1px solid rgba(240,161,60,.4); }
+  .roleblock.fund > h2 .tag { background: rgba(99,201,168,.14); color: var(--fund); border: 1px solid rgba(99,201,168,.4); }
+  .roleblock.credit > h2 .tag { background: rgba(106,169,255,.14); color: var(--accent); border: 1px solid rgba(106,169,255,.4); }
+  .roleblock > .rolelead { color: var(--dim); margin: 0 0 4px; max-width: 74ch; }
+  .roleblock > .rolelead code { font-size: 12px; }
+
+  .pg {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    margin: 16px 0; overflow: hidden;
+  }
+  .pg > h3 {
+    margin: 0; padding: 12px 16px; background: var(--panel-2);
+    border-bottom: 1px solid var(--line);
+    font-size: 15.5px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap;
+  }
+  .pg > h3 code { font-size: 12px; font-weight: 400; }
+  .pg > h3 .when { color: var(--dim); font-size: 12.5px; font-weight: 400; margin-left: auto; }
+  .pg > .in { padding: 14px 16px; }
+  .pg > .in > :first-child { margin-top: 0; }
+  .pg > .in > :last-child { margin-bottom: 0; }
+  .pg ul { margin: 0 0 10px; padding-left: 20px; }
+  .pg li { margin-bottom: 5px; }
+  .pg .does { color: var(--dim); font-size: 13.5px; margin: 0 0 10px; }
+  .pg .does b { color: var(--text); font-weight: 600; }
+
+  nav.toc {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 18px 22px; margin-bottom: 40px;
+  }
+  nav.toc h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); margin: 0 0 12px; font-weight: 600; }
+  nav.toc ol { margin: 0; padding-left: 22px; columns: 2; column-gap: 34px; }
+  nav.toc li { margin-bottom: 6px; break-inside: avoid; }
+  nav.toc a { color: var(--text); text-decoration: none; }
+  nav.toc a:hover { color: var(--accent); text-decoration: underline; }
+
+  h2.step {
+    font-size: 22px; margin: 52px 0 6px; padding-top: 14px;
+    border-top: 1px solid var(--line); letter-spacing: -0.2px;
+  }
+  h2.step .num {
+    display: inline-block; min-width: 30px; color: var(--dim); font-variant-numeric: tabular-nums;
+  }
+  .lead { color: var(--dim); margin: 0 0 22px; max-width: 72ch; }
+
+  .who {
+    display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: 0.4px;
+    padding: 3px 10px; border-radius: 999px; vertical-align: middle;
+    margin-left: 8px; position: relative; top: -2px;
+  }
+  .who.shop { background: rgba(240,161,60,.16); color: var(--shop); border: 1px solid rgba(240,161,60,.35); }
+  .who.fund { background: rgba(99,201,168,.14); color: var(--fund); border: 1px solid rgba(99,201,168,.35); }
+  .who.auto { background: rgba(106,169,255,.14); color: var(--accent); border: 1px solid rgba(106,169,255,.35); }
+  .who.admin { background: rgba(154,163,178,.16); color: var(--dim); border: 1px solid var(--line); }
+
+  .screen {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 0; margin: 20px 0; overflow: hidden;
+  }
+  .screen > .bar {
+    background: var(--panel-2); border-bottom: 1px solid var(--line);
+    padding: 10px 16px; font-size: 13px; color: var(--dim);
+    display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap;
+  }
+  .screen > .bar b { color: var(--text); font-weight: 600; font-size: 14px; }
+  .screen > .bar code { font-size: 12px; }
+  .screen > .body { padding: 16px 18px; }
+  .screen > .body > :first-child { margin-top: 0; }
+  .screen > .body > :last-child { margin-bottom: 0; }
+
+  ul.sees { margin: 0 0 12px; padding-left: 20px; }
+  ul.sees li { margin-bottom: 5px; }
+  .label { color: var(--text); background: var(--panel-2); border: 1px solid var(--line);
+           border-radius: 5px; padding: 1px 7px; font-size: 13.5px; white-space: nowrap; }
+  code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px;
+         padding: 1px 6px; font-size: 12.5px; font-family: "Cascadia Mono", Consolas, monospace; }
+
+  figure.shot { margin: 16px 0 6px; }
+  figure.shot img {
+    width: 100%; display: block; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--bg);
+  }
+  figure.shot figcaption {
+    color: var(--dim); font-size: 12.5px; margin-top: 7px; padding-left: 2px;
+  }
+  .screen > .body > figure.shot:last-child { margin-bottom: 0; }
+
+  /* --- hotspots: hover cuts the box out and magnifies it --- */
+  .pic { position: relative; line-height: 0; border-radius: 8px; }
+
+  .hs {
+    position: absolute; border: 2px solid var(--accent); border-radius: 5px;
+    background: transparent; cursor: zoom-in; padding: 0;
+    opacity: .34; transition: opacity .16s;
+  }
+  .pic .hs:hover, .pic .hs.pin { opacity: 1; z-index: 4; }
+  .hs::before {
+    content: attr(data-n);
+    position: absolute; top: -11px; left: -11px;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--accent); color: #07101f;
+    font: 600 12px/22px "Segoe UI", system-ui, sans-serif;
+    text-align: center;
+  }
+
+  /* the magnified cut-out */
+  .loupe {
+    position: absolute; z-index: 9; pointer-events: none;
+    opacity: 0; visibility: hidden; transform: translateY(6px) scale(.98);
+    transform-origin: top center;
+    transition: opacity .17s ease, transform .17s ease, visibility .17s;
+    width: max-content; max-width: min(96%, 760px);
+  }
+  .pic.on .loupe.show { opacity: 1; visibility: visible; transform: translateY(0) scale(1); }
+  .loupe .crop {
+    border: 2px solid var(--accent); border-radius: 9px; overflow: hidden;
+    background: var(--bg); box-shadow: 0 18px 48px rgba(0,0,0,.62);
+    background-repeat: no-repeat;
+  }
+  :root[data-theme="light"] .loupe .crop { box-shadow: 0 18px 44px rgba(20,25,35,.28); }
+  .loupe .say {
+    margin-top: 8px; background: var(--panel); color: var(--text);
+    border: 1px solid var(--accent); border-radius: 8px;
+    padding: 9px 13px; font: 400 13.5px/1.55 "Segoe UI", "Noto Sans Thai", system-ui, sans-serif;
+    box-shadow: 0 10px 30px rgba(0,0,0,.45); white-space: normal;
+  }
+  :root[data-theme="light"] .loupe .say { box-shadow: 0 10px 26px rgba(20,25,35,.18); }
+  .loupe .say b { color: var(--accent); font-weight: 600; }
+  .loupe .say .n {
+    display: inline-block; width: 17px; height: 17px; border-radius: 50%;
+    background: var(--accent); color: #07101f; font: 600 11px/17px system-ui;
+    text-align: center; margin-right: 6px; position: relative; top: -1px;
+  }
+
+  figure.shot > .hint {
+    color: var(--dim); font-size: 12.5px; margin-top: 7px; padding-left: 2px;
+  }
+  figure.shot > .hint .k {
+    display: inline-block; width: 15px; height: 15px; border-radius: 50%;
+    background: var(--accent); color: #07101f; font: 600 10px/15px system-ui;
+    text-align: center; margin-right: 4px; position: relative; top: -1px;
+  }
+  .hs .tip { display: none; }
+  @media (hover: none) { .hs { opacity: .75; } }
+
+  .flip { margin: 14px 0 4px; font-size: 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .flip .t { color: var(--dim); font-size: 12.5px; text-transform: uppercase; letter-spacing: .6px; margin-right: 2px; }
+  .badge { border-radius: 6px; padding: 2px 9px; font-size: 13px; border: 1px solid var(--line); background: var(--panel-2); }
+  .badge.after { border-color: rgba(99,201,168,.45); color: var(--ok); background: rgba(99,201,168,.1); }
+  .arrow { color: var(--dim); }
+
+  .note {
+    border-left: 3px solid var(--accent); background: rgba(106,169,255,.07);
+    padding: 10px 14px; margin: 14px 0; border-radius: 0 8px 8px 0; font-size: 14px;
+  }
+  .note.warn { border-left-color: var(--warn); background: rgba(224,112,95,.08); }
+  .note b { color: var(--text); }
+
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--dim); font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: .5px; }
+  tbody tr:last-child td { border-bottom: 0; }
+  .tablewrap { overflow-x: auto; }
+
+  .money { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 18px 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .card h4 { margin: 0 0 6px; font-size: 15px; }
+  .card p { margin: 0 0 8px; font-size: 13.5px; color: var(--dim); }
+  .card .tag { font-size: 12px; color: var(--dim); }
+
+  .map { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin: 24px 0; }
+  .map svg { width: 100%; height: auto; display: block; }
+
+  footer.end { margin-top: 60px; padding-top: 22px; border-top: 1px solid var(--line); color: var(--dim); font-size: 13.5px; }
+  a { color: var(--accent); }
+
+  @media (max-width: 700px) {
+    .three { grid-template-columns: 1fr; }
+    nav.toc ol { columns: 1; }
+    h1 { font-size: 24px; }
+  }
+</style>
+</head>
+<body>
+<button class="themebtn" id="tb">สว่าง / มืด</button>
+<div class="wrap">
+
+<header class="top">
+  <h1>ค่าคอมร้านตามแผน — เดินทั้งเส้น</h1>
+  <p class="sub">
+    เดิมกองทุนจ่ายค่าคอมให้ร้านก้อนเดียววันเปิดสัญญา แล้วเรียกคืนถ้าลูกค้าหยุดจ่ายเร็ว
+    ตอนนี้ร้านเลือก "แผน" ได้: ค่าคอมแบ่งเป็นก้อน ก้อนแรกวันเปิด ก้อนถัดไปปลดเมื่อลูกค้าจ่ายงวดครบ
+    หน้านี้เดินทีละจอ ว่าใครตั้ง ใครเห็นก้อน ก้อนเปลี่ยนสถานะอย่างไร และการเงินรวบเป็นใบจ่ายตรงไหน
+  </p>
+  <p class="sub" style="margin-top:10px">
+    ทุกจอถูกเดินจริงบน DEV วันที่ 11 ตุลาคม 2026 · ป้ายภาษาไทยคือป้ายที่ขึ้นบนหน้าจอจริง ·
+    ตัวอย่างหลัก: สัญญา <code>CT-2610-000444-4</code> ร้าน DEV Deal Partner X แผน 7% + 5% + 5%
+  </p>
+  <div class="modebar" role="group" aria-label="เลือกวิธีอ่าน">
+    <button id="mEasy" type="button">แบบเข้าใจง่าย</button>
+    <button id="mDetail" type="button">แบบละเอียด</button>
+    <button id="mRole" type="button">แยกตามบทบาท</button>
+  </div>
+  <p class="modenote" id="modenote"></p>
+</header>
+
+<nav class="toc">
+  <h2>ในหน้านี้</h2>
+  <ol>
+    <li><a href="#s0">คน 3 บทบาท และคำว่า "แผน"</a></li>
+    <li><a href="#s1">ผู้ดูแลตั้งแผนให้ร้าน</a></li>
+    <li><a href="#s2">สัญญาเปิด → ก้อนค่าคอมเกิด</a></li>
+    <li><a href="#s3">การเงินรวบก้อนเป็นใบจ่าย</a></li>
+    <li><a href="#s4">ร้านเห็นอะไร</a></li>
+    <li><a href="#s5">ตัวอย่างจริงบน DEV</a></li>
+    <li><a href="#s6">ที่ยังไม่เรียบร้อย</a></li>
+  </ol>
+</nav>
+
+<h2 class="step" id="s0"><span class="num">0</span> คน 3 บทบาท และคำว่า "แผน"</h2>
+<p class="lead">ก่อนเปิดจอ: ใครทำอะไร และ "แผน" ต่างจากของเดิมตรงไหน</p>
+
+<div class="three">
+  <div class="card"><h4>ADMIN <span class="who admin">ผู้ดูแลบริษัทกองทุน</span></h4>
+    <p>ตั้งเงื่อนไขของร้านแต่ละร้าน รวมถึงเลือกแผนค่าคอม</p><span class="tag">DEV: <code>ui_fund_admin_a</code></span></div>
+  <div class="card"><h4>FINANCE <span class="who fund">การเงินกองทุน</span></h4>
+    <p>ดูก้อนค่าคอมของทุกสัญญา รวบก้อนที่พร้อมเป็นใบจ่าย แล้วออกใบ จ่าย</p><span class="tag">DEV: <code>ui_fund_finance_a</code></span></div>
+  <div class="card"><h4>SHOP <span class="who shop">ร้าน</span></h4>
+    <p>เห็นก้อนค่าคอมของสัญญาตัวเอง ว่าก้อนไหนได้แล้ว ก้อนไหนรออะไร</p><span class="tag">DEV: <code>ui_branch_manager_dpx</code></span></div>
+</div>
+
+<div class="story">
+  <span class="beat">ของเดิม กับ แผน</span>
+  <p><b>ยังไม่ตั้ง (ระบบเดิม)</b> — ร้านมี "% ร้าน" ที่พิมพ์เอง (เช่น 17%) กองทุนจ่ายทั้งก้อนวันเปิดสัญญา
+  ถ้าลูกค้าหยุดจ่ายเร็ว ร้านถูกเรียกคืนตามกติกาคืนค่าคอม</p>
+  <p><b>แผน</b> — ชุดสำเร็จรูปที่กองทุนกำหนดไว้ (เลือกได้ แก้ไม่ได้) บอกว่าจ่ายกี่ก้อน ก้อนละกี่ % ปลดเมื่อไร
+  เช่น <span class="label">7% + 5% + 5% (งวด 1, 2)</span> = วันเปิด 7% · ลูกค้าจ่ายงวด 1 ครบ อีก 5% · งวด 2 ครบ อีก 5%</p>
+  <p>ร้านที่อยู่บนแผน <b>ไม่ใช้ "% ร้าน" อีก</b> — ส่วนของร้านมาจากแผนทั้งหมด ส่วน "% บริษัท" ยังใช้เหมือนเดิม
+  สัญญาที่เปิดไปแล้ว<b>ล็อกตัวเลข ณ วันเปิด</b> เปลี่ยนแผนทีหลังไม่กระทบ</p>
+</div>
+
+<div class="screen nopic">
+  <div class="bar"><b>ก้อนค่าคอม 1 ก้อน ไล่สถานะอย่างไร</b> <span class="who auto">ระบบ</span></div>
+  <div class="body">
+    <ul class="sees">
+      <li><span class="label">ก้อนวันเปิด · รอใบขอรับเงิน</span> — ก้อนแรก (pay_no 0) ไม่ได้มาทางนี้ มันอยู่บนใบขอรับเงินของร้านใบเดิม (ค่าเครื่อง + ค่าคอมวันเปิด)</li>
+      <li><span class="label">ค่าคอมที่รอการจัดเก็บค่างวด</span> — ก้อนที่ผูกกับงวดที่ลูกค้ายังไม่จ่าย</li>
+      <li><span class="label">ปลดแล้ว · รอพ้นวันของบิล</span> — ลูกค้าจ่ายงวดนั้นแล้ววันนี้ รอให้วันของบิลผ่านไปก่อน (กันบิลถูกยกเลิกในวัน)</li>
+      <li><span class="label">ปลดแล้ว · รอครบกำหนด</span> — ช่วงถือตามนโยบาย holding (DEV: 7 วัน) กันลูกค้าขอคืนเงิน</li>
+      <li><span class="label">พร้อมรวบ</span> — การเงินกดรวบได้</li>
+      <li><span class="label">อยู่ในใบ</span> → <span class="label">จ่ายแล้ว</span> — อยู่บนใบค่าคอมส่วนเพิ่ม แล้วถูกจ่าย</li>
+      <li><span class="label">ไม่เกิด (สัญญาสิ้นสุด)</span> — สัญญาจบก่อนลูกค้าจ่ายถึงงวดนั้น ก้อนนี้ไม่มีวันเกิด</li>
+    </ul>
+    <div class="note">ตัวเลขทุกตัวบนจอมาจากฝั่งหลังบ้านตรง ๆ หน้าจอไม่คำนวณเอง — ร้านกับการเงินจึงเห็นเลขเดียวกันเสมอ</div>
+  </div>
+</div>
+
+<h2 class="step" id="s1"><span class="num">1</span> ผู้ดูแลตั้งแผนให้ร้าน <span class="who admin">ADMIN</span></h2>
+<p class="lead">หน้า "เงื่อนไข Deal Partner" ใต้เมนูราคา · ตารางร้านท้ายหน้า · <code>/admin/pricing/deal-partner-rates</code></p>
+
+<div class="story">
+  <span class="beat">สิ่งที่เห็น</span>
+  <p>ตารางร้านบอกทันทีว่าร้านไหนอยู่บนแผน ร้านไหนยังระบบเดิม ปุ่ม <span class="label">เปลี่ยน</span> ในคอลัมน์ค่าคอมเปิดหน้าต่างเลือกแผนอย่างเดียว
+  ส่วนดินสอขวาสุดเปิดหน้าต่าง <span class="label">แก้ไขเงื่อนไขร้าน</span> ที่มีทุกเงื่อนไข (แผนเป็นบรรทัดแรกในนั้น)</p>
+</div>
+
+<div class="screen">
+  <div class="bar"><b>ตารางร้าน deal partner</b> <code>/admin/pricing/deal-partner-rates</code> <span class="who admin">ADMIN</span></div>
+  <div class="body">
+    <ul class="sees">
+      <li>ร้านบนแผน: ชื่อแผนนำ แล้วตามด้วย <span class="label">บริษัท 0%</span> — ไม่มี "% ร้าน" เพราะไม่ได้ใช้</li>
+      <li>ร้านระบบเดิม: <span class="label">17% · ร้าน 17% · บริษัท 0%</span> แล้วบรรทัด <span class="label">ยังไม่ตั้ง (ระบบเดิม)</span></li>
+      <li><span class="label">เปลี่ยน</span> ข้างแผน = เปิดหน้าต่างเลือกแผน · ดินสอ = หน้าต่างเงื่อนไขทั้งหมด</li>
+    </ul>
+    <figure class="shot">
+      <div class="pic">
+        <img src="shots/cp-01-shops-table.png" alt="ตารางร้าน deal partner">
+        <button class="hs" data-n="1" style="left:47.1%;top:81.4%;width:20.9%;height:7.0%">
+          <span class="tip"><b>ร้านบนแผน</b> ชื่อแผนนำ แล้ว "บริษัท 0%" — ไม่แสดง % ร้าน เพราะส่วนของร้านมาจากแผน</span>
+        </button>
+        <button class="hs" data-n="2" style="left:58.0%;top:80.9%;width:5.0%;height:6.2%">
+          <span class="tip"><b>เปลี่ยน</b> ทางลัดเปิดหน้าต่างเลือกแผนของร้านนี้ บันทึกเฉพาะแผน</span>
+        </button>
+        <button class="hs" data-n="3" style="left:46.9%;top:87.5%;width:12.1%;height:6.8%">
+          <span class="tip"><b>ร้านระบบเดิม</b> รวม 17% = ร้าน 17% + บริษัท 0% และบอกว่ายังไม่ตั้งแผน</span>
+        </button>
+        <button class="hs" data-n="4" style="left:90.6%;top:81.2%;width:4.6%;height:7.5%">
+          <span class="tip"><b>ดินสอ</b> เปิดหน้าต่าง "แก้ไขเงื่อนไขร้าน" — แผน, % บริษัท, ค่าทำสัญญา, ค่าคืนเครื่อง, คลัง, กติกาคืนค่าคอม, บัญชีรับเงิน</span>
+        </button>
+      </div>
+      <p class="hint"><span class="k">1</span>เอาเมาส์ชี้กรอบ ระบบจะตัดส่วนนั้นมาขยายให้พร้อมคำอธิบาย · กดเพื่อค้างไว้</p>
+      <figcaption>ตารางร้านท้ายหน้า "เงื่อนไข Deal Partner" — DEV มี 2 ร้าน: ร้านหนึ่งอยู่บนแผน อีกร้านยังระบบเดิม</figcaption>
+    </figure>
+
+  </div>
+</div>
+
+<div class="screen">
+  <div class="bar"><b>หน้าต่าง แก้ไขเงื่อนไขร้าน — ร้านที่อยู่บนแผน</b> <span class="who admin">ADMIN</span></div>
+  <div class="body">
+    <ul class="sees">
+      <li>บรรทัดแรก <span class="label">แผนค่าคอม</span> กับปุ่ม <span class="label">เปลี่ยน</span> และคำเตือน "แผนมีผลกับสัญญาที่เปิดหลังจากตั้ง · สัญญาที่เปิดไปแล้วใช้แผนเดิมจนจบ" (ถ้อยคำที่ owner เคาะ)</li>
+      <li>มีแค่ <span class="label">% บริษัท</span> — ช่อง % ร้าน และกล่อง % รวม ไม่แสดง เพราะบนแผนไม่ได้ใช้</li>
+      <li>ที่เหลือเหมือนเดิม: ค่าทำสัญญา, ค่าคืนเครื่องในระยะประกัน, สาขารับเครื่องคืน, กติกาคืนค่าคอม, บัญชีรับเงินของร้าน, หมายเหตุ</li>
+      <li>บันทึกแล้วขึ้นหน้าสรุป (ไม่ปิดเอง) · ปิดทั้งที่ยังไม่บันทึกจะถูกถามก่อน</li>
+    </ul>
+    <figure class="shot">
+      <div class="pic">
+        <img src="shots/cp-02-terms-plan.png" alt="หน้าต่างแก้ไขเงื่อนไขร้าน ร้านบนแผน">
+        <button class="hs" data-n="1" style="left:35.2%;top:4.4%;width:11.7%;height:6.8%">
+          <span class="tip"><b>ชื่อหน้าต่าง</b> "แก้ไขเงื่อนไขร้าน" — ไม่ใช่แค่ค่าคอม มีทุกเงื่อนไขของร้านอยู่ในนี้</span>
+        </button>
+        <button class="hs" data-n="2" style="left:35.7%;top:19.5%;width:27.8%;height:11.1%">
+          <span class="tip"><b>แผนนำ</b> แผนที่ใช้อยู่ + ปุ่มเปลี่ยน + คำเตือนว่าแผนมีผลเฉพาะสัญญาที่เปิดหลังจากนี้</span>
+        </button>
+        <button class="hs" data-n="3" style="left:35.2%;top:29.8%;width:15.5%;height:9.8%">
+          <span class="tip"><b>% บริษัท อย่างเดียว</b> ไม่มี % ร้าน และไม่มี % รวม — บนแผน ส่วนของร้านมาจากแผน</span>
+        </button>
+        <button class="hs" data-n="4" style="left:35.7%;top:38.8%;width:27.8%;height:20.9%">
+          <span class="tip"><b>ค่าธรรมเนียม 2 ตัว</b> ค่าทำสัญญาเก็บจากลูกค้าทุกสัญญา · ค่าคืนเครื่องเกิดเฉพาะเมื่อลูกค้าคืนเครื่องในระยะประกัน</span>
+        </button>
+      </div>
+      <p class="hint"><span class="k">1</span>เอาเมาส์ชี้กรอบ ระบบจะตัดส่วนนั้นมาขยายให้พร้อมคำอธิบาย · กดเพื่อค้างไว้</p>
+      <figcaption>ร้าน DEV Deal Partner X บนแผน 7% + 5% + 5% — ช่วงที่เห็นคือครึ่งบน หน้าต่างเลื่อนต่อได้</figcaption>
+    </figure>
+
+  </div>
+</div>
+
+<div class="screen">
+  <div class="bar"><b>หน้าต่างเดียวกัน — ร้านที่ยังระบบเดิม</b> <span class="who admin">ADMIN</span></div>
+  <div class="body">
+    <ul class="sees">
+      <li>แผน = <span class="label">ยังไม่ตั้ง (ระบบเดิม)</span></li>
+      <li>มีครบ <span class="label">% ร้าน</span> <span class="label">% บริษัท</span> และกล่อง <span class="label">% รวม</span> ที่ต้องอยู่ในช่วงที่ holding กำหนด (DEV: 10–20%)</li>
+      <li>พิมพ์ให้รวมเกินช่วง → กล่องรวมเป็นแดง ปุ่มบันทึกกดไม่ได้</li>
+    </ul>
+    <figure class="shot">
+      <div class="pic">
+        <img src="shots/cp-03-terms-noplan.png" alt="หน้าต่างแก้ไขเงื่อนไขร้าน ร้านระบบเดิม">
+        <button class="hs" data-n="1" style="left:35.2%;top:22.2%;width:10.4%;height:6.2%">
+          <span class="tip"><b>ยังไม่ตั้ง (ระบบเดิม)</b> ร้านนี้ยังจ่ายก้อนเดียววันเปิด + เรียกคืน</span>
+        </button>
+        <button class="hs" data-n="2" style="left:35.7%;top:29.8%;width:27.8%;height:9.8%">
+          <span class="tip"><b>% ร้าน กลับมา</b> เพราะไม่มีแผน ส่วนของร้านมาจากช่องนี้ · % บริษัท อยู่ข้างกัน</span>
+        </button>
+        <button class="hs" data-n="3" style="left:36.1%;top:39.3%;width:27.0%;height:6.2%">
+          <span class="tip"><b>% รวม</b> ร้าน + บริษัท ต้องอยู่ในช่วง 10–20% ที่ holding ตั้ง เกินแล้วบันทึกไม่ได้</span>
+        </button>
+      </div>
+      <p class="hint"><span class="k">1</span>เอาเมาส์ชี้กรอบ ระบบจะตัดส่วนนั้นมาขยายให้พร้อมคำอธิบาย · กดเพื่อค้างไว้</p>
+      <figcaption>ร้าน TEST Day-4 Deal Partner — ยังไม่ตั้งแผน จึงเห็นช่อง % ร้าน และ % รวม</figcaption>
+    </figure>
+
+  </div>
+</div>
+
+<div class="screen">
+  <div class="bar"><b>หน้าต่าง แผนค่าคอม (เลือกแผน)</b> <span class="who admin">ADMIN</span></div>
+  <div class="body">
+    <ul class="sees">
+      <li>เปิดจากปุ่ม <span class="label">เปลี่ยน</span> ทั้งในตารางและในหน้าต่างเงื่อนไขร้าน — หน้าต่างเดียวกัน</li>
+      <li>การ์ดละแผน: ชื่อ · ยอดรวม · ก้อนละกี่ % ปลดตอนไหน · คำอธิบายจากกองทุน · ป้าย <span class="label">ใช้อยู่</span> บนแผนปัจจุบัน</li>
+      <li>การ์ดสุดท้าย <span class="label">ยังไม่ตั้ง (ระบบเดิม)</span> = ถอดแผน กลับไปใช้ % ร้าน</li>
+      <li>แผนที่กองทุนปิดไปแล้วแต่ร้านยังใช้อยู่ ยังแสดงพร้อมป้าย "ปิดใช้แล้ว" (ยังมีผล) — DEV ยังไม่มีกรณีนี้</li>
+      <li>บันทึกส่งเฉพาะแผน เงื่อนไขอื่นไม่ถูกแตะ · ขึ้นหน้าสรุป "บันทึกแผนค่าคอมแล้ว" เดิม → ใหม่</li>
+    </ul>
+    <figure class="shot">
+      <div class="pic">
+        <img src="shots/cp-04-plan-picker.png" alt="หน้าต่างเลือกแผนค่าคอม">
+        <button class="hs" data-n="1" style="left:33.1%;top:22.1%;width:33.8%;height:5.8%">
+          <span class="tip"><b>ตอนนี้</b> แผนที่ร้านใช้อยู่ ก่อนเปลี่ยน</span>
+        </button>
+        <button class="hs" data-n="2" style="left:33.4%;top:27.8%;width:30.4%;height:6.2%">
+          <span class="tip"><b>คำเตือนที่ owner เคาะ</b> แผนมีผลกับสัญญาที่เปิดหลังจากตั้ง · สัญญาที่เปิดไปแล้วใช้แผนเดิมจนจบ</span>
+        </button>
+        <button class="hs" data-n="3" style="left:32.4%;top:51.2%;width:35.2%;height:12.0%">
+          <span class="tip"><b>การ์ดแผน</b> ชื่อ + ยอดรวม 17% · บรรทัดก้อน "วันเปิด 7% · งวด 1 5% · งวด 2 5%" · คำอธิบายจากกองทุน · ป้าย ใช้อยู่</span>
+        </button>
+        <button class="hs" data-n="4" style="left:32.4%;top:69.0%;width:35.2%;height:9.6%">
+          <span class="tip"><b>ยังไม่ตั้ง (ระบบเดิม)</b> เลือกการ์ดนี้ = ถอดแผน ร้านกลับไปใช้ % ร้าน ที่พิมพ์เอง</span>
+        </button>
+      </div>
+      <p class="hint"><span class="k">1</span>เอาเมาส์ชี้กรอบ ระบบจะตัดส่วนนั้นมาขยายให้พร้อมคำอธิบาย · กดเพื่อค้างไว้</p>
+      <figcaption>แผนที่ DEV มีให้เลือก 4 แผน + ระบบเดิม — ป้าย "ใช้อยู่" บน 7% + 5% + 5%</figcaption>
+    </figure>
+
+  </div>
+</div>
+
+<h2 class="step" id="s2"><span class="num">2</span> สัญญาเปิด → ก้อนค่าคอมเกิด <span class="who fund">FINANCE</span></h2>
+<p class="lead">หน้า "ค่าคอมร้าน" ใต้เมนูร้าน deal partner · <code>/admin/shop-commission</code> · การเงินและผู้ดูแลบริษัทเห็น</p>
+
+<div class="story fund">
+  <span class="beat">เกิดอะไรตอนสัญญาใช้งาน</span>
+  <p>วันที่สัญญาร้านเป็น "ใช้งาน" ระบบประทับแผนและตัวเลขลงสัญญา แล้วสร้างก้อนตามแผน
+  ก้อนวันเปิดไปอยู่บนใบขอรับเงินใบเดิมของร้าน ก้อนที่เหลือรอลูกค้าจ่ายงวด
+  สัญญาเก่าที่เปิดก่อนมีแผนถูกแปะว่า <span class="label">แบบเดิม: จ่ายครั้งเดียววันเปิด + เรียกคืน</span> และมีก้อนเดียว</p>
+</div>
+
+<div class="screen">
+  <div class="bar"><b>ค่าคอมร้าน — แท็บ สัญญา</b> <code>/admin/shop-commission/97930</code> <span class="who fund">FINANCE</span></div>
+  <div class="body">
+    <ul class="sees">
+      <li>รางซ้าย: สัญญาละแถว — เลขสัญญา, ป้ายสถานะค่าคอม (<span class="label">มีก้อนรอจ่าย</span> / <span class="label">จ่ายครบแล้ว</span> / <span class="label">สัญญาสิ้นสุด</span> / <span class="label">รอการจัดเก็บค่างวด</span>), ยอดค่าคอมตามแผน, ลูกค้า · ร้าน, ชื่อแผน, วันเปิด</li>
+      <li>ค้นหาด้วยเลขสัญญาหรือชื่อลูกค้า · กรองวันเปิด · กรองสถานะ · ลูกศรขึ้นลงเดินแถวได้</li>
+      <li>ขวา: หัวสัญญา (ลิงก์ไปหน้าสัญญา) · การ์ดสรุป · รายการ <span class="label">ก้อนค่าคอม (3)</span> ก้อนละบรรทัด พร้อมสถานะและวันที่ปลด</li>
+      <li>แท็บและสัญญาที่เลือกอยู่ในที่อยู่หน้า — กดย้อนกลับได้ ก๊อปลิงก์ให้คนอื่นเปิดเจอจอเดียวกัน</li>
+    </ul>
+    <figure class="shot">
+      <div class="pic">
+        <img src="shots/cp-05-finance-commission.png" alt="หน้าค่าคอมร้าน แท็บสัญญา">
+        <button class="hs" data-n="1" style="left:17.4%;top:17.9%;width:28.9%;height:9.7%">
+          <span class="tip"><b>แถวสัญญา</b> เลขสัญญา + ป้าย "มีก้อนรอจ่าย" + ยอดตามแผน 1,632 · บรรทัดล่างคือชื่อแผน</span>
+        </button>
+        <button class="hs" data-n="2" style="left:17.2%;top:31.2%;width:29.7%;height:5.8%">
+          <span class="tip"><b>สัญญาก่อนมีแผน</b> ถูกแปะ "แบบเดิม: จ่ายครั้งเดียววันเปิด + เรียกคืน" มีก้อนเดียว</span>
+        </button>
+        <button class="hs" data-n="3" style="left:67.8%;top:25.9%;width:31.2%;height:10.1%">
+          <span class="tip"><b>สรุป</b> งวดที่จ่ายแล้ว 1/6 · ค่าคอมตามแผน 1,632 = 17% ของยอดจัด 9,600</span>
+        </button>
+        <button class="hs" data-n="4" style="left:52.3%;top:45.5%;width:47.7%;height:6.4%">
+          <span class="tip"><b>ก้อนวันเปิด 7% = 672</b> "รอใบขอรับเงิน" — ก้อนนี้อยู่บนใบขอรับเงินใบเดิมของร้าน ไม่ได้มาทางใบค่าคอมส่วนเพิ่ม</span>
+        </button>
+        <button class="hs" data-n="5" style="left:52.3%;top:52.2%;width:47.7%;height:6.4%">
+          <span class="tip"><b>งวด 1 5% = 480</b> ลูกค้าจ่ายงวด 1 แล้ววันนี้ → "ปลดแล้ว · รอพ้นวันของบิล" ต่อไปจะรอครบกำหนด 7 วัน แล้วค่อย "พร้อมรวบ"</span>
+        </button>
+        <button class="hs" data-n="6" style="left:52.3%;top:58.9%;width:47.7%;height:6.4%">
+          <span class="tip"><b>งวด 2 5% = 480</b> "ค่าคอมที่รอการจัดเก็บค่างวด" — รอลูกค้าจ่ายงวด 2</span>
+        </button>
+      </div>
+      <p class="hint"><span class="k">1</span>เอาเมาส์ชี้กรอบ ระบบจะตัดส่วนนั้นมาขยายให้พร้อมคำอธิบาย · กดเพื่อค้างไว้</p>
+      <figcaption>สัญญา CT-2610-000444-4 — ลูกค้าจ่ายงวด 1 แล้ววันเดียวกับที่เปิด ก้อนงวด 1 จึงปลดแล้วแต่ยังรอ</figcaption>
+    </figure>
+
+  </div>
+</div>
+
+<div class="screen">
+  <div class="bar"><b>ค่าคอมร้าน — แท็บ รายเดือน</b> <code>/admin/shop-commission?tab=monthly</code> <span class="who fund">FINANCE</span></div>
+  <div class="body">
+    <ul class="sees">
+      <li>เดือนละแถวต่อร้าน (เดือนตามวันเปิดสัญญา): ยอดค่าคอมตามแผนรวม · จำนวนสัญญา · ยอดจัดรวม · แยกตามสถานะก้อน</li>
+      <li>ตัวเลขแยกสถานะ เช่น <span class="label">รอใบขอรับเงิน 3,546</span> <span class="label">รอการจัดเก็บค่างวด 480</span> <span class="label">จ่ายแล้ว 10,988</span> <span class="label">ไม่เกิด 1,632</span></li>
+      <li>กดเดือนไม่เปลี่ยนด้านขวา — ด้านขวายังแสดงสัญญาที่เลือกไว้จากแท็บสัญญา</li>
+    </ul>
+    <figure class="shot">
+      <div class="pic">
+        <img src="shots/cp-06-finance-monthly.png" alt="หน้าค่าคอมร้าน แท็บรายเดือน">
+        <button class="hs" data-n="1" style="left:17.4%;top:8.9%;width:18.0%;height:9.4%">
+          <span class="tip"><b>ตุลาคม 2026</b> 2 สัญญา ยอดตามแผน 4,506 — ในนั้น 3,546 รอใบขอรับเงิน และ 480 รอลูกค้าจ่ายงวด</span>
+        </button>
+        <button class="hs" data-n="2" style="left:17.4%;top:17.7%;width:12.6%;height:9.4%">
+          <span class="tip"><b>กันยายน 2026</b> 4 สัญญาแบบเดิม จ่ายแล้ว 10,988 · "ไม่เกิด 1,632" = สัญญาที่สิ้นสุดไป ก้อนนั้นไม่มีวันเกิด</span>
+        </button>
+      </div>
+      <p class="hint"><span class="k">1</span>เอาเมาส์ชี้กรอบ ระบบจะตัดส่วนนั้นมาขยายให้พร้อมคำอธิบาย · กดเพื่อค้างไว้</p>
+      <figcaption>เดือนตามวันเปิดสัญญา — DEV มี 2 เดือน</figcaption>
+    </figure>
+
+  </div>
+</div>
+
+<h2 class="step" id="s3"><span class="num">3</span> การเงินรวบก้อนเป็นใบจ่าย <span class="who fund">FINANCE</span></h2>
+<p class="lead">หน้า "เอกสารเงินของกองทุน" แท็บใหม่ <span class="label">ค่าคอมส่วนเพิ่ม</span> · <code>/admin/fund-bills</code></p>
+
+<div class="story fund">
+  <span class="beat">เมื่อก้อน "พร้อมรวบ"</span>
+  <p>การเงินกด <span class="label">รวบ</span> ที่ร้านนั้น → ก้อนที่พร้อมทั้งหมดของร้านรวมเป็นใบร่าง 1 ใบ ชนิดใหม่ "ใบค่าคอมส่วนเพิ่ม"
+  จากนั้นเดินเหมือนใบจ่ายร้านใบอื่น: ออกใบ → จ่าย (แนบสลิปได้) → ก้อนกลายเป็น <span class="label">จ่ายแล้ว</span> พร้อมเลขใบและวันที่ ทั้งหน้าการเงินและหน้าร้าน
+  ถ้าจ่ายผิด ใช้ใบลดหนี้เหมือนเดิม</p>
+</div>
+
+<div class="screen">
+  <div class="bar"><b>เอกสารเงินของกองทุน — แท็บ ค่าคอมส่วนเพิ่ม</b> <code>/admin/fund-bills</code> <span class="who fund">FINANCE</span></div>
+  <div class="body">
+    <ul class="sees">
+      <li>ร้านละแถว: <span class="label">พร้อมรวบ N ก้อน</span> และก้อนที่ยังรออยู่แยกเหตุผล (รอปิดวัน / รอพ้นวัน / รอครบกำหนด)</li>
+      <li>ปุ่ม <span class="label">รวบ</span> เปิดหน้าต่างยืนยัน บอกว่าจะรวมกี่ก้อนเป็นใบร่าง 1 ใบ · ถ้ายังไม่มีก้อนพร้อม หน้าต่างบอกว่ารออะไร และปุ่มรวบในนั้นกดไม่ได้</li>
+      <li>ใบที่รวบแล้วไปโผล่ในแท็บ ร่าง → ออกใบแล้ว → ชำระครบ เหมือนใบจ่ายร้านเดิม</li>
+    </ul>
+    <figure class="shot">
+      <div class="pic">
+        <img src="shots/cp-07-fund-bills-extra.png" alt="เอกสารเงินของกองทุน แท็บค่าคอมส่วนเพิ่ม">
+        <button class="hs" data-n="1" style="left:20.8%;top:3.1%;width:10.1%;height:8.2%">
+          <span class="tip"><b>แท็บใหม่</b> ค่าคอมส่วนเพิ่ม — อยู่ข้าง "รอจัดใบ" ของใบขอรับเงินเดิม</span>
+        </button>
+        <button class="hs" data-n="2" style="left:17.4%;top:8.9%;width:23.9%;height:9.4%">
+          <span class="tip"><b>ร้านละแถว</b> พร้อมรวบ 0 ก้อน · รอพ้นวัน 1 — ก้อนงวด 1 ของสัญญาตัวอย่างยังรอวันของบิลผ่านไป</span>
+        </button>
+        <button class="hs" data-n="3" style="left:39.6%;top:9.6%;width:5.6%;height:8.1%">
+          <span class="tip"><b>รวบ</b> เปิดหน้าต่างยืนยัน — ตอนนี้จะบอกว่ายังไม่มีก้อนพร้อม และให้รวบไม่ได้</span>
+        </button>
+      </div>
+      <p class="hint"><span class="k">1</span>เอาเมาส์ชี้กรอบ ระบบจะตัดส่วนนั้นมาขยายให้พร้อมคำอธิบาย · กดเพื่อค้างไว้</p>
+      <figcaption>วันที่ถ่าย DEV ยังไม่มีก้อนที่พร้อมรวบ — ก้อนแรกจะพร้อมวันที่ 18 ต.ค. 2026 (พ้นวันบิล + ถือ 7 วัน)</figcaption>
+    </figure>
+
+  </div>
+</div>
+
+<div class="screen">
+  <div class="bar"><b>หน้าต่าง รวบใบค่าคอมส่วนเพิ่ม — ยังไม่มีก้อนพร้อม</b> <span class="who fund">FINANCE</span></div>
+  <div class="body">
+    <ul class="sees">
+      <li>บรรทัดใต้ชื่อร้านบอกเหตุผล: <span class="label">ยังไม่มีก้อนพร้อมรวบ · รอพ้นวัน 1</span> · ปุ่ม <span class="label">รวบ</span> กดไม่ได้</li>
+      <li>เมื่อมีก้อนพร้อม บรรทัดนี้จะเป็น "พร้อมรวบ N ก้อน · ยอด" และปุ่มกดได้ → ใบร่าง 1 ใบ → หน้าสรุปพร้อมปุ่มเปิดใบ</li>
+    </ul>
+    <figure class="shot">
+      <div class="pic">
+        <img src="shots/cp-09-bundle-window.png" alt="หน้าต่างรวบใบค่าคอมส่วนเพิ่ม">
+        <button class="hs" data-n="1" style="left:35.3%;top:37.4%;width:29.4%;height:5.8%">
+          <span class="tip"><b>เหตุผลที่ยังรวบไม่ได้</b> ก้อนงวด 1 ยังรอให้วันของบิลผ่านไปก่อน</span>
+        </button>
+        <button class="hs" data-n="2" style="left:58.9%;top:63.5%;width:6.9%;height:9.0%">
+          <span class="tip"><b>รวบ กดไม่ได้</b> จนกว่าจะมีก้อน "พร้อมรวบ" อย่างน้อย 1 ก้อน</span>
+        </button>
+      </div>
+      <p class="hint"><span class="k">1</span>เอาเมาส์ชี้กรอบ ระบบจะตัดส่วนนั้นมาขยายให้พร้อมคำอธิบาย · กดเพื่อค้างไว้</p>
+      <figcaption>เปิดจากปุ่ม รวบ ของร้าน DEV Deal Partner X — พบระหว่างทำหน้านี้ว่าปุ่มเคยกดได้ทั้งที่ไม่มีก้อน แก้แล้ว</figcaption>
+    </figure>
+
+  </div>
+</div>
+
+<h2 class="step" id="s4"><span class="num">4</span> ร้านเห็นอะไร <span class="who shop">SHOP</span></h2>
+<p class="lead">เมนูใหม่ "ค่าคอมของฉัน" ใต้ "เงินของร้าน" · <code>/admin/contracts/my-commission</code></p>
+
+<div class="story">
+  <span class="beat">เลขเดียวกับการเงิน</span>
+  <p>ร้านเห็นสัญญาของตัวเองทุกสัญญา ก้อนไหนได้แล้ว ก้อนไหนรออะไร ตัวเลขชุดเดียวกับที่การเงินเห็น
+  ต่างกันแค่ขอบเขต — ร้านไม่เห็นชื่อร้าน (เป็นร้านตัวเอง) ไม่เห็นส่วน holding และไม่เห็นยอดค้างฝั่งกองทุน</p>
+</div>
+
+<div class="screen">
+  <div class="bar"><b>ค่าคอมของฉัน</b> <code>/admin/contracts/my-commission/97930</code> <span class="who shop">SHOP</span></div>
+  <div class="body">
+    <ul class="sees">
+      <li>หน้าตาเดียวกับหน้าการเงิน: แท็บ สัญญา / รายเดือน · รางซ้าย · ก้อนค่าคอมขวา</li>
+      <li>แถวไม่มี "· ร้าน" ต่อท้ายชื่อลูกค้า · การ์ดสรุปไม่มีบรรทัดร้าน</li>
+      <li>เมื่อก้อนถูกจ่าย ร้านเห็นเลขใบและวันที่ตรงบรรทัดก้อนนั้น และเปิดดูใบได้จากเมนู "รับเงินแล้ว"</li>
+    </ul>
+    <figure class="shot">
+      <div class="pic">
+        <img src="shots/cp-08-shop-my-commission.png" alt="หน้าค่าคอมของฉัน ฝั่งร้าน">
+        <button class="hs" data-n="1" style="left:16.6%;top:17.9%;width:29.5%;height:9.7%">
+          <span class="tip"><b>แถวเดียวกับการเงิน</b> เลขสัญญา ป้าย ยอดตามแผน แผน — แต่ไม่มีชื่อร้านต่อท้าย</span>
+        </button>
+        <button class="hs" data-n="2" style="left:52.0%;top:34.9%;width:47.4%;height:6.0%">
+          <span class="tip"><b>ก้อนค่าคอม (3)</b> สถานะและยอดต่อก้อน ตรงกับหน้าการเงินทุกบรรทัด</span>
+        </button>
+      </div>
+      <p class="hint"><span class="k">1</span>เอาเมาส์ชี้กรอบ ระบบจะตัดส่วนนั้นมาขยายให้พร้อมคำอธิบาย · กดเพื่อค้างไว้</p>
+      <figcaption>ร้าน DEV Deal Partner X เข้าในฐานะผู้จัดการร้าน — สัญญาเดียวกัน ตัวเลขเดียวกัน</figcaption>
+    </figure>
+
+  </div>
+</div>
+
+<h2 class="step" id="s5"><span class="num">5</span> ตัวอย่างจริงบน DEV</h2>
+<p class="lead">สัญญา <code>CT-2610-000444-4</code> · John Tester · DEV Deal Partner X · แผน 7% + 5% + 5% · ยอดจัด 9,600</p>
+
+<div class="tablewrap">
+<table>
+  <thead><tr><th>ก้อน</th><th class="money">ยอด</th><th>สถานะ 11 ต.ค.</th><th>ต่อไป</th></tr></thead>
+  <tbody>
+    <tr><td>วันเปิด 7%</td><td class="money">672</td><td>ก้อนวันเปิด · รอใบขอรับเงิน</td><td>อยู่บนใบขอรับเงินใบเดิมของร้าน — จ่ายทางนั้น</td></tr>
+    <tr><td>งวด 1 5%</td><td class="money">480</td><td>ปลดแล้ว · รอพ้นวันของบิล (จ่ายงวด 1 ด้วยใบ BL-2610-001505-1)</td><td>→ รอครบกำหนด 7 วัน → พร้อมรวบ 18 ต.ค. → รวบ → ออกใบ → จ่าย</td></tr>
+    <tr><td>งวด 2 5%</td><td class="money">480</td><td>ค่าคอมที่รอการจัดเก็บค่างวด</td><td>รอลูกค้าจ่ายงวด 2</td></tr>
+  </tbody>
+</table>
+</div>
+<div class="note">ด่านรับงานของ BE (§G) เดินถึงขั้น 3 แล้ว: ตั้งแผน ✓ · เปิดสัญญาแล้วก้อนเกิดตามแผน ✓ · จ่ายงวด 1 แล้วก้อนปลด ✓ · ขั้น 4–6 (รวบ → ออกใบ → จ่าย + สลิป → ใบลดหนี้ → ร้านเห็น) รอให้ก้อนพ้นช่วงถือก่อน</div>
+
+<h2 class="step" id="s6"><span class="num">6</span> ที่ยังไม่เรียบร้อย</h2>
+<div class="screen nopic">
+  <div class="bar"><b>ยังไม่ได้เห็นจริง</b></div>
+  <div class="body">
+    <ul class="sees">
+      <li><b>รวบ → ออกใบ → จ่าย → ใบลดหนี้</b> — ยังไม่มีก้อน "พร้อมรวบ" บน DEV จนกว่าจะถึง 18 ต.ค. (หรือ BE ตั้งช่วงถือเป็น 0 ชั่วคราว ก็ยังต้องข้ามวัน 1 วัน) หน้าต่างรวบและใบชนิดใหม่จึงยังไม่ได้เดินจริง</li>
+      <li><b>ก้อน "จ่ายแล้ว"</b> พร้อมเลขใบบนหน้าร้าน — ยังไม่ได้เห็น ด้วยเหตุเดียวกัน</li>
+      <li><b>แผนที่ถูกปิดใช้</b> ขณะร้านยังใช้อยู่ (ป้าย "ปิดใช้แล้ว") — DEV ไม่มีกรณีนี้</li>
+    </ul>
+  </div>
+</div>
+<div class="screen nopic">
+  <div class="bar"><b>คำถามเปิด</b></div>
+  <div class="body">
+    <ul class="sees">
+      <li><b>กติกาคืนค่าคอมกับร้านบนแผน</b> — แบบของ BE บอกว่าแผนไม่มีเรียกคืน แต่ตัวคำนวณเรียกคืนฝั่งหลังบ้านยังไม่ดูแผน สัญญาบนแผนจึงยังเข้าคิวเรียกคืนได้ หน้าต่างเงื่อนไขร้านจึงยังแสดงกติกาคืนค่าคอมให้ทุกร้าน (ตามที่ตกลง) — ยังไม่ได้แจ้ง BE</li>
+      <li><b>แผนของร้าน DEV Deal Partner X ถูกเปลี่ยนระหว่างวัน</b> (15% ครั้งเดียว → 7% + 5% + 5%) โดยไม่ใช่จากการทดสอบนี้ — ไม่กระทบสัญญาตัวอย่างเพราะล็อกตัวเลขไว้แล้ว</li>
+    </ul>
+  </div>
+</div>
+
+<div id="rolemode">
+  <div class="roleblock credit">
+    <h2><span class="tag">ADMIN</span> ผู้ดูแลบริษัทกองทุน</h2>
+    <p class="rolelead">DEV: <code>ui_fund_admin_a</code> · ตั้งเงื่อนไขร้าน</p>
+    <div class="pg"><h3>เงื่อนไข Deal Partner <code>/admin/pricing/deal-partner-rates</code><span class="when">ตอนรับร้านใหม่ หรือเปลี่ยนข้อตกลง</span></h3>
+      <div class="in"><p class="does"><b>ทำอะไร:</b> ตารางร้านท้ายหน้า → <span class="label">เปลี่ยน</span> เลือกแผน หรือดินสอ → <span class="label">แก้ไขเงื่อนไขร้าน</span> ทั้งชุด</p>
+      <ul><li>บนแผน: เห็นแผน + % บริษัท · ระบบเดิม: % ร้าน + % บริษัท + % รวม</li><li>แผนมีผลกับสัญญาที่เปิดหลังตั้งเท่านั้น</li></ul></div></div>
+    <div class="pg"><h3>ค่าคอมร้าน <code>/admin/shop-commission</code><span class="when">ดูได้เหมือนการเงิน</span></h3>
+      <div class="in"><p class="does"><b>ทำอะไร:</b> ดูก้อนของทุกสัญญา ไม่มีปุ่มสั่งงาน</p></div></div>
+  </div>
+  <div class="roleblock fund">
+    <h2><span class="tag">FINANCE</span> การเงินกองทุน</h2>
+    <p class="rolelead">DEV: <code>ui_fund_finance_a</code> · รวบ ออกใบ จ่าย</p>
+    <div class="pg"><h3>ค่าคอมร้าน <code>/admin/shop-commission</code><span class="when">ตรวจก่อนรวบ / ตอบร้าน</span></h3>
+      <div class="in"><p class="does"><b>ทำอะไร:</b> หาสัญญา ดูว่าก้อนไหนรออะไร · แท็บรายเดือนดูภาพรวมต่อร้าน</p></div></div>
+    <div class="pg"><h3>เอกสารเงินของกองทุน → ค่าคอมส่วนเพิ่ม <code>/admin/fund-bills</code><span class="when">เมื่อมีก้อนพร้อมรวบ</span></h3>
+      <div class="in"><p class="does"><b>ทำอะไร:</b> กด <span class="label">รวบ</span> ที่ร้าน → ใบร่าง → ออกใบ → จ่าย (แนบสลิปได้) → ใบลดหนี้ถ้าผิด</p></div></div>
+  </div>
+  <div class="roleblock shop">
+    <h2><span class="tag">SHOP</span> ร้าน</h2>
+    <p class="rolelead">DEV: <code>ui_branch_manager_dpx</code> · ดูอย่างเดียว</p>
+    <div class="pg"><h3>ค่าคอมของฉัน <code>/admin/contracts/my-commission</code><span class="when">อยากรู้ว่าจะได้เงินเมื่อไร</span></h3>
+      <div class="in"><p class="does"><b>ทำอะไร:</b> ดูก้อนต่อสัญญาและต่อเดือน ก้อนที่จ่ายแล้วมีเลขใบ · เปิดใบได้จาก "รับเงินแล้ว"</p></div></div>
+  </div>
+</div>
+
+<footer class="end">หน้านี้สร้างจากจอจริงบน DEV 11 ต.ค. 2026 · งานตาม <code>UI_FEEDBACK/2026-10-10_IMPLEMENT_commission_plan_tranche_flow.md</code> · คู่กับ <a href="partner-flow-walkthrough.html">ร้านค้าคู่ค้า — เดินทั้งเส้น</a></footer>
+</div>
+<script>
+  (function () {
+    var root = document.documentElement;
+    try {
+      var saved = localStorage.getItem('cp-theme');
+      if (saved) root.setAttribute('data-theme', saved);
+    } catch (e) {}
+    // easy / detailed switch
+    (function () {
+      var body = document.body;
+      var bEasy = document.getElementById('mEasy');
+      var bDetail = document.getElementById('mDetail');
+      var bRole = document.getElementById('mRole');
+      var note = document.getElementById('modenote');
+      var notes = {
+        easy: 'สรุปสั้นต่อขั้น + ภาพจอจริงที่ชี้ดูได้ · ADMIN = ผู้ดูแลบริษัทกองทุน · FINANCE = การเงินกองทุน · SHOP = ร้าน',
+        detail: 'ทีละหน้าจอ พร้อมภาพจริงที่ชี้ดูได้ว่าตรงไหนคืออะไร',
+        role: 'ไล่ทีละบทบาท ว่าแต่ละคนเปิดหน้าไหนบ้าง ใช้ทำอะไร และเปิดตอนไหน'
+      };
+      function apply(m) {
+        body.setAttribute('data-mode', m);
+        bEasy.classList.toggle('sel', m === 'easy');
+        bDetail.classList.toggle('sel', m === 'detail');
+        bRole.classList.toggle('sel', m === 'role');
+        note.textContent = notes[m] || notes.easy;
+        try { localStorage.setItem('cp-mode', m); } catch (e) {}
+      }
+      bEasy.addEventListener('click', function () { apply('easy'); });
+      bDetail.addEventListener('click', function () { apply('detail'); });
+      bRole.addEventListener('click', function () { apply('role'); });
+      var saved = 'easy';
+      try { saved = localStorage.getItem('cp-mode') || 'easy'; } catch (e) {}
+      apply(saved);
+    })();
+
+    document.querySelectorAll('.pic').forEach(function (pic) {
+      var img = pic.querySelector('img');
+      var loupe = document.createElement('div');
+      loupe.className = 'loupe';
+      loupe.innerHTML = '<div class="crop"></div><div class="say"></div>';
+      pic.appendChild(loupe);
+      var crop = loupe.querySelector('.crop');
+      var say = loupe.querySelector('.say');
+
+      function show(hs) {
+        var pw = pic.clientWidth;
+        if (!pw) return;
+        var fx = parseFloat(hs.style.left) / 100;
+        var fy = parseFloat(hs.style.top) / 100;
+        var fw = parseFloat(hs.style.width) / 100;
+        var fh = parseFloat(hs.style.height) / 100;
+        var ph = img.clientHeight;
+
+        // magnify so the cut-out is readable, capped by the picture's width
+        var maxW = Math.min(pw * 0.92, 720);
+        var z = Math.min(3.2, Math.max(1.6, maxW / (fw * pw)));
+        var cw = fw * pw * z, ch = fh * ph * z;
+        var maxH = Math.max(120, ph * 0.72);
+        if (ch > maxH) { z *= maxH / ch; cw = fw * pw * z; ch = fh * ph * z; }
+
+        crop.style.width = Math.round(cw) + 'px';
+        crop.style.height = Math.round(ch) + 'px';
+        crop.style.backgroundImage = 'url("' + img.getAttribute('src') + '")';
+        crop.style.backgroundSize = Math.round(pw * z) + 'px ' + Math.round(ph * z) + 'px';
+        crop.style.backgroundPosition = '-' + Math.round(fx * pw * z) + 'px -' + Math.round(fy * ph * z) + 'px';
+
+        say.innerHTML = '<span class="n">' + hs.dataset.n + '</span>' + hs.querySelector('.tip').innerHTML;
+
+        // place it under the box, or above when there is more room there;
+        // the whole thing (crop + note) must stay inside the picture
+        var boxTop = fy * ph, boxBottom = (fy + fh) * ph;
+        var gap = 12, noteH = 58;
+        var roomBelow = ph - boxBottom - gap;
+        var roomAbove = boxTop - gap;
+        var below = roomBelow >= roomAbove;
+        var room = Math.max(90, (below ? roomBelow : roomAbove) - noteH);
+        if (ch > room) {
+          var k = room / ch;
+          cw = Math.round(cw * k); ch = Math.round(ch * k); z *= k;
+          crop.style.width = cw + 'px';
+          crop.style.height = ch + 'px';
+          crop.style.backgroundSize = Math.round(pw * z) + 'px ' + Math.round(ph * z) + 'px';
+          crop.style.backgroundPosition = '-' + Math.round(fx * pw * z) + 'px -' + Math.round(fy * ph * z) + 'px';
+        }
+        loupe.style.left = '0px';
+        loupe.style.right = '0px';
+        loupe.style.marginLeft = 'auto';
+        loupe.style.marginRight = 'auto';
+        if (below) {
+          loupe.style.top = Math.round(boxBottom + gap) + 'px';
+          loupe.style.bottom = 'auto';
+        } else {
+          loupe.style.bottom = Math.round(ph - boxTop + gap) + 'px';
+          loupe.style.top = 'auto';
+        }
+        loupe.classList.add('show');
+        pic.classList.add('on');
+      }
+      function hide() {
+        if (pic.querySelector('.hs.pin')) return;
+        loupe.classList.remove('show');
+        pic.classList.remove('on');
+      }
+
+      pic.querySelectorAll('.hs').forEach(function (hs) {
+        hs.addEventListener('mouseenter', function () { show(hs); });
+        hs.addEventListener('mouseleave', hide);
+        hs.addEventListener('click', function (e) {
+          e.preventDefault();
+          var was = hs.classList.contains('pin');
+          pic.querySelectorAll('.hs.pin').forEach(function (o) { o.classList.remove('pin'); });
+          if (was) { loupe.classList.remove('show'); pic.classList.remove('on'); }
+          else { hs.classList.add('pin'); show(hs); }
+        });
+      });
+    });
+    document.addEventListener('click', function (e) {
+      if (e.target.closest('.hs')) return;
+      document.querySelectorAll('.pic.on').forEach(function (p) {
+        p.querySelectorAll('.hs.pin').forEach(function (o) { o.classList.remove('pin'); });
+        p.classList.remove('on');
+        var l = p.querySelector('.loupe'); if (l) l.classList.remove('show');
+      });
+    });
+    document.getElementById('tb').addEventListener('click', function () {
+      var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      root.setAttribute('data-theme', next);
+      try { localStorage.setItem('cp-theme', next); } catch (e) {}
+    });
+  })();
+</script>
+</body>
+</html>
