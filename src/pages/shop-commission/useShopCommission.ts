@@ -72,7 +72,8 @@ export interface ContractCommissionListOptions {
   dateFrom?: string;
   dateTo?: string;
   branchId?: string;
-  status?: ContractCommissionStatus | '';
+  /** A contract status, or READY_NOW = contracts with at least one step ready to bundle (finance only). */
+  status?: ContractCommissionStatus | 'READY_NOW' | '';
   search?: string;
   pageIndex: number;
   pageSize: number;
@@ -85,7 +86,8 @@ export function useContractCommissionList({
   if (dateFrom) params.push(`activated_on=gte.${dateFrom}`);
   if (dateTo) params.push(`activated_on=lte.${dateTo}`);
   if (branchId && scope === 'finance') params.push(`branch_id=eq.${branchId}`);
-  if (status) params.push(`commission_status=eq.${status}`);
+  if (status === 'READY_NOW') params.push('ready_amount=gt.0');
+  else if (status) params.push(`commission_status=eq.${status}`);
   const term = search?.trim();
   if (term) {
     const esc = term.replace(/[(),]/g, ' ');
@@ -144,3 +146,18 @@ export function useCommissionMonthly(scope: ShopCommissionScope, branchId?: stri
 }
 
 export type { TrancheStatus };
+
+/** The contract's payment request (the PS- document the opening step rides
+ *  on). Finance reads the company view, the shop its own. */
+export function useContractSettlement(scope: ShopCommissionScope, contractId: number | null) {
+  const view = scope === 'finance' ? 'v_partner_settlements' : 'v_partner_my_settlements';
+  const query = useQuery({
+    queryKey: ['shop-commission', 'settlement', scope, contractId],
+    queryFn: () => apiClient.get<{ settlement_id: number; settlement_code: string; status: string; is_paid: boolean }[]>(
+      `/${view}?contract_id=eq.${contractId}&select=settlement_id,settlement_code,status,is_paid&order=settlement_id.desc&limit=1`,
+    ),
+    enabled: contractId != null,
+    staleTime: 30 * 1000,
+  });
+  return query.data?.[0] ?? null;
+}

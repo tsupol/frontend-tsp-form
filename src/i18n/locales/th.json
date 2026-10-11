@@ -9674,7 +9674,9 @@
     "planChange": "เปลี่ยน",
     "ratesUnderPlan": "บริษัท {{company}}",
     "panelReady": "พร้อมรวบ",
-    "panelWaiting": "รออยู่"
+    "panelWaiting": "รออยู่",
+    "filterReadyNow": "มีก้อนพร้อมรวบ",
+    "sumUnpaid": "ปลดแล้ว · ยังไม่จ่าย"
   },
   "fundDayGuard": {
     "closedToday": "วันที่ {{date}} ปิดวันกองทุนแล้ว — บันทึกได้พรุ่งนี้",

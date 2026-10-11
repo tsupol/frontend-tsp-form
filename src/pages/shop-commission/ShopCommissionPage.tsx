@@ -32,7 +32,7 @@ import {
   type ContractCommissionStatus, type ShopCommissionScope,
 } from './shopCommissionTypes';
 import {
-  useCommissionMonthly, useContractCommissionList, useContractCommissionRow, useContractTranches,
+  useCommissionMonthly, useContractCommissionList, useContractCommissionRow, useContractSettlement, useContractTranches,
 } from './useShopCommission';
 
 type Tab = 'contracts' | 'monthly';
@@ -86,7 +86,7 @@ export function ShopCommissionPage({ scope }: { scope: ShopCommissionScope }) {
   const [presetKey, setPresetKey] = useState<string | null>(null);
   const [rangeTyping, setRangeTyping] = useState(false);
   const [branchId, setBranchId] = useState('');
-  const [status, setStatus] = useState<ContractCommissionStatus | ''>('');
+  const [status, setStatus] = useState<ContractCommissionStatus | 'READY_NOW' | ''>('');
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
@@ -120,9 +120,14 @@ export function ShopCommissionPage({ scope }: { scope: ShopCommissionScope }) {
       .map(([id, name]) => ({ value: String(id), label: name }));
   }, [monthly.rows]);
 
-  const statusOptions = CONTRACT_COMMISSION_STATUSES.map(s => ({
-    value: s, label: t(`shopCommission.contractStatus_${s}`),
-  }));
+  const statusOptions = [
+    // Finance's first question is "what can I bundle now" — a status of its
+    // own, ahead of the contract statuses.
+    ...(isFinance ? [{ value: 'READY_NOW', label: t('shopCommission.filterReadyNow') }] : []),
+    ...CONTRACT_COMMISSION_STATUSES.map(s => ({
+      value: s, label: t(`shopCommission.contractStatus_${s}`),
+    })),
+  ];
 
   const rangePresets = useMemo(
     () => createDateRangePresets({
@@ -251,7 +256,7 @@ export function ShopCommissionPage({ scope }: { scope: ShopCommissionScope }) {
                             <Select
                               options={statusOptions}
                               value={status || null}
-                              onChange={v => setStatus((v as ContractCommissionStatus) ?? '')}
+                              onChange={v => setStatus((v as ContractCommissionStatus | 'READY_NOW') ?? '')}
                               placeholder={t('shopCommission.allStatuses')}
                               size="sm" showChevron clearable searchable={false}
                             />
@@ -309,6 +314,12 @@ export function ShopCommissionPage({ scope }: { scope: ShopCommissionScope }) {
                             <span className="truncate flex-1 min-w-0">{r.commission_plan_name ?? r.commission_plan}</span>
                             <span className="shrink-0"><DateTime value={r.activated_on} showTime={false} /></span>
                           </div>
+                          {/* What finance can act on now, apart from the contract's overall status. */}
+                          {isFinance && (r.ready_amount ?? 0) > 0 && (
+                            <div className="mt-0.5 text-xs text-warning-fg">
+                              {t('shopCommission.fig_ready')} <span className="tabular-nums font-medium">{fmtCurrency(r.ready_amount ?? 0)}</span>
+                            </div>
+                          )}
                         </button>
                       );
                     }}
@@ -432,6 +443,7 @@ function ContractCommissionDetail({ scope, contractId, row: rowFromList, isMobil
   // detail then reads its own row from the same view.
   const own = useContractCommissionRow(scope, rowFromList ? null : contractId);
   const tranches = useContractTranches(scope, contractId);
+  const settlement = useContractSettlement(scope, contractId);
   const row = rowFromList ?? own.data ?? null;
 
   const stat = (label: string, value: React.ReactNode, emphasis = false, className = '') => (
@@ -445,10 +457,20 @@ function ContractCommissionDetail({ scope, contractId, row: rowFromList, isMobil
     switch (tr.status) {
       case 'WAIT_HOLD':
         return tr.hold_until ? <>{t('shopCommission.holdUntil')} <DateTime value={tr.hold_until} showTime={false} /></> : null;
+      case 'UNLOCKED_UNPAID':
+        // The opening step is paid through the shop's payment request, so
+        // name that document — finance can open it from here.
+        return settlement ? (
+          <Link
+            to={isFinance ? `/admin/partner-settlements/${settlement.settlement_id}` : `/admin/contracts/settlement-payment/${tr.contract_id}`}
+            className="text-primary-fg hover:underline inline-flex items-center gap-1"
+          >
+            {settlement.settlement_code}<ExternalLink size={12} />
+          </Link>
+        ) : (tr.unlocked_on ? <>{t('shopCommission.unlockedOn')} <DateTime value={tr.unlocked_on} showTime={false} /></> : null);
       case 'WAIT_DAY_CLOSE':
       case 'WAIT_DAY_END':
       case 'READY':
-      case 'UNLOCKED_UNPAID':
         return tr.unlocked_on ? <>{t('shopCommission.unlockedOn')} <DateTime value={tr.unlocked_on} showTime={false} /></> : null;
       case 'IN_BILL':
       case 'PAID': {
@@ -519,6 +541,9 @@ function ContractCommissionDetail({ scope, contractId, row: rowFromList, isMobil
                 {stat(t('shopCommission.installments'), `${row.installments_paid}/${row.installments_total}`)}
                 {stat(t('shopCommission.planTotal'), fmtCurrency(row.plan_total), true)}
                 {stat(t('shopCommission.fig_paid'), fmtCurrency(row.paid_amount ?? 0))}
+                {stat(t('shopCommission.sumUnpaid'), fmtCurrency(row.unlocked_unpaid_amount ?? 0))}
+                {isFinance && (row.ready_amount ?? 0) > 0 && stat(t('shopCommission.fig_ready'), fmtCurrency(row.ready_amount ?? 0), false, 'text-warning-fg')}
+                {(row.awaiting_collection_amount ?? 0) > 0 && stat(t('shopCommission.fig_awaiting'), fmtCurrency(row.awaiting_collection_amount ?? 0))}
                 {row.last_paid_date && stat(t('shopCommission.lastPaid'), <DateTime value={row.last_paid_date} showTime={false} />)}
               </div>
               {row.commission_status === 'AWAITING_COLLECTION' && row.awaiting_until_pay_no != null && (

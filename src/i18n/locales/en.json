@@ -9688,7 +9688,9 @@
     "planChange": "Change",
     "ratesUnderPlan": "Company {{company}}",
     "panelReady": "Ready to bundle",
-    "panelWaiting": "Still waiting"
+    "panelWaiting": "Still waiting",
+    "filterReadyNow": "Ready to bundle now",
+    "sumUnpaid": "Released, not yet paid"
   },
   "fundDayGuard": {
     "closedToday": "The fund's day {{date}} is already closed — this can be recorded tomorrow.",
