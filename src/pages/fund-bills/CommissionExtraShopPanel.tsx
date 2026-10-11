@@ -5,11 +5,12 @@
 // The queue row only carries counts; the user picking a shop wants to know
 // WHICH steps and WHY they wait, so the steps are read here per shop.
 
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Badge, Button, Tooltip } from 'tsp-form';
-import { ExternalLink, Store } from 'lucide-react';
+import { ChevronRight, ExternalLink, Store } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { fmtCurrency, formatEntityCode } from '../../lib/format';
 import { DateTime } from '../../components/DateTime';
@@ -53,40 +54,77 @@ export function CommissionExtraShopPanel({ shop, canBundle, onBundle }: {
     ? (r.hold_until ? <>{t('shopCommission.holdUntil')} <DateTime value={r.hold_until} showTime={false} /></> : null)
     : (r.unlocked_on ? <>{t('shopCommission.unlockedOn')} <DateTime value={r.unlocked_on} showTime={false} /></> : null);
 
-  const list = (title: string, items: Row[], total: number | null, hint?: string) => (
+  // Groups fold the lists at real volume: ready slices per contract (finance
+  // presses รวบ for all of them, so the per-contract sum is what matters);
+  // waiting slices per "what they wait for + when", since the question there
+  // is when, not which. Each group unfolds to its slices.
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const toggle = (k: string) => setOpen(prev => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n; });
+
+  type Group = { key: string; head: React.ReactNode; items: Row[]; total: number };
+  const groupBy = (items: Row[], keyOf: (r: Row) => string, headOf: (r: Row) => React.ReactNode): Group[] => {
+    const m = new Map<string, Group>();
+    for (const r of items) {
+      const k = keyOf(r);
+      let g = m.get(k);
+      if (!g) { g = { key: k, head: headOf(r), items: [], total: 0 }; m.set(k, g); }
+      g.items.push(r); g.total += Number(r.amount);
+    }
+    return [...m.values()];
+  };
+  const readyGroups = groupBy(ready, r => `c${r.contract_id}`, r => (
+    <Link to={`/admin/contracts/search/${r.contract_id}`} className="font-medium text-primary-fg hover:underline inline-flex items-center gap-1" onClick={e => e.stopPropagation()}>
+      {formatEntityCode(r.contract_code)}<ExternalLink size={12} />
+    </Link>
+  ));
+  const waitingGroups = groupBy(waiting, r => `${r.status}|${r.status === 'WAIT_HOLD' ? r.hold_until : r.unlocked_on}`, r => (
+    <span className="min-w-0 truncate">
+      <Badge size="sm" color={TRANCHE_STATUS_COLOR[r.status]}>{t(`shopCommission.tranche_${r.status}`)}</Badge>
+      <span className="text-xs text-subtle ml-2">{when(r)}</span>
+    </span>
+  ));
+
+  const slice = (r: Row, showContract: boolean) => (
+    <div key={`${r.contract_id}-${r.pay_no}`} className="pl-9 pr-3 py-1.5 border-t border-line-subtle flex items-center gap-2 text-sm">
+      {showContract && (
+        <Link to={`/admin/contracts/search/${r.contract_id}`} className="text-primary-fg hover:underline inline-flex items-center gap-1" onClick={e => e.stopPropagation()}>
+          {formatEntityCode(r.contract_code)}<ExternalLink size={12} />
+        </Link>
+      )}
+      <span className="text-subtle">{payNoLabel(r.pay_no, t)} {Number(r.pct)}%</span>
+      <span className="flex-1" />
+      <span className="tabular-nums">{fmtCurrency(r.amount)}</span>
+    </div>
+  );
+
+  const list = (title: string, groups: Group[], count: number, total: number | null, showContractInSlice: boolean, hint?: string) => (
     <div className="rounded-md border border-line overflow-hidden">
       <div className="px-3 py-2 bg-surface text-sm font-medium flex items-center gap-2">
         <span>{title}</span>
-        <span className="text-subtle font-normal">({items.length})</span>
+        <span className="text-subtle font-normal">({count})</span>
         <span className="flex-1" />
         {total != null && <span className="tabular-nums">{fmtCurrency(total)}</span>}
       </div>
-      {hint && items.length > 0 && (
+      {hint && count > 0 && (
         <div className="px-3 py-1.5 text-xs text-subtle border-t border-line">{hint}</div>
       )}
-      {items.length === 0 ? (
+      {groups.length === 0 ? (
         <div className="px-3 py-3 text-sm text-subtler">{t('common.noData')}</div>
-      ) : items.map(r => (
-        <div key={`${r.contract_id}-${r.pay_no}`} className="px-3 py-2 border-t border-line flex items-start gap-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap text-sm">
-              <Link
-                to={`/admin/contracts/search/${r.contract_id}`}
-                className="font-medium text-primary-fg hover:underline inline-flex items-center gap-1"
-                onClick={e => e.stopPropagation()}
-              >
-                {formatEntityCode(r.contract_code)}<ExternalLink size={12} />
-              </Link>
-              <span>{payNoLabel(r.pay_no, t)} {Number(r.pct)}%</span>
-            </div>
-            <div className="flex items-center gap-2 mt-0.5 text-xs text-subtle flex-wrap">
-              <Badge size="sm" color={TRANCHE_STATUS_COLOR[r.status]}>{t(`shopCommission.tranche_${r.status}`)}</Badge>
-              <span>{when(r)}</span>
-            </div>
+      ) : groups.map(g => {
+        const isOpen = open.has(g.key);
+        return (
+          <div key={g.key} className="border-t border-line">
+            <button type="button" onClick={() => toggle(g.key)}
+              className="w-full text-left px-3 py-2 flex items-center gap-2 cursor-pointer hover:bg-surface-hover">
+              <ChevronRight size={14} className={`shrink-0 text-subtle transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+              <span className="flex-1 min-w-0 text-sm flex items-center gap-2">{g.head}</span>
+              <span className="text-xs text-subtle shrink-0">{t('shopCommission.sliceCount', { count: g.items.length })}</span>
+              <span className="text-sm tabular-nums font-medium shrink-0">{fmtCurrency(g.total)}</span>
+            </button>
+            {isOpen && g.items.map(r => slice(r, showContractInSlice))}
           </div>
-          <span className="text-sm tabular-nums font-medium shrink-0">{fmtCurrency(r.amount)}</span>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 
@@ -112,8 +150,8 @@ export function CommissionExtraShopPanel({ shop, canBundle, onBundle }: {
             <div className="text-sm text-subtler">{t('common.loading')}</div>
           ) : (
             <>
-              {list(t('shopCommission.panelReady'), ready, shop.ready_amount)}
-              {list(t('shopCommission.panelWaiting'), waiting, null, t('shopCommission.panelWaitingHint'))}
+              {list(t('shopCommission.panelReady'), readyGroups, ready.length, shop.ready_amount, false)}
+              {list(t('shopCommission.panelWaiting'), waitingGroups, waiting.length, null, true, t('shopCommission.panelWaitingHint'))}
             </>
           )}
         </div>

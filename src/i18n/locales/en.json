@@ -9691,7 +9691,8 @@
     "panelWaiting": "Still waiting",
     "filterReadyNow": "Ready to bundle now",
     "sumUnpaid": "Released, not yet paid",
-    "panelWaitingHint": "These move to \"Ready to bundle\" on their own once the bill day has ended and the hold period has passed. Nothing to do here."
+    "panelWaitingHint": "These move to \"Ready to bundle\" on their own once the bill day has ended and the hold period has passed. Nothing to do here.",
+    "sliceCount": "{{count}} step(s)"
   },
   "fundDayGuard": {
     "closedToday": "The fund's day {{date}} is already closed — this can be recorded tomorrow.",
