@@ -9683,8 +9683,7 @@
     "planSaved": "Commission plan saved",
     "planSteps": "Paid in steps",
     "planChange": "Change",
-    "ratesUnderPlan": "Company {{company}} · shop {{branch}} for contracts before the plan",
-    "branchRateBeforePlan": "Only for contracts opened before the plan — the plan sets the shop's share of new ones."
+    "ratesUnderPlan": "Company {{company}}"
   },
   "fundDayGuard": {
     "closedToday": "The fund's day {{date}} is already closed — this can be recorded tomorrow.",

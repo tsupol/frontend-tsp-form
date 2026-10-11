@@ -3,11 +3,11 @@
 //
 // What the backend does with a shop's numbers (mig 1400 · contract activation):
 //   · on a plan  — the shop's share of a new contract comes from the plan's
-//                  steps; the stored shop % is skipped. Contracts opened
-//                  before the plan keep the shop %.
+//                  steps; the stored shop % is skipped. Contracts already
+//                  open froze their rates at activation, so while the plan
+//                  is set the shop % does nothing.
 //   · company %  — applies either way.
-// So a shop on a plan leads with the plan, and its shop % is labelled as
-// belonging to the contracts from before the plan.
+// So a shop on a plan shows the plan and the company %, nothing else.
 
 import { useTranslation } from 'react-i18next';
 const fmtPct = (n: number) => `${Number(n)}%`;
@@ -47,10 +47,7 @@ export function ShopCommissionRates({ row, onChangePlan }: {
           {change}
         </div>
         <div className="text-xs text-subtle tabular-nums truncate">
-          {t('shopCommission.ratesUnderPlan', {
-            company: fmtPct(row.company_rate_percent),
-            branch: fmtPct(row.branch_rate_percent),
-          })}
+          {t('shopCommission.ratesUnderPlan', { company: fmtPct(row.company_rate_percent) })}
         </div>
       </div>
     );

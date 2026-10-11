@@ -750,7 +750,8 @@ function BranchConfigModal({ open, onClose, config, warehouses, onSaved, planSav
         || payout.account_name.trim() !== '';
       const saved = await apiClient.rpc<BranchConfigRow>('fn_deal_partner_branch_config_set', {
         p_branch_id: config.branch_id,
-        p_branch_rate_percent: parseFloat(data.branch_rate_percent),
+        // On a plan the shop % is not shown, so it is left as it is (NULL = keep).
+        ...(currentPlan ? {} : { p_branch_rate_percent: parseFloat(data.branch_rate_percent) }),
         p_company_rate_percent: parseFloat(data.company_rate_percent),
         p_doc_fee_amount: parseFloat(data.doc_fee_amount),
         p_guarantee_return_fee_amount: parseFloat(data.guarantee_return_fee_amount),
@@ -808,15 +809,19 @@ function BranchConfigModal({ open, onClose, config, warehouses, onSaved, planSav
             headline={t('dealPartnerRate.configSaved')}
             contractCode={config?.branch_name ?? ''}
             detailRows={[
-              { label: t('dealPartnerRate.branchRate'), value: fmtPct(result.branch_rate_percent) },
-              { label: t('dealPartnerRate.companyRate'), value: fmtPct(result.company_rate_percent) },
-              { label: t('dealPartnerRate.totalRate'), value: fmtPct(result.total_rate_percent), emphasis: true },
               {
                 label: t('shopCommission.plan'),
                 value: result.commission_plan
                   ? `${result.commission_plan_name ?? result.commission_plan} · ${planTranchesLabel(result.commission_plan_tranches, t)}`
                   : t('shopCommission.planNoneShort'),
               },
+              ...(result.commission_plan ? [] : [
+                { label: t('dealPartnerRate.branchRate'), value: fmtPct(result.branch_rate_percent) },
+              ]),
+              { label: t('dealPartnerRate.companyRate'), value: fmtPct(result.company_rate_percent) },
+              ...(result.commission_plan ? [] : [
+                { label: t('dealPartnerRate.totalRate'), value: fmtPct(result.total_rate_percent), emphasis: true },
+              ]),
               { label: t('dealPartnerRate.riskParty'), value: riskLabel(result.risk_party) },
               { label: t('dealPartnerRate.docFeeAmount'), value: fmtBaht(result.doc_fee_amount) },
               { label: t('dealPartnerRate.guaranteeFeeAmount'), value: fmtBaht(result.guarantee_return_fee_amount) },
@@ -844,9 +849,11 @@ function BranchConfigModal({ open, onClose, config, warehouses, onSaved, planSav
                 </div>
               </div>
 
-              {/* Commission plan (mig 1400) first: on a plan it decides the
-                  shop's share of new contracts, and the shop % below only
-                  still counts for contracts opened before the plan. */}
+              {/* Commission plan (mig 1400) first. On a plan the shop's share
+                  of every new contract comes from the plan and the stored
+                  shop % is skipped entirely (contracts already open froze
+                  their rates at activation), so the shop % input and the
+                  total only show without a plan. Company % applies either way. */}
               <div className="flex flex-col">
                 <label className="form-label">{t('shopCommission.plan')}</label>
                 <div className="flex items-center gap-2 text-sm min-w-0">
@@ -863,21 +870,20 @@ function BranchConfigModal({ open, onClose, config, warehouses, onSaved, planSav
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col">
-                  <label className="form-label">{t('dealPartnerRate.branchRate')}</label>
-                  <Controller
-                    name="branch_rate_percent"
-                    control={control}
-                    rules={{ required: t('dealPartnerRate.rateRequired') }}
-                    render={({ field }) => (
-                      <MaskedInput mask="number" decimalScale={2} value={field.value} onChange={(raw) => field.onChange(raw)} suffix="%" />
-                    )}
-                  />
-                  <FormErrorMessage error={errors.branch_rate_percent} />
-                  {currentPlan && (
-                    <p className="text-xs text-subtle mt-1">{t('shopCommission.branchRateBeforePlan')}</p>
-                  )}
-                </div>
+                {!currentPlan && (
+                  <div className="flex flex-col">
+                    <label className="form-label">{t('dealPartnerRate.branchRate')}</label>
+                    <Controller
+                      name="branch_rate_percent"
+                      control={control}
+                      rules={{ required: t('dealPartnerRate.rateRequired') }}
+                      render={({ field }) => (
+                        <MaskedInput mask="number" decimalScale={2} value={field.value} onChange={(raw) => field.onChange(raw)} suffix="%" />
+                      )}
+                    />
+                    <FormErrorMessage error={errors.branch_rate_percent} />
+                  </div>
+                )}
                 <div className="flex flex-col">
                   <label className="form-label">{t('dealPartnerRate.companyRate')}</label>
                   <Controller
@@ -892,15 +898,17 @@ function BranchConfigModal({ open, onClose, config, warehouses, onSaved, planSav
                 </div>
               </div>
 
-              <div className={`text-sm px-3 py-2 rounded-md border ${
-                outOfRange ? 'bg-danger-soft border-danger-border text-danger-fg' : 'bg-surface border-line'
-              }`}>
-                <div className="flex items-center justify-between">
-                  <span>{t('dealPartnerRate.totalRate')}</span>
-                  <span className="tabular-nums font-medium">{total !== null ? fmtPct(total) : '—'}</span>
+              {!currentPlan && (
+                <div className={`text-sm px-3 py-2 rounded-md border ${
+                  outOfRange ? 'bg-danger-soft border-danger-border text-danger-fg' : 'bg-surface border-line'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <span>{t('dealPartnerRate.totalRate')}</span>
+                    <span className="tabular-nums font-medium">{total !== null ? fmtPct(total) : '—'}</span>
+                  </div>
                 </div>
-              </div>
-              {outOfRange && config && (
+              )}
+              {!currentPlan && outOfRange && config && (
                 <p className="text-xs text-danger-fg -mt-3">
                   {t('dealPartnerRate.rangeHint', { min: config.total_min, max: config.total_max })}
                 </p>

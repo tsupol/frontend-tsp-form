@@ -4109,7 +4109,7 @@
     "branchConfigs": "ร้าน deal partner",
     "branch": "ร้าน/สาขา",
     "branchRate": "% ร้าน",
-    "companyRate": "% company",
+    "companyRate": "% บริษัท",
     "totalRate": "% รวม",
     "riskParty": "ผู้รับความเสี่ยง",
     "riskBranch": "ร้านรับความเสี่ยง",
@@ -9669,8 +9669,7 @@
     "planSaved": "บันทึกแผนค่าคอมแล้ว",
     "planSteps": "จ่ายเป็นก้อน",
     "planChange": "เปลี่ยน",
-    "ratesUnderPlan": "บริษัท {{company}} · ร้าน {{branch}} สำหรับสัญญาก่อนมีแผน",
-    "branchRateBeforePlan": "ใช้กับสัญญาที่เปิดก่อนมีแผนเท่านั้น — สัญญาใหม่ร้านได้ตามแผน"
+    "ratesUnderPlan": "บริษัท {{company}}"
   },
   "fundDayGuard": {
     "closedToday": "วันที่ {{date}} ปิดวันกองทุนแล้ว — บันทึกได้พรุ่งนี้",
