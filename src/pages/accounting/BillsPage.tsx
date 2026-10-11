@@ -1172,7 +1172,9 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
         onCancelled={() => {
           invalidateAfterBillChange();
           // The day-close was recomputed to a new version — refresh those views too.
+          // Under a fund it is the fund's day (fund day close §E1).
           queryClient.invalidateQueries({ queryKey: ['day-close'] });
+          queryClient.invalidateQueries({ predicate: q => String(q.queryKey[0] ?? '').startsWith('fund-day') });
           onBillChanged();
         }}
       />

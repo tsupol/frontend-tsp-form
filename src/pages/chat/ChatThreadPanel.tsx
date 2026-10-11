@@ -1107,7 +1107,7 @@ export function ChatThreadPanel({
         row={selectedSlip}
         open={!!selectedSlip}
         onClose={() => setSelectedSlip(null)}
-        onSuccess={(action) => {
+        onSuccess={(action, extra) => {
           setSelectedSlip(null);
           queryClient.invalidateQueries({ queryKey: ['chat-thread-submissions', contractId] });
           queryClient.invalidateQueries({ queryKey: ['payment-submissions'] });
@@ -1119,7 +1119,16 @@ export function ChatThreadPanel({
                 : 'paymentSubmissions.reopenSuccess';
           addSnackbar({
             type: 'success',
-            message: <div className="alert alert-success"><CheckCircle size={16} /><span>{t(key)}</span></div>,
+            message: (
+              <div className="alert alert-success">
+                <CheckCircle size={16} />
+                <span className="flex flex-col">
+                  <span>{t(key)}</span>
+                  {/* Fund day close §D2: the bill went on a later day. */}
+                  {extra?.billDayNote && <span className="text-xs">{extra.billDayNote}</span>}
+                </span>
+              </div>
+            ),
           });
         }}
       />

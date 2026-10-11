@@ -9,6 +9,9 @@ import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import type {
   FundBankLine,
+  FundDayCloseCheck,
+  FundDayCloseCreateResult,
+  FundDayCloseRow,
   FundDaySummary,
   FundMoneyLine,
   FundReconHistoryRow,
@@ -89,6 +92,8 @@ export function useFundReconSave(companyId: number | null) {
       queryClient.invalidateQueries({ queryKey: ['fund-recon-overview'] });
       queryClient.invalidateQueries({ queryKey: ['fund-recon-history'] });
       queryClient.invalidateQueries({ queryKey: ['fund-recon-versions'] });
+      // A save can clear a RECON_REQUIRED blocker — never leave the old check up.
+      queryClient.invalidateQueries({ queryKey: ['fund-day-close-check'] });
     },
   });
 }
@@ -129,5 +134,61 @@ export function useFundReconVersions(companyId: number | null, date: string | nu
         + `&account_key=eq.${encodeURIComponent(accountKey ?? '')}&order=version.desc`,
       ),
     enabled: !!date && !!accountKey,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Fund day close (mig 1405 · UI_SUMMARY/148 §8)
+//
+// Both RPCs always get p_company_id AND p_date (rule M3): a holding admin has
+// no company in the token, and the server's default day is not necessarily the
+// day on screen.
+// ---------------------------------------------------------------------------
+
+/** The pre-close check. Read-only; `enabled` is the user having asked for it. */
+export function useFundDayCloseCheck(companyId: number | null, date: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['fund-day-close-check', companyId, date],
+    queryFn: () =>
+      apiClient.rpc<FundDayCloseCheck>('fn_fund_day_close_check', {
+        p_company_id: companyId,
+        p_date: date,
+      }),
+    enabled: enabled && !!date,
+    staleTime: 0,
+    retry: false,
+  });
+}
+
+export function useFundDayCloseCreate(companyId: number | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ date, note }: { date: string; note: string | null }) =>
+      apiClient.rpc<FundDayCloseCreateResult>('fn_fund_day_close_create', {
+        p_company_id: companyId,
+        p_date: date,
+        p_note: note,
+      }),
+    onSettled: () => {
+      // Success or a blocker, the day's state may have moved under us.
+      queryClient.invalidateQueries({ queryKey: ['fund-day-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['fund-day-close-check'] });
+      queryClient.invalidateQueries({ queryKey: ['fund-day-closes'] });
+      queryClient.invalidateQueries({ queryKey: ['nav', 'fund-day-unclosed'] });
+    },
+  });
+}
+
+/** Close history, newest day first — one row per day (its latest version). */
+export function useFundDayCloses(companyId: number | null) {
+  return useQuery({
+    queryKey: ['fund-day-closes', companyId],
+    queryFn: () =>
+      apiClient.get<FundDayCloseRow[]>(
+        `/v_fund_day_closes?company_id=eq.${companyId}&order=close_date.desc&limit=50`
+        + '&select=id,holding_id,company_id,company_name,close_date,version,is_amended,closed_on,closed_by,'
+        + 'closed_by_name,closed_at,note,bill_count,fund_doc_count,category_net,money_net,recon_ok,first_closed_at',
+      ),
+    staleTime: 0,
   });
 }

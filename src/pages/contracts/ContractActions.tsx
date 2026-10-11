@@ -43,6 +43,9 @@ import { RepairRequestModal } from './RepairRequestModal';
 import { AppointmentCreateModal, AppointmentCancelModal } from './AppointmentModals';
 import { TransferBranchModal } from './TransferBranchModal';
 import { ActionDoneView, type ActionDoneDetailRow } from './ActionDoneView';
+import { BillDayBlockedNotice } from '../../components/BillDayPreview';
+import { useBillDatePreview, useBillDayConfirm } from '../../hooks/useBillDay';
+import { billDayDoneRow, type BillDay } from '../../lib/billDay';
 import { ContractFeeModal } from './ContractFeeModal';
 import { LateFeeCollectModal } from './LateFeeCollectModal';
 import { RescheduleDueDayModal } from './RescheduleDueDayModal';
@@ -3091,6 +3094,9 @@ interface PayInstallmentResult {
   amount: number;
   credit_used: number;
   days_early: number | null;
+  /** mig 1407: the day the bill actually landed on, and why (fund day close §D2). */
+  bill_date?: string;
+  bill_day?: BillDay | null;
 }
 
 // fn_payment_slip_precheck response (staff view). Null fields are dropped by the
@@ -3139,7 +3145,7 @@ function PayInstallmentModal({ open, contract, onClose }: {
   /** Unused by this modal — success is shown in-modal. Kept for prop-shape parity with other action modals. */
   onSuccess?: (msgKey: string, override?: ReactNode) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const invalidate = useContractInvalidate(contract.id);
@@ -3555,7 +3561,17 @@ function PayInstallmentModal({ open, contract, onClose }: {
   });
 
   const isSubmitting = mutation.isPending || slipMutation.isPending || proceedMutation.isPending;
-  const submitMode = () => (mode === 'payNow' ? mutation.mutate() : slipMutation.mutate());
+
+  // Fund day close §D1: which day will this bill land on? Asked when the box
+  // opens; SHIFTED asks before pressing, BLOCKED disables the button. The slip
+  // path issues no bill (a reviewer does, later), so it is not asked.
+  const billDayPreview = useBillDatePreview(contract.branch_id, 'CONTRACT_PAYMENT', open && view === 'form' && mode === 'payNow');
+  const billDayConfirm = useBillDayConfirm(billDayPreview);
+  const billDayBlocked = mode === 'payNow' && billDayPreview.data?.state === 'BLOCKED';
+
+  const submitMode = () => (mode === 'payNow'
+    ? billDayConfirm.guard(() => mutation.mutate())
+    : slipMutation.mutate());
 
   const canSubmit = (() => {
     if (mode === 'slipReview') {
@@ -3565,6 +3581,7 @@ function PayInstallmentModal({ open, contract, onClose }: {
     if (walletExceeded) return false;
     if (overpayBlocked) return false;
     if (channel === 'TRANSFER' && !bankAccountId) return false;
+    if (billDayBlocked) return false;
     return true;
   })();
 
@@ -3825,6 +3842,12 @@ function PayInstallmentModal({ open, contract, onClose }: {
             </div>
           )}
 
+          {view === 'form' && billDayBlocked && (
+            <div className="border-t border-line shrink-0 px-4 py-3">
+              <BillDayBlockedNotice preview={billDayPreview.data} />
+            </div>
+          )}
+
           {view === 'form' && (
             <div className="border-t border-line shrink-0 px-4 py-2.5 flex items-center gap-2 text-info-fg">
               <Info size={14} className="shrink-0" />
@@ -3845,7 +3868,10 @@ function PayInstallmentModal({ open, contract, onClose }: {
               headline={t('contract.payInstallment_doneHeadline', { defaultValue: 'Payment recorded' })}
               contractCode={contract.code_display ?? contract.code}
               billId={result.bill_id}
-              detailRows={buildPayInstallmentDetailRows(result, channel, t)}
+              detailRows={[
+                ...buildPayInstallmentDetailRows(result, channel, t),
+                ...[billDayDoneRow(result.bill_day, t, i18n.language)].filter(r => r != null),
+              ]}
               extras={
                 <PayInstallmentAfterSummary
                   result={result}
@@ -3908,6 +3934,8 @@ function PayInstallmentModal({ open, contract, onClose }: {
           )}
         </div>
       </Modal>
+
+      {billDayConfirm.dialog}
 
       {/* Duplicate-slip advisory — shown after precheck flags a match, before the
           submission is created. Advisory only: "Send anyway" always available.

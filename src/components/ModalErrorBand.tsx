@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { XCircle, X } from 'lucide-react';
 
@@ -28,16 +29,22 @@ export interface ModalErrorBandProps {
   variant?: 'danger' | 'warning';
   /** Clears the parent's error state. Omit to render a non-dismissable band. */
   onDismiss?: () => void;
+  /** The way out of this error, shown under the message inside the band —
+   *  e.g. a link to the page that clears the blocker. Optional. */
+  action?: ReactNode;
 }
 
-export function ModalErrorBand({ message, variant = 'danger', onDismiss }: ModalErrorBandProps) {
+export function ModalErrorBand({ message, variant = 'danger', onDismiss, action }: ModalErrorBandProps) {
   const { t } = useTranslation();
   if (!message) return null;
   return (
     <div className="px-4 py-3 border-t border-line shrink-0">
       <div className={`alert alert-${variant} mb-0`} role="alert" aria-live="polite">
         <XCircle size={16} className="shrink-0" />
-        <span className="flex-1 min-w-0">{message}</span>
+        <div className="flex-1 min-w-0 flex flex-col gap-1">
+          <span>{message}</span>
+          {action && <div>{action}</div>}
+        </div>
         {onDismiss && (
           <button
             type="button"

@@ -44,7 +44,7 @@ interface CountersResponse {
 }
 
 export function useNavCounts() {
-  const { user } = useAuth();
+  const { user, isFundCompany } = useAuth();
   const role = user?.role_code ?? '';
   const isBranchUser = role === 'BRANCH_STAFF' || role === 'BRANCH_MANAGER';
 
@@ -81,6 +81,33 @@ export function useNavCounts() {
     // Deal-partner shops have no collections menu and the view is outside the
     // nnf_partner whitelist (permanent 403) — don't poll a dead view.
     enabled: user?.branch_type !== 'DEAL_PARTNER',
+    refetchInterval: FALLBACK_POLL_MS,
+    refetchOnWindowFocus: true,
+    retry: false,
+  });
+
+  // Fund days still to close (mig 1405, work order 2026-10-11 A5) — a second
+  // exception to the one-RPC rule, because BE serves this count as its own view
+  // (`v_fund_day_unclosed`, ~5 ms) and named that view for the badge. Days with
+  // activity that are not closed yet, today included; the row drops when the
+  // day is closed, never when the page is opened. With the holding's switch off
+  // the view is always empty, so the badge never shows. Only a fund company's
+  // users can have rows, so nobody else polls it. Not driven by the WS events
+  // below: a close is rare, and the close mutation invalidates this key itself.
+  const fundCompanyId = user?.company_id ?? null;
+  const { data: fundUnclosedCount } = useQuery({
+    queryKey: ['nav', 'fund-day-unclosed', fundCompanyId],
+    queryFn: async () => {
+      const filter = fundCompanyId ? `company_id=eq.${fundCompanyId}&` : '';
+      const { totalCount } = await apiClient.getPaginated<{ activity_date: string }>(
+        `/v_fund_day_unclosed?${filter}select=activity_date`,
+        { page: 1, pageSize: 1 },
+      );
+      return totalCount;
+    },
+    // A shop under a fund is in a FINANCIER company too, but nnf_partner cannot
+    // read the view (permanent 403) — don't poll a dead view.
+    enabled: !!isFundCompany && user?.branch_type !== 'DEAL_PARTNER',
     refetchInterval: FALLBACK_POLL_MS,
     refetchOnWindowFocus: true,
     retry: false,
@@ -154,6 +181,7 @@ export function useNavCounts() {
     unreadChatCount: n('chat_unread'),
     callCenterMineCount: n('my_book'),
     unassignedNoCollectorCount: unassignedCount ?? 0,
+    fundDayUnclosedCount: fundUnclosedCount ?? 0,
     legalWaitCount: n('repo_pool'),
     unreadNotifCount: n('notifications'),
   };

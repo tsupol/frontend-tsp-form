@@ -9,7 +9,7 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Badge, Button, DataTable, DataTableColumnHeader, InputDatePicker, MobileHeader,
   type ColumnDef,
@@ -21,12 +21,18 @@ import { DateTime } from '../../components/DateTime';
 import {
   fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr,
 } from '../../lib/format';
+import { OverflowTabs } from '../../components/OverflowTabs';
 import { FundReconVersionsModal } from './FundReconVersionsModal';
-import { useFundCompanyId, useFundReconHistory, useFundReconOverview } from './useFundDay';
+import {
+  useFundCompanyId, useFundDayCloses, useFundReconHistory, useFundReconOverview,
+} from './useFundDay';
 import {
   UNSPECIFIED_ACCOUNT,
-  type FundReconHistoryRow, type FundReconOverviewAccount,
+  type FundDayCloseRow, type FundReconHistoryRow, type FundReconOverviewAccount,
 } from './fundDayTypes';
+
+type ReconTab = 'accounts' | 'closes';
+const RECON_TABS: ReconTab[] = ['accounts', 'closes'];
 
 /** First day of the month, two months back — enough to see the recent trail. */
 function defaultFromDate(): string {
@@ -48,6 +54,21 @@ export function FundDayReconPage() {
   const [trail, setTrail] = useState<FundReconHistoryRow | null>(null);
 
   const overview = useFundReconOverview(companyId);
+
+  // Day closes (mig 1405). The tab exists only once there is a close to show:
+  // with the holding's switch off and no history, the page is unchanged. Rows
+  // stay after the switch is turned off, and so does the tab. Tab lives in the
+  // address so back/forward and a copied link land on it.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const closes = useFundDayCloses(companyId);
+  const hasCloses = (closes.data?.length ?? 0) > 0;
+  const tab: ReconTab = hasCloses && searchParams.get('tab') === 'closes' ? 'closes' : 'accounts';
+  const switchTab = (next: ReconTab) => {
+    const params = new URLSearchParams(searchParams);
+    if (next === 'closes') params.set('tab', 'closes');
+    else params.delete('tab');
+    setSearchParams(params);
+  };
   const history = useFundReconHistory(companyId, fromDate, pageIndex + 1, pageSize);
 
   const accountLabel = (row: { account_key: string; bank_name: string | null; account_number: string | null }) =>
@@ -173,6 +194,98 @@ export function FundDayReconPage() {
     },
   ];
 
+  // The figures on a close row are the ones recorded at the moment of closing —
+  // shown as they are, never added to today's live totals.
+  const closeColumns: ColumnDef<FundDayCloseRow>[] = [
+    {
+      accessorKey: 'close_date',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('fundDay.colDate')} />,
+      cell: ({ row }) => <DateTime value={row.original.close_date} showTime={false} />,
+    },
+    {
+      accessorKey: 'version',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('fundDay.close.version')} />,
+      cell: ({ row }) => (
+        <div className="flex flex-col gap-1 items-start">
+          <Badge color="success" size="sm">{t('fundDay.close.versionShort', { version: row.original.version })}</Badge>
+          {row.original.is_amended && (
+            <span className="text-xs text-warning-fg">{t('fundDay.close.amended')}</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: 'closed_by',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('fundDay.close.colClosedBy')} />,
+      cell: ({ row }) => {
+        const r = row.original;
+        return (
+          <div className="flex flex-col text-sm">
+            <span>{r.closed_by_name ?? '—'}</span>
+            <span className="text-xs text-subtle"><DateTime value={r.closed_at} showTime /></span>
+            {r.is_amended && r.first_closed_at && (
+              <span className="text-xs text-subtle">
+                {t('fundDay.close.firstClosedAt')}: <DateTime value={r.first_closed_at} showTime />
+              </span>
+            )}
+            {r.note && <span className="text-xs text-subtle">{r.note}</span>}
+          </div>
+        );
+      },
+      enableSorting: false,
+    },
+    {
+      id: 'counts',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('fundDay.close.colItems')} />,
+      cell: ({ row }) => (
+        <div className="flex flex-col text-sm tabular-nums">
+          <span>{t('fundDay.close.billCount')}: {row.original.bill_count}</span>
+          <span>{t('fundDay.close.fundDocCount')}: {row.original.fund_doc_count}</span>
+        </div>
+      ),
+      enableSorting: false,
+    },
+    {
+      id: 'nets',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('fundDay.close.colNetAtClose')} />,
+      cell: ({ row }) => (
+        <div className="flex flex-col text-sm tabular-nums">
+          <span>{t('fundDay.categoryNet')}: {fmtCurrency(row.original.category_net)}</span>
+          <span>{t('fundDay.moneyNet')}: {fmtCurrency(row.original.money_net)}</span>
+        </div>
+      ),
+      enableSorting: false,
+    },
+    {
+      id: 'recon',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('fundDay.close.reconState')} />,
+      cell: ({ row }) => (
+        row.original.recon_ok
+          ? <Badge color="success" size="sm">{t('fundDay.close.reconOk')}</Badge>
+          : <Badge color="warning" size="sm">{t('fundDay.close.closedWithDiff')}</Badge>
+      ),
+      enableSorting: false,
+    },
+    {
+      id: 'actions',
+      header: () => <span className="sr-only">{t('fundDay.colActions')}</span>,
+      cell: ({ row }) => (
+        <div className="flex justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            startIcon={<CalendarClock size={14} />}
+            onClick={() => navigate(`/admin/fund-day-money?date=${row.original.close_date}`)}
+          >
+            {t('fundDay.openDay')}
+          </Button>
+        </div>
+      ),
+      enableSorting: false,
+      className: 'w-40',
+    },
+  ];
+
   const renderOverviewCard = (account: FundReconOverviewAccount) => {
     const net = account.cumulative_diff_net;
     return (
@@ -271,6 +384,26 @@ export function FundDayReconPage() {
           </div>
         )}
 
+        {hasCloses && (
+          <div className="mb-3">
+            <OverflowTabs
+              tabs={RECON_TABS}
+              activeTab={tab}
+              onTabChange={switchTab}
+              renderLabel={(x) => (x === 'closes' ? t('fundDay.close.tabCloses') : t('fundDay.byAccount'))}
+            />
+          </div>
+        )}
+
+        {tab === 'closes' ? (
+          <DataTable<FundDayCloseRow>
+            outlined
+            data={closes.data ?? []}
+            columns={closeColumns}
+            className={`flex-1 min-h-0 ${closes.isFetching ? 'opacity-60' : ''} transition-opacity`}
+            noResults={<div className="p-8 text-center text-subtler">{t('common.noData')}</div>}
+          />
+        ) : (<>
         {overview.data && overview.data.accounts.length > 0 && (
           <div className="grid gap-3 mb-4 sm:grid-cols-2 xl:grid-cols-3">
             {overview.data.accounts.map(renderOverviewCard)}
@@ -329,6 +462,7 @@ export function FundDayReconPage() {
             </div>
           }
         />
+        </>)}
       </div>
 
       <FundReconVersionsModal

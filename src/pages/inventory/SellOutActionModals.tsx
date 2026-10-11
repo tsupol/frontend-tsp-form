@@ -8,6 +8,9 @@ import { CurrencyInput } from '../../components/CurrencyInput';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { BranchPaymentAccountField } from '../../components/BranchPaymentAccountField';
 import { ActionDoneView } from '../contracts/ActionDoneView';
+import { BillDayBlockedNotice } from '../../components/BillDayPreview';
+import { useBillDatePreview, useBillDayConfirm } from '../../hooks/useBillDay';
+import { billDayDoneRow, type BillDay } from '../../lib/billDay';
 import { fmtCurrency } from '../../lib/format';
 import { getBucketLabel, getBucketColor } from './inventoryUtils';
 import { translateApiError } from '../../lib/apiErrors';
@@ -296,6 +299,9 @@ interface CommitResponse {
   total_amount: number;
   asset_id: number;
   sold_bucket: string;
+  /** mig 1407: the day the sale bill landed on, and why (fund day close §D2). */
+  bill_date?: string;
+  bill_day?: BillDay | null;
 }
 
 type ViewState = 'form' | 'done';
@@ -311,7 +317,7 @@ export function SellOutCommitModal({
   approvedPrice: number;
   onCommitted: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [view, setView] = useState<ViewState>('form');
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [pin, setPin] = useState('');
@@ -370,7 +376,13 @@ export function SellOutCommitModal({
     onError: (err) => setError(translateErr(err, t)),
   });
 
-  const canSubmit = balanced && !transferMissingBank && pin.length === 6 && !commitMutation.isPending;
+  // Fund day close §D1: once the fund (or branch) has closed today, a sale can
+  // wait for tomorrow — the backend says BLOCKED and the button stays off.
+  const billDayPreview = useBillDatePreview(branchId, 'ASSET_SOLD_OUT', open && view === 'form');
+  const billDayConfirm = useBillDayConfirm(billDayPreview);
+  const billDayBlocked = billDayPreview.data?.state === 'BLOCKED';
+
+  const canSubmit = balanced && !transferMissingBank && pin.length === 6 && !commitMutation.isPending && !billDayBlocked;
 
   // Dirty guard — the seeded CASH row is untouched state, so only a changed
   // split / entered PIN counts as dirty. Once committed (`done`) nothing is at
@@ -479,9 +491,14 @@ export function SellOutCommitModal({
               <BranchPinInput value={pin} onChange={setPin} required />
             </div>
           </div>
+          {billDayBlocked && (
+            <div className="px-4 py-3 border-t border-line shrink-0">
+              <BillDayBlockedNotice preview={billDayPreview.data} />
+            </div>
+          )}
           <div className="modal-footer">
             <Button variant="ghost" onClick={handleClose} disabled={commitMutation.isPending}>{t('common.cancel')}</Button>
-            <Button color="primary" onClick={() => { setError(''); commitMutation.mutate(); }} disabled={!canSubmit}>
+            <Button color="primary" onClick={() => { setError(''); void billDayConfirm.guard(() => commitMutation.mutate()); }} disabled={!canSubmit}>
               {commitMutation.isPending ? t('common.loading') : t('assetSales.confirmSale', { defaultValue: 'Confirm sale' })}
             </Button>
           </div>
@@ -495,6 +512,7 @@ export function SellOutCommitModal({
           billId={result.bill_id}
           detailRows={[
             { label: t('assetSales.total', { defaultValue: 'Total' }), value: fmtCurrency(result.total_amount), emphasis: true },
+            ...[billDayDoneRow(result.bill_day, t, i18n.language)].filter(r => r != null),
           ]}
           extras={
             <div className="flex items-center gap-2 text-xs">
@@ -507,6 +525,8 @@ export function SellOutCommitModal({
         />
       )}
     </Modal>
+
+    {billDayConfirm.dialog}
 
     {/* Unsaved-changes guard — sibling, not nested, to keep the shared modal
         context in sync. */}

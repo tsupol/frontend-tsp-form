@@ -7,33 +7,40 @@
 // so but still lets the count be written, because a record is worth more than a
 // blocked screen.
 //
-// Nothing here closes or locks a day. Saving is note-taking: a later change to a
-// saved day shows up as `drifted` on the history page.
+// Saving is note-taking: a later change to a saved day shows up as `drifted` on
+// the history page. Closing the day (mig 1405, §8) is the separate step after
+// it, and only exists when the summary says `day_close_enabled` — with the
+// holding's switch off this page looks exactly as it did before.
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  Button, Input, InputDatePicker, MobileHeader, PageNav, PageNavPanel,
+  Badge, Button, Input, InputDatePicker, MobileHeader, PageNav, PageNavPanel, Tooltip,
 } from 'tsp-form';
 import {
-  AlertTriangle, ArrowRightFromLine, ChevronDown, ChevronRight, History,
-  Keyboard, Loader2, Save, Wallet,
+  AlertTriangle, ArrowRightFromLine, CheckCircle, ChevronDown, ChevronRight, ClipboardCheck, History,
+  Keyboard, Loader2, Lock, RefreshCw, Save, Wallet, X,
 } from 'lucide-react';
 import { CurrencyInput } from '../../components/CurrencyInput';
 import { DateTime } from '../../components/DateTime';
 import {
-  fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr,
+  fmtCurrency, formatDateTime, makeDatePickerFormat, parseLocalDate, toLocalDateStr,
 } from '../../lib/format';
 import { useMyPermissions } from '../../hooks/useMyPermissions';
+import { translateApiError } from '../../lib/apiErrors';
 import { FundLinesTable } from './FundLinesTable';
 import { FundReconSaveModal, type FundReconDraft } from './FundReconSaveModal';
+import { FundDayCloseBlockers } from './FundDayCloseBlockers';
+import { reconPendingAccounts } from './fundDayCloseUtils';
+import { FundDayCloseModal } from './FundDayCloseModal';
 import {
-  useFundBankLines, useFundCompanyId, useFundDaySummary, useFundMoneyLines,
+  useFundBankLines, useFundCompanyId, useFundDayCloseCheck, useFundDaySummary, useFundMoneyLines,
 } from './useFundDay';
 import {
   UNSPECIFIED_ACCOUNT, fundTodayISO,
-  type FundDayAccount, type FundDayCategory,
+  type FundDayAccount, type FundDayCategory, type FundDayCloseCheck,
 } from './fundDayTypes';
 
 /** What the user typed into one account card before pressing save. */
@@ -74,12 +81,14 @@ export function FundDayMoneyPage() {
   // can link straight here.
   const dateParam = searchParams.get('date');
   const date = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : fundTodayISO();
-  const setDate = (next: string) => {
+  /** `keepCheck` = the pre-close check follows to the new day (go-to-day, close-next). */
+  const setDate = (next: string, keepCheck = false) => {
     if (!next) return;
     const params = new URLSearchParams(searchParams);
     params.set('date', next);
     setSearchParams(params, { replace: true });
     setInputs({});
+    setCheckOpen(keepCheck);
   };
 
   const [isTypingDate, setIsTypingDate] = useState(false);
@@ -87,8 +96,36 @@ export function FundDayMoneyPage() {
   const [openCategory, setOpenCategory] = useState<string | null>(null);
   const [openAccount, setOpenAccount] = useState<string | null>(null);
   const [saveOpen, setSaveOpen] = useState(false);
+  const [checkOpen, setCheckOpen] = useState(false);
+  const [closeOpen, setCloseOpen] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data: summary, isLoading, isError, error } = useFundDaySummary(companyId, date);
+
+  // Rule M2: the day is the server's. With no date in the address the device
+  // clock is only a first guess — once the server says what today is, use it
+  // (they differ around midnight, or on a device with a wrong clock).
+  useEffect(() => {
+    if (!dateParam && summary?.today && summary.today !== date) setDate(summary.today);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateParam, summary?.today]);
+
+  // Closing exists only when the backend says so for this day, and only while
+  // the day is not closed — never decided here from dates or settings.
+  const closeEnabled = !!summary?.day_close_enabled;
+  const dayClose = summary?.day_close ?? null;
+  const check = useFundDayCloseCheck(companyId, date, checkOpen && closeEnabled && !dayClose);
+  const checkData = check.data && check.data.date === date ? check.data : null;
+  const pendingAccounts = useMemo(() => reconPendingAccounts(checkData?.blockers), [checkData]);
+
+  const showAccount = (accountKey: string) => {
+    document.getElementById(`fund-account-${accountKey}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+  const reloadDay = () => {
+    queryClient.invalidateQueries({ queryKey: ['fund-day-summary'] });
+    queryClient.invalidateQueries({ queryKey: ['fund-day-close-check'] });
+  };
+  const goToDate = (d: string) => setDate(d, true);
 
   // Only one expansion is fetched at a time — the lines are a detail view, not
   // part of the page's own totals.
@@ -157,6 +194,33 @@ export function FundDayMoneyPage() {
     />
   );
 
+  /**
+   * "Close the day": enabled only on the check's own word (`can_close`, not
+   * already closed). Without FUND.DAY_CLOSE the result stays readable but the
+   * button is disabled, and the tooltip says which permission is missing.
+   */
+  const renderCloseButton = (c: FundDayCloseCheck) => {
+    const ready = c.can_close && !c.already_closed;
+    const tip = !c.allowed_to_close
+      ? t('fundDay.close.noPermission')
+      : !ready ? t('fundDay.close.fixFirst') : null;
+    const button = (
+      <Button
+        variant="primary"
+        size="sm"
+        startIcon={<Lock size={14} />}
+        disabled={!ready || !c.allowed_to_close}
+        onClick={() => setCloseOpen(true)}
+      >
+        {t('fundDay.close.closeButton')}
+      </Button>
+    );
+    // A disabled button swallows pointer events, so the tooltip hangs on a wrapper.
+    return tip
+      ? <Tooltip content={tip}><span className="inline-flex">{button}</span></Tooltip>
+      : button;
+  };
+
   const renderAccountCard = (account: FundDayAccount) => {
     const isUnspecified = account.account_key === UNSPECIFIED_ACCOUNT;
     const input = inputs[account.account_key] ?? EMPTY_INPUT;
@@ -166,10 +230,23 @@ export function FundDayMoneyPage() {
     const diffOut = toNumber(input.counted_out) - account.out_amount;
     const touched = input.counted_in !== '' || input.counted_out !== '';
     const needsNote = touched && (diffIn !== 0 || diffOut !== 0) && input.note.trim().length < 3;
+    // Named by the pre-close check as still needing a count (or a recount).
+    const pendingReason = pendingAccounts.get(account.account_key);
 
     return (
-      <div key={account.account_key} className="border border-line rounded-lg overflow-hidden">
+      <div
+        key={account.account_key}
+        id={`fund-account-${account.account_key}`}
+        className={`border rounded-lg overflow-hidden ${pendingReason ? 'border-warning-border ring-1 ring-warning-border' : 'border-line'}`}
+      >
         <div className="px-4 py-3">
+          {pendingReason && (
+            <div className="mb-2">
+              <Badge color={pendingReason === 'DRIFTED' ? 'danger' : 'warning'} size="xs">
+                {t(`fundDay.close.reason.${pendingReason}`, { defaultValue: pendingReason })}
+              </Badge>
+            </div>
+          )}
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div className="min-w-0">
               <div className="font-medium">
@@ -331,6 +408,32 @@ export function FundDayMoneyPage() {
               >
                 {t('fundDay.openHistory')}
               </Button>
+              {closeEnabled && dayClose && (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <Badge color="success" size="sm">
+                    <span className="inline-flex items-center gap-1">
+                      <Lock size={12} />
+                      {t('fundDay.close.badgeClosed', { version: dayClose.version })}
+                      {' · '}
+                      <DateTime value={dayClose.closed_at} showTime />
+                      {dayClose.version > 1 && <>{' '}{t('fundDay.close.amended')}</>}
+                    </span>
+                  </Badge>
+                  {!dayClose.recon_ok && (
+                    <Badge color="warning" size="sm">{t('fundDay.close.closedWithDiff')}</Badge>
+                  )}
+                </div>
+              )}
+              {closeEnabled && !dayClose && !checkOpen && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  startIcon={<ClipboardCheck size={16} />}
+                  onClick={() => setCheckOpen(true)}
+                >
+                  {t('fundDay.close.checkButton')}
+                </Button>
+              )}
               <div className="flex-1" />
               {canSave && (
                 <Button
@@ -360,6 +463,67 @@ export function FundDayMoneyPage() {
                       <AlertTriangle size={16} className="shrink-0" />
                       <span>{(error as Error)?.message ?? t('common.error')}</span>
                     </div>
+                  )}
+
+                  {closeEnabled && !dayClose && checkOpen && (
+                    <section className="border border-line rounded-lg px-4 py-3 flex flex-col gap-3">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h2 className="heading-3 flex-1 min-w-0">
+                          {t('fundDay.close.checkTitle', { date: formatDateTime(date, i18n.language, false) })}
+                        </h2>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          startIcon={<RefreshCw size={14} className={check.isFetching ? 'animate-spin' : undefined} />}
+                          disabled={check.isFetching}
+                          onClick={() => { void check.refetch(); }}
+                        >
+                          {t('fundDay.close.checkAgain')}
+                        </Button>
+                        <Tooltip content={t('fundDay.close.hideCheck')}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            startIcon={<X size={14} />}
+                            aria-label={t('fundDay.close.hideCheck')}
+                            onClick={() => setCheckOpen(false)}
+                          />
+                        </Tooltip>
+                      </div>
+
+                      {check.isLoading && (
+                        <div className="flex items-center gap-2 text-sm text-subtle">
+                          <Loader2 size={16} className="animate-spin" />
+                          <span>{t('fundDay.close.checking')}</span>
+                        </div>
+                      )}
+
+                      {check.isError && (
+                        <div className="alert alert-danger mb-0">
+                          <AlertTriangle size={16} className="shrink-0" />
+                          <span>{translateApiError(check.error, t)}</span>
+                        </div>
+                      )}
+
+                      {checkData && (
+                        <>
+                          {checkData.blockers.length > 0 ? (
+                            <FundDayCloseBlockers
+                              blockers={checkData.blockers}
+                              onGoToDate={goToDate}
+                              onShowAccount={showAccount}
+                              onReload={reloadDay}
+                            />
+                          ) : (
+                            <div className="flex items-center gap-2 text-sm text-success-fg">
+                              <CheckCircle size={16} className="shrink-0" />
+                              <span>{t('fundDay.close.readyToClose')}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-end">{renderCloseButton(checkData)}</div>
+                        </>
+                      )}
+                    </section>
                   )}
 
                   {summary && !summary.balanced && (
@@ -474,6 +638,17 @@ export function FundDayMoneyPage() {
         drafts={drafts}
         onClose={() => setSaveOpen(false)}
         onSaved={() => setInputs({})}
+      />
+
+      <FundDayCloseModal
+        open={closeOpen}
+        companyId={companyId}
+        date={date}
+        check={checkData}
+        onClose={() => setCloseOpen(false)}
+        onGoToDate={goToDate}
+        onShowAccount={showAccount}
+        onReload={reloadDay}
       />
     </>
   );

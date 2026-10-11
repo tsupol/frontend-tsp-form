@@ -2732,6 +2732,9 @@
     "BUYBACK": "ซื้อคืนจากลูกค้า"
   },
   "chat": {
+    "scopeMine": "ลูกค้าของฉัน",
+    "scopeAll": "ลูกค้าทั้งกองทุน",
+    "waitingReplyTip": "แชทที่รอตอบ",
     "title": "แชท",
     "searchPlaceholder": "ชื่อ เลขสัญญา เบอร์โทร IMEI ซีเรียล",
     "searchEmpty": "ไม่พบผลลัพธ์ที่ตรงกับคำค้น",
@@ -5182,7 +5185,50 @@
     "viewTrail": "ร่องรอยการแก้",
     "walletLine": "วอลเล็ต",
     "walletReference": "เงินในวอลเล็ต (ไม่ผ่านบัญชี): {{amount}} จาก {{count}} รายการ",
-    "willBeVersion": "จะกลายเป็น version {{version}}"
+    "willBeVersion": "จะกลายเป็น version {{version}}",
+    "close": {
+      "checkButton": "ตรวจก่อนปิดวัน",
+      "checkTitle": "ตรวจก่อนปิดวัน {{date}}",
+      "checking": "กำลังตรวจ…",
+      "checkAgain": "ตรวจใหม่",
+      "hideCheck": "ซ่อนผลตรวจ",
+      "readyToClose": "ไม่มีอะไรค้าง — ปิดวันนี้ได้",
+      "closeButton": "ปิดวัน",
+      "noPermission": "ต้องมีสิทธิ์ FUND.DAY_CLOSE",
+      "fixFirst": "แก้รายการด้านบนก่อน แล้วกดตรวจใหม่",
+      "badgeClosed": "ปิดแล้ว v{{version}}",
+      "amended": "(แก้หลังปิด)",
+      "closedWithDiff": "ปิดโดยมีส่วนต่างที่บันทึกไว้",
+      "goToDate": "ไปวันที่ {{date}}",
+      "reload": "โหลดใหม่",
+      "showAccount": "ดู",
+      "reason": {
+        "NOT_SAVED": "ยังไม่บันทึกผล",
+        "DRIFTED": "ยอดระบบเปลี่ยนหลังบันทึก"
+      },
+      "billStatus": {
+        "OPEN": "ยังไม่จ่าย",
+        "PARTIAL": "จ่ายบางส่วน"
+      },
+      "confirmTitle": "ปิดวันกองทุน",
+      "lockHint": "การปิดวันจะล็อกบิลลูกค้าของทุกสาขาใต้กองทุน และเอกสารกองทุนที่ชำระในวันนั้น ปิดแล้วเปิดใหม่ไม่ได้",
+      "billCount": "บิลลูกค้า",
+      "fundDocCount": "เอกสารกองทุนที่ชำระ",
+      "reconWarning": "มีบัญชีที่บันทึกผลโดยมีส่วนต่าง ยังปิดวันได้ — ส่วนต่างจะถูกบันทึกไว้",
+      "noteLabel": "หมายเหตุ (ไม่บังคับ)",
+      "cannotCloseYet": "ยังปิดวันไม่ได้:",
+      "doneHeadline": "ปิดวันแล้ว",
+      "version": "เวอร์ชัน",
+      "reconState": "ผลกระทบยอด",
+      "reconOk": "ตรงทุกบัญชี",
+      "closeNext": "ปิดวันถัดไป ({{date}})",
+      "tabCloses": "ประวัติปิดวัน",
+      "colClosedBy": "ผู้ปิด",
+      "colItems": "รายการ",
+      "colNetAtClose": "ยอด ณ ตอนปิด",
+      "firstClosedAt": "ปิดครั้งแรก",
+      "versionShort": "v{{version}}"
+    }
   },
   "help": {
     "title": "ช่วยเหลือ",
@@ -6333,6 +6379,14 @@
     "kind": "ชนิด",
     "kindCredit": "ฝ่ายสินเชื่อ",
     "kindPayout": "ฝ่ายการเงิน",
+    "kindCustomerService": "ฝ่ายบริการลูกค้า",
+    "tabCredit": "สินเชื่อ",
+    "tabPayout": "การเงิน",
+    "tabCustomerService": "บริการลูกค้า",
+    "noCustomerServiceWarn": "{{n}} ร้านยังไม่มีฝ่ายบริการลูกค้า — ลูกค้าร้านนี้จะไม่มีใครเป็น \"ลูกค้าของฉัน\" ในแชท",
+    "noCollectorInfo": "{{n}} ร้านยังไม่มีทีมทวง — สัญญาค้างของร้านนี้จะไม่ถูกแจก",
+    "openCollectionTeams": "ไปหน้าทีมทวง",
+    "pickUserHintCustomerService": "พนักงานระดับบริษัทของกองทุนคนไหนก็ได้ (ผู้ดูแล บัญชี สินเชื่อ ทวง …) หรือผู้ดูแล holding",
     "blockedShopsWarn": "สาขาร้าน {{n}} แห่งยื่นขออนุมัติไม่ได้ — ยังไม่มีฝ่ายสินเชื่อดูแล",
     "noPayoutShopsInfo": "สาขาร้าน {{n}} แห่งยังไม่มีฝ่ายการเงินดูแล (ใช้ในรอบชำระ)",
     "allCompanies": "ทุกบริษัท",
@@ -6364,6 +6418,9 @@
     "reactivatePool": "เปิดใช้งาน pool",
     "deactivateHint": "ปิดใช้งานแล้วร้านใน pool นี้จะไม่มีผู้ตรวจ",
     "reactivateHint": "pool นี้ถูกปิดใช้งาน — ร้านใน pool ไม่มีผู้ตรวจจนกว่าจะเปิดใหม่",
+    "noMembersCustomerService": "ยังไม่มีสมาชิก — ลูกค้าของร้านเหล่านี้ยังไม่มีใครดูแลในแชท",
+    "deactivateHintCustomerService": "ปิดใช้แล้วร้านเหล่านี้จะไม่มีฝ่ายบริการลูกค้า",
+    "reactivateHintCustomerService": "ทีมนี้ปิดใช้อยู่ — ร้านในทีมไม่มีฝ่ายบริการลูกค้าจนกว่าจะเปิดใช้ใหม่",
     "deactivateConfirm": "ปิดใช้งาน pool นี้?",
     "deactivateBlocksShops": "สาขาร้าน {{n}} แห่งใน pool นี้จะยื่นขออนุมัติไม่ได้",
     "reactivateConfirm": "เปิดใช้งาน pool นี้อีกครั้ง? ร้านใน pool จะกลับมามีผู้ตรวจ",
@@ -9613,5 +9670,25 @@
     "planSteps": "จ่ายเป็นก้อน",
     "planChange": "เปลี่ยน",
     "planChangeFromList": "เปลี่ยนได้จากปุ่ม \"เปลี่ยน\" ในรายการร้าน"
+  },
+  "fundDayGuard": {
+    "closedToday": "วันที่ {{date}} ปิดวันกองทุนแล้ว — บันทึกได้พรุ่งนี้",
+    "closedPast": "วันที่ {{date}} ปิดวันกองทุนแล้ว — เลือกวันที่ที่ยังไม่ปิด",
+    "previousNotClosed": "วันที่ {{date}} ของกองทุนมีรายการแต่ยังไม่ปิดวัน — ปิดวันนั้นก่อน แล้วกลับมากดอีกครั้ง",
+    "goClose": "ไปปิดวัน {{date}}",
+    "pickedDayClosed": "วันที่ {{date}} ปิดวันกองทุนแล้ว — บันทึกลงวันนี้ไม่ได้ เลือกวันอื่น",
+    "fundDayCloseAdjusted": "ปิดวันกองทุนถูกคำนวณใหม่"
+  },
+  "billDay": {
+    "reason_FUND_DAY_CLOSED": "ปิดวันกองทุน",
+    "reason_BRANCH_DAY_CLOSED": "ปิดวันสาขา",
+    "reason_UNKNOWN": "ปิดวันแล้ว",
+    "blocked": "ปิดวันแล้ว ({{reason}}วันที่ {{date}}) — ออกบิลประเภทนี้ได้วันถัดไป",
+    "confirmTitle": "บิลจะลงวันถัดไป",
+    "confirmBody": "บิลจะลงวันที่ {{billDate}} เพราะ{{reason}}วันที่ {{closedDate}} (ปิดเมื่อ {{closedAt}}) — ยืนยัน?",
+    "confirmCustomerNote": "ใบเสร็จของลูกค้ายังแสดงเวลาที่จ่ายจริง",
+    "confirmGo": "ยืนยัน",
+    "datedLabel": "บิลลงวันที่",
+    "datedValue": "{{date}} — เพราะ{{reason}}วันที่ {{closedDate}}"
   }
 }

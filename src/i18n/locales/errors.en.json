@@ -1294,5 +1294,14 @@
   "OPS.STATE.STATUS_NOT_SETTABLE": "This status cannot be set from here.",
   "MDM.NOT_FOUND.ASSET": "Device not found.",
   "sale.partner.commission_plan_invalid": "Commission plan {{commission_plan}} does not exist or is closed. Pick one from the list.",
-  "fund.commission_extra.empty": "Nothing is ready to bundle yet. Waiting for day close {{wait_day_close}} · waiting for the day to end {{wait_day_end}} · waiting for the hold period {{wait_hold}} · already in a document {{in_bill}}"
+  "fund.commission_extra.empty": "Nothing is ready to bundle yet. Waiting for day close {{wait_day_close}} · waiting for the day to end {{wait_day_end}} · waiting for the hold period {{wait_hold}} · already in a document {{in_bill}}",
+  "fund.state.day_already_closed": "The fund's day {{close_date}} is already closed — record it on a day that isn't closed.",
+  "fund.state.previous_day_not_closed": "The fund's day {{unclosed_date}} isn't closed yet — close that day first.",
+  "sale.state.day_already_closed": "The day is already closed — this kind of bill can be issued tomorrow.",
+  "fund.state.day_already_closed_basic": "This fund day has already been closed. Reload to see the close.",
+  "fund.state.previous_day_not_closed_basic": "An earlier fund day with activity isn't closed yet. Fund days close in order — close that day first.",
+  "fund.state.has_pending_bills": "Some bills on this day aren't fully paid. Collect the rest, or cancel the bill if it is still open, then check again.",
+  "fund.state.recon_required": "Some accounts with money on this day aren't reconciled yet, or their system figure changed after the count was recorded. Record the count, then check again.",
+  "fund.state.day_close_not_enabled": "Closing the fund's day isn't switched on for this holding.",
+  "fund.validation.day_empty": "Nothing happened on this day, so there's nothing to close."
 }

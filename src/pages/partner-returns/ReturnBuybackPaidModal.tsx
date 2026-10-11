@@ -13,9 +13,9 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Modal, Button, Input, InputDatePicker, Select, TextArea } from 'tsp-form';
 import { ExternalLink, Info, Keyboard } from 'lucide-react';
-import { apiClient, ApiError } from '../../lib/api';
-import { translateApiError } from '../../lib/apiErrors';
-import { ModalErrorBand } from '../../components/ModalErrorBand';
+import { apiClient } from '../../lib/api';
+import { FundDayClosedHint, FundPayErrorBand } from '../../components/FundDayPayGuard';
+import { describeFundPayError, type FundPayError } from '../../lib/fundDayPay';
 import { DateTime } from '../../components/DateTime';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../../lib/format';
@@ -62,7 +62,7 @@ export function ReturnBuybackPaidModal({ open, detail, actions, onClose }: Props
   // blank, the row lands under "ไม่ระบุบัญชี" on the daily money summary (148).
   const [accountId, setAccountId] = useState('');
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FundPayError | null>(null);
   const [result, setResult] = useState<ReturnBuybackPaidResult | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
 
@@ -115,7 +115,7 @@ export function ReturnBuybackPaidModal({ open, detail, actions, onClose }: Props
       setView('done');
       invalidate(detail.return_id);
     } catch (err) {
-      setError(err instanceof ApiError ? translateApiError(err, t) : String(err));
+      setError(describeFundPayError(err, t, i18n.language));
     } finally {
       setSaving(false);
     }
@@ -184,6 +184,8 @@ export function ReturnBuybackPaidModal({ open, detail, actions, onClose }: Props
                   {futureDate && (
                     <span className="text-xs text-danger-fg mt-1">{t('partnerReturn.paidDateFuture')}</span>
                   )}
+                  {/* Steer away from a closed fund day before pressing (fund day close §B). */}
+                  <FundDayClosedHint companyId={detail?.company_id} date={paidDate} enabled={open && !futureDate} />
                 </div>
 
                 <div className="flex flex-col">
@@ -215,7 +217,7 @@ export function ReturnBuybackPaidModal({ open, detail, actions, onClose }: Props
               </div>
             </div>
 
-            <ModalErrorBand message={error} onDismiss={() => setError(null)} />
+            <FundPayErrorBand error={error} onDismiss={() => setError(null)} />
 
             <div className="modal-footer">
               <Button variant="ghost" onClick={handleClose} disabled={saving}>{t('common.cancel')}</Button>

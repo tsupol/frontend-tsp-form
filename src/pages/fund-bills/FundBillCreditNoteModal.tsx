@@ -14,9 +14,9 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Button, Input, TextArea } from 'tsp-form';
 import { Smartphone } from 'lucide-react';
-import { apiClient, ApiError } from '../../lib/api';
-import { translateApiError } from '../../lib/apiErrors';
-import { ModalErrorBand } from '../../components/ModalErrorBand';
+import { apiClient } from '../../lib/api';
+import { FundPayErrorBand } from '../../components/FundDayPayGuard';
+import { describeFundPayError, type FundPayError } from '../../lib/fundDayPay';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { fmtCurrency } from '../../lib/format';
 import { useFundBillInvalidate } from './useFundBills';
@@ -29,14 +29,14 @@ interface FundBillCreditNoteModalProps {
 }
 
 export function FundBillCreditNoteModal({ open, bill, onClose }: FundBillCreditNoteModalProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const invalidate = useFundBillInvalidate();
 
   const [view, setView] = useState<'form' | 'done'>('form');
   const [reasonCode, setReasonCode] = useState('');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FundPayError | null>(null);
   const [result, setResult] = useState<FundBillCreditNoteResult | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
 
@@ -76,7 +76,7 @@ export function FundBillCreditNoteModal({ open, bill, onClose }: FundBillCreditN
       setView('done');
       invalidate(bill.bill_id);
     } catch (err) {
-      setError(err instanceof ApiError ? translateApiError(err, t) : String(err));
+      setError(describeFundPayError(err, t, i18n.language));
     } finally {
       setSaving(false);
     }
@@ -131,7 +131,7 @@ export function FundBillCreditNoteModal({ open, bill, onClose }: FundBillCreditN
               </div>
             </div>
 
-            <ModalErrorBand message={error} onDismiss={() => setError(null)} />
+            <FundPayErrorBand error={error} onDismiss={() => setError(null)} />
 
             <div className="modal-footer">
               <Button variant="ghost" onClick={handleClose} disabled={saving}>{t('common.cancel')}</Button>

@@ -12,9 +12,9 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Button, Input, InputDatePicker, RadioGroup, Select, TextArea } from 'tsp-form';
 import { Keyboard } from 'lucide-react';
-import { apiClient, ApiError } from '../../lib/api';
-import { translateApiError } from '../../lib/apiErrors';
-import { ModalErrorBand } from '../../components/ModalErrorBand';
+import { apiClient } from '../../lib/api';
+import { FundDayClosedHint, FundPayErrorBand } from '../../components/FundDayPayGuard';
+import { describeFundPayError, type FundPayError } from '../../lib/fundDayPay';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../../lib/format';
@@ -56,7 +56,7 @@ export function FundClawbackCollectModal({ open, bill, onClose }: FundClawbackCo
   const [reference, setReference] = useState('');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FundPayError | null>(null);
   const [result, setResult] = useState<FundClawbackCollectResult | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
 
@@ -112,7 +112,7 @@ export function FundClawbackCollectModal({ open, bill, onClose }: FundClawbackCo
       setView('done');
       invalidate();
     } catch (err) {
-      setError(err instanceof ApiError ? translateApiError(err, t) : String(err));
+      setError(describeFundPayError(err, t, i18n.language));
     } finally {
       setSaving(false);
     }
@@ -164,6 +164,8 @@ export function FundClawbackCollectModal({ open, bill, onClose }: FundClawbackCo
                   {futureDate && (
                     <span className="text-xs text-danger-fg mt-1">{t('fundClawback.dateFuture')}</span>
                   )}
+                  {/* Steer away from a closed fund day before pressing (fund day close §B). */}
+                  <FundDayClosedHint companyId={bill?.company_id} date={paidDate} enabled={open && !futureDate} />
                 </div>
 
                 <div className="flex flex-col">
@@ -206,7 +208,7 @@ export function FundClawbackCollectModal({ open, bill, onClose }: FundClawbackCo
               </div>
             </div>
 
-            <ModalErrorBand message={error} onDismiss={() => setError(null)} />
+            <FundPayErrorBand error={error} onDismiss={() => setError(null)} />
 
             <div className="modal-footer">
               <Button variant="ghost" onClick={handleClose} disabled={saving}>{t('common.cancel')}</Button>

@@ -11,6 +11,9 @@ import { BranchPaymentAccountField } from '../../components/BranchPaymentAccount
 import { useAllowedPaymentMethods, useBranchIsPartner } from '../../hooks/useAllowedPaymentMethods';
 import { ProductPickerModal, type SellableVariant } from '../../components/ProductPickerModal';
 import { ActionDoneView, type ActionDoneDetailRow } from './ActionDoneView';
+import { BillDayBlockedNotice } from '../../components/BillDayPreview';
+import { useBillDatePreview, useBillDayConfirm } from '../../hooks/useBillDay';
+import { billDayDoneRow, type BillDay } from '../../lib/billDay';
 import { translateApiError } from '../../lib/apiErrors';
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -98,6 +101,9 @@ type PaymentMethod = 'CASH' | 'TRANSFER';
 
 interface BillCreateResult {
   bill_id: number;
+  /** mig 1407: the day the bill landed on, and why (fund day close §D2). */
+  bill_date?: string;
+  bill_day?: BillDay | null;
   code_display?: string;
   bill_code?: string;
 }
@@ -171,7 +177,7 @@ export function ContractAddonModal({ open, contract, onClose, onSuccess }: {
   const [submitting, setSubmitting] = useState(false);
   const createdBill = useRef<BillCreateResult | null>(null);
   const { settle, reset: resetSettle } = useBillSettle();
-  const [result, setResult] = useState<{ billId: number; code: string } | null>(null);
+  const [result, setResult] = useState<{ billId: number; code: string; billDay: BillDay | null } | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
 
   // Add-line composer. `pickCharge` holds the catalog-backed charge type being
@@ -402,7 +408,14 @@ export function ContractAddonModal({ open, contract, onClose, onSuccess }: {
       displayReasons.push(t('contractAddon.blockNoBank'));
     }
   });
-  const canSubmit = lines.length > 0 && isBalanced && displayReasons.length === 0 && !submitting && !!contract;
+  // Fund day close §D1: which day will the bill land on? Asked when the box
+  // opens. Once a bill exists (an earlier press whose payment failed) its day is
+  // fixed, so the question no longer applies.
+  const billDayPreview = useBillDatePreview(contract?.branch_id ?? null, 'CONTRACT_ADDON', open && view === 'form');
+  const billDayConfirm = useBillDayConfirm(billDayPreview);
+  const billDayBlocked = billDayPreview.data?.state === 'BLOCKED' && !createdBill.current;
+
+  const canSubmit = lines.length > 0 && isBalanced && displayReasons.length === 0 && !submitting && !!contract && !billDayBlocked;
 
   // ── Confirm — full server sequence ──────────────────────────────────────
   const handleConfirm = async () => {
@@ -456,7 +469,7 @@ export function ContractAddonModal({ open, contract, onClose, onSuccess }: {
         confirm: { p_contract_id: contract.id, p_confirmed_by: user?.user_id ?? null },
       });
 
-      setResult({ billId, code: created.code_display ?? created.bill_code ?? String(billId) });
+      setResult({ billId, code: created.code_display ?? created.bill_code ?? String(billId), billDay: created.bill_day ?? null });
       setView('done');
       onSuccess();
     } catch (err) {
@@ -484,6 +497,7 @@ export function ContractAddonModal({ open, contract, onClose, onSuccess }: {
   const doneDetailRows: ActionDoneDetailRow[] = result ? [
     { label: t('contractAddon.total'), value: fmtCurrency(total), emphasis: true },
     ...(giftValue > 0 ? [{ label: t('contractAddon.giftValue'), value: fmtCurrency(giftValue) }] : []),
+    ...[billDayDoneRow(result.billDay, t, i18n.language)].filter(r => r != null),
   ] : [];
 
   return (
@@ -733,13 +747,14 @@ export function ContractAddonModal({ open, contract, onClose, onSuccess }: {
                     </ul>
                   </div>
                 )}
+                <BillDayBlockedNotice preview={billDayPreview.data} />
                 <div className="flex justify-end gap-2">
                   <Button variant="outline" onClick={handleClose}>{t('common.cancel')}</Button>
                   <Button
                     color="primary"
                     disabled={!canSubmit}
                     startIcon={submitting ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
-                    onClick={handleConfirm}
+                    onClick={() => (createdBill.current ? handleConfirm() : billDayConfirm.guard(() => { void handleConfirm(); }))}
                   >
                     {submitting ? t('common.loading') : t('contractAddon.confirm')}
                   </Button>
@@ -878,6 +893,8 @@ export function ContractAddonModal({ open, contract, onClose, onSuccess }: {
           </Button>
         </div>
       </Modal>
+
+      {billDayConfirm.dialog}
 
       {/* Discard-confirm sub-modal (always mounted) */}
       <Modal open={confirmClose} onClose={() => setConfirmClose(false)} maxWidth="24rem" width="100%">

@@ -430,7 +430,7 @@ export function PaymentSubmissionsPage() {
         row={selected}
         open={!!selected}
         onClose={() => setSelected(null)}
-        onSuccess={(action) => {
+        onSuccess={(action, extra) => {
           setSelected(null);
           refresh();
           const key =
@@ -439,7 +439,16 @@ export function PaymentSubmissionsPage() {
                 : 'paymentSubmissions.reopenSuccess';
           addSnackbar({
             type: 'success',
-            message: <div className="alert alert-success"><CheckCircle size={16} /><span>{t(key)}</span></div>,
+            message: (
+              <div className="alert alert-success">
+                <CheckCircle size={16} />
+                <span className="flex flex-col">
+                  <span>{t(key)}</span>
+                  {/* Fund day close §D2: the bill went on a later day. */}
+                  {extra?.billDayNote && <span className="text-xs">{extra.billDayNote}</span>}
+                </span>
+              </div>
+            ),
           });
         }}
       />

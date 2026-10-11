@@ -2735,6 +2735,9 @@
     "BUYBACK": "Buyback"
   },
   "chat": {
+    "scopeMine": "My customers",
+    "scopeAll": "Whole fund",
+    "waitingReplyTip": "Chats waiting for a reply",
     "title": "Chat",
     "searchPlaceholder": "Name, contract, phone, IMEI, serial",
     "searchEmpty": "Nothing matched that search",
@@ -5186,7 +5189,50 @@
     "viewTrail": "Edit trail",
     "walletLine": "Wallet",
     "walletReference": "Wallet money (no bank account): {{amount}} over {{count}} item(s)",
-    "willBeVersion": "This will become version {{version}}."
+    "willBeVersion": "This will become version {{version}}.",
+    "close": {
+      "checkButton": "Check before closing the day",
+      "checkTitle": "Before closing {{date}}",
+      "checking": "Checking…",
+      "checkAgain": "Check again",
+      "hideCheck": "Hide the check",
+      "readyToClose": "Nothing is in the way — this day can be closed.",
+      "closeButton": "Close the day",
+      "noPermission": "Needs the FUND.DAY_CLOSE permission",
+      "fixFirst": "Fix the items above, then check again",
+      "badgeClosed": "Closed v{{version}}",
+      "amended": "(amended after close)",
+      "closedWithDiff": "Closed with a recorded difference",
+      "goToDate": "Go to {{date}}",
+      "reload": "Reload",
+      "showAccount": "Show",
+      "reason": {
+        "NOT_SAVED": "Not recorded yet",
+        "DRIFTED": "System figure changed after recording"
+      },
+      "billStatus": {
+        "OPEN": "Unpaid",
+        "PARTIAL": "Partly paid"
+      },
+      "confirmTitle": "Close the fund's day",
+      "lockHint": "Closing locks this day's customer bills at every branch under the fund, and the fund documents paid on it. A closed day can't be reopened.",
+      "billCount": "Customer bills",
+      "fundDocCount": "Fund documents paid",
+      "reconWarning": "Some accounts were recorded with a difference. The day can still be closed — the difference stays on record.",
+      "noteLabel": "Note (optional)",
+      "cannotCloseYet": "The day can't be closed yet:",
+      "doneHeadline": "Day closed",
+      "version": "Version",
+      "reconState": "Reconciliation",
+      "reconOk": "All accounts match",
+      "closeNext": "Close the next day ({{date}})",
+      "tabCloses": "Day closes",
+      "colClosedBy": "Closed by",
+      "colItems": "Items",
+      "colNetAtClose": "Totals at close",
+      "firstClosedAt": "First closed",
+      "versionShort": "v{{version}}"
+    }
   },
   "help": {
     "title": "Help",
@@ -6342,6 +6388,14 @@
     "kind": "Type",
     "kindCredit": "Credit team",
     "kindPayout": "Payout team",
+    "kindCustomerService": "Customer service team",
+    "tabCredit": "Credit",
+    "tabPayout": "Payout",
+    "tabCustomerService": "Customer service",
+    "noCustomerServiceWarn": "{{n}} shop(s) have no customer service team yet — their customers will be nobody's \"my customers\" in chat",
+    "noCollectorInfo": "{{n}} shop(s) have no collection team yet — their overdue contracts won't be handed out.",
+    "openCollectionTeams": "Open collection teams",
+    "pickUserHintCustomerService": "Any company-level staff of the fund (admins, finance, credit, collections…) or a holding admin.",
     "blockedShopsWarn": "{{n}} shop branch(es) cannot submit approval requests — no active credit reviewer",
     "noPayoutShopsInfo": "{{n}} shop branch(es) have no payout reviewer yet (needed for payout rounds)",
     "allCompanies": "All companies",
@@ -6373,6 +6427,9 @@
     "reactivatePool": "Reactivate pool",
     "deactivateHint": "Deactivating removes this pool's shops from review — they lose their reviewer.",
     "reactivateHint": "This pool is inactive — its shops have no reviewer until it is reactivated.",
+    "noMembersCustomerService": "No members — customers of these shops are nobody's in chat",
+    "deactivateHintCustomerService": "Deactivating leaves these shops with no customer service team.",
+    "reactivateHintCustomerService": "This team is inactive — its shops have no customer service team until it is reactivated.",
     "deactivateConfirm": "Deactivate this pool?",
     "deactivateBlocksShops": "{{n}} shop branch(es) in this pool will no longer be able to submit approval requests.",
     "reactivateConfirm": "Reactivate this pool? Its shops get their reviewers back.",
@@ -9627,5 +9684,25 @@
     "planSteps": "Paid in steps",
     "planChange": "Change",
     "planChangeFromList": "Change it with the \"Change\" button in the shop list."
+  },
+  "fundDayGuard": {
+    "closedToday": "The fund's day {{date}} is already closed — this can be recorded tomorrow.",
+    "closedPast": "The fund's day {{date}} is already closed — pick a date that isn't closed.",
+    "previousNotClosed": "The fund's day {{date}} has entries but isn't closed yet — close that day first, then press again.",
+    "goClose": "Go close {{date}}",
+    "pickedDayClosed": "The fund's day {{date}} is closed — recording on it will be refused. Pick another date.",
+    "fundDayCloseAdjusted": "Fund day close recomputed"
+  },
+  "billDay": {
+    "reason_FUND_DAY_CLOSED": "the fund closed its day",
+    "reason_BRANCH_DAY_CLOSED": "the branch closed its day",
+    "reason_UNKNOWN": "the day was closed",
+    "blocked": "Day closed ({{reason}} on {{date}}) — this kind of bill can be issued tomorrow.",
+    "confirmTitle": "Bill goes on the next day",
+    "confirmBody": "This bill will be dated {{billDate}} because {{reason}} on {{closedDate}} (closed at {{closedAt}}). Continue?",
+    "confirmCustomerNote": "The customer's receipt still shows the time they actually paid.",
+    "confirmGo": "Continue",
+    "datedLabel": "Bill date",
+    "datedValue": "{{date}} — {{reason}} on {{closedDate}}"
   }
 }

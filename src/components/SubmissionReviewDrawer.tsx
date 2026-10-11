@@ -14,6 +14,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { MediaLightbox, MediaThumbButton } from './MediaLightbox';
 import { normalizeKey } from '../lib/mediaPath';
 import { translateApiError } from '../lib/apiErrors';
+import { BillDayBlockedNotice } from './BillDayPreview';
+import { useBillDatePreview, useBillDayConfirm } from '../hooks/useBillDay';
+import { billDayShiftedText, type BillDay } from '../lib/billDay';
 
 export type SubmissionStatus = 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
 
@@ -170,9 +173,10 @@ export function SubmissionReviewDrawer({
   row: SubmissionRow | null;
   open: boolean;
   onClose: () => void;
-  onSuccess: (action: 'approve' | 'reject' | 'reopen') => void;
+  /** `billDayNote` — set when approving put the bill on a later day (fund day close §D2). */
+  onSuccess: (action: 'approve' | 'reject' | 'reopen', extra?: { billDayNote: string | null }) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const [reason, setReason] = useState('');
   const [bankAccountId, setBankAccountId] = useState<string>('');
@@ -234,6 +238,15 @@ export function SubmissionReviewDrawer({
     if (defaulted) setBankAccountId(String(defaulted.id));
   }, [row, bankAccounts, bankAccountId]);
 
+  // Fund day close §D1: approving issues the installment bill. Ask which day it
+  // lands on while the slip is open for review. Hooks sit above the `!row`
+  // early return so their order never changes.
+  const reviewable = open && !!row && row.status === 'PENDING_REVIEW' && !liveCancelled
+    && (row.allowed_actions ?? []).includes('APPROVE');
+  const billDayPreview = useBillDatePreview(row?.branch_id ?? null, 'CONTRACT_PAYMENT', reviewable);
+  const billDayConfirm = useBillDayConfirm(billDayPreview);
+  const billDayBlocked = reviewable && billDayPreview.data?.state === 'BLOCKED';
+
   if (!row) {
     return (
       <Drawer open={open} onClose={onClose} side="right" ariaLabel={t('paymentSubmissions.review')}>
@@ -275,7 +288,7 @@ export function SubmissionReviewDrawer({
           p_note: reason.trim() || null,
         });
       } else {
-        await apiClient.rpc('fn_payment_submission_review', {
+        const res = await apiClient.rpc<{ bill_day?: BillDay | null } | null>('fn_payment_submission_review', {
           p_submission_id: row.id,
           p_action: action === 'approve' ? 'APPROVE' : 'REJECT',
           p_channel: action === 'approve' ? 'TRANSFER' : null,
@@ -284,6 +297,10 @@ export function SubmissionReviewDrawer({
           p_reject_reason: action === 'reject' ? (reason.trim() || null) : null,
           p_reviewed_by: user?.user_id ?? null,
         });
+        if (action === 'approve') {
+          onSuccess(action, { billDayNote: billDayShiftedText(res?.bill_day, t, i18n.language) });
+          return;
+        }
       }
       onSuccess(action);
     } catch (err) {
@@ -486,6 +503,8 @@ export function SubmissionReviewDrawer({
                 </div>
               )}
 
+              {billDayBlocked && <BillDayBlockedNotice preview={billDayPreview.data} />}
+
               {isPending && canApprove && (
                 <div>
                   <div className="form-label mb-1">{t('paymentSubmissions.bankAccount')}</div>
@@ -530,8 +549,8 @@ export function SubmissionReviewDrawer({
                   {canApprove && (
                     <Button
                       color="success" size="sm" className="flex-1"
-                      disabled={!!busy || !bankAccountId}
-                      onClick={() => handleAction('approve')}
+                      disabled={!!busy || !bankAccountId || billDayBlocked}
+                      onClick={() => billDayConfirm.guard(() => { void handleAction('approve'); })}
                     >
                       {busy === 'approve' ? t('common.loading') : t('paymentSubmissions.approve')}
                     </Button>
@@ -561,6 +580,8 @@ export function SubmissionReviewDrawer({
           </div>
         )}
       </Drawer>
+
+      {billDayConfirm.dialog}
 
       <MediaLightbox
         open={!!zoomedKey}

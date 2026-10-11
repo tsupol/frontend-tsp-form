@@ -78,6 +78,139 @@ export interface FundDaySummary {
   money_net: number;
   /** false = the two axes disagree. A warning band, never a reason to block saving. */
   balanced: boolean;
+  // mig 1405 — closing the fund's day.
+  /** Customer bills dated this day (not voided) and fund payments made on it. */
+  bill_count: number;
+  fund_doc_count: number;
+  /** Every real account counted, not drifted, no difference. false is a warning, never a block. */
+  recon_ok: boolean;
+  /**
+   * false = the holding has not switched day close on, or this day is before
+   * the switch date. Then nothing about closing shows at all — no button, no
+   * "not closed" badge.
+   */
+  day_close_enabled: boolean;
+  /** The latest close of this day, or null when it is not closed. Never computed on screen. */
+  day_close: FundDayCloseInfo | null;
+}
+
+// ---------------------------------------------------------------------------
+// Fund day close (mig 1405 · UI_SUMMARY/148 §8)
+// ---------------------------------------------------------------------------
+
+/** One close of one day, as fn_fund_day_summary.day_close / check.already_closed carry it. */
+export interface FundDayCloseInfo {
+  id: number;
+  /** 1 = the first close; > 1 = a bill of that day was corrected after closing. */
+  version: number;
+  /** The server day the close was made (may be later than the day closed). */
+  closed_on: string;
+  closed_by: number | null;
+  closed_at: string;
+  note: string | null;
+  recon_ok: boolean;
+}
+
+/** One reason the day cannot be closed yet. Same shape for check and create errors. */
+export interface FundDayCloseBlocker {
+  code: string;
+  params: Record<string, unknown>;
+}
+
+/** HAS_PENDING_BILLS → params.bills[]. */
+export interface FundDayPendingBill {
+  bill_id: number;
+  bill_code: string | null;
+  branch_id: number | null;
+  bill_purpose: string | null;
+  status: string;
+  total_amount: number;
+}
+
+/** RECON_REQUIRED → params.accounts[]. */
+export interface FundDayPendingAccount {
+  account_key: string;
+  bank_name: string | null;
+  account_number: string | null;
+  reason: 'NOT_SAVED' | 'DRIFTED';
+  in_amount: number;
+  out_amount: number;
+}
+
+export interface FundDayCloseCheck {
+  company_id: number;
+  date: string;
+  /** The server's day — the reference date, never the device clock. */
+  today: string;
+  enabled_from: string;
+  already_closed: FundDayCloseInfo | null;
+  can_close: boolean;
+  /** false = the result can be read but the close button stays disabled. */
+  allowed_to_close: boolean;
+  /** In the order they need fixing. */
+  blockers: FundDayCloseBlocker[];
+  prev_unclosed_date: string | null;
+  pending_bills: FundDayPendingBill[];
+  accounts_pending: FundDayPendingAccount[];
+  bill_count: number;
+  fund_doc_count: number;
+  category_net: number;
+  money_net: number;
+  balanced: boolean;
+  recon_ok: boolean;
+  accounts: FundDayAccount[];
+}
+
+export interface FundDayCloseCreateResult {
+  fund_day_close_id: number;
+  company_id: number;
+  close_date: string;
+  version: number;
+  closed_on: string;
+  closed_by: number;
+  bill_count: number;
+  fund_doc_count: number;
+  category_net: number;
+  money_net: number;
+  balanced: boolean;
+  recon_ok: boolean;
+  /** The earliest day with activity still open, or null when nothing is left. */
+  next_unclosed_date: string | null;
+}
+
+/** v_fund_day_closes — one row per day (its latest version). */
+export interface FundDayCloseRow {
+  id: number;
+  holding_id: number;
+  company_id: number;
+  company_name: string | null;
+  close_date: string;
+  version: number;
+  is_amended: boolean;
+  closed_on: string;
+  closed_by: number | null;
+  closed_by_name: string | null;
+  closed_at: string;
+  note: string | null;
+  bill_count: number;
+  fund_doc_count: number;
+  category_net: number;
+  money_net: number;
+  recon_ok: boolean;
+  /** When the day was first locked (v1). */
+  first_closed_at: string | null;
+  // `snapshot` (the summary as it stood at close) is deliberately not selected:
+  // it must never be mixed with live figures.
+}
+
+/** v_fund_day_unclosed — days with activity that are still open, today included. */
+export interface FundDayUnclosedRow {
+  holding_id: number;
+  company_id: number;
+  company_name: string | null;
+  activity_date: string;
+  is_past: boolean;
+  days_open: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -252,7 +385,10 @@ export interface FundReconVersionRow {
   saved_at: string | null;
 }
 
-/** Today in local (Bangkok) terms — the summary defaults to it. */
+/**
+ * Today in local (Bangkok) terms — only the page's first guess before the
+ * server answers. Once a response carries `today`, that wins (rule M2).
+ */
 export function fundTodayISO(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

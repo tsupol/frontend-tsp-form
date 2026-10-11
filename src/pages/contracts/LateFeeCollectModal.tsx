@@ -6,6 +6,9 @@ import { apiClient, ApiError } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { ActionDoneView, type ActionDoneDetailRow } from './ActionDoneView';
+import { BillDayBlockedNotice } from '../../components/BillDayPreview';
+import { useBillDatePreview, useBillDayConfirm } from '../../hooks/useBillDay';
+import { billDayDoneRow, type BillDay } from '../../lib/billDay';
 import { translateApiError } from '../../lib/apiErrors';
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -28,6 +31,8 @@ interface ContractForLateFee {
   code: string;
   code_display: string | null;
   late_fee_balance: number | null;
+  /** The branch the fee bill is issued at (fund day close preview). */
+  branch_id?: number | null;
 }
 
 interface LateFeeResult {
@@ -37,6 +42,9 @@ interface LateFeeResult {
   waive_amount?: number;
   bill_total?: number;
   remaining_balance?: number;
+  /** mig 1407: the day the bill landed on, and why (fund day close §D2). */
+  bill_date?: string;
+  bill_day?: BillDay | null;
 }
 
 export function LateFeeCollectModal({ open, contract, onClose, onSuccess }: {
@@ -45,7 +53,7 @@ export function LateFeeCollectModal({ open, contract, onClose, onSuccess }: {
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
 
   const [view, setView] = useState<'form' | 'done'>('form');
@@ -98,7 +106,12 @@ export function LateFeeCollectModal({ open, contract, onClose, onSuccess }: {
   if (waive > collect) blockReasons.push(t('lateFee.blockWaiveExceeds'));
   // Waiving part of a fee must be justified (audit trail) — reason mandatory on waive.
   if (waiveOn && !note.trim()) blockReasons.push(t('lateFee.blockWaiveReason'));
-  const canSubmit = blockReasons.length === 0 && !submitting && !!contract;
+  // Fund day close §D1: which day will the fee bill land on? Asked when the box opens.
+  const billDayPreview = useBillDatePreview(contract?.branch_id ?? null, 'CONTRACT_FEE', open && view === 'form');
+  const billDayConfirm = useBillDayConfirm(billDayPreview);
+  const billDayBlocked = billDayPreview.data?.state === 'BLOCKED';
+
+  const canSubmit = blockReasons.length === 0 && !submitting && !!contract && !billDayBlocked;
 
   const handleConfirm = async () => {
     if (!canSubmit || !contract) return;
@@ -145,6 +158,7 @@ export function LateFeeCollectModal({ open, contract, onClose, onSuccess }: {
       : []),
     { label: t('lateFee.netCharged'), value: fmtCurrency(result.bill_total ?? net), emphasis: true },
     { label: t('lateFee.remainingBalance'), value: fmtCurrency(result.remaining_balance ?? 0) },
+    ...[billDayDoneRow(result.bill_day, t, i18n.language)].filter(r => r != null),
   ] : [];
 
   return (
@@ -259,13 +273,14 @@ export function LateFeeCollectModal({ open, contract, onClose, onSuccess }: {
                     </ul>
                   </div>
                 )}
+                <BillDayBlockedNotice preview={billDayPreview.data} />
                 <div className="flex justify-end gap-2">
                   <Button variant="outline" onClick={handleClose}>{t('common.cancel')}</Button>
                   <Button
                     color="primary"
                     disabled={!canSubmit}
                     startIcon={submitting ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
-                    onClick={handleConfirm}
+                    onClick={() => billDayConfirm.guard(() => { void handleConfirm(); })}
                   >
                     {submitting ? t('common.loading') : t('lateFee.confirm')}
                   </Button>
@@ -275,6 +290,8 @@ export function LateFeeCollectModal({ open, contract, onClose, onSuccess }: {
           )}
         </div>
       </Modal>
+
+      {billDayConfirm.dialog}
 
       {/* Discard-confirm sub-modal (always mounted) */}
       <Modal open={confirmClose} onClose={() => setConfirmClose(false)} maxWidth="24rem" width="100%">

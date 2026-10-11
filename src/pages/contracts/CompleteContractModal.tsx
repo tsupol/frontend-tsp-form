@@ -13,6 +13,9 @@ import { useWalletAvailable, useWalletActions } from './wallet/useWallet';
 import { WalletActionForm } from './wallet/WalletActionModal';
 import type { WalletType, WalletAction } from './wallet/types';
 import { ActionDoneView, type ActionDoneDetailRow } from './ActionDoneView';
+import { BillDayBlockedNotice } from '../../components/BillDayPreview';
+import { useBillDatePreview, useBillDayConfirm } from '../../hooks/useBillDay';
+import { billDayDoneRow, type BillDay } from '../../lib/billDay';
 import { ContractFeeModal } from './ContractFeeModal';
 import { useContractInvalidate } from './useContractInvalidate';
 import { translateApiError } from '../../lib/apiErrors';
@@ -131,6 +134,8 @@ interface PayoffBillInfo {
   bill_code: string;
   bill_total: number;
   installments_count: number;
+  /** mig 1407: the day the payoff bill landed on, and why (fund day close §D2). */
+  bill_day?: BillDay | null;
 }
 
 // Asset movement entry returned by fn_contract_complete (Phase 18)
@@ -461,6 +466,14 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
     onError: (err: unknown) => { setStep(''); setApiError(err); },
   });
 
+  // Fund day close §D1: a new payoff bill — which day will it land on? Not asked
+  // when a bill already exists (an open payoff bill, or one made on an earlier
+  // press): its day is already fixed.
+  const makesNewPayoffBill = !preview?.open_bill && !payoffBill;
+  const billDayPreview = useBillDatePreview(contract.branch_id ?? null, 'CONTRACT_PAYOFF', open && view === 'payoff' && makesNewPayoffBill);
+  const billDayConfirm = useBillDayConfirm(billDayPreview);
+  const billDayBlocked = makesNewPayoffBill && billDayPreview.data?.state === 'BLOCKED';
+
   const payMutation = useMutation({
     mutationFn: collectAddConfirm,
     onSuccess: () => {
@@ -617,6 +630,10 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
             </div>
           )}
 
+          {view === 'payoff' && billDayBlocked && (
+            <div className="mb-4"><BillDayBlockedNotice preview={billDayPreview.data} /></div>
+          )}
+
           {view === 'payoff' && (
             <PayoffView
               preview={preview}
@@ -631,14 +648,18 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
               discountReason={payoffDiscountReason}
               onDiscountReasonChange={setPayoffDiscountReason}
               isPending={payMutation.isPending}
+              blocked={billDayBlocked}
               step={step}
               onCancel={onClose}
               onConfirm={() => {
+                const go = () => (makesNewPayoffBill
+                  ? billDayConfirm.guard(() => payMutation.mutate())
+                  : payMutation.mutate());
                 // A discount request creates the bill and stops — there is no
                 // payment to balance yet, so the payment check does not apply.
                 if (payoffDiscount > 0) {
                   setError('');
-                  payMutation.mutate();
+                  void go();
                   return;
                 }
                 const validationError = validatePayoffPayment(preview, payments, t);
@@ -648,7 +669,7 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
                   return;
                 }
                 setError('');
-                payMutation.mutate();
+                void go();
               }}
             />
           )}
@@ -771,6 +792,8 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
       </div>
     </Modal>
 
+    {billDayConfirm.dialog}
+
     {/* Stacked on top of the close flow — settle a late fee / service charge,
         then the wallet gate refetches balances on close. */}
     <ContractFeeModal
@@ -818,7 +841,7 @@ function DoneView({
   onViewBill?: () => void;
   onClose: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const isComplete = action.kind === 'complete';
   const isEarlyPayoff = isComplete && action.closeReason === 'EARLY_PAYOFF';
   const newState = completeResult.state;
@@ -863,6 +886,8 @@ function DoneView({
   }
   if (isEarlyPayoff && payoffBill) {
     rows.push({ label: t('contract.complete_done_installmentsCleared', { defaultValue: 'Installments cleared' }), value: String(payoffBill.installments_count) });
+    const dayRow = billDayDoneRow(payoffBill.bill_day, t, i18n.language);
+    if (dayRow) rows.push(dayRow);
   }
   // The device's own code, not the searchable form carried on the movements.
   const device = isComplete ? (completeResult as CompleteResult).device : null;
@@ -1296,6 +1321,7 @@ function PayoffView({
   discountReason,
   onDiscountReasonChange,
   isPending,
+  blocked = false,
   step,
   onCancel,
   onConfirm,
@@ -1314,6 +1340,8 @@ function PayoffView({
   discountReason: string;
   onDiscountReasonChange: (v: string) => void;
   isPending: boolean;
+  /** The bill's day is closed for this kind of bill (fund day close §D1 BLOCKED). */
+  blocked?: boolean;
   step: string;
   onCancel: () => void;
   onConfirm: () => void;
@@ -1507,7 +1535,7 @@ function PayoffView({
         <Button
           color="primary"
           onClick={onConfirm}
-          disabled={isPending || overCap || (awaitingApproval && !discountReason.trim())}
+          disabled={isPending || blocked || overCap || (awaitingApproval && !discountReason.trim())}
         >
           {isPending
             ? stepLabel || t('common.loading')

@@ -241,7 +241,11 @@ function ShopFundBillPanel({ bill }: { bill: PartnerMyFundBill }) {
   const lineLabel = (line: PartnerMyFundBillLine) =>
     (i18n.language === 'th' && line.line_type_name)
       ? line.line_type_name
-      : t(`settlement.lineType_${line.line_type}`, { defaultValue: line.line_type });
+      // The shop's own wording first; any type it has no word for (commission
+      // bills, credit notes, adjustments…) reads as the fund documents say it.
+      : t(`settlement.lineType_${line.line_type}`, {
+          defaultValue: t(`fundBill.lineType_${line.line_type}`, { defaultValue: line.line_type }),
+        });
 
   const renderLine = (line: PartnerMyFundBillLine) => (
     <div key={line.line_id} className="flex items-center gap-2 px-3 py-1.5 border-t border-line">

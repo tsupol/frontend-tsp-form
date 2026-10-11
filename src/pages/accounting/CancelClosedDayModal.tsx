@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button, Modal, TextArea, Select, Badge } from 'tsp-form';
-import { XCircle, AlertTriangle } from 'lucide-react';
+import { AlertTriangle, ExternalLink } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
 import { DateTime } from '../../components/DateTime';
 import { useVoidReasons } from '../../hooks/useVoidReasons';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { translateApiError } from '../../lib/apiErrors';
+import { fundDayPagePath } from '../../lib/fundDayPay';
+import { ModalErrorBand } from '../../components/ModalErrorBand';
 
 // ยกเลิกบิลที่วันปิดยอดไปแล้ว (CANCEL_CLOSED_DAY) — cancel a PAID contract-payment
 // bill whose day has already been closed. The normal Cancel/Void verbs are blocked
@@ -40,6 +42,9 @@ interface CancelClosedDayResult {
   payments_reversed: ClosedDayPaymentReversed[];
   day_close_date: string;
   day_close_version: number;
+  /** mig 1405: whose day was re-closed — a branch's own day close, or the fund
+   *  company's (a shop/warehouse bill under a fund). Absent on older responses. */
+  day_close_kind?: 'BRANCH' | 'FUND' | null;
   expected_before: number;
   expected_after: number;
   customer_id: number | null;
@@ -128,13 +133,6 @@ export function CancelClosedDayModal({
           <>
             <div className="modal-content">
               <div className="form-grid">
-                {error && (
-                  <div className="alert alert-danger">
-                    <XCircle size={18} />
-                    <div><div className="alert-description">{error}</div></div>
-                  </div>
-                )}
-
                 {/* Target bill */}
                 <div className="flex items-center gap-2 text-sm rounded-md bg-surface px-3 py-2 border border-line">
                   <span className="flex-1 min-w-0 truncate font-medium tabular-nums">{billCode}</span>
@@ -169,6 +167,7 @@ export function CancelClosedDayModal({
                 </div>
               </div>
             </div>
+            <ModalErrorBand message={error} onDismiss={() => setError('')} />
             <div className="modal-footer">
               <Button onClick={handleClose} disabled={busy}>{t('common.cancel')}</Button>
               <Button color="danger" onClick={handleCancel} disabled={!canSubmit}>
@@ -230,11 +229,26 @@ export function CancelClosedDayModal({
                 {/* Day-close recomputed to a new version */}
                 <div className="rounded-md border border-warning-border bg-warning-soft p-3 text-sm">
                   <div className="text-warning-fg font-medium mb-1 inline-flex items-center gap-1.5">
-                    <span>{t('accounting.bills.cancelClosedDay.dayCloseAdjusted')}</span>
+                    <span>
+                      {result.day_close_kind === 'FUND'
+                        ? t('fundDayGuard.fundDayCloseAdjusted')
+                        : t('accounting.bills.cancelClosedDay.dayCloseAdjusted')}
+                    </span>
                     <Badge size="xs" color="warning">v{result.day_close_version}</Badge>
                   </div>
                   <div className="flex items-center justify-between gap-2 text-xs text-subtle">
-                    <span><DateTime value={result.day_close_date} showTime={false} /></span>
+                    {result.day_close_kind === 'FUND' ? (
+                      // The fund's day lives on the daily-money page; open that day there.
+                      <Link
+                        to={fundDayPagePath(result.day_close_date)}
+                        className="text-primary-fg hover:underline inline-flex items-center gap-1"
+                      >
+                        <DateTime value={result.day_close_date} showTime={false} />
+                        <ExternalLink size={12} />
+                      </Link>
+                    ) : (
+                      <span><DateTime value={result.day_close_date} showTime={false} /></span>
+                    )}
                     <span className="tabular-nums">
                       {fmtCurrency(result.expected_before)} → {fmtCurrency(result.expected_after)}
                     </span>

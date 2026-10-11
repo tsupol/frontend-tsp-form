@@ -283,6 +283,7 @@ export const AppSideNav = () => {
     unassignedNoCollectorCount,
     legalWaitCount,
     unreadNotifCount,
+    fundDayUnclosedCount,
   } = useNavCounts();
 
   // Render an icon with an optional count badge.
@@ -547,7 +548,9 @@ export const AppSideNav = () => {
     ...(canSeeFundDayMoney
       ? [{
           key: 'fund-day-money',
-          icon: <CalendarClock size="1rem" />,
+          // Fund days with activity still to close (always 0 while the
+          // holding's day-close switch is off).
+          ...iconWithCount(<CalendarClock size="1rem" />, fundDayUnclosedCount),
           label: t('nav.fundDayMoney'),
           path: '/admin/fund-day-money',
         }, {

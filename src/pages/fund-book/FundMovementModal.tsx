@@ -18,15 +18,15 @@
 // The withdrawal ceiling is read from the book, never worked out here: the
 // backend enforces its own figure and a second guess would disagree with it.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Modal, Button, Input, InputDatePicker, MaskedInput, RadioGroup, Select, TextArea,
 } from 'tsp-form';
 import { Keyboard } from 'lucide-react';
-import { apiClient, ApiError } from '../../lib/api';
-import { translateApiError } from '../../lib/apiErrors';
-import { ModalErrorBand } from '../../components/ModalErrorBand';
+import { apiClient } from '../../lib/api';
+import { FundDayClosedHint, FundPayErrorBand } from '../../components/FundDayPayGuard';
+import { describeFundPayError, type FundPayError } from '../../lib/fundDayPay';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../../lib/format';
@@ -88,7 +88,9 @@ export function FundMovementModal({
   const [receiptNo, setReceiptNo] = useState('');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FundPayError | null>(null);
+  /** The document issued by an earlier press whose confirmation was refused. */
+  const createdRef = useRef<{ signature: string; bill_id: number } | null>(null);
   const [result, setResult] = useState<FundMovementConfirmResult | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
 
@@ -110,6 +112,7 @@ export function FundMovementModal({
     setError(null);
     setResult(null);
     setConfirmClose(false);
+    createdRef.current = null;
   }, [open, purpose]);
 
   const isExpense = purpose === 'EXPENSE';
@@ -165,7 +168,7 @@ export function FundMovementModal({
     setSaving(true);
     setError(null);
     try {
-      const created = await apiClient.rpc<FundMovementCreateResult>('fn_fund_movement_create', {
+      const createParams = {
         p_company_id: companyId,
         p_purpose: purpose,
         p_owner_type: isExpense ? 'HOLDING' : ownerType,
@@ -174,7 +177,15 @@ export function FundMovementModal({
         p_payee_name: isExpense ? payeeName.trim() : null,
         p_category_id: isExpense && categoryId ? Number(categoryId) : null,
         p_receipt_no: isExpense && receiptNo.trim() ? receiptNo.trim() : null,
-      });
+      };
+      // A refused confirmation (e.g. the fund's day is closed, or an earlier day
+      // still has to be closed) leaves the issued document behind. Pressing
+      // again with the same details confirms THAT document instead of issuing a
+      // second one.
+      const signature = JSON.stringify(createParams);
+      const reuse = createdRef.current?.signature === signature ? createdRef.current : null;
+      const created = reuse ?? await apiClient.rpc<FundMovementCreateResult>('fn_fund_movement_create', createParams);
+      createdRef.current = { signature, bill_id: created.bill_id };
 
       const confirmed = await apiClient.rpc<FundMovementConfirmResult>('fn_fund_movement_confirm', {
         p_bill_id: created.bill_id,
@@ -189,7 +200,7 @@ export function FundMovementModal({
       setView('done');
       invalidate();
     } catch (err) {
-      setError(err instanceof ApiError ? translateApiError(err, t) : String(err));
+      setError(describeFundPayError(err, t, i18n.language));
       // The document may already exist as a draft, so refresh either way.
       invalidate();
     } finally {
@@ -315,6 +326,8 @@ export function FundMovementModal({
                   {futureDate && (
                     <span className="text-xs text-danger-fg mt-1">{t('fundBook.dateFuture')}</span>
                   )}
+                  {/* Steer away from a closed fund day before pressing (fund day close §B). */}
+                  <FundDayClosedHint companyId={companyId} date={paidDate} enabled={open && !futureDate} />
                 </div>
 
                 <div className="flex flex-col">
@@ -357,7 +370,7 @@ export function FundMovementModal({
               </div>
             </div>
 
-            <ModalErrorBand message={error} onDismiss={() => setError(null)} />
+            <FundPayErrorBand error={error} onDismiss={() => setError(null)} />
 
             <div className="modal-footer">
               <Button variant="ghost" onClick={handleClose} disabled={saving}>{t('common.cancel')}</Button>
