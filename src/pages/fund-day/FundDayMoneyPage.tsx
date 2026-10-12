@@ -381,24 +381,31 @@ export function FundDayMoneyPage() {
    */
   const renderGroupLine = (key: string, icon: ReactNode, label: string, itemCount: number) => {
     const expanded = openAccount === key;
+    const clickable = itemCount > 0;
+    // The whole row is the control when there are rows to open, so the count
+    // never floats alone at the far edge of a wide panel with dead space beside
+    // it. With nothing to open it is a plain, non-interactive line.
+    const Row = clickable ? 'button' : 'div';
     return (
-      <div key={key} className={expanded ? 'border border-line rounded-lg overflow-hidden' : ''}>
-        <div className={`flex items-center justify-between gap-3 flex-wrap text-sm text-subtle ${expanded ? 'px-4 py-3' : 'px-1'}`}>
-          <div className="flex items-center gap-2 min-w-0">
-            {icon}
-            <span>{label}</span>
-          </div>
-          {itemCount > 0 && (
-            <button
-              type="button"
-              onClick={() => setOpenAccount(expanded ? null : key)}
-              className="text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer text-sm"
-            >
-              {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+      <div key={key} className="border border-line rounded-lg overflow-hidden">
+        <Row
+          {...(clickable
+            ? { type: 'button' as const, onClick: () => setOpenAccount(expanded ? null : key) }
+            : {})}
+          className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm text-subtle text-left ${
+            clickable ? 'cursor-pointer hover:bg-surface-hover' : ''
+          }`}
+        >
+          {icon}
+          <span className="min-w-0 truncate">{label}</span>
+          <span className="flex-1" />
+          {clickable && (
+            <span className="inline-flex items-center gap-1 text-primary-fg shrink-0">
               {t('fundDay.itemCount', { count: itemCount })}
-            </button>
+              {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            </span>
           )}
-        </div>
+        </Row>
         {expanded && (
           <div className="border-t border-line bg-surface-shallow">
             <FundLinesTable lines={bankLines.data} loading={bankLines.isLoading} />

@@ -7,9 +7,9 @@
 // find the same movement in the bank statement.
 
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
-import { Loader2, ExternalLink } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
+import { EntityCodeLink } from '../../components/EntityCodeLink';
 import { fmtCurrency } from '../../lib/format';
 import { isBankLine, type FundLine } from './fundDayTypes';
 
@@ -41,7 +41,6 @@ function docPath(line: FundLine): string | null {
 
 export function FundLinesTable({ lines, loading }: FundLinesTableProps) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
 
   if (loading) {
     return (
@@ -116,18 +115,7 @@ export function FundLinesTable({ lines, loading }: FundLinesTableProps) {
                   <td className="px-3 py-2">{bank?.party_name ?? '—'}</td>
                 )}
                 <td className="px-3 py-2">
-                  {path ? (
-                    <button
-                      type="button"
-                      onClick={() => navigate(path)}
-                      className="text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer font-medium"
-                    >
-                      {docLabel}
-                      <ExternalLink size={12} />
-                    </button>
-                  ) : (
-                    <span className="font-medium">{docLabel}</span>
-                  )}
+                  <EntityCodeLink to={path} code={docLabel} className="font-medium" />
                   {bank?.contract_code && (
                     <div className="text-xs text-subtle">{bank.contract_code}</div>
                   )}
