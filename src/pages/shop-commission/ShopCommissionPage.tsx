@@ -25,6 +25,7 @@ import { OverflowTabs } from '../../components/OverflowTabs';
 import { FilterBar } from '../../components/FilterBar';
 import { SearchInput } from '../../components/SearchInput';
 import { DateTime } from '../../components/DateTime';
+import { CopyButton } from '../../components/CopyButton';
 import { fmtCurrency, formatEntityCode, makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../../lib/format';
 import {
   CONTRACT_COMMISSION_STATUSES, CONTRACT_STATUS_COLOR, payNoLabel,
@@ -508,6 +509,7 @@ function ContractCommissionDetail({ scope, contractId, row: rowFromList, isMobil
               <ExternalLink size={12} className="shrink-0" />
             </Link>
           )}
+          {row && <CopyButton value={formatEntityCode(row.contract_code)} size={14} className="shrink-0" />}
           {row && (
             <Badge size="sm" color={CONTRACT_STATUS_COLOR[row.commission_status] ?? 'default'}>
               {t(`shopCommission.contractStatus_${row.commission_status}`, { defaultValue: row.commission_status })}
