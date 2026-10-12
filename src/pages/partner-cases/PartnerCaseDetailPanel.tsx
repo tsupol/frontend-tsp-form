@@ -16,11 +16,11 @@ import { useQuery } from '@tanstack/react-query';
 import { Badge, Button, Tooltip } from 'tsp-form';
 import {
   ArrowLeft, Clock, FileText, Smartphone, User, Wallet,
-  AlertTriangle, ImageOff, ExternalLink,
+  AlertTriangle, ImageOff,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
+import { EntityCodeLink } from '../../components/EntityCodeLink';
 import { fmtCurrency, formatTel, formatCid } from '../../lib/format';
 import { MediaLightboxKeyGallery, MediaThumbButton } from '../../components/MediaLightbox';
 import { normalizeKey } from '../../lib/mediaPath';
@@ -87,7 +87,6 @@ export function PartnerCaseDetailPanel({
   detail, loading, isMobile, onBack, onDecided,
 }: PartnerCaseDetailPanelProps) {
   const { t, i18n } = useTranslation();
-  const navigate = useNavigate();
 
   const [approveOpen, setApproveOpen] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
@@ -401,14 +400,11 @@ export function PartnerCaseDetailPanel({
               <div className="rounded-md border border-line overflow-hidden">
                 {shownContracts.map(c => (
                   <div key={c.contract_id} className="flex items-center gap-2 px-3 py-2 border-b border-line last:border-b-0">
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/admin/contracts/search/${c.contract_id}`)}
-                      className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer shrink-0"
-                    >
-                      {c.contract_code}
-                      <ExternalLink size={12} />
-                    </button>
+                    <EntityCodeLink
+                      to={`/admin/contracts/search/${c.contract_id}`}
+                      code={c.contract_code}
+                      className="text-sm font-medium shrink-0"
+                    />
                     <Badge size="sm">{t(`contract.state_${c.state}`, { defaultValue: c.state })}</Badge>
                     {/* Overdue is the fact a credit reviewer is looking for. */}
                     {(c.overdue_count ?? 0) > 0 && (

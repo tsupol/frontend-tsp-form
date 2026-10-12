@@ -1,16 +1,17 @@
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import {
   MobileHeader, DataTable, Select, Badge, InputDateRangePicker,
 } from 'tsp-form';
 import {
-  ArrowRightFromLine, Keyboard, ExternalLink, Wallet, HandCoins,
+  ArrowRightFromLine, Keyboard, Wallet, HandCoins,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
+import { EntityCodeLink } from '../../components/EntityCodeLink';
 import { FilterBar, type FilterBarItem } from '../../components/FilterBar';
 import {
   fmtCurrency, toLocalDateStr, parseLocalDate, makeDateRangePickerFormat,
@@ -47,7 +48,6 @@ function defaultRange() {
 export function PaymentsPage() {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
-  const navigate = useNavigate();
   const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
   const userBranchId = isBranchUser && user?.branch_id ? String(user.branch_id) : '';
 
@@ -287,14 +287,11 @@ export function PaymentsPage() {
               >
                 <div className="flex flex-col gap-1 min-w-0 flex-1">
                   <div className="flex items-center gap-2 min-w-0">
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/admin/accounting/bills/${p.bill_id}`)}
-                      className="font-mono text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer truncate"
-                    >
-                      {p.bill_code}
-                      <ExternalLink size={12} />
-                    </button>
+                    <EntityCodeLink
+                      to={`/admin/accounting/bills/${p.bill_id}`}
+                      code={p.bill_code}
+                      className="font-mono text-sm font-medium truncate"
+                    />
                     <Badge color={METHOD_COLOR[p.method] ?? 'default'} size="sm">
                       {t(`accounting.payments.m_${p.method}`, { defaultValue: p.method })}
                     </Badge>
@@ -304,14 +301,12 @@ export function PaymentsPage() {
                     <span className="truncate">
                       {p.customer_name?.trim() && <span>{p.customer_name}</span>}
                       {p.contract_code && (
-                        <> · <button
-                          type="button"
-                          onClick={() => p.contract_id && navigate(`/admin/contracts/search/${p.contract_id}`)}
-                          className="font-mono text-primary-fg hover:underline inline-flex items-center gap-0.5 bg-transparent border-none p-0 cursor-pointer"
-                        >
-                          {p.contract_code}
-                          <ExternalLink size={11} />
-                        </button></>
+                        <> · <EntityCodeLink
+                          to={p.contract_id ? `/admin/contracts/search/${p.contract_id}` : null}
+                          code={p.contract_code}
+                          iconSize={11}
+                          className="font-mono"
+                        /></>
                       )}
                       {p.bank_name && <> · <span>{p.bank_name} {p.account_number_display}</span></>}
                       {p.payer_name && <> · <span>{p.payer_name}</span></>}

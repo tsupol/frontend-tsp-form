@@ -6,10 +6,11 @@ import {
   PageNav, PageNavPanel, MobileHeader, DataTable,
   Badge, Select, Button, useSnackbarContext,
 } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Package, ExternalLink, ArrowRight, XCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, Package, ArrowRight, XCircle } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { DateTime } from '../../components/DateTime';
+import { EntityCodeLink } from '../../components/EntityCodeLink';
 import { CopyButton } from '../../components/CopyButton';
 import { fmtCurrency } from '../../lib/format';
 import { codeDisplay } from './inventoryUtils';
@@ -309,7 +310,6 @@ function AssetSaleDetailPanel({
   addSnackbar: (opts: { message: React.ReactNode }) => void;
 }) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [cancelOpen, setCancelOpen] = useState(false);
   const [commitOpen, setCommitOpen] = useState(false);
@@ -368,14 +368,11 @@ function AssetSaleDetailPanel({
         {/* Asset */}
         <section className="px-4 py-2.5 border-b border-line">
           <SectionLabel>{t('assetSales.asset')}</SectionLabel>
-          <button
-            type="button"
-            onClick={() => navigate(`/admin/inventory/assets/${row.asset_id}`)}
-            className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
-          >
-            {codeDisplay(row.asset_code_display, row.asset_code)}
-            <ExternalLink size={12} />
-          </button>
+          <EntityCodeLink
+            to={`/admin/inventory/assets/${row.asset_id}`}
+            code={codeDisplay(row.asset_code_display, row.asset_code)}
+            className="text-sm font-medium"
+          />
           <div className="text-sm mt-0.5">{row.product_name}</div>
           <div className="text-xs text-subtle mt-0.5">
             {row.serial_no && <>SN: {row.serial_no}</>}
@@ -396,14 +393,11 @@ function AssetSaleDetailPanel({
           <section className="px-4 py-2.5 border-b border-line">
             <SectionLabel>{t('assetSales.bill')}</SectionLabel>
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => navigate(`/admin/accounting/bills/${row.bill_id}`)}
-                className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
-              >
-                {row.bill_code ?? `#${row.bill_id}`}
-                <ExternalLink size={12} />
-              </button>
+              <EntityCodeLink
+                to={`/admin/accounting/bills/${row.bill_id}`}
+                code={row.bill_code ?? `#${row.bill_id}`}
+                className="text-sm font-medium"
+              />
               {row.bill_status && (
                 <Badge size="xs" color={row.bill_voided ? 'danger' : 'default'}>{row.bill_status}</Badge>
               )}

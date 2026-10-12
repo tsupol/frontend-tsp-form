@@ -20,10 +20,11 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Badge, Button, Tooltip } from 'tsp-form';
 import {
-  ArrowLeft, Camera, CheckCircle2, ExternalLink, FileSignature, History, Info, PenLine,
+  ArrowLeft, Camera, CheckCircle2, FileSignature, History, Info, PenLine,
   Send, Trash2, XCircle,
 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
+import { EntityCodeLink } from '../../components/EntityCodeLink';
 import { PartnerRemitAccounts } from '../../components/PartnerRemitAccounts';
 import { PartnerReturnTimeline } from '../../components/PartnerReturnTimeline';
 import { ContractPhotoGroups } from '../contracts/ContractPhotoGroups';
@@ -177,14 +178,10 @@ export function ReturnDetailPanel({ returnId, isMobile, onBack }: {
                 {refLabel(receivePoints, detail.receive_point)}
               </Row>
               <Row label={t('partnerReturn.contract')}>
-                <button
-                  type="button"
-                  onClick={() => navigate(`/admin/contracts/search/${detail.contract_id}`)}
-                  className="text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
-                >
-                  {detail.contract_code ?? detail.contract_id}
-                  <ExternalLink size={12} />
-                </button>
+                <EntityCodeLink
+                  to={`/admin/contracts/search/${detail.contract_id}`}
+                  code={detail.contract_code ?? String(detail.contract_id)}
+                />
               </Row>
               <Row label={t('partnerReturn.customer')}>{detail.customer_name ?? '—'}</Row>
               <Row label={t('partnerReturn.device')}>

@@ -14,12 +14,12 @@
 import { OverflowTabs } from '../../components/OverflowTabs';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 import { Badge, Button, Tooltip } from 'tsp-form';
 import {
-  ArrowLeft, ExternalLink, FileQuestion, Image as ImageIcon, PackageSearch, Wrench,
+  ArrowLeft, FileQuestion, Image as ImageIcon, PackageSearch, Wrench,
 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
+import { EntityCodeLink } from '../../components/EntityCodeLink';
 import { PartnerReturnTimeline } from '../../components/PartnerReturnTimeline';
 import { PartnerRemitAccounts } from '../../components/PartnerRemitAccounts';
 import { fmtCurrency } from '../../lib/format';
@@ -68,7 +68,6 @@ interface Props {
 
 export function PartnerReturnDetailPanel({ returnId, isMobile, onBack, queueRow }: Props) {
   const { t, i18n } = useTranslation();
-  const navigate = useNavigate();
 
   const { detail, isLoading, isFetched } = usePartnerReturnDetail(returnId);
   const { row } = usePartnerReturnRow(returnId);
@@ -234,14 +233,10 @@ export function PartnerReturnDetailPanel({ returnId, isMobile, onBack, queueRow 
 
               <div className="px-3 py-2.5 border-t border-line grid gap-2 sm:grid-cols-2 text-sm">
                 <Fact label={t('partnerReturn.contract')}>
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/admin/contracts/${detail.contract_id}`)}
-                    className="text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
-                  >
-                    {detail.contract_code}
-                    <ExternalLink size={12} />
-                  </button>
+                  <EntityCodeLink
+                    to={`/admin/contracts/${detail.contract_id}`}
+                    code={detail.contract_code}
+                  />
                   {detail.contract_state && (
                     <span className="text-xs text-subtle ml-1">
                       {t(`contract.state_${detail.contract_state}`, { defaultValue: detail.contract_state })}
@@ -285,14 +280,10 @@ export function PartnerReturnDetailPanel({ returnId, isMobile, onBack, queueRow 
               <div className="px-3 py-2.5 border-t border-line grid gap-2 sm:grid-cols-2 text-sm">
                 <Fact label={t('partnerReturn.settlement')}>
                   {detail.settlement_code ? (
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/admin/partner-settlements/${detail.settlement_id}`)}
-                      className="text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
-                    >
-                      {detail.settlement_code}
-                      <ExternalLink size={12} />
-                    </button>
+                    <EntityCodeLink
+                      to={`/admin/partner-settlements/${detail.settlement_id}`}
+                      code={detail.settlement_code}
+                    />
                   ) : '—'}
                   {detail.settlement_status && (
                     <span className="text-xs text-subtle ml-1">
@@ -307,14 +298,10 @@ export function PartnerReturnDetailPanel({ returnId, isMobile, onBack, queueRow 
                 </Fact>
                 <Fact label={t('partnerReturn.paidPayout')}>
                   {detail.paid_bill_code ? (
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/admin/fund-bills/${detail.paid_bill_id}`)}
-                      className="text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
-                    >
-                      {detail.paid_bill_code}
-                      <ExternalLink size={12} />
-                    </button>
+                    <EntityCodeLink
+                      to={`/admin/fund-bills/${detail.paid_bill_id}`}
+                      code={detail.paid_bill_code}
+                    />
                   ) : t('partnerReturn.notPaidYet')}
                 </Fact>
                 <Fact label={t('partnerReturn.guarantee')}>

@@ -15,13 +15,13 @@
 import { OverflowTabs } from '../../components/OverflowTabs';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 import {
   PageNav, PageNavPanel, DataTable, MobileHeader, Badge, Button, Checkbox,
 } from 'tsp-form';
-import { ArrowRightFromLine, Clock, ExternalLink } from 'lucide-react';
+import { ArrowRightFromLine, Clock } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
-import { fmtCurrency, formatEntityCode } from '../../lib/format';
+import { EntityCodeLink } from '../../components/EntityCodeLink';
+import { fmtCurrency } from '../../lib/format';
 import { useFundClawbackCandidates } from './useFundClawback';
 import { FundClawbackIssueModal } from './FundClawbackIssueModal';
 import type { FundClawbackCandidate } from './fundClawbackTypes';
@@ -30,7 +30,6 @@ type TabKey = 'DUE' | 'UPCOMING';
 
 export function FundClawbackPage() {
   const { t } = useTranslation();
-  const navigate = useNavigate();
 
   const [tab, setTab] = useState<TabKey>('DUE');
   const [selected, setSelected] = useState<number[]>([]);
@@ -79,14 +78,11 @@ export function FundClawbackPage() {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => navigate(`/admin/contracts/search/${r.contract_id}`)}
-              className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer truncate"
-            >
-              {formatEntityCode(r.contract_code)}
-              <ExternalLink size={12} />
-            </button>
+            <EntityCodeLink
+              to={`/admin/contracts/search/${r.contract_id}`}
+              code={r.contract_code}
+              className="text-sm font-medium truncate"
+            />
             {/* Who owes it back decides what goes on the document, and the shop
              *  never sees a document the company owes. */}
             <Badge color={r.liable_party_type === 'BRANCH' ? 'warning' : 'info'} size="sm">

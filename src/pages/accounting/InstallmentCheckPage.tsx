@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState, type ReactNode } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import {
@@ -7,11 +7,12 @@ import {
 } from 'tsp-form';
 import {
   ArrowRightFromLine, Keyboard, FileSpreadsheet, Loader2, Repeat, Flag,
-  Landmark, Smartphone, User, Receipt, Image as ImageIcon, ExternalLink,
+  Landmark, Smartphone, User, Receipt, Image as ImageIcon,
 } from 'lucide-react';
 import { ApiError, apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
+import { EntityCodeLink } from '../../components/EntityCodeLink';
 import { MediaLightbox } from '../../components/MediaLightbox';
 import { FilterBar, type FilterBarItem } from '../../components/FilterBar';
 import {
@@ -361,18 +362,18 @@ export function InstallmentCheckPage() {
                       ? <Flag size={14} className="text-warning-fg shrink-0 self-center" />
                       : <Repeat size={14} className="text-subtle shrink-0 self-center" />}
                     {/* Payment code → payment-list, filtered to this payment (shows voided/reversed there). */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const p = new URLSearchParams({ q: r.payment_code, from: fromDate, to: toDate });
-                        if (!allBranches && branchId) p.set('branch_id', branchId);
-                        navigate(`/admin/accounting/payment-list?${p.toString()}`);
-                      }}
-                      className={`font-mono text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-0.5 bg-transparent border-none p-0 cursor-pointer ${r.is_reversed ? 'line-through text-subtler' : ''}`}
-                    >
-                      {r.payment_code}
-                      <ExternalLink size={10} />
-                    </button>
+                    {(() => {
+                      const p = new URLSearchParams({ q: r.payment_code, from: fromDate, to: toDate });
+                      if (!allBranches && branchId) p.set('branch_id', branchId);
+                      return (
+                        <EntityCodeLink
+                          to={`/admin/accounting/payment-list?${p.toString()}`}
+                          code={r.payment_code}
+                          iconSize={10}
+                          className={`font-mono text-sm font-medium ${r.is_reversed ? 'line-through text-subtler' : ''}`}
+                        />
+                      );
+                    })()}
                     <Badge color={r.kind === 'EARLY_PAYOFF' ? 'warning' : 'secondary'} size="xs">
                       {t(`accounting.installmentCheck.kind_${r.kind}`)}
                     </Badge>
@@ -402,24 +403,20 @@ export function InstallmentCheckPage() {
                   {/* Line 2 — bill · contract · customer (bill + contract link out) */}
                   <div className="flex items-center gap-1.5 text-xs text-subtle mt-1.5 flex-wrap">
                     <Receipt size={12} className="shrink-0" />
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/admin/accounting/bills/${r.bill_id}`)}
-                      className="font-mono text-primary-fg hover:underline inline-flex items-center gap-0.5 bg-transparent border-none p-0 cursor-pointer"
-                    >
-                      {r.bill_code}
-                      <ExternalLink size={10} />
-                    </button>
+                    <EntityCodeLink
+                      to={`/admin/accounting/bills/${r.bill_id}`}
+                      code={r.bill_code}
+                      iconSize={10}
+                      className="font-mono"
+                    />
                     <span className="text-line">|</span>
                     <User size={12} className="shrink-0" />
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/admin/contracts/search/${r.contract_id}`)}
-                      className="font-mono text-primary-fg hover:underline inline-flex items-center gap-0.5 bg-transparent border-none p-0 cursor-pointer"
-                    >
-                      {r.contract_code}
-                      <ExternalLink size={10} />
-                    </button>
+                    <EntityCodeLink
+                      to={`/admin/contracts/search/${r.contract_id}`}
+                      code={r.contract_code}
+                      iconSize={10}
+                      className="font-mono"
+                    />
                     <span className="text-fg">{r.customer_name}</span>
                     {r.customer_tel && <span>· {r.customer_tel}</span>}
                   </div>

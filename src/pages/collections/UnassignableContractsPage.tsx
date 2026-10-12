@@ -14,8 +14,9 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { MobileHeader, Badge } from 'tsp-form';
-import { ArrowRightFromLine, AlertTriangle, ExternalLink, Users, ArrowRightLeft } from 'lucide-react';
+import { ArrowRightFromLine, AlertTriangle, Users, ArrowRightLeft } from 'lucide-react';
 import { fmtCurrency } from '../../lib/format';
+import { EntityCodeLink } from '../../components/EntityCodeLink';
 import { useUnassignableContracts, type UnassignableContract, type UnassignableReason } from './managerApi';
 import { useBranchPoolMap } from './collectionPoolApi';
 
@@ -115,14 +116,11 @@ export function UnassignableContractsPage() {
                 {group.rows.map(c => (
                   <div key={c.contract_id} className="px-3 py-2.5 flex items-center gap-3">
                     <div className="min-w-0 flex-1">
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/admin/contracts/search/${c.contract_id}`)}
-                        className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
-                      >
-                        {c.contract_code}
-                        <ExternalLink size={12} />
-                      </button>
+                      <EntityCodeLink
+                        to={`/admin/contracts/search/${c.contract_id}`}
+                        code={c.contract_code}
+                        className="text-sm font-medium"
+                      />
                     </div>
                     <div className="text-right shrink-0 text-sm">
                       <div className="font-medium">฿{fmtCurrency(c.outstanding_amount)}</div>

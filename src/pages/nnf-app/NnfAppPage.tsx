@@ -9,7 +9,6 @@
 // branch column; branch users don't.
 
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { MobileHeader, Badge, Button, Tooltip } from 'tsp-form';
@@ -19,6 +18,7 @@ import {
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
+import { EntityCodeLink } from '../../components/EntityCodeLink';
 import { formatTel } from '../../lib/format';
 import { ResetCustomerLoginModal } from '../../components/ResetCustomerLoginModal';
 import {
@@ -340,15 +340,13 @@ function ActivationAge({ activatedOn, days }: { activatedOn: string | null; days
 /** Contract code → the contract screen. Every row on this page is a contract,
  *  and the staffer's next move is almost always to open it. */
 function ContractLink({ id, code }: { id: number; code: string }) {
-  const navigate = useNavigate();
   return (
-    <button
-      type="button"
-      onClick={() => navigate(`/admin/contracts/search/${id}`)}
-      className="font-medium text-sm tabular-nums text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
-    >
-      {code}<ExternalLink size={12} className="opacity-60" />
-    </button>
+    <EntityCodeLink
+      to={`/admin/contracts/search/${id}`}
+      code={code}
+      icon={<ExternalLink size={12} className="opacity-60 shrink-0" />}
+      className="font-medium text-sm tabular-nums"
+    />
   );
 }
 

@@ -6,12 +6,13 @@ import {
   MobileHeader, Badge, InputDateRangePicker, Button,
 } from 'tsp-form';
 import {
-  ArrowRightFromLine, Keyboard, ChevronRight, ChevronDown, ExternalLink, Truck, Building2, FileSpreadsheet, Loader2, XCircle,
+  ArrowRightFromLine, Keyboard, ChevronRight, ChevronDown, Truck, Building2, FileSpreadsheet, Loader2, XCircle,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { FilterBar, type FilterBarItem } from '../../components/FilterBar';
 import { DateTime } from '../../components/DateTime';
+import { EntityCodeLink } from '../../components/EntityCodeLink';
 import {
   fmtCurrency, toLocalDateStr, parseLocalDate, makeDateRangePickerFormat,
 } from '../../lib/format';
@@ -396,14 +397,12 @@ function GroupRow({
               <span className="text-subtler shrink-0 tabular-nums w-28">
                 <DateTime value={r.bill_created_at} />
               </span>
-              <button
-                type="button"
-                onClick={() => navigate(`/admin/accounting/bills/${r.bill_id}`)}
-                className="font-mono text-primary-fg hover:underline inline-flex items-center gap-0.5 bg-transparent border-none p-0 cursor-pointer shrink-0"
-              >
-                {r.bill_code}
-                <ExternalLink size={10} />
-              </button>
+              <EntityCodeLink
+                to={`/admin/accounting/bills/${r.bill_id}`}
+                code={r.bill_code}
+                iconSize={10}
+                className="font-mono shrink-0"
+              />
               <span className="flex-1 min-w-0 truncate text-subtle">
                 {r.customer_name?.trim() && <>{r.customer_name} · </>}
                 {r.charge_name_th || r.charge_type}

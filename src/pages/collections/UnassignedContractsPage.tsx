@@ -8,11 +8,11 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 import { MobileHeader, Badge, Button } from 'tsp-form';
-import { ArrowRightFromLine, AlertTriangle, ExternalLink } from 'lucide-react';
+import { ArrowRightFromLine, AlertTriangle } from 'lucide-react';
 import { fmtCurrency } from '../../lib/format';
 import { DateTime } from '../../components/DateTime';
+import { EntityCodeLink } from '../../components/EntityCodeLink';
 import { useUnassignedContracts, type PoolReason } from './managerApi';
 
 /** Tab order: the one that needs action first, then the deliberate waits. */
@@ -26,7 +26,6 @@ const REASONS: { key: PoolReason; label: string; hint: string; danger?: boolean 
 
 export function UnassignedContractsPage() {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const [reason, setReason] = useState<PoolReason>('NO_COLLECTOR');
   const { data, isLoading, isError } = useUnassignedContracts(reason);
 
@@ -77,14 +76,11 @@ export function UnassignedContractsPage() {
             {data.map(c => (
               <div key={c.contract_id} className="px-3 py-2.5 flex items-center gap-3">
                 <div className="min-w-0 flex-1">
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/admin/contracts/search/${c.contract_id}`)}
-                    className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
-                  >
-                    {c.contract_code_display}
-                    <ExternalLink size={12} />
-                  </button>
+                  <EntityCodeLink
+                    to={`/admin/contracts/search/${c.contract_id}`}
+                    code={c.contract_code_display}
+                    className="text-sm font-medium"
+                  />
                   <div className="text-xs text-subtle truncate">{c.customer_name}</div>
                 </div>
                 <div className="text-right shrink-0 text-sm">

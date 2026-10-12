@@ -25,14 +25,14 @@
 // Backend: migs 915/928/930/931.
 
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { MobileHeader, Badge, Button, DataTableFooter } from 'tsp-form';
-import { ArrowRightFromLine, RefreshCw, CheckCircle2, ExternalLink, Copy, Check } from 'lucide-react';
+import { ArrowRightFromLine, RefreshCw, CheckCircle2, Copy, Check } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
+import { EntityCodeLink } from '../../components/EntityCodeLink';
 import { formatTel } from '../../lib/format';
 import { getBucketLabel, getBucketColor } from '../inventory/inventoryUtils';
 
@@ -239,7 +239,6 @@ function AnomalyTab({ rows, totalCount, loading, error, fetching, showBranch, pa
 
 function AnomalyCard({ row, showBranch }: { row: MdmAnomalyRow; showBranch: boolean }) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const simRemoved = row.anomaly_codes.includes('SIM_REMOVED');
 
   return (
@@ -282,14 +281,12 @@ function AnomalyCard({ row, showBranch }: { row: MdmAnomalyRow; showBranch: bool
       {/* Context footer — divider separates identity/signal from metadata. */}
       <div className="mt-2.5 pt-2.5 border-t border-line-subtle flex items-center gap-x-2.5 gap-y-1 flex-wrap text-xs text-subtle">
         {row.contract_id && row.contract_code && (
-          <button
-            type="button"
-            onClick={() => navigate(`/admin/contracts/search/${row.contract_id}`)}
-            className="text-xs font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer tabular-nums"
-          >
-            {row.contract_code}
-            <ExternalLink size={11} />
-          </button>
+          <EntityCodeLink
+            to={`/admin/contracts/search/${row.contract_id}`}
+            code={row.contract_code}
+            iconSize={11}
+            className="text-xs font-medium tabular-nums"
+          />
         )}
         {row.contract_state && (
           <span>{t(`contract.state_${row.contract_state}`, { defaultValue: row.contract_state })}</span>
@@ -338,7 +335,6 @@ function SilentTab({ rows, totalCount, loading, error, fetching, showBranch, pag
 
 function SilentCard({ row, showBranch }: { row: MdmSilentRow; showBranch: boolean }) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
 
   return (
     <div className="rounded-lg border border-line bg-surface p-3.5">
@@ -350,14 +346,12 @@ function SilentCard({ row, showBranch }: { row: MdmSilentRow; showBranch: boolea
         {/* Which contract this silent device belongs to — keyed on contract_id,
             never the display code (IMPLEMENT 2026-08-11 §3). */}
         {row.contract_id && row.contract_code && (
-          <button
-            type="button"
-            onClick={() => navigate(`/admin/contracts/search/${row.contract_id}`)}
-            className="text-xs font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer tabular-nums"
-          >
-            {row.contract_code}
-            <ExternalLink size={11} />
-          </button>
+          <EntityCodeLink
+            to={`/admin/contracts/search/${row.contract_id}`}
+            code={row.contract_code}
+            iconSize={11}
+            className="text-xs font-medium tabular-nums"
+          />
         )}
         {row.contract_state && (
           <span>{t(`contract.state_${row.contract_state}`, { defaultValue: row.contract_state })}</span>
@@ -386,7 +380,6 @@ function DeviceIdentity({ serial, assetCode, assetId }: {
   assetId: number;
 }) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
 
   const copySerial = () => {
@@ -411,14 +404,12 @@ function DeviceIdentity({ serial, assetCode, assetId }: {
     <div className="min-w-0">
       {assetCode ? (
         <>
-          <button
-            type="button"
-            onClick={() => navigate(`/admin/inventory/assets/${assetId}`)}
-            className="max-w-full text-[0.95rem] font-semibold text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer tabular-nums"
-          >
-            <span className="truncate">{assetCode}</span>
-            <ExternalLink size={13} className="shrink-0" />
-          </button>
+          <EntityCodeLink
+            to={`/admin/inventory/assets/${assetId}`}
+            code={assetCode}
+            iconSize={13}
+            className="max-w-full text-[0.95rem] font-semibold tabular-nums truncate"
+          />
           <div className="mt-0.5 flex items-center gap-1.5 text-xs text-subtle tabular-nums">
             <span className="truncate">{serial}</span>
             {copyBtn}

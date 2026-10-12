@@ -7,11 +7,12 @@ import {
   PageNav, PageNavPanel,
 } from 'tsp-form';
 import {
-  ArrowRightFromLine, ArrowLeft, Keyboard, ArrowLeftRight, ExternalLink, Search,
+  ArrowRightFromLine, ArrowLeft, Keyboard, ArrowLeftRight, Search,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
+import { EntityCodeLink } from '../../components/EntityCodeLink';
 import { FilterBar, type FilterBarItem } from '../../components/FilterBar';
 import {
   fmtCurrency, toLocalDateStr, parseLocalDate, makeDateRangePickerFormat,
@@ -467,27 +468,23 @@ export function PaymentListPage() {
                         </div>
                         <div className="flex items-center gap-1.5 text-xs text-subtle min-w-0">
                           <span className="truncate inline-flex items-center gap-1.5 min-w-0">
-                            <span
-                              role="link"
-                              tabIndex={0}
-                              onClick={(e) => { e.stopPropagation(); navigate(`/admin/accounting/bills/${p.bill_id}`); }}
-                              className="font-mono text-primary-fg hover:underline inline-flex items-center gap-0.5 cursor-pointer"
-                            >
-                              {p.bill_code_display}
-                              <ExternalLink size={10} />
-                            </span>
+                            <EntityCodeLink
+                              to={`/admin/accounting/bills/${p.bill_id}`}
+                              code={p.bill_code_display}
+                              iconSize={10}
+                              className="font-mono"
+                              stopPropagation
+                            />
                             {p.contract_id && (
                               <>
                                 <span className="text-subtler">·</span>
-                                <span
-                                  role="link"
-                                  tabIndex={0}
-                                  onClick={(e) => { e.stopPropagation(); navigate(`/admin/contracts/search/${p.contract_id}`); }}
-                                  className="font-mono text-primary-fg hover:underline inline-flex items-center gap-0.5 cursor-pointer"
-                                >
-                                  {p.contract_code_display ?? `CT#${p.contract_id}`}
-                                  <ExternalLink size={10} />
-                                </span>
+                                <EntityCodeLink
+                                  to={`/admin/contracts/search/${p.contract_id}`}
+                                  code={p.contract_code_display ?? `CT#${p.contract_id}`}
+                                  iconSize={10}
+                                  className="font-mono"
+                                  stopPropagation
+                                />
                               </>
                             )}
                             {p.bank_name && <span className="truncate">· {p.bank_name} {p.account_number}</span>}
@@ -605,23 +602,19 @@ function PaymentDetailPanel({
 
         {/* Cross-reference links (bill / contract) — same targets as the row */}
         <div className="flex flex-col gap-2 border-t border-line pt-4">
-          <button
-            type="button"
-            onClick={() => navigate(`/admin/accounting/bills/${p.bill_id}`)}
-            className="text-primary-fg hover:underline font-mono inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer self-start"
-          >
-            {p.bill_code_display}
-            <ExternalLink size={13} />
-          </button>
+          <EntityCodeLink
+            to={`/admin/accounting/bills/${p.bill_id}`}
+            code={p.bill_code_display}
+            iconSize={13}
+            className="font-mono self-start"
+          />
           {p.contract_id && (
-            <button
-              type="button"
-              onClick={() => navigate(`/admin/contracts/search/${p.contract_id}`)}
-              className="text-primary-fg hover:underline font-mono inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer self-start"
-            >
-              {p.contract_code_display ?? `CT#${p.contract_id}`}
-              <ExternalLink size={13} />
-            </button>
+            <EntityCodeLink
+              to={`/admin/contracts/search/${p.contract_id}`}
+              code={p.contract_code_display ?? `CT#${p.contract_id}`}
+              iconSize={13}
+              className="font-mono self-start"
+            />
           )}
         </div>
       </div>
