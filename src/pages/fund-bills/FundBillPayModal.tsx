@@ -114,9 +114,10 @@ export function FundBillPayModal({ open, bill, onClose }: FundBillPayModalProps)
       });
       setResult(res);
       invalidate(bill.bill_id);
-      // The pay is recorded; the slip goes on the shop's transfer row and its
-      // failure is reported on the done view, never rolled back.
-      await slip.attach({ billId: bill.bill_id });
+      // The pay is recorded; the slip goes on the movement the pay named
+      // (null = no bank transfer this time, so no slip step) and its failure
+      // is reported on the done view, never rolled back.
+      await slip.attach(res.payment_id);
       setView('done');
     } catch (err) {
       attempt.fail(err, amend);

@@ -208,7 +208,7 @@ export function FundMovementModal({
       invalidate();
       // The confirm returns the movement it wrote, so the slip goes straight
       // onto it; a failure is reported on the done view, never rolled back.
-      await slip.attach({ paymentId: confirmed.payment_id });
+      await slip.attach(confirmed.payment_id);
       setView('done');
     } catch (err) {
       attempt.fail(err, amend);

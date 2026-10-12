@@ -118,9 +118,10 @@ export function FundClawbackCollectModal({ open, bill, onClose }: FundClawbackCo
       });
       setResult(res);
       invalidate();
-      // The slip goes on the movement this press wrote; a failure is reported
-      // on the done view, never rolled back.
-      await slip.attach({ billId: shown.bill_id });
+      // The slip goes on the movement the call names (the fund book's row when
+      // the clawback split across two books; null = nothing through a bank);
+      // a failure is reported on the done view, never rolled back.
+      await slip.attach(res.payment_id);
       setView('done');
     } catch (err) {
       attempt.fail(err, amend);

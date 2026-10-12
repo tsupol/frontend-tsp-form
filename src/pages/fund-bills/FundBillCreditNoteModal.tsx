@@ -83,8 +83,9 @@ export function FundBillCreditNoteModal({ open, bill, onClose }: FundBillCreditN
       setResult(res);
       invalidate(bill.bill_id);
       // The slip (the shop's transfer back) goes on the credit note's own
-      // reversal row; a failure is reported on the done view, never rolled back.
-      await slip.attach({ billId: res.credit_note_id });
+      // reversal row, which the call names (null = nothing through a bank);
+      // a failure is reported on the done view, never rolled back.
+      await slip.attach(res.payment_id);
       setView('done');
     } catch (err) {
       attempt.fail(err, amend);

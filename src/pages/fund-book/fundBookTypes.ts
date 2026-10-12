@@ -112,7 +112,9 @@ export interface FundMovementConfirmResult {
   bill_id: number;
   bill_code: string;
   status: string;
-  payment_id: number;
+  /** The movement a slip belongs to (mig 1417); null = nothing went through a bank. */
+  payment_id: number | null;
+  payment_ids?: number[];
   amount: number;
   flow: 'IN' | 'OUT';
   /** The book's balance right after the movement landed. */

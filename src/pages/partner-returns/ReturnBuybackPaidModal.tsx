@@ -121,9 +121,10 @@ export function ReturnBuybackPaidModal({ open, detail, actions, onClose }: Props
       });
       setResult(res);
       invalidate(detail.return_id);
-      // The slip (the shop's transfer) goes on the buyback document's one
-      // movement; a failure is reported on the done view, never rolled back.
-      await slip.attach({ billId: res.buyback_bill_id });
+      // The slip (the shop's transfer) goes on the buyback document's movement
+      // the call names (null = nothing through a bank); a failure is reported
+      // on the done view, never rolled back.
+      await slip.attach(res.payment_id);
       setView('done');
     } catch (err) {
       attempt.fail(err, amend);
