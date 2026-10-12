@@ -8510,7 +8510,6 @@
       "feature_REWARD": "Reward points",
       "fundShareTitle": "Installment share to the company (%)",
       "fundShareHint": "The share of collected installments this fund company keeps (late fees and deposits excluded). Each contract keeps the value in force on the day it opens.",
-      "fundShareNotCalc": "Set · the system does not compute the share yet",
       "fundShareNeverSet": "Never set",
       "fundShareSetBy": "Set by",
       "fundShareNote": "Note",

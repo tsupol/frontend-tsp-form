@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Badge, Button, DataTable, MaskedInput, Modal, TextArea, type ColumnDef,
+  Button, DataTable, MaskedInput, Modal, TextArea, type ColumnDef,
 } from 'tsp-form';
-import { AlertTriangle, Pencil } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { translateApiError } from '../../lib/apiErrors';
@@ -15,11 +15,11 @@ import { ActionDoneView } from '../contracts/ActionDoneView';
 
 // ── Fund revenue share (mig 1431) ─────────────────────────────────────────────
 // The % of collected installments (not late fees, not deposits) the fund
-// company keeps. Phase 1 is configuration only: the backend stores the value
-// and its history but does not compute or move money yet (`calc_enabled` is
-// false), so the panel carries a standing "not computed yet" badge. A contract
-// freezes the value in force on the day it opens, which is why the edit modal
-// says the change reaches only contracts opened after saving.
+// company keeps. Since mig 1441 the backend books it the moment an installment
+// is collected — the company's book gets its share, the fund's book the rest —
+// with no document, no bundle and no payout. A contract freezes the value in
+// force on the day it opens, which is why the edit modal says the change
+// reaches only contracts opened after saving.
 //
 // Only holding admin / SYSTEM_DEV may write (the backend refuses everyone else
 // with PERMISSION_DENIED); fund users see the panel read-only. Operating
@@ -136,11 +136,6 @@ export function FundRevenueShareSection({ companyId }: { companyId: number }) {
           <div className="flex flex-col gap-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-3xl font-semibold tabular-nums leading-none">{fmtPct(row.share_pct)}</span>
-              {!row.calc_enabled && (
-                <Badge size="sm" color="warning" startIcon={<AlertTriangle size={11} />}>
-                  {t('settings.config.fundShareNotCalc')}
-                </Badge>
-              )}
             </div>
             <div className="text-xs text-subtle">
               {row.set_at ? (
@@ -318,14 +313,6 @@ function FundRevenueShareModal({ open, row, onClose, onSaved }: {
               { label: t('settings.config.fundSharePrevious'), value: fmtPct(result.previous_share_pct) },
               { label: t('settings.config.fundShareNew'), value: fmtPct(result.share_pct), emphasis: true },
             ]}
-            extras={
-              !result.calc_enabled ? (
-                <div className="alert alert-warning">
-                  <AlertTriangle size={16} />
-                  <span className="alert-description text-xs">{t('settings.config.fundShareNotCalc')}</span>
-                </div>
-              ) : undefined
-            }
             onClose={forceClose}
           />
         )}
