@@ -17,11 +17,6 @@ import { fmtCurrency, formatEntityCode } from '../../lib/format';
 import { useFundBillCandidates, useFundBillInvalidate } from './useFundBills';
 import type { FundBillAddSettlementResult, FundBillCandidate } from './fundBillTypes';
 
-// `v_fund_bill_candidates` carries the contract's standard product name since
-// mig 1422. `FundBillCandidate` lives in a file another stream owns right now,
-// so the field is read here until it moves onto the type.
-const productName = (r: FundBillCandidate): string | null =>
-  (r as FundBillCandidate & { product_display_name?: string | null }).product_display_name ?? null;
 
 interface FundBillAddSettlementModalProps {
   open: boolean;
@@ -145,8 +140,8 @@ export function FundBillAddSettlementModal({
                           <span className="block text-subtle text-small">
                             {formatEntityCode(row.contract_code)} · {fmtCurrency(row.net_amount)}
                           </span>
-                          {productName(row) && (
-                            <span className="block text-subtle text-small">{productName(row)}</span>
+                          {row.product_display_name && (
+                            <span className="block text-subtle text-small">{row.product_display_name}</span>
                           )}
                           {row.finance_checked_at && (
                             <span className="block text-subtler text-small">

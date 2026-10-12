@@ -39,6 +39,8 @@ export interface SettlementReturnReasonRef {
 export interface PartnerSettlement {
   settlement_id: number;
   settlement_code: string;
+  /** Standard product name (mig 1422), null when the row has no contract. */
+  product_display_name?: string | null;
   contract_id: number;
   contract_code: string;
   contract_state: string;

@@ -50,6 +50,8 @@ export type FundLineDirection = 'TO_PARTY' | 'FROM_PARTY' | 'MEMO';
 export interface FundBillCandidate {
   settlement_id: number;
   settlement_code: string;
+  /** Standard product name (mig 1422). */
+  product_display_name?: string | null;
   holding_id: number;
   company_id: number;
   branch_id: number;

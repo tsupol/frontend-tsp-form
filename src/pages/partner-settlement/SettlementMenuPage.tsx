@@ -37,11 +37,6 @@ import {
 } from './usePartnerSettlement';
 import { settlementBadgeColor, type PartnerSettlement } from './partnerSettlementTypes';
 
-// `v_partner_my_settlements` carries the contract's standard product name since
-// mig 1422. `PartnerSettlement` lives in a file another stream owns right now,
-// so the field is read here until it moves onto the type.
-const productName = (r: PartnerSettlement): string | null =>
-  (r as PartnerSettlement & { product_display_name?: string | null }).product_display_name ?? null;
 
 interface SettlementMenuPageProps {
   menu: SettlementMenu;
@@ -175,8 +170,8 @@ export function SettlementMenuPage({ menu, basePath, titleKey }: SettlementMenuP
                             {fmtCurrency(r.net_amount)}
                           </span>
                         </div>
-                        {productName(r) && (
-                          <div className="text-xs text-subtle mt-0.5 truncate">{productName(r)}</div>
+                        {r.product_display_name && (
+                          <div className="text-xs text-subtle mt-0.5 truncate">{r.product_display_name}</div>
                         )}
                         {/* The one line that decides what the shop does next. */}
                         {r.status === 'NEEDS_FIX' && (
