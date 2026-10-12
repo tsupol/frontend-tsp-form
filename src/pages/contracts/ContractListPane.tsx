@@ -422,8 +422,7 @@ export function ContractListPane({
                             {getStateLabel(contract.state, t)}
                           </Badge>
                           {contract.is_device_deposited && (
-                            <Badge size="xs" color="warning" className="shrink-0 inline-flex items-center gap-1">
-                              <Archive size={10} />
+                            <Badge size="xs" color="warning" className="shrink-0" startIcon={<Archive size={10} />}>
                               {t('contract.deposit_chip', { defaultValue: 'Device deposited' })}
                             </Badge>
                           )}

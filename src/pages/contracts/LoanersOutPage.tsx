@@ -170,8 +170,8 @@ export function LoanersOutPage() {
                             <div className="flex items-center gap-2 min-w-0">
                               <span className="font-medium text-sm truncate">{row.contract_code_display ?? row.contract_code}</span>
                               {row.primary_device_bucket === 'IN_REPAIR' && (
-                                <Badge size="xs" color="warning">
-                                  <Wrench size={10} className="mr-0.5" />{t('loaner.primaryRepairing')}
+                                <Badge size="xs" color="warning" startIcon={<Wrench size={10} />}>
+                                  {t('loaner.primaryRepairing')}
                                 </Badge>
                               )}
                             </div>

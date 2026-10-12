@@ -259,13 +259,11 @@ function LoginRowView({ row, lang, t }: {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 flex-wrap">
             {row.success ? (
-              <Badge size="xs" color="success">
-                <CheckCircle size={10} className="mr-0.5" />
+              <Badge size="xs" color="success" startIcon={<CheckCircle size={10} />}>
                 {t('customer.login.result_success')}
               </Badge>
             ) : (
-              <Badge size="xs" color="danger">
-                <XCircle size={10} className="mr-0.5" />
+              <Badge size="xs" color="danger" startIcon={<XCircle size={10} />}>
                 {t('customer.login.result_failed')}
               </Badge>
             )}

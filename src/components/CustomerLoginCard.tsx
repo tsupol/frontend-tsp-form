@@ -82,8 +82,7 @@ export function CustomerLoginCard({ customer, onChanged, noCard = false }: Props
               <div className="flex items-center gap-1.5 flex-wrap justify-end">
                 <Badge size="xs" color="success">{t('customer.login.hasLogin')}</Badge>
                 {customer.is_currently_locked && (
-                  <Badge size="xs" color="danger">
-                    <Lock size={10} className="mr-0.5" />
+                  <Badge size="xs" color="danger" startIcon={<Lock size={10} />}>
                     {customer.locked_until
                       ? t('customer.login.lockedUntil', {
                           until: formatDateTime(customer.locked_until, i18n.language, true),
@@ -92,8 +91,7 @@ export function CustomerLoginCard({ customer, onChanged, noCard = false }: Props
                   </Badge>
                 )}
                 {!customer.is_currently_locked && customer.failed_login_count > 0 && (
-                  <Badge size="xs" color="warning">
-                    <Clock size={10} className="mr-0.5" />
+                  <Badge size="xs" color="warning" startIcon={<Clock size={10} />}>
                     {t('customer.login.failedCount', { count: customer.failed_login_count })}
                   </Badge>
                 )}

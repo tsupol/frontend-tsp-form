@@ -167,18 +167,18 @@ export function DeviceContextBadges({
   return (
     <>
       {inRepair && (
-        <Badge size="sm" color="info">
-          <Wrench size={11} className="inline -mt-0.5 mr-0.5" />{t('callCenter.deviceInRepair')}
+        <Badge size="sm" color="info" startIcon={<Wrench size={11} />}>
+          {t('callCenter.deviceInRepair')}
         </Badge>
       )}
       {deposited && (
-        <Badge size="sm" color="warning">
-          <Store size={11} className="inline -mt-0.5 mr-0.5" />{t('callCenter.deviceDeposited')}
+        <Badge size="sm" color="warning" startIcon={<Store size={11} />}>
+          {t('callCenter.deviceDeposited')}
         </Badge>
       )}
       {hasLoaner && (
-        <Badge size="sm" color={loanerProminent ? 'danger' : 'info'}>
-          <Repeat size={11} className="inline -mt-0.5 mr-0.5" />{t('callCenter.hasLoaner')}
+        <Badge size="sm" color={loanerProminent ? 'danger' : 'info'} startIcon={<Repeat size={11} />}>
+          {t('callCenter.hasLoaner')}
         </Badge>
       )}
     </>
@@ -191,8 +191,7 @@ export function AppointmentBadge({ date }: { date: string | null }) {
   const { t } = useTranslation();
   if (!date) return null;
   return (
-    <Badge size="sm" color="success">
-      <CalendarClock size={11} className="inline -mt-0.5 mr-0.5" />
+    <Badge size="sm" color="success" startIcon={<CalendarClock size={11} />}>
       {t('callCenter.appointmentOn')} <DateTime value={date} showTime={false} />
     </Badge>
   );
