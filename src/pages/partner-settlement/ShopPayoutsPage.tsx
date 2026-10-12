@@ -23,9 +23,11 @@ import { Navigate } from 'react-router-dom';
 import { PageNav, PageNavPanel, DataTable, MobileHeader, Badge } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine, Banknote } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
+import { CopyButton } from '../../components/CopyButton';
+import { EntityCodeLink } from '../../components/EntityCodeLink';
 import { SearchInput } from '../../components/SearchInput';
 import { useStagePick } from '../../lib/stagePick';
-import { fmtCurrency, formatEntityCode } from '../../lib/format';
+import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { PartnerBalanceHeader } from './PartnerBalanceHeader';
 import { FundPaymentEvidence } from '../fund-bills/FundPaymentEvidence';
@@ -230,7 +232,11 @@ function ShopFundBillPanel({ bill }: { bill: PartnerMyFundBill }) {
   const manual: PartnerMyFundBillLine[] = [];
   for (const line of lines.rows) {
     if (line.is_manual) { manual.push(line); continue; }
-    let group = byContract.find(g => g.settlement_id === line.settlement_id);
+    // Payout lines ride on a payment request; commission lines have none and
+    // group by their contract instead, so each contract keeps its own block.
+    let group = byContract.find(g => line.settlement_id != null
+      ? g.settlement_id === line.settlement_id
+      : g.settlement_id == null && g.contract_id === line.contract_id);
     if (!group) {
       group = {
         settlement_id: line.settlement_id,
@@ -265,7 +271,13 @@ function ShopFundBillPanel({ bill }: { bill: PartnerMyFundBill }) {
 
   const renderLine = (line: PartnerMyFundBillLine) => (
     <div key={line.line_id} className="flex items-center gap-2 px-3 py-1.5 border-t border-line">
-      <span className="text-sm truncate flex-1 min-w-0">{lineLabel(line)}</span>
+      <span className="flex-1 min-w-0">
+        <span className="block text-sm truncate">{lineLabel(line)}</span>
+        {/* A commission line says which step it pays (backend-written). */}
+        {line.settlement_id == null && !line.is_manual && line.note && (
+          <span className="block text-xs text-subtle truncate">{line.note}</span>
+        )}
+      </span>
       {line.is_manual && <Badge color="warning" size="sm">{t('settlement.manualLine')}</Badge>}
       <span
         className={`text-sm tabular-nums shrink-0 ${
@@ -281,6 +293,7 @@ function ShopFundBillPanel({ bill }: { bill: PartnerMyFundBill }) {
     <>
       <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
         <span className="font-medium text-sm truncate">{bill.bill_code}</span>
+        <CopyButton value={bill.bill_code} size={14} className="shrink-0" />
         <Badge color={payoutBadgeColor(bill.status)} size="sm">
           {t(`settlement.payoutStatus_${bill.status}`, { defaultValue: bill.status })}
         </Badge>
@@ -314,20 +327,27 @@ function ShopFundBillPanel({ bill }: { bill: PartnerMyFundBill }) {
               <div className="px-3 py-3 text-sm text-subtler">{t('settlement.noLinesYet')}</div>
             )}
             {byContract.map(group => (
-              <div key={group.settlement_id ?? 'none'} className="border-b border-line last:border-b-0">
+              <div key={group.settlement_id != null ? `s${group.settlement_id}` : `c${group.contract_id}`} className="border-b border-line last:border-b-0">
                 <div className="flex items-center gap-2 px-3 py-2 bg-surface-shallow">
-                  <span className="text-sm font-medium truncate">
-                    {formatEntityCode(group.contract_code)}
-                  </span>
+                  <EntityCodeLink
+                    to={group.contract_id != null ? `/admin/contracts/search/${group.contract_id}` : null}
+                    code={group.contract_code}
+                    className="text-sm font-medium truncate"
+                  />
                   <span className="flex-1" />
-                  <span className="text-sm tabular-nums font-medium shrink-0">
-                    {fmtCurrency(settlementNet(group.settlement_id))}
-                  </span>
+                  {/* A request's net is the backend's figure; commission blocks
+                   *  have no request, so their lines carry the amounts alone. */}
+                  {group.settlement_id != null && (
+                    <span className="text-sm tabular-nums font-medium shrink-0">
+                      {fmtCurrency(settlementNet(group.settlement_id))}
+                    </span>
+                  )}
                 </div>
-                <div className="px-3 pb-0.5 text-xs text-subtle truncate">
-                  {group.settlement_code ?? '—'}
-                  {groupProduct(group) && <> · {groupProduct(group)}</>}
-                </div>
+                {(group.settlement_code || groupProduct(group)) && (
+                  <div className="px-3 pb-0.5 text-xs text-subtle truncate">
+                    {[group.settlement_code, groupProduct(group)].filter(Boolean).join(' · ')}
+                  </div>
+                )}
                 {group.lines.map(renderLine)}
               </div>
             ))}
