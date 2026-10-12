@@ -29,7 +29,7 @@ import { useTranslation } from 'react-i18next';
 import { Badge, Button, Tooltip } from 'tsp-form';
 import { useNavigate } from 'react-router-dom';
 import {
-  Building2, ExternalLink, FileQuestion, Plus, Smartphone, Store, Trash2, Wrench,
+  Building2, ExternalLink, FileQuestion, Landmark, Plus, Smartphone, Store, Trash2, Wallet, Wrench,
 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency, formatEntityCode } from '../../lib/format';
@@ -339,7 +339,7 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
             )}
 
             {/* Header card — the shop, the purpose, the money. */}
-            <div className="rounded-md border border-line overflow-hidden">
+            <div className="@container/hdr rounded-md border border-line overflow-hidden">
               <div className="px-3 py-2.5 bg-surface flex items-center gap-2 flex-wrap">
                 <span className="font-medium">{bill.branch_name ?? bill.company_name ?? '—'}</span>
                 <Badge color={fundBillStatusColor(bill.status)} size="sm">
@@ -361,43 +361,55 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
                *  company's money the shop kept, and read as "paid" it looked
                *  like an overpayment. Before payment nothing has moved, so the
                *  document's amount is the figure. */}
-              <div className="px-3 py-2.5 border-t border-line flex items-end gap-5 flex-wrap">
-                {moneyMoved ? (
-                  <>
-                    <div>
-                      <div className="text-xs text-subtle">{t('fundBill.bankNet')}</div>
-                      <div className={`text-xl font-semibold tabular-nums ${signedClass(bill.bank_net)}`}>
-                        {signed(bill.bank_net)}
+              {moneyMoved ? (
+                <>
+                  {/* Three places money sits, read as one strip: equal weight,
+                   *  each with its own icon, a thin divider between them. Which
+                   *  one it is comes from the icon + label, not the size; the
+                   *  in/out colour on the number carries direction. */}
+                  <div className="border-t border-line grid grid-cols-1 @[22rem]/hdr:grid-cols-3 divide-y @[22rem]/hdr:divide-y-0 @[22rem]/hdr:divide-x divide-line">
+                    {([
+                      { icon: Landmark, label: t('fundBill.bankNet'), value: bill.bank_net },
+                      { icon: Wallet, label: t('fundBill.fundBookNet'), value: bill.fund_book_net },
+                      { icon: Building2, label: t('fundBill.companyBookNet'), value: bill.company_book_net },
+                    ] as const).map(({ icon: Icon, label, value }) => (
+                      <div key={label} className="px-3 py-2.5 flex flex-col gap-1 min-w-0">
+                        <div className="flex items-center gap-1.5 text-xs text-subtle min-w-0">
+                          <Icon size={13} className="shrink-0" />
+                          <span className="truncate">{label}</span>
+                        </div>
+                        <div className={`text-lg font-semibold tabular-nums ${signedClass(value)}`}>
+                          {signed(value)}
+                        </div>
                       </div>
+                    ))}
+                  </div>
+                  {bill.returned_net !== 0 && (
+                    <div className="px-3 py-2 border-t border-line flex items-center gap-2 text-sm">
+                      <span className="text-subtle">{t('fundBill.netAfterReturns')}</span>
+                      <span className="flex-1" />
+                      <span className="font-semibold tabular-nums text-success-fg">
+                        {fmtCurrency(bill.net_after_returns)}
+                      </span>
                     </div>
-                    <div>
-                      <div className="text-xs text-subtle">{t('fundBill.fundBookNet')}</div>
-                      <div className={`text-base font-semibold tabular-nums ${signedClass(bill.fund_book_net)}`}>
-                        {signed(bill.fund_book_net)}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-subtle">{t('fundBill.companyBookNet')}</div>
-                      <div className={`text-base font-semibold tabular-nums ${signedClass(bill.company_book_net)}`}>
-                        {signed(bill.company_book_net)}
-                      </div>
-                    </div>
-                  </>
-                ) : (
+                  )}
+                </>
+              ) : (
+                <div className="px-3 py-2.5 border-t border-line flex items-end gap-5 flex-wrap">
                   <div>
                     <div className="text-xs text-subtle">{t('fundBill.documentAmount')}</div>
                     <div className="text-xl font-semibold tabular-nums">{fmtCurrency(bill.net_amount)}</div>
                   </div>
-                )}
-                {bill.returned_net !== 0 && (
-                  <div>
-                    <div className="text-xs text-subtle">{t('fundBill.netAfterReturns')}</div>
-                    <div className="text-base font-semibold tabular-nums text-success-fg">
-                      {fmtCurrency(bill.net_after_returns)}
+                  {bill.returned_net !== 0 && (
+                    <div>
+                      <div className="text-xs text-subtle">{t('fundBill.netAfterReturns')}</div>
+                      <div className="text-base font-semibold tabular-nums text-success-fg">
+                        {fmtCurrency(bill.net_after_returns)}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
 
               {bill.void_reason && (
                 <div className="px-3 py-2.5 border-t border-line text-sm">
@@ -618,11 +630,13 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
              *  reads as "left the fund's book, entered the company's", not as
              *  a second payment to the shop. */}
             {payments.rows.length > 0 && (
-              <div className="rounded-md border border-line overflow-hidden">
+              <div className="@container rounded-md border border-line overflow-hidden">
                 <div className="px-3 py-2 bg-surface text-sm font-medium">
                   {t('fundBill.payments')}
                 </div>
-                <div className="px-3 py-1.5 border-t border-line grid grid-cols-[1fr_auto_auto_auto] gap-x-3 text-xs text-subtle">
+                {/* Column headers only once the panel is wide enough to run as a
+                 *  table; on a narrow panel each row stacks its own labels. */}
+                <div className="hidden @md:grid px-3 py-1.5 border-t border-line grid-cols-[1fr_auto_auto_auto] gap-x-3 text-xs text-subtle">
                   <span />
                   <span className="text-right w-24">{t('fundBill.colBank')}</span>
                   <span className="text-right w-24">{t('fundBill.colFundBook')}</span>
@@ -630,7 +644,7 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
                 </div>
                 {payments.rows.map(p => (
                   <div key={p.payment_id} className={`px-3 py-2.5 border-t border-line ${p.voided_at ? 'opacity-60' : ''}`}>
-                    <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 items-start">
+                    <div className="@md:grid @md:grid-cols-[1fr_auto_auto_auto] @md:gap-x-3 @md:items-start">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           {p.is_reversal && (
@@ -655,15 +669,22 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
                           {p.reference && <span>{p.reference}</span>}
                         </div>
                       </div>
-                      <span className={`text-sm tabular-nums text-right w-24 ${signedClass(p.bank_amount)}`}>
-                        {signed(p.bank_amount)}
-                      </span>
-                      <span className={`text-sm tabular-nums text-right w-24 ${signedClass(p.fund_book_amount)}`}>
-                        {signed(p.fund_book_amount)}
-                      </span>
-                      <span className={`text-sm tabular-nums text-right w-24 ${signedClass(p.company_book_amount)}`}>
-                        {signed(p.company_book_amount)}
-                      </span>
+                      {/* Narrow: the three figures sit on their own line, each
+                       *  labelled and wrapping, so the name keeps its width.
+                       *  Wide: they become the three right-aligned columns. */}
+                      {([
+                        { label: t('fundBill.colBank'), value: p.bank_amount },
+                        { label: t('fundBill.colFundBook'), value: p.fund_book_amount },
+                        { label: t('fundBill.colCompanyBook'), value: p.company_book_amount },
+                      ] as const).map(({ label, value }, i) => (
+                        <div
+                          key={label}
+                          className={`flex items-baseline gap-1.5 text-sm tabular-nums @md:block @md:text-right @md:w-24 ${i === 0 ? 'mt-1.5 @md:mt-0' : ''}`}
+                        >
+                          <span className="text-xs text-subtle @md:hidden">{label}</span>
+                          <span className={signedClass(value)}>{signed(value)}</span>
+                        </div>
+                      ))}
                     </div>
 
                     {/* A slip belongs to the movement, and only to one that
