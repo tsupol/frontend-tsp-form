@@ -1309,6 +1309,5 @@
   "fund.state.day_close_not_enabled": "Closing the fund's day isn't switched on for this holding.",
   "fund.validation.day_empty": "Nothing happened on this day, so there's nothing to close.",
   "PARTNER.VALIDATION.SHARE_PCT_RANGE": "The share must be between 0 and 100%, with at most 2 decimals.",
-  "CORE.VALIDATION.FINANCIER_ONLY": "This setting applies to a fund company only.",
-  "CORE.NOT_FOUND.COMPANY": "Company not found."
+  "CORE.VALIDATION.FINANCIER_ONLY": "This setting applies to a fund company only."
 }

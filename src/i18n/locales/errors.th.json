@@ -1309,6 +1309,5 @@
   "fund.state.day_close_not_enabled": "holding นี้ยังไม่เปิดใช้การปิดวันกองทุน",
   "fund.validation.day_empty": "วันนี้ไม่มีรายการ ไม่ต้องปิดวัน",
   "PARTNER.VALIDATION.SHARE_PCT_RANGE": "ส่วนแบ่งต้องอยู่ระหว่าง 0–100% (ทศนิยมไม่เกิน 2 ตำแหน่ง)",
-  "CORE.VALIDATION.FINANCIER_ONLY": "ตั้งค่านี้ได้เฉพาะบริษัทกองทุน",
-  "CORE.NOT_FOUND.COMPANY": "ไม่พบบริษัท"
+  "CORE.VALIDATION.FINANCIER_ONLY": "ตั้งค่านี้ได้เฉพาะบริษัทกองทุน"
 }
