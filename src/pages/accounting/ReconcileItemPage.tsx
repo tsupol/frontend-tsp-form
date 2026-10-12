@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import {
@@ -47,7 +47,6 @@ function defaultRange() {
 export function ReconcileItemPage() {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
-  const navigate = useNavigate();
   const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
   const userBranchId = isBranchUser && user?.branch_id ? String(user.branch_id) : '';
 
@@ -330,7 +329,6 @@ export function ReconcileItemPage() {
                           rows={rowsBySubgroup.get(key) ?? []}
                           open={openGroup === key}
                           onToggle={() => setOpenGroup(o => o === key ? null : key)}
-                          navigate={navigate}
                           t={t}
                         />
                       );
@@ -348,13 +346,12 @@ export function ReconcileItemPage() {
 
 /* One subgroup: folded header (name · count · ขาย/คืน/สุทธิ), expand → its rows. */
 function GroupRow({
-  group, rows, open, onToggle, navigate, t,
+  group, rows, open, onToggle, t,
 }: {
   group: ReconcileItemGroup;
   rows: ReconcileItemRow[];
   open: boolean;
   onToggle: () => void;
-  navigate: ReturnType<typeof useNavigate>;
   t: ReturnType<typeof useTranslation>['t'];
 }) {
   const baseLabel = t(`accounting.reconcile.subgroup.${group.subgroup}`, { defaultValue: group.name_th });

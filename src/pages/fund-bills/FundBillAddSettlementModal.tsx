@@ -15,7 +15,7 @@ import { ActionDoneView } from '../contracts/ActionDoneView';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency, formatEntityCode } from '../../lib/format';
 import { useFundBillCandidates, useFundBillInvalidate } from './useFundBills';
-import type { FundBillAddSettlementResult, FundBillCandidate } from './fundBillTypes';
+import type { FundBillAddSettlementResult } from './fundBillTypes';
 
 
 interface FundBillAddSettlementModalProps {

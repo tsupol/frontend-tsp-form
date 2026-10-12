@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
@@ -70,7 +70,6 @@ function defaultRange() {
 export function PaymentListPage() {
   const { t, i18n } = useTranslation();
   const { user, can } = useAuth();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isBranchUser = ['BRANCH_STAFF', 'BRANCH_MANAGER'].includes(user?.role_code ?? '');
   const userBranchId = isBranchUser && user?.branch_id ? String(user.branch_id) : '';
@@ -517,7 +516,6 @@ export function PaymentListPage() {
                 ) : (
                   <PaymentDetailPanel
                     payment={selectedPayment}
-                    navigate={navigate}
                     onClose={isMobile ? goBack : () => setSelectedId(null)}
                     t={t}
                   />
@@ -545,12 +543,10 @@ export function PaymentListPage() {
 // on the bill). Renders the full record for the selected PM-xxxx.
 function PaymentDetailPanel({
   payment: p,
-  navigate,
   onClose,
   t,
 }: {
   payment: PaymentRow;
-  navigate: ReturnType<typeof useNavigate>;
   onClose: () => void;
   t: ReturnType<typeof useTranslation>['t'];
 }) {

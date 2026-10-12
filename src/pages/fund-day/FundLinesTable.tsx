@@ -96,8 +96,8 @@ export function FundLinesTable({ lines, loading }: FundLinesTableProps) {
             // What the row is: the account axis names it (mig 1423); the
             // category axis is already grouped by category, so the category
             // label is the best name it has.
-            const kind = bank
-              ? (bank.item_kind_name ?? bank.item_kind)
+            const kind = isBankLine(line)
+              ? (line.item_kind_name ?? line.item_kind)
               : t(`fundDay.category.${line.category_code}`, { defaultValue: line.category_code });
             const docLabel = line.doc_code ?? `#${line.ref_id ?? '—'}`;
             return (
@@ -169,8 +169,8 @@ function FundLineCard({ line, anySlip, t }: {
 }) {
   const path = docPath(line);
   const bank = isBankLine(line) ? line : null;
-  const kind = bank
-    ? (bank.item_kind_name ?? bank.item_kind)
+  const kind = isBankLine(line)
+    ? (line.item_kind_name ?? line.item_kind)
     : t(`fundDay.category.${line.category_code}`, { defaultValue: line.category_code });
   const docLabel = line.doc_code ?? `#${line.ref_id ?? '—'}`;
   const sub = [
