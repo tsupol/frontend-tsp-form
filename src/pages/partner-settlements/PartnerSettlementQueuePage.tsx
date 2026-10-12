@@ -33,7 +33,7 @@ import {
   type PartnerSettlementQueueRow,
 } from './partnerSettlementTypes';
 
-const TABS: SettlementQueueTab[] = ['WAITING_BRANCH', 'TO_CHECK', 'CHECKED', 'IN_PAYOUT'];
+const TABS: SettlementQueueTab[] = ['WAITING_BRANCH', 'TO_CHECK', 'CHECKED', 'IN_PAYOUT', 'PAID'];
 
 /** Where the shop fills in the bank account it wants to be paid into. */
 const PAYOUT_ACCOUNT_PATH = '/admin/pricing/deal-partner-rates';
@@ -65,7 +65,8 @@ export function PartnerSettlementQueuePage() {
   useEffect(() => {
     if (!detail || detail.settlement_id !== selectedId) return;
     const target: SettlementQueueTab | null =
-      detail.status === 'IN_PAYOUT' ? 'IN_PAYOUT'
+      detail.status === 'PAID' ? 'PAID'
+      : detail.status === 'IN_PAYOUT' ? 'IN_PAYOUT'
       : detail.status === 'CLOSE_SUBMITTED' ? 'TO_CHECK'
       : detail.waiting_on === 'BRANCH' ? 'WAITING_BRANCH'
       : null;
@@ -94,7 +95,7 @@ export function PartnerSettlementQueuePage() {
     if (selectedId != null && detail?.settlement_id === selectedId
       && !sorted.some(r => r.settlement_id === selectedId)) {
       return [{
-        submitted_age_days: 0,
+        submitted_age_days: null,
         has_payout_account: true,
         finance_checked_at: null,
         finance_checked_by: null,
@@ -271,9 +272,11 @@ function QueueRow({ row, tab, statusLabel, onPick, onOpenPayout, onOpenAccountSe
   const { t } = useTranslation();
 
   const ageDays = tab === 'WAITING_BRANCH' ? row.age_days : row.submitted_age_days;
-  const ageLabel = tab === 'WAITING_BRANCH'
-    ? t('partnerSettlement.ageDays', { count: ageDays ?? 0 })
-    : t('partnerSettlement.submittedAgeDays', { count: ageDays ?? 0 });
+  const ageLabel = ageDays == null
+    ? null
+    : tab === 'WAITING_BRANCH'
+      ? t('partnerSettlement.ageDays', { count: ageDays })
+      : t('partnerSettlement.submittedAgeDays', { count: ageDays });
 
   return (
     <div className="relative">
@@ -300,7 +303,7 @@ function QueueRow({ row, tab, statusLabel, onPick, onOpenPayout, onOpenAccountSe
             </Tooltip>
           )}
           <span className="flex-1" />
-          <span className="text-xs text-subtle shrink-0">{ageLabel}</span>
+          {ageLabel && <span className="text-xs text-subtle shrink-0">{ageLabel}</span>}
         </div>
 
         <div className="text-sm mt-0.5 truncate">{row.customer_name ?? '—'}</div>

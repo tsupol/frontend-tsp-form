@@ -6732,13 +6732,15 @@
       "WAITING_BRANCH": "Shop has not submitted",
       "TO_CHECK": "To review",
       "CHECKED": "Reviewed - awaiting payout",
-      "IN_PAYOUT": "In a payout document"
+      "IN_PAYOUT": "In a payout document",
+      "PAID": "Paid"
     },
     "empty": {
       "WAITING_BRANCH": "No shop is holding a close-out right now",
       "TO_CHECK": "Nothing waiting to be reviewed",
       "CHECKED": "Nothing reviewed and awaiting a payout document",
-      "IN_PAYOUT": "No request is in a payout document"
+      "IN_PAYOUT": "No request is in a payout document",
+      "PAID": "No paid request yet"
     },
     "status": {
       "AWAITING_CLOSE": "Awaiting close-out",

@@ -13,13 +13,14 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Badge, Button, Tooltip, LabeledCheckbox } from 'tsp-form';
 import {
   ArrowLeft, ExternalLink, Images, History, Smartphone,
   Wallet, AlertTriangle, CheckCircle2, Store,
 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
+import { CopyButton } from '../../components/CopyButton';
 import { fmtCurrency } from '../../lib/format';
 import { ContractPhotoGroups } from '../contracts/ContractPhotoGroups';
 import {
@@ -154,6 +155,7 @@ export function PartnerSettlementReviewPanel({
           </button>
         )}
         <span className="font-medium text-sm truncate">{detail.settlement_code}</span>
+        <CopyButton value={detail.settlement_code} size={14} className="shrink-0" />
         <Badge color={settlementStatusColor(detail.status)} size="sm">
           {statusLabel(detail.status)}
         </Badge>
@@ -194,6 +196,7 @@ export function PartnerSettlementReviewPanel({
 
         <HistoryBlock
           rows={logRows}
+          fundBillId={detail.fund_bill_id}
           statusLabel={statusLabel}
           reasonLabel={reasonLabel}
         />
@@ -417,12 +420,16 @@ function LineRow({ line }: { line: PartnerSettlementLine }) {
 }
 
 /** Submit / withdraw / send-back / tick, oldest first. */
-function HistoryBlock({ rows, statusLabel, reasonLabel }: {
+function HistoryBlock({ rows, fundBillId, statusLabel, reasonLabel }: {
   rows: PartnerSettlementCloseLogRow[];
+  fundBillId: number | null;
   statusLabel: (code: string | null) => string;
   reasonLabel: (code: string | null) => string | null;
 }) {
   const { t } = useTranslation();
+  // The payout rows carry the document code as their note; link it so finance
+  // reaches the money side of the request from its history.
+  const isPayoutRow = (code: string) => code === 'PAYOUT_ADD' || code === 'PAYOUT_PAID';
 
   return (
     <section>
@@ -452,7 +459,19 @@ function HistoryBlock({ rows, statusLabel, reasonLabel }: {
                   {reasonLabel(row.reason_code) ?? row.reason_code}
                 </div>
               )}
-              {row.note && <div className="text-sm text-subtle mt-0.5">{row.note}</div>}
+              {row.note && (
+                isPayoutRow(row.action_code) && fundBillId != null ? (
+                  <Link
+                    to={`/admin/fund-bills/${fundBillId}`}
+                    className="text-sm text-primary-fg hover:underline inline-flex items-center gap-1 mt-0.5"
+                  >
+                    {row.note}
+                    <ExternalLink size={12} className="shrink-0" />
+                  </Link>
+                ) : (
+                  <div className="text-sm text-subtle mt-0.5">{row.note}</div>
+                )
+              )}
               {row.check_snapshot && <SnapshotLine snapshot={row.check_snapshot} />}
             </div>
           ))}

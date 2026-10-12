@@ -29,7 +29,9 @@ export type SettlementQueueTab =
   /** Ticked, waiting for a payout document. */
   | 'CHECKED'
   /** Already sitting in a payout document. */
-  | 'IN_PAYOUT';
+  | 'IN_PAYOUT'
+  /** Finished — the payout was paid. A history, not a work list. */
+  | 'PAID';
 
 /**
  * The PostgREST filters behind each tab, straight out of 140 §2 / the 1270
@@ -41,6 +43,8 @@ const TAB_PARAMS: Record<SettlementQueueTab, string[]> = {
   TO_CHECK: ['status=eq.CLOSE_SUBMITTED', 'finance_checked_at=is.null', 'order=close_submitted_at.asc'],
   CHECKED: ['status=eq.CLOSE_SUBMITTED', 'finance_checked_at=not.is.null', 'order=close_submitted_at.asc'],
   IN_PAYOUT: ['status=eq.IN_PAYOUT', 'order=close_submitted_at.asc'],
+  // Newest first — finance reads this as "what did we pay lately", not a backlog.
+  PAID: ['status=eq.PAID', 'order=close_submitted_at.desc'],
 };
 
 export interface SettlementQueueOptions {
