@@ -32,6 +32,8 @@ import {
   Building2, ExternalLink, FileQuestion, Landmark, Plus, Smartphone, Store, Trash2, Wallet, Wrench,
 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
+import { CopyButton } from '../../components/CopyButton';
+import { EntityCodeLink } from '../../components/EntityCodeLink';
 import { fmtCurrency, formatEntityCode } from '../../lib/format';
 import { blockingReasonText } from '../../lib/apiErrors';
 import {
@@ -43,6 +45,7 @@ import {
   useFundBillLog,
   useFundBillPayments,
   useFundBillSettlements,
+  useFundBillIdByCode,
 } from './useFundBills';
 import {
   fundBillStatusColor,
@@ -94,6 +97,10 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
   const { t, i18n } = useTranslation();
 
   const { bill, isLoading, isFetched } = useFundBill(billId);
+  const creditNoteId = useFundBillIdByCode(bill?.credit_note_code ?? null);
+  // A credit note points at the document it undoes; name it so finance can go back.
+  const isCreditNote = bill?.bill_type === 'CREDIT_NOTE';
+  const { bill: reversedBill } = useFundBill(isCreditNote ? bill?.ref_bill_id ?? null : null);
   const { actions } = useFundBillActions(billId);
   // A typed or stale id resolves to no row. Without this the page renders an
   // empty shell that reads as broken rather than "there is no such document".
@@ -304,6 +311,7 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
       {!isMobile && (
         <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
           <span className="font-medium truncate">{bill?.bill_code ?? ''}</span>
+          {bill && <CopyButton value={bill.bill_code} size={14} className="shrink-0" />}
           {bill && (
             <Badge color={fundBillStatusColor(bill.status)} size="sm">
               {statusLabel(bill.status)}
@@ -328,11 +336,22 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
           <div className="max-w-4xl mx-auto flex flex-col gap-4">
             {/* A reversed document keeps its status and its amounts — the only
              *  sign it was undone is this flag, so it has to be loud. */}
+            {isCreditNote && bill.ref_bill_id != null && (
+              <div className="alert alert-info">
+                <span>
+                  {t('fundBill.creditNoteOfBanner')}{' '}
+                  <EntityCodeLink to={`/admin/fund-bills/${bill.ref_bill_id}`} code={reversedBill?.bill_code ?? `#${bill.ref_bill_id}`} />
+                </span>
+              </div>
+            )}
             {bill.is_reversed && (
               <div className="alert alert-warning">
                 <span>
                   {t('fundBill.reversedBanner')}
-                  {bill.credit_note_code && <> · {bill.credit_note_code}</>}
+                  {bill.credit_note_code && <> · <EntityCodeLink
+                    to={creditNoteId != null ? `/admin/fund-bills/${creditNoteId}` : null}
+                    code={bill.credit_note_code}
+                  /></>}
                 </span>
               </div>
             )}

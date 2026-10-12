@@ -4960,6 +4960,7 @@
     "removeLineAction": "ถอดบรรทัด",
     "removeSettlement": "ถอดใบขอรับเงิน",
     "reversalRow": "กลับรายการ",
+    "creditNoteOfBanner": "ใบลดหนี้นี้กลับรายการของใบ",
     "reversedBanner": "ใบนี้ถูกกลับรายการด้วยใบลดหนี้แล้ว",
     "reversedShort": "กลับรายการแล้ว",
     "selectAll": "เลือกทั้งหมด",

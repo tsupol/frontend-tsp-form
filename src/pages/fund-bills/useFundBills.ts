@@ -156,6 +156,20 @@ export function useFundBill(billId: number | null) {
   return { ...query, bill: query.data ?? null };
 }
 
+/** A fund document's id from its code — the reversed document carries only the
+ *  credit note's code, and the banner links to it. */
+export function useFundBillIdByCode(code: string | null) {
+  const query = useQuery({
+    queryKey: ['fund-bills', 'id-by-code', code],
+    queryFn: () => apiClient
+      .get<{ bill_id: number }[]>(`/v_fund_bills?bill_code=eq.${encodeURIComponent(code ?? '')}&select=bill_id`)
+      .then(rows => rows[0]?.bill_id ?? null),
+    enabled: !!code,
+    staleTime: 5 * 60 * 1000,
+  });
+  return query.data ?? null;
+}
+
 /**
  * The document's lines.
  *

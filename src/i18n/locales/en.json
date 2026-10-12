@@ -4964,6 +4964,7 @@
     "removeLineAction": "Remove line",
     "removeSettlement": "Remove request",
     "reversalRow": "reversal",
+    "creditNoteOfBanner": "This credit note undoes",
     "reversedBanner": "This document has been undone by a credit note.",
     "reversedShort": "Undone",
     "selectAll": "Select all",
