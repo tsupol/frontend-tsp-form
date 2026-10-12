@@ -24,6 +24,7 @@ import {
   Send, Trash2, XCircle,
 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
+import { CopyButton } from '../../components/CopyButton';
 import { EntityCodeLink } from '../../components/EntityCodeLink';
 import { PartnerRemitAccounts } from '../../components/PartnerRemitAccounts';
 import { PartnerReturnTimeline } from '../../components/PartnerReturnTimeline';
@@ -131,6 +132,7 @@ export function ReturnDetailPanel({ returnId, isMobile, onBack }: {
           </button>
         )}
         <span className="font-medium text-sm truncate">{detail.return_code}</span>
+        <CopyButton value={detail.return_code} size={14} className="shrink-0" />
         <Badge color={returnBadgeColor(detail.status)} size="sm">{statusLabel}</Badge>
       </div>
 

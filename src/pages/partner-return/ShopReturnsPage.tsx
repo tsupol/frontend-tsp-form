@@ -10,10 +10,11 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Navigate, useNavigate, useParams } from 'react-router-dom';
+import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { PageNav, PageNavPanel, DataTable, MobileHeader, Badge } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine, PackageCheck } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
+import { formatEntityCode } from '../../lib/format';
 import { SearchInput } from '../../components/SearchInput';
 import { useDropMissingPick } from '../../lib/stagePick';
 import { useAuth } from '../../contexts/AuthContext';
@@ -36,7 +37,17 @@ export function ShopReturnsPage() {
 
   const selectedId = returnIdParam ? Number(returnIdParam) : null;
 
-  const [tab, setTab] = useState<ReturnMenu>('OPEN');
+  // The tab lives in the address so a copied link reopens it. A link that
+  // names a document but no tab (from the contract page, a notification) opens
+  // on "all", the one tab that always holds it, instead of a blank panel.
+  const [searchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab') as ReturnMenu | null;
+  const tab: ReturnMenu = tabParam && TABS.includes(tabParam) ? tabParam : (selectedId ? 'ALL' : 'OPEN');
+  // Switching tab keeps the open document only if the new tab lists it too.
+  const setTab = (next: ReturnMenu) => {
+    const keep = selectedId != null && (next === 'ALL' || next === selectedStatus);
+    navigate(`${keep ? `${BASE_PATH}/${selectedId}` : BASE_PATH}?tab=${next}`);
+  };
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [pageIndex, setPageIndex] = useState(0);
@@ -48,7 +59,8 @@ export function ShopReturnsPage() {
     menu: tab, search: debouncedSearch, pageIndex, pageSize,
   });
   const statuses: ReturnStatusRef[] = useReturnStatuses();
-  useDropMissingPick(selectedId, rows.map(r => r.return_id), isSuccess && !isFetching, () => navigate(BASE_PATH, { replace: true }));
+  const selectedStatus = rows.find(r => r.return_id === selectedId)?.status ?? null;
+  useDropMissingPick(selectedId, rows.map(r => r.return_id), isSuccess && !isFetching, () => navigate(`${BASE_PATH}?tab=${tab}`, { replace: true }));
 
   // Shop-only: these views answer 403 for a staff session, which reads its own
   // queue instead. After the hooks so hook order stays stable.
@@ -61,7 +73,7 @@ export function ShopReturnsPage() {
     return (isThai ? row.name_th : row.name_en) || code;
   };
 
-  const select = (id: number) => navigate(`${BASE_PATH}/${id}`, { replace: true });
+  const select = (id: number) => navigate(`${BASE_PATH}/${id}?tab=${tab}`, { replace: true });
 
   return (
     <PageNav
@@ -171,7 +183,7 @@ export function ShopReturnsPage() {
                           <div className="text-xs text-subtle mt-0.5 truncate">{r.product_display_name}</div>
                         )}
                         <div className="text-xs text-subtle mt-0.5 flex items-center gap-2">
-                          <span className="truncate">{r.contract_code ?? '—'}</span>
+                          <span className="truncate">{r.contract_code ? formatEntityCode(r.contract_code) : '—'}</span>
                           <span className="flex-1" />
                           <span className="shrink-0">
                             <DateTime value={r.created_at} showTime={false} />
