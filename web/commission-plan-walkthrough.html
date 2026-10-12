@@ -291,6 +291,8 @@
   .money { font-variant-numeric: tabular-nums; white-space: nowrap; }
 
   .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 18px 0; }
+  .grid2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 12px 0; }
+  .grid2 .shot { margin: 0; }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
   .card h4 { margin: 0 0 6px; font-size: 15px; }
   .card p { margin: 0 0 8px; font-size: 13.5px; color: var(--dim); }
@@ -304,6 +306,7 @@
 
   @media (max-width: 700px) {
     .three { grid-template-columns: 1fr; }
+    .grid2 { grid-template-columns: 1fr; }
     nav.toc ol { columns: 1; }
     h1 { font-size: 24px; }
   }
@@ -655,6 +658,49 @@
   </div>
 </div>
 
+
+<div class="screen">
+  <div class="bar"><b>หลังเที่ยงคืน — ก้อนพร้อมรวบจริง</b> <code>/admin/fund-bills?shop=7</code> <span class="who fund">FINANCE</span></div>
+  <div class="body">
+    <ul class="sees">
+      <li>วันที่ 12 ต.ค. 00:19 (ช่วงถือตั้งเป็น 0 บน DEV): แถวร้านขึ้น <span class="label">พร้อมรวบ 8 ก้อน · 6,768</span> และปุ่ม <span class="label">รวบ</span> บนแถวโผล่</li>
+      <li>แผงขวา "พร้อมรวบ (8)" จัดกลุ่มตามสัญญา 5 สัญญา บอกจำนวนก้อนและยอดต่อสัญญา กดลูกศรเพื่อกางดูทีละก้อน · "รออยู่ (0)" ว่าง</li>
+    </ul>
+    <figure class="shot">
+      <div class="pic">
+        <img src="shots/cp-midnight.png" alt="แท็บค่าคอมส่วนเพิ่ม หลังเที่ยงคืน มี 8 ก้อนพร้อมรวบ">
+        <button class="hs" data-n="1" style="left:21.0%;top:11.6%;width:25.5%;height:6.8%">
+          <span class="tip"><b>แถวร้าน</b> พร้อมรวบ 8 ก้อน · 6,768 — ปุ่ม รวบ โผล่เพราะมีก้อนพร้อมแล้ว</span>
+        </button>
+        <button class="hs" data-n="2" style="left:54.8%;top:13.6%;width:37.5%;height:29.4%">
+          <span class="tip"><b>พร้อมรวบ (8)</b> 5 สัญญา — 517-9 696 · 202-6 1,592 · 234-9 720 · 444-4 480 · 491-5 3,280 · กางแต่ละสัญญาเห็นก้อนและ %</span>
+        </button>
+      </div>
+      <p class="hint"><span class="k">1</span>เอาเมาส์ชี้กรอบ ระบบจะตัดส่วนนั้นมาขยายให้พร้อมคำอธิบาย · กดเพื่อค้างไว้</p>
+      <figcaption>8 ก้อนของ 5 สัญญาปลดตอนจ่ายงวดวันที่ 11 ต.ค. แล้วพร้อมรวบทันทีที่พ้นวัน — ที่ DEV ตั้งช่วงถือ 0 วันไว้เดินทดสอบ (ของจริง 7 วัน)</figcaption>
+    </figure>
+  </div>
+</div>
+
+<div class="screen">
+  <div class="bar"><b>รวบ → ใบร่าง → ออกใบ → จ่าย</b> <span class="who fund">FINANCE</span></div>
+  <div class="body">
+    <ul class="sees">
+      <li><b>หน้าต่างรวบ</b> บอก "พร้อมรวบ 8 ก้อน · 6,768" และปุ่ม รวบ กดได้ · กดแล้วได้ใบร่าง <code>FB-2610-000007-9</code> หน้าสรุปบอกว่าใบไปอยู่แท็บ ร่าง และร้านหายจากคิว · ปุ่มหลัก <span class="label">ไปที่ใบร่าง</span></li>
+      <li><b>ใบร่าง</b> บรรทัดละก้อน บอกสัญญา ก้อนไหน % ยอด · แก้บรรทัดไม่ได้ (ยกเลิกใบได้ ก้อนกลับเข้าคิว)</li>
+      <li><b>ออกใบ</b> หน้าต่างยืนยันเตือนว่าบรรทัดจะถูกล็อก · หน้าสรุป ร่าง → ออกใบแล้ว · ปุ่มหลัก <span class="label">บันทึกจ่ายเงิน</span> เปิดหน้าต่างจ่ายใบเดียวกันต่อทันที</li>
+      <li><b>บันทึกจ่ายเงิน</b> เลือกบัญชีที่จ่าย วันที่ เลขอ้างอิง แนบสลิปได้ · ใบค่าคอมไม่มีกล่อง "สองฝั่ง" เพราะไม่มีส่วนของบริษัท · หน้าสรุปบอกว่าก้อนเป็น "จ่ายแล้ว" และร้านเห็นในหน้าค่าคอมของฉัน</li>
+    </ul>
+    <div class="grid2">
+      <figure class="shot"><div class="pic"><img src="shots/cp-10-bundle-modal.png" alt="หน้าต่างรวบ มี 8 ก้อนพร้อม"></div><figcaption>หน้าต่างรวบ — มีก้อนพร้อม ปุ่มกดได้</figcaption></figure>
+      <figure class="shot"><div class="pic"><img src="shots/cp-12-bundle-done.png" alt="หน้าสรุปหลังรวบ"></div><figcaption>หลังรวบ — ใบร่างไปอยู่แท็บ ร่าง</figcaption></figure>
+      <figure class="shot"><div class="pic"><img src="shots/cp-13-draft-detail.png" alt="ใบร่างค่าคอมส่วนเพิ่ม"></div><figcaption>ใบร่าง FB-2610-000007-9 — 8 บรรทัด 5 สัญญา</figcaption></figure>
+      <figure class="shot"><div class="pic"><img src="shots/cp-15-issue-done.png" alt="หน้าสรุปหลังออกใบ"></div><figcaption>หลังออกใบ — ปุ่มหลักพาไปบันทึกจ่ายเงิน</figcaption></figure>
+      <figure class="shot"><div class="pic"><img src="shots/cp-16-pay-filled.png" alt="หน้าต่างบันทึกจ่ายเงิน กรอกแล้ว"></div><figcaption>บันทึกจ่ายเงิน — บัญชี KBANK · อ้างอิง TEST-CP-001</figcaption></figure>
+    </div>
+  </div>
+</div>
+
 <h2 class="step" id="s4"><span class="num">4</span> ร้านเห็นอะไร <span class="who shop">SHOP</span></h2>
 <p class="lead">เมนูใหม่ "ค่าคอมของฉัน" ใต้ "เงินของร้าน" · <code>/admin/contracts/my-commission</code></p>
 
@@ -694,23 +740,23 @@
 
 <div class="tablewrap">
 <table>
-  <thead><tr><th>ก้อน</th><th class="money">ยอด</th><th>สถานะ 11 ต.ค.</th><th>ต่อไป</th></tr></thead>
+  <thead><tr><th>ก้อน</th><th class="money">ยอด</th><th>สถานะ 12 ต.ค.</th><th>ต่อไป</th></tr></thead>
   <tbody>
     <tr><td>วันเปิด 7%</td><td class="money">672</td><td>ก้อนวันเปิด · รอใบขอรับเงิน</td><td>อยู่บนใบขอรับเงินใบเดิมของร้าน — จ่ายทางนั้น</td></tr>
-    <tr><td>งวด 1 5%</td><td class="money">480</td><td>ปลดแล้ว · รอพ้นวันของบิล (จ่ายงวด 1 ด้วยใบ BL-2610-001505-1)</td><td>→ รอครบกำหนด 7 วัน → พร้อมรวบ 18 ต.ค. → รวบ → ออกใบ → จ่าย</td></tr>
+    <tr><td>งวด 1 5%</td><td class="money">480</td><td>จ่ายแล้ว · ใบ FB-2610-000007-9 (รวบ 12 ต.ค. พร้อมอีก 7 ก้อนของ 4 สัญญา)</td><td>ร้านเห็นเลขใบตรงบรรทัดก้อน · ถ้าจ่ายผิดใช้ใบลดหนี้ ก้อนกลับเป็นพร้อมรวบ</td></tr>
     <tr><td>งวด 2 5%</td><td class="money">480</td><td>ค่าคอมที่รอการจัดเก็บค่างวด</td><td>รอลูกค้าจ่ายงวด 2</td></tr>
   </tbody>
 </table>
 </div>
-<div class="note">ด่านรับงานของ BE (§G) เดินถึงขั้น 3 แล้ว: ตั้งแผน ✓ · เปิดสัญญาแล้วก้อนเกิดตามแผน ✓ · จ่ายงวด 1 แล้วก้อนปลด ✓ · ขั้น 4–6 (รวบ → ออกใบ → จ่าย + สลิป → ใบลดหนี้ → ร้านเห็น) รอให้ก้อนพ้นช่วงถือก่อน</div>
+<div class="note">ด่านรับงานของ BE (§G): ตั้งแผน ✓ · ก้อนเกิดตามแผน ✓ · จ่ายงวดแล้วก้อนปลด ✓ · รวบ ✓ · ออกใบ ✓ · จ่าย ✓ · ที่เหลือ: แนบสลิป (BE เปิดชนิดไฟล์ให้แล้ว 12 ต.ค.) · ร้านเห็น "จ่ายแล้ว" · ใบลดหนี้</div>
 
 <h2 class="step" id="s6"><span class="num">6</span> ที่ยังไม่เรียบร้อย</h2>
 <div class="screen nopic">
   <div class="bar"><b>ยังไม่ได้เห็นจริง</b></div>
   <div class="body">
     <ul class="sees">
-      <li><b>รวบ → ออกใบ → จ่าย → ใบลดหนี้</b> — ยังไม่มีก้อน "พร้อมรวบ" บน DEV จนกว่าจะถึง 18 ต.ค. (หรือ BE ตั้งช่วงถือเป็น 0 ชั่วคราว ก็ยังต้องข้ามวัน 1 วัน) หน้าต่างรวบและใบชนิดใหม่จึงยังไม่ได้เดินจริง</li>
-      <li><b>ก้อน "จ่ายแล้ว"</b> พร้อมเลขใบบนหน้าร้าน — ยังไม่ได้เห็น ด้วยเหตุเดียวกัน</li>
+      <li><b>ใบลดหนี้</b> บนใบค่าคอม — ยังไม่ได้เดิน (ก้อนควรกลับเป็นพร้อมรวบ)</li>
+      <li><b>สลิปแนบจริง</b> — ครั้งแรก 12 ต.ค. 01:50 แนบไม่สำเร็จเพราะ be-media ยังไม่เปิดชนิดไฟล์นี้ BE แก้ให้ 10:44 วันเดียวกัน ยังไม่ได้แนบซ้ำ</li>
       <li><b>แผนที่ถูกปิดใช้</b> ขณะร้านยังใช้อยู่ (ป้าย "ปิดใช้แล้ว") — DEV ไม่มีกรณีนี้</li>
     </ul>
   </div>
