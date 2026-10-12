@@ -13,7 +13,7 @@
 // React Query invalidation — every report query on every page refetches.
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Select, useSnackbarContext } from 'tsp-form';
+import { Badge, Select, useSnackbarContext } from 'tsp-form';
 import { Landmark } from 'lucide-react';
 import { apiClient } from '../lib/api';
 import { translateApiError } from '../lib/apiErrors';
@@ -91,11 +91,8 @@ export function ReportSideTag({ className }: { className?: string }) {
   const current = currentReportSide(useReportSideOptions().data);
   if (!current || current.side !== 'FUND') return null;
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-md bg-warning-soft border border-warning-border text-warning-fg px-2 py-1 text-xs leading-normal ${className ?? ''}`}
-    >
-      <Landmark size={13} className="shrink-0" />
-      <span>{t('reportSide.viewing', { label: current.label })}</span>
-    </span>
+    <Badge color="warning" startIcon={<Landmark size={13} />} className={className}>
+      {t('reportSide.viewing', { label: current.label })}
+    </Badge>
   );
 }
