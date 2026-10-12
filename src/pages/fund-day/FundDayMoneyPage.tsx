@@ -268,8 +268,8 @@ export function FundDayMoneyPage() {
               onClick={() => setOpenAccount(expanded ? null : account.account_key)}
               className="text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer text-sm"
             >
-              {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               {t('fundDay.itemCount', { count: account.item_count })}
+              {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
             </button>
           </div>
 
@@ -401,8 +401,8 @@ export function FundDayMoneyPage() {
           <span className="flex-1" />
           {clickable && (
             <span className="inline-flex items-center gap-1 text-primary-fg shrink-0">
-              {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               {t('fundDay.itemCount', { count: itemCount })}
+              {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
             </span>
           )}
         </Row>
@@ -618,8 +618,8 @@ export function FundDayMoneyPage() {
                                               {row.direction === 'IN' ? '+' : '−'}{fmtCurrency(row.amount)}
                                             </span>
                                             <span className="inline-flex items-center gap-1 text-primary-fg text-xs shrink-0 w-24 justify-end">
-                                              {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                                               {t('fundDay.itemCount', { count: row.item_count })}
+                                              {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                                             </span>
                                           </button>
                                           {expanded && (
