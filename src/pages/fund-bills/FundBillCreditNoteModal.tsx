@@ -122,7 +122,11 @@ export function FundBillCreditNoteModal({ open, bill, onClose }: FundBillCreditN
               </div>
 
               <div className="mt-3 alert alert-warning">
-                <span>{t('fundBill.creditNoteWarning')}</span>
+                <span>
+                  {bill?.bill_purpose === 'COMMISSION_EXTRA'
+                    ? t('fundBill.creditNoteWarningCommission')
+                    : t('fundBill.creditNoteWarning')}
+                </span>
               </div>
 
               <div className="form-grid mt-4">

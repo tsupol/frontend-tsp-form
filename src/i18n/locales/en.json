@@ -4880,6 +4880,7 @@
     "creditNoteReasonRequired": "Reason",
     "creditNoteRecheckHint": "The finance check on each reopened request is cleared - check them again before they can be paid.",
     "creditNoteWarning": "This does not change the document. A new document is issued against it that runs the other way, the requests reopen, and the devices go back to the shop.",
+    "creditNoteWarningCommission": "This does not change the document. A new document is issued against it that runs the other way, and the commission steps on it go back to \"ready to bundle\".",
     "devices": "Devices",
     "devicesMovedToHolding": "{{count}} device(s) now owned by holding",
     "devicesReturnedToShop": "{{count}} device(s) back with the shop",
