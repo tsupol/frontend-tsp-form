@@ -549,7 +549,7 @@ export function DashboardPage() {
             </span>
             {/* Fund side chosen above — repeat it next to the numbers so nobody
                 reads fund money as branch money. */}
-            <ReportSideTag className="ml-2 normal-case tracking-normal" />
+            <ReportSideTag className="ml-2" />
           </h2>
 
           {todayQuery.isError ? (

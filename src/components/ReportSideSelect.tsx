@@ -13,7 +13,7 @@
 // React Query invalidation — every report query on every page refetches.
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Badge, Select, useSnackbarContext } from 'tsp-form';
+import { Select, useSnackbarContext } from 'tsp-form';
 import { Landmark } from 'lucide-react';
 import { apiClient } from '../lib/api';
 import { translateApiError } from '../lib/apiErrors';
@@ -67,7 +67,7 @@ export function ReportSideSelect({ className }: { className?: string }) {
   return (
     <div className={`flex items-center gap-2 ${className ?? ''}`}>
       <span className="text-sm text-subtle whitespace-nowrap">{t('reportSide.label')}</span>
-      <div style={{ width: '14rem' }}>
+      <div style={{ width: '16rem' }}>
         <Select
           size="sm"
           options={options.map((o) => ({ value: optionValue(o), label: optionLabel(o, t) }))}
@@ -91,9 +91,11 @@ export function ReportSideTag({ className }: { className?: string }) {
   const current = currentReportSide(useReportSideOptions().data);
   if (!current || current.side !== 'FUND') return null;
   return (
-    <Badge color="warning" size="sm" className={`inline-flex items-center gap-1 ${className ?? ''}`}>
-      <Landmark size={12} />
-      {t('reportSide.viewing', { label: current.label })}
-    </Badge>
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-md bg-warning-soft border border-warning-border text-warning-fg px-2 py-1 text-xs leading-normal ${className ?? ''}`}
+    >
+      <Landmark size={13} className="shrink-0" />
+      <span>{t('reportSide.viewing', { label: current.label })}</span>
+    </span>
   );
 }
