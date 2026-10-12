@@ -58,6 +58,22 @@ export function PartnerSettlementQueuePage() {
   const queue = usePartnerSettlementQueue({ tab, branchId, pageIndex, pageSize });
   const { detail, isLoading: detailLoading } = usePartnerSettlementDetail(selectedId);
 
+  // A deep link (from a payout document, a contract) names one request. Stand on
+  // the tab that holds it, so the rail shows its neighbours rather than the
+  // default "to check" list it is not in. A fully paid request belongs to no
+  // tab — leave the current one; its detail still opens on the right.
+  useEffect(() => {
+    if (!detail || detail.settlement_id !== selectedId) return;
+    const target: SettlementQueueTab | null =
+      detail.status === 'IN_PAYOUT' ? 'IN_PAYOUT'
+      : detail.status === 'CLOSE_SUBMITTED' ? 'TO_CHECK'
+      : detail.waiting_on === 'BRANCH' ? 'WAITING_BRANCH'
+      : null;
+    if (target) setTab(target);
+    // Only when the link target changes — a later tab change is the user's own.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, detail?.settlement_id, detail?.status]);
+
   // The rail sorts by shop so one shop reads as a block; within a shop the
   // backend's own order (oldest first) is preserved.
   const rows = useMemo(() => {
@@ -65,12 +81,32 @@ export function PartnerSettlementQueuePage() {
     queue.rows.forEach((r, i) => {
       if (!order.has(r.branch_id)) order.set(r.branch_id, i);
     });
-    return [...queue.rows].sort((a, b) => {
+    const sorted = [...queue.rows].sort((a, b) => {
       const ba = order.get(a.branch_id) ?? 0;
       const bb = order.get(b.branch_id) ?? 0;
       return ba - bb;
     });
-  }, [queue.rows]);
+    // A deep-linked request that no tab holds (a paid, terminal one) would leave
+    // the rail blank with the detail open on the right. Pin it as a single row
+    // so the rail is never empty after following a link, and it reads as
+    // selected. The detail view lacks a few queue-only fields; they only drive
+    // the age label and the account nudge, harmless on a settled row.
+    if (selectedId != null && detail?.settlement_id === selectedId
+      && !sorted.some(r => r.settlement_id === selectedId)) {
+      return [{
+        submitted_age_days: 0,
+        has_payout_account: true,
+        finance_checked_at: null,
+        finance_checked_by: null,
+        finance_checked_by_name: null,
+        close_submit_count: 0,
+        close_returned_reason_code: null,
+        product_display_name: null,
+        ...detail,
+      } as PartnerSettlementQueueRow, ...sorted];
+    }
+    return sorted;
+  }, [queue.rows, selectedId, detail]);
 
   // The queue row carries who ticked it; the detail view does not.
   const selectedRow = queue.rows.find(r => r.settlement_id === selectedId) ?? null;
