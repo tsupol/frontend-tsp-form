@@ -24,10 +24,11 @@ import {
 import { FundBillDetailPanel } from './FundBillDetailPanel';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../../lib/format';
-import { useFundBillCandidateBranches, useFundBillList } from './useFundBills';
+import {
+  useFundBillCandidateBranches, useFundBillList, type FundBillListRow,
+} from './useFundBills';
 import {
   fundBillStatusColor,
-  type FundBill,
   type FundBillStatus,
 } from './fundBillTypes';
 import type { FundBillCandidateBranch } from './useFundBills';
@@ -338,7 +339,7 @@ export function FundBillsPage() {
                   }
                 />
               ) : (
-                <DataTable<FundBill>
+                <DataTable<FundBillListRow>
                   data={list.rows}
                   getRowProps={row => ({
                     'data-state': row.original.bill_id === selectedId ? 'selected' : undefined,

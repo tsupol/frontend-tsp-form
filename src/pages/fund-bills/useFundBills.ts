@@ -103,11 +103,25 @@ export interface FundBillListOptions {
   pageSize: number;
 }
 
+/**
+ * The columns the list rail draws. Asked for by name: the three money-moved
+ * figures (mig 1421) are computed per row only when requested, and the rail
+ * never shows them — measured 2.02 ms → 0.43 ms for 50 rows (work order §4).
+ */
+export const FUND_BILL_LIST_COLUMNS = [
+  'bill_id', 'bill_code', 'status', 'bill_purpose', 'purpose_name', 'bill_date',
+  'branch_id', 'branch_name', 'company_name', 'contract_count',
+  'net_amount', 'returned_net', 'net_after_returns', 'is_reversed',
+] as const;
+
+/** What the rail gets per row — a slice of `FundBill`, not the whole head. */
+export type FundBillListRow = Pick<FundBill, (typeof FUND_BILL_LIST_COLUMNS)[number]>;
+
 /** One status tab of the document list. */
 export function useFundBillList({
   status, purpose, dateFrom, dateTo, pageIndex, pageSize,
 }: FundBillListOptions) {
-  const params = [`status=eq.${status}`];
+  const params = [`status=eq.${status}`, `select=${FUND_BILL_LIST_COLUMNS.join(',')}`];
   if (purpose) params.push(`bill_purpose=eq.${purpose}`);
   if (dateFrom) params.push(`bill_date=gte.${dateFrom}`);
   if (dateTo) params.push(`bill_date=lte.${dateTo}`);
@@ -115,7 +129,7 @@ export function useFundBillList({
 
   const query = useQuery({
     queryKey: ['fund-bills', 'list', status, purpose ?? '', dateFrom ?? '', dateTo ?? '', pageIndex, pageSize],
-    queryFn: () => apiClient.getPaginated<FundBill>(
+    queryFn: () => apiClient.getPaginated<FundBillListRow>(
       `/v_fund_bills?${params.join('&')}`,
       { page: pageIndex + 1, pageSize },
     ),
@@ -196,20 +210,9 @@ export function useFundBillSettlements(settlementIds: number[]) {
   return { ...query, rows: query.data ?? [] };
 }
 
-/** What this document did to each of the two money books, entry by entry. */
-export function useFundBillBookLines(billId: number | null) {
-  const query = useQuery({
-    queryKey: ['fund-bills', 'book-lines', billId],
-    queryFn: () => apiClient.get<{ book_type: 'FUND' | 'COMPANY'; signed_amount: number }[]>(
-      `/v_fund_book_lines?bill_id=eq.${billId}&select=book_type,signed_amount`,
-    ),
-    enabled: billId != null,
-    staleTime: 10 * 1000,
-  });
-  return { ...query, rows: query.data ?? [] };
-}
-
-/** The transfer rows — a paid payout has two, shop and company. */
+/** The money movements — one row per place money moved (mig 1421); a paid
+ *  payout has up to three: the transfer, the company's money the shop kept,
+ *  and the company's share moved between books. */
 export function useFundBillPayments(billId: number | null) {
   const query = useQuery({
     queryKey: ['fund-bills', 'payments', billId],

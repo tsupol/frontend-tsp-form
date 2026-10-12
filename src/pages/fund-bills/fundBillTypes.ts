@@ -94,6 +94,15 @@ export interface FundBill {
   net_after_returns: number;
   line_count: number;
   contract_count: number;
+  /**
+   * What really moved, signed as the books see it (mig 1421): the bank
+   * transfer, the fund's book and the company's book. These are the header
+   * figures — `net_amount` / `paid_net` differ from the bank by the company's
+   * money the shop kept, and reading them as "paid" misled the owner.
+   */
+  bank_net: number;
+  fund_book_net: number;
+  company_book_net: number;
   note: string | null;
   issued_at: string | null;
   created_at: string;
@@ -126,6 +135,10 @@ export interface FundBillLine {
   contract_code: string | null;
   tier_pct: number | null;
   installments_paid: number | null;
+  /** Commission rate the line was computed at (mig 1421) — "ค่าคอมร้าน 15%". */
+  rate_percent: number | null;
+  /** Ready-to-show product name (mig 1422); null on lines with no contract. */
+  product_display_name: string | null;
   /** Hand-entered discount / surcharge — shown apart from contract rows. */
   is_manual: boolean;
   reason_code: string | null;
@@ -176,7 +189,28 @@ export interface FundBillPayment {
   voided_at: string | null;
   void_reason: string | null;
   evidence_count: number;
+  /** What kind of movement this row is (mig 1421, `sale.ref_fund_payment_kinds`). */
+  payment_kind: FundPaymentKind;
+  /** Thai name of the kind, from the view. */
+  payment_kind_name: string | null;
+  /** Signed effect on each of the three places money sits; null = untouched.
+   *  `bank_amount` null means no real transfer — no slip belongs on the row. */
+  bank_amount: number | null;
+  fund_book_amount: number | null;
+  company_book_amount: number | null;
 }
+
+export type FundPaymentKind =
+  | 'SHOP_PAYOUT'
+  | 'SHOP_COMMISSION_EXTRA'
+  | 'SHOP_HELD_COMPANY_MONEY'
+  | 'COMPANY_SHARE'
+  | 'SHOP_CLAWBACK'
+  | 'SHOP_BUYBACK'
+  | 'EXPENSE'
+  | 'CAPITAL_IN'
+  | 'CAPITAL_OUT'
+  | 'OTHER';
 
 export interface FundBillLogRow {
   log_id: number;
@@ -293,6 +327,10 @@ export interface FundBillPayResult {
   devices: FundBillPaidDevice[] | null;
   /** Set when this press recorded into a closed fund day (mig 1411). */
   day_close_amended?: FundDayCloseAmended | null;
+  /** The movement a slip belongs to (mig 1417); null = nothing went through a bank. */
+  payment_id: number | null;
+  /** Every movement this press wrote. */
+  payment_ids: number[];
 }
 
 export interface FundBillIssueResult {
@@ -316,6 +354,10 @@ export interface FundBillCreditNoteResult {
   devices: FundBillPaidDevice[] | null;
   /** Set when this press recorded into a closed fund day (mig 1411). */
   day_close_amended?: FundDayCloseAmended | null;
+  /** The reversal movement on the credit note a slip belongs to (mig 1417);
+   *  null = nothing went through a bank. */
+  payment_id: number | null;
+  payment_ids: number[];
 }
 
 export interface FundBillAddLineResult {

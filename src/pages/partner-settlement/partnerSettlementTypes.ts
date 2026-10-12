@@ -224,6 +224,8 @@ export interface PartnerMyFundBillLine {
   settlement_code: string | null;
   is_manual: boolean;
   note: string | null;
+  /** Ready-to-show product name (mig 1422); null on lines with no contract. */
+  product_display_name: string | null;
 }
 
 /** `v_partner_my_fund_bill_payments` — the shop's own transfer, with its slips. */
@@ -241,6 +243,12 @@ export interface PartnerMyFundBillPayment {
   paid_date: string;
   is_reversal: boolean;
   evidence_count: number;
+  /** What kind of movement this is, in the shop's words (mig 1421). */
+  payment_kind: string;
+  payment_kind_name: string | null;
+  /** Money into (+) or out of (−) the shop's account. Null = an internal
+   *  entry that moved nothing — shown as a note, never as money in. */
+  shop_amount: number | null;
 }
 
 /** `v_partner_my_commission_report` — one row per contract the shop was paid for. */

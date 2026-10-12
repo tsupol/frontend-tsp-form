@@ -9,9 +9,13 @@
 // account and never mixes the two. A document that was undone by a credit note
 // leaves this list, because the shop's view holds paid ones only.
 //
-// Picking one opens it: the contracts inside with their lines, and the transfer
-// itself. `net_after_returns` is what the shop is left with once a device
-// buyback or a clawback has come back out.
+// Picking one opens it: the contracts inside with their lines, and the money
+// movements in the shop's own words (mig 1421): `shop_amount` is what entered
+// (+) or left (−) the shop's account; a row with none is an internal entry the
+// fund already took off the transfer, shown as a note and never as money in.
+// The slips on a movement are the fund's photos of the transfer, which the
+// shop may view but not change (mig 1420). `net_after_returns` is what the
+// shop is left with once a device buyback or a clawback has come back out.
 
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -24,6 +28,7 @@ import { useStagePick } from '../../lib/stagePick';
 import { fmtCurrency, formatEntityCode } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { PartnerBalanceHeader } from './PartnerBalanceHeader';
+import { FundPaymentEvidence } from '../fund-bills/FundPaymentEvidence';
 import {
   usePartnerMyFundBills,
   usePartnerMyFundBillLines,
@@ -34,6 +39,7 @@ import {
   payoutBadgeColor,
   type PartnerMyFundBill,
   type PartnerMyFundBillLine,
+  type PartnerMyFundBillPayment,
 } from './partnerSettlementTypes';
 
 export function ShopPayoutsPage() {
@@ -247,6 +253,16 @@ function ShopFundBillPanel({ bill }: { bill: PartnerMyFundBill }) {
           defaultValue: t(`fundBill.lineType_${line.line_type}`, { defaultValue: line.line_type }),
         });
 
+  /** The movement's name in the shop's words — the view's Thai, else ours. */
+  const paymentName = (p: PartnerMyFundBillPayment) =>
+    (i18n.language === 'th' && p.payment_kind_name)
+      ? p.payment_kind_name
+      : t(`settlement.paymentKind_${p.payment_kind}`, { defaultValue: p.payment_kind });
+
+  /** One product per contract: the group's product is its lines'. */
+  const groupProduct = (group: ContractGroup) =>
+    group.lines.find(l => l.product_display_name)?.product_display_name ?? null;
+
   const renderLine = (line: PartnerMyFundBillLine) => (
     <div key={line.line_id} className="flex items-center gap-2 px-3 py-1.5 border-t border-line">
       <span className="text-sm truncate flex-1 min-w-0">{lineLabel(line)}</span>
@@ -308,7 +324,10 @@ function ShopFundBillPanel({ bill }: { bill: PartnerMyFundBill }) {
                     {fmtCurrency(settlementNet(group.settlement_id))}
                   </span>
                 </div>
-                <div className="px-3 pb-0.5 text-xs text-subtle">{group.settlement_code ?? '—'}</div>
+                <div className="px-3 pb-0.5 text-xs text-subtle truncate">
+                  {group.settlement_code ?? '—'}
+                  {groupProduct(group) && <> · {groupProduct(group)}</>}
+                </div>
                 {group.lines.map(renderLine)}
               </div>
             ))}
@@ -326,7 +345,9 @@ function ShopFundBillPanel({ bill }: { bill: PartnerMyFundBill }) {
           </div>
         )}
 
-        {/* The transfer itself — the account it landed in, and the reference. */}
+        {/* The money movements, each named from the shop's side. A row with
+         *  no `shop_amount` moved nothing in the shop's account — the fund
+         *  took it off the transfer — so it reads as a note, not as money. */}
         {payments.rows.length > 0 && (
           <div>
             <div className="text-xs font-medium text-subtle uppercase tracking-wider mb-1.5">
@@ -336,18 +357,40 @@ function ShopFundBillPanel({ bill }: { bill: PartnerMyFundBill }) {
               {payments.rows.map(p => (
                 <div key={p.payment_id} className="px-3 py-2 border-b border-line last:border-b-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm truncate flex-1 min-w-0">
-                      {i18n.language === 'th' && p.method_name
-                        ? p.method_name
-                        : t(`settlement.method_${p.method}`, { defaultValue: p.method })}
-                    </span>
-                    <span className="text-sm tabular-nums shrink-0">{fmtCurrency(p.amount)}</span>
+                    {p.is_reversal && (
+                      <Badge color="warning" size="sm">{t('settlement.reversalRow')}</Badge>
+                    )}
+                    <span className="text-sm truncate flex-1 min-w-0">{paymentName(p)}</span>
+                    {p.shop_amount == null ? (
+                      <span className="text-xs text-subtle shrink-0">
+                        {fmtCurrency(p.amount)} · {t('settlement.shopAmountHeld')}
+                      </span>
+                    ) : (
+                      <span
+                        className={`text-sm tabular-nums shrink-0 ${
+                          p.shop_amount < 0 ? 'text-danger-fg' : p.shop_amount > 0 ? 'text-success-fg' : ''
+                        }`}
+                      >
+                        {p.shop_amount > 0 ? '+' : ''}{fmtCurrency(p.shop_amount)}
+                      </span>
+                    )}
                   </div>
                   <div className="text-xs text-subtle mt-0.5">
                     <DateTime value={p.paid_date} showTime={false} />
+                    {' · '}
+                    {i18n.language === 'th' && p.method_name
+                      ? p.method_name
+                      : t(`settlement.method_${p.method}`, { defaultValue: p.method })}
                     {p.dest_account_no && <> · {p.dest_bank_code} {p.dest_account_no}</>}
                     {p.reference && <> · {p.reference}</>}
                   </div>
+                  {/* The fund's slips for a transfer that went through a bank.
+                   *  View only: the shop cannot add or remove (mig 1420). */}
+                  {p.shop_amount != null && (
+                    <div className="mt-2">
+                      <FundPaymentEvidence paymentId={p.payment_id} canEdit={false} />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
