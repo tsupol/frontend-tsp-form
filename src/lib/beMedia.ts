@@ -334,6 +334,10 @@ export function beMediaCanPresign(key: string): boolean {
     /^private\/assets\/\d+\/evidence-/.test(k) ||
     /^private\/asset_check\/\d+\/photo-/.test(k) ||
     /^private\/sell_out\/\d+\/condition-/.test(k) ||
+    // fund payment slips (mig 1293 / 1420): staff and the shop on the row can
+    // view; be-media presigns the shape (checked 2026-10-12 as a shop user).
+    // Missing here meant privateMediaUrl threw before the request was made.
+    /^private\/fund_payments\/\d+\/evidence-/.test(k) ||
     // repair photo album (mig 633 prefix private/repairs/{repair_order_id}/).
     // ⚠ The BE read-side fn_media_url_check does NOT yet accept this shape (no
     // repairs read shape as of 2026-07-16) — this regex is FE-side optimistic;
