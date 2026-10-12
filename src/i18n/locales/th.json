@@ -8702,6 +8702,8 @@
     }
   },
   "settlement": {
+    "loadFailedDesc": "ระบบตอบกลับเป็นข้อผิดพลาด จึงแสดงยอดที่จะได้รับและปุ่มยื่นปิดงานไม่ได้ แจ้งทีมดูแลระบบ",
+    "loadFailedTitle": "โหลดใบขอรับเงินของสัญญานี้ไม่ได้",
     "adjustDirection_FROM_BRANCH": "ร้านโอนคืน",
     "adjustDirection_TO_BRANCH": "กองทุนโอนเพิ่ม",
     "adjustedNet": "จ่ายจริงรวม",

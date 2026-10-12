@@ -18,7 +18,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Badge, Button, Tooltip } from 'tsp-form';
 import {
-  Wallet, CheckCircle2, XCircle, Undo2, ChevronDown, ChevronRight, Images, History,
+  Wallet, CheckCircle2, XCircle, AlertTriangle, Undo2, ChevronDown, ChevronRight, Images, History,
 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
@@ -59,7 +59,7 @@ export function SettlementCard({
   // and the shop views answer 403 for them.
   const applies = isDealPartner && contractId != null;
 
-  const { detail } = usePartnerMySettlementDetail(contractId, applies);
+  const { detail, isError: detailFailed, error: detailError } = usePartnerMySettlementDetail(contractId, applies);
   const { caps, isLoading: capsLoading } = usePartnerSettlementActions(contractId, applies);
   const { rows: logRows } = usePartnerSettlementCloseLog(contractId, applies && !!detail);
   const statusRef = useSettlementStatusRef();
@@ -68,6 +68,24 @@ export function SettlementCard({
   const groupLabel = usePhotoGroupLabels();
 
   if (!applies) return null;
+  // A contract with no request answers with no rows; a failed call is a
+  // backend fault, so say so instead of hiding the card as if nothing were owed.
+  if (detailFailed) {
+    return (
+      <div className={`alert alert-warning ${className ?? ''}`} data-testid="settlement-card-load-failed">
+        <AlertTriangle size={18} />
+        <div>
+          <div className="alert-title">{t('settlement.loadFailedTitle')}</div>
+          <div className="alert-description">
+            {t('settlement.loadFailedDesc')}
+            {detailError instanceof Error && detailError.message && (
+              <div className="text-xs opacity-80 mt-1 break-words">{detailError.message}</div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
   // No request for this contract — nothing to say (404 on the capability call).
   if (!detail && !capsLoading && !caps) return null;
   if (!detail) return null;

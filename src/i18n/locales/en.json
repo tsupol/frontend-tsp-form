@@ -8713,6 +8713,8 @@
     }
   },
   "settlement": {
+    "loadFailedDesc": "The system answered with an error, so the amounts owed and the close-out button can't be shown. Let the support team know.",
+    "loadFailedTitle": "Couldn't load this contract's payment request",
     "adjustDirection_FROM_BRANCH": "Sent back by the shop",
     "adjustDirection_TO_BRANCH": "Extra sent to the shop",
     "adjustedNet": "Actually paid",
