@@ -153,8 +153,8 @@ export function useContractSettlement(scope: ShopCommissionScope, contractId: nu
   const view = scope === 'finance' ? 'v_partner_settlements' : 'v_partner_my_settlements';
   const query = useQuery({
     queryKey: ['shop-commission', 'settlement', scope, contractId],
-    queryFn: () => apiClient.get<{ settlement_id: number; settlement_code: string; status: string; is_paid: boolean }[]>(
-      `/${view}?contract_id=eq.${contractId}&select=settlement_id,settlement_code,status,is_paid&order=settlement_id.desc&limit=1`,
+    queryFn: () => apiClient.get<{ settlement_id: number; settlement_code: string; status: string; is_paid: boolean; waiting_on: string | null }[]>(
+      `/${view}?contract_id=eq.${contractId}&select=settlement_id,settlement_code,status,is_paid,waiting_on&order=settlement_id.desc&limit=1`,
     ),
     enabled: contractId != null,
     staleTime: 30 * 1000,

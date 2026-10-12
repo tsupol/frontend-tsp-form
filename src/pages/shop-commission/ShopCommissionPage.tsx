@@ -58,6 +58,15 @@ function monthBounds(month: string): [string, string] {
   return [toLocalDateStr(new Date(d.getFullYear(), d.getMonth(), 1)), toLocalDateStr(last)];
 }
 
+/** The shop menu that holds its payment request: whose move it is decides
+ *  (the same split the two menus use). A request in neither menu opens on the
+ *  contract, where its card lives. */
+function shopSettlementPath(waitingOn: string | null, contractId: number): string {
+  if (waitingOn === 'BRANCH') return `/admin/contracts/settlement-close/${contractId}`;
+  if (waitingOn === 'FINANCE') return `/admin/contracts/settlement-payment/${contractId}`;
+  return `/admin/contracts/search/${contractId}`;
+}
+
 export function ShopCommissionPage({ scope }: { scope: ShopCommissionScope }) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
@@ -466,7 +475,7 @@ function ContractCommissionDetail({ scope, contractId, row: rowFromList, isMobil
         // name that document — finance can open it from here.
         return settlement ? (
           <Link
-            to={isFinance ? `/admin/partner-settlements/${settlement.settlement_id}` : `/admin/contracts/settlement-payment/${tr.contract_id}`}
+            to={isFinance ? `/admin/partner-settlements/${settlement.settlement_id}` : shopSettlementPath(settlement.waiting_on, tr.contract_id)}
             className="text-primary-fg hover:underline inline-flex items-center gap-1"
           >
             {settlement.settlement_code}<ExternalLink size={12} />
