@@ -227,6 +227,10 @@
   "CORE.AUTH.PERMISSION_DENIED": "คุณไม่มีสิทธิ์ดำเนินการนี้",
   "core.auth.permission_denied": "คุณไม่มีสิทธิ์ดำเนินการนี้",
   "CORE.NOT_FOUND.BRANCH": "ไม่พบสาขา",
+  "CORE.NOT_FOUND.COMPANY": "ไม่พบบริษัทนี้ใน holding",
+  "core.not_found.company": "ไม่พบบริษัทนี้ใน holding",
+  "CORE.VALIDATION.REPORT_SIDE_NOT_FINANCIER": "เลือกดูรายงานได้เฉพาะฝั่งบริษัทกองทุน (หรือสาขาปกติ)",
+  "core.validation.report_side_not_financier": "เลือกดูรายงานได้เฉพาะฝั่งบริษัทกองทุน (หรือสาขาปกติ)",
   "core.not_found.branch": "ไม่พบสาขา",
   "SALE.STATE.CONTRACT_STATE_NOT_ALLOWED": "สัญญาต้องอยู่ในสถานะ active จึงจะเปิดบิลนี้ได้",
   "sale.state.contract_state_not_allowed": "สัญญาต้องอยู่ในสถานะ active จึงจะเปิดบิลนี้ได้",
@@ -1303,5 +1307,8 @@
   "fund.state.has_pending_bills": "มีบิลในวันนี้ที่ยังจ่ายไม่ครบ — เก็บเงินให้ครบ หรือยกเลิกบิลที่ยังเปิดอยู่ แล้วกดตรวจใหม่",
   "fund.state.recon_required": "มีบัญชีที่มีรายการวันนี้แต่ยังไม่บันทึกผลกระทบยอด หรือยอดระบบเปลี่ยนหลังบันทึก — บันทึกผลแล้วกดตรวจใหม่",
   "fund.state.day_close_not_enabled": "holding นี้ยังไม่เปิดใช้การปิดวันกองทุน",
-  "fund.validation.day_empty": "วันนี้ไม่มีรายการ ไม่ต้องปิดวัน"
+  "fund.validation.day_empty": "วันนี้ไม่มีรายการ ไม่ต้องปิดวัน",
+  "PARTNER.VALIDATION.SHARE_PCT_RANGE": "ส่วนแบ่งต้องอยู่ระหว่าง 0–100% (ทศนิยมไม่เกิน 2 ตำแหน่ง)",
+  "CORE.VALIDATION.FINANCIER_ONLY": "ตั้งค่านี้ได้เฉพาะบริษัทกองทุน",
+  "CORE.NOT_FOUND.COMPANY": "ไม่พบบริษัท"
 }

@@ -4097,6 +4097,11 @@
       "wholeHolding": "Whole holding"
     }
   },
+  "reportSide": {
+    "label": "Show reports for",
+    "operating": "Operating branches",
+    "viewing": "Viewing: {{label}}"
+  },
   "dealPartnerRate": {
     "title": "Deal Partner Terms",
     "policyTitle": "Holding policy",
@@ -5135,8 +5140,11 @@
       "SHOP_PAYOUT": "Shop payouts"
     },
     "itemCount": "{{count}} item(s)",
-    "lineAmount": "Amount",
-    "lineDoc": "Document",
+    "lineAmount": "In / out",
+    "lineDate": "Date",
+    "lineDoc": "Document / contract",
+    "lineKind": "Item",
+    "lineParty": "With",
     "lineSender": "Sender",
     "lineSource": "From",
     "lineTransactionRef": "Transaction ref.",
@@ -5187,12 +5195,13 @@
     "title": "Daily money summary",
     "unsavedDays": "Days not yet counted",
     "unspecifiedAccount": "No account recorded",
-    "unspecifiedHint": "These movements have no bank account on the document, so they cannot be counted against a statement.",
+    "unspecifiedHint": "Real transfers recorded without a bank account picked, so they cannot be counted against a statement.",
+    "internalReference": "Internal · no bank movement: {{amount}}",
     "versionsEmpty": "This day and account have not been recorded yet.",
     "versionsTitle": "Edit trail",
     "viewTrail": "Edit trail",
     "walletLine": "Wallet",
-    "walletReference": "Wallet money (no bank account): {{amount}} over {{count}} item(s)",
+    "walletReference": "Wallet money (no bank account): {{amount}}",
     "willBeVersion": "This will become version {{version}}.",
     "close": {
       "checkButton": "Check before closing the day",
@@ -8464,7 +8473,26 @@
       "rewardRateBahtHint": "1–1,000,000 · every this many baht of a fully-paid installment…",
       "rewardRatePoints": "Points earned",
       "rewardRatePointsHint": "0–1,000, up to 2 decimals · …earns this many points · 0 = none · applies to installments paid after saving · only while Reward points is on (Switches tab)",
-      "feature_REWARD": "Reward points"
+      "feature_REWARD": "Reward points",
+      "fundShareTitle": "Installment share to the company (%)",
+      "fundShareHint": "The share of collected installments this fund company keeps (late fees and deposits excluded). Each contract keeps the value in force on the day it opens.",
+      "fundShareNotCalc": "Set · the system does not compute the share yet",
+      "fundShareNeverSet": "Never set",
+      "fundShareSetBy": "Set by",
+      "fundShareNote": "Note",
+      "fundShareEdit": "Edit",
+      "fundShareHistory": "History",
+      "fundShareHistoryEmpty": "No history yet",
+      "fundShareColDate": "Date",
+      "fundShareColPct": "%",
+      "fundShareColBy": "Set by",
+      "fundShareColNote": "Note",
+      "fundShareEditTitle": "Edit installment share",
+      "fundShareCurrent": "Current:",
+      "fundShareNew": "New share (%)",
+      "fundShareFieldHint": "Applies to contracts opened after saving · contracts already open keep their value",
+      "fundShareSaved": "Share saved",
+      "fundSharePrevious": "Previous"
     },
     "bankAccounts": {
       "title": "Bank Accounts",

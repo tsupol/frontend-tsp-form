@@ -4093,6 +4093,11 @@
       "wholeHolding": "ทั้ง holding"
     }
   },
+  "reportSide": {
+    "label": "ดูรายงาน",
+    "operating": "สาขาปกติ",
+    "viewing": "กำลังดู: {{label}}"
+  },
   "dealPartnerRate": {
     "title": "เงื่อนไข Deal Partner",
     "policyTitle": "นโยบายของ holding",
@@ -5131,8 +5136,11 @@
       "SHOP_PAYOUT": "จ่ายเงินร้าน"
     },
     "itemCount": "{{count}} รายการ",
-    "lineAmount": "จำนวนเงิน",
-    "lineDoc": "เอกสาร",
+    "lineAmount": "เข้า/ออก",
+    "lineDate": "วันที่",
+    "lineDoc": "เอกสาร / สัญญา",
+    "lineKind": "รายการ",
+    "lineParty": "กับใคร",
     "lineSender": "ผู้โอน",
     "lineSource": "ที่มา",
     "lineTransactionRef": "เลขอ้างอิงรายการ",
@@ -5183,12 +5191,13 @@
     "title": "สรุปเงินรายวัน",
     "unsavedDays": "วันที่ยังไม่บันทึกผล",
     "unspecifiedAccount": "ไม่ระบุบัญชี",
-    "unspecifiedHint": "รายการเหล่านี้ไม่ได้ระบุบัญชีไว้ในเอกสาร จึงเอาไปชนกับ statement ไม่ได้",
+    "unspecifiedHint": "โอนจริงที่ไม่ได้เลือกบัญชีตอนบันทึก จึงเอาไปชนกับ statement ไม่ได้",
+    "internalReference": "ภายใน · ไม่ผ่านธนาคาร: {{amount}}",
     "versionsEmpty": "วันและบัญชีนี้ยังไม่เคยบันทึกผล",
     "versionsTitle": "ร่องรอยการแก้",
     "viewTrail": "ร่องรอยการแก้",
     "walletLine": "วอลเล็ต",
-    "walletReference": "เงินในวอลเล็ต (ไม่ผ่านบัญชี): {{amount}} จาก {{count}} รายการ",
+    "walletReference": "เงินในวอลเล็ต (ไม่ผ่านบัญชี): {{amount}}",
     "willBeVersion": "จะกลายเป็น version {{version}}",
     "close": {
       "checkButton": "ตรวจก่อนปิดวัน",
@@ -8453,7 +8462,26 @@
       "rewardRateBahtHint": "1–1,000,000 · ค่างวดที่จ่ายครบทุกเท่านี้บาท…",
       "rewardRatePoints": "ได้ (คะแนน)",
       "rewardRatePointsHint": "0–1,000 ทศนิยมได้ 2 ตำแหน่ง · …ได้คะแนนเท่านี้ · 0 = ไม่ให้คะแนน · มีผลกับงวดที่จ่ายหลังบันทึก · ให้เฉพาะตอนเปิดคะแนนสะสม (แท็บสวิตช์)",
-      "feature_REWARD": "คะแนนสะสม"
+      "feature_REWARD": "คะแนนสะสม",
+      "fundShareTitle": "ส่วนแบ่งค่างวดให้บริษัท (%)",
+      "fundShareHint": "ส่วนแบ่งที่บริษัทกองทุนได้จากค่างวดที่เก็บได้ (ไม่รวมค่าปรับ/เงินประกัน) · สัญญาจำค่าที่ตั้งไว้ ณ วันเปิดสัญญา",
+      "fundShareNotCalc": "ตั้งค่าไว้แล้ว · ระบบยังไม่คำนวณส่วนแบ่ง",
+      "fundShareNeverSet": "ยังไม่เคยตั้งค่า",
+      "fundShareSetBy": "ตั้งโดย",
+      "fundShareNote": "หมายเหตุ",
+      "fundShareEdit": "แก้ไข",
+      "fundShareHistory": "ประวัติ",
+      "fundShareHistoryEmpty": "ยังไม่มีประวัติ",
+      "fundShareColDate": "วันที่",
+      "fundShareColPct": "%",
+      "fundShareColBy": "ผู้ตั้ง",
+      "fundShareColNote": "หมายเหตุ",
+      "fundShareEditTitle": "แก้ไขส่วนแบ่งค่างวดให้บริษัท",
+      "fundShareCurrent": "ค่าปัจจุบัน:",
+      "fundShareNew": "ค่าใหม่ (%)",
+      "fundShareFieldHint": "ใช้กับสัญญาที่เปิดหลังบันทึก · สัญญาที่เปิดแล้วใช้ค่าเดิม",
+      "fundShareSaved": "บันทึกส่วนแบ่งแล้ว",
+      "fundSharePrevious": "ค่าเดิม"
     },
     "bankAccounts": {
       "title": "บัญชีธนาคาร",

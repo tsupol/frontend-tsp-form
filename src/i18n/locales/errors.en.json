@@ -228,6 +228,10 @@
   "core.auth.permission_denied": "You do not have permission for this action",
   "CORE.NOT_FOUND.BRANCH": "Branch not found",
   "core.not_found.branch": "Branch not found",
+  "CORE.NOT_FOUND.COMPANY": "Company not found in this holding",
+  "core.not_found.company": "Company not found in this holding",
+  "CORE.VALIDATION.REPORT_SIDE_NOT_FINANCIER": "Reports can only be viewed for a fund company (or the operating branches)",
+  "core.validation.report_side_not_financier": "Reports can only be viewed for a fund company (or the operating branches)",
   "SALE.STATE.CONTRACT_STATE_NOT_ALLOWED": "Contract must be active to open this bill",
   "sale.state.contract_state_not_allowed": "Contract must be active to open this bill",
   "sale.state.day_not_closed": "The bill's day isn't closed — use the normal Cancel/Void flow.",
@@ -1303,5 +1307,8 @@
   "fund.state.has_pending_bills": "Some bills on this day aren't fully paid. Collect the rest, or cancel the bill if it is still open, then check again.",
   "fund.state.recon_required": "Some accounts with money on this day aren't reconciled yet, or their system figure changed after the count was recorded. Record the count, then check again.",
   "fund.state.day_close_not_enabled": "Closing the fund's day isn't switched on for this holding.",
-  "fund.validation.day_empty": "Nothing happened on this day, so there's nothing to close."
+  "fund.validation.day_empty": "Nothing happened on this day, so there's nothing to close.",
+  "PARTNER.VALIDATION.SHARE_PCT_RANGE": "The share must be between 0 and 100%, with at most 2 decimals.",
+  "CORE.VALIDATION.FINANCIER_ONLY": "This setting applies to a fund company only.",
+  "CORE.NOT_FOUND.COMPANY": "Company not found."
 }
