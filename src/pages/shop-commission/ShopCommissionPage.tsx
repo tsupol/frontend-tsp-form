@@ -310,6 +310,9 @@ export function ShopCommissionPage({ scope }: { scope: ShopCommissionScope }) {
                             {r.customer_name ?? '—'}
                             {isFinance && r.branch_name && <span className="text-subtle"> · {r.branch_name}</span>}
                           </div>
+                          {r.product_display_name && (
+                            <div className="text-xs text-subtle mt-0.5 truncate">{r.product_display_name}</div>
+                          )}
                           <div className="flex items-center gap-2 mt-0.5 text-xs text-subtle">
                             <span className="truncate flex-1 min-w-0">{r.commission_plan_name ?? r.commission_plan}</span>
                             <span className="shrink-0"><DateTime value={r.activated_on} showTime={false} /></span>
@@ -535,7 +538,7 @@ function ContractCommissionDetail({ scope, contractId, row: rowFromList, isMobil
                 {/* The plan name is a sentence, so it gets the whole row. */}
                 {stat(t('shopCommission.plan'), row.commission_plan_name ?? row.commission_plan, false, 'col-span-full')}
                 {isFinance && row.branch_name && stat(t('shopCommission.shop'), row.branch_name)}
-                {stat(t('shopCommission.model'), row.model_name ?? '—')}
+                {stat(t('shopCommission.product'), row.product_display_name ?? '—', false, 'col-span-full')}
                 {stat(t('shopCommission.activatedOn'), <DateTime value={row.activated_on} showTime={false} />)}
                 {stat(t('shopCommission.financed'), fmtCurrency(row.financed_amount))}
                 {stat(t('shopCommission.installments'), `${row.installments_paid}/${row.installments_total}`)}

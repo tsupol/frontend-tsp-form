@@ -61,6 +61,8 @@ export interface PartnerReturn {
   created_by_name: string | null;
   created_at: string;
   updated_at: string | null;
+  /** The contract's standard product name (mig 1422) — on the list views only, not the detail view. */
+  product_display_name?: string | null;
 }
 
 /** One entry of `return_photos[]` on the detail view — a RETURN_* slot's count. */

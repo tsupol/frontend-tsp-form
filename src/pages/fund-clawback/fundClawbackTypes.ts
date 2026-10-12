@@ -28,6 +28,8 @@ export interface FundClawbackCandidate {
   settlement_code: string;
   contract_id: number;
   contract_code: string | null;
+  /** The contract's standard product name (mig 1422). */
+  product_display_name: string | null;
   holding_id: number;
   company_id: number;
   branch_id: number;
@@ -77,4 +79,8 @@ export interface FundClawbackCollectResult {
   paid_date: string;
   /** Set when this press recorded into a closed fund day (mig 1411). */
   day_close_amended?: FundDayCloseAmended | null;
+  /** The movement a slip belongs to (mig 1417) — the fund book's row when the
+   *  clawback split across two books; null = nothing went through a bank. */
+  payment_id: number | null;
+  payment_ids: number[];
 }

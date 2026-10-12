@@ -20,14 +20,14 @@ import {
 } from '../shop-commission/shopCommissionTypes';
 
 type Row = Pick<CommissionTrancheRow,
-  'contract_id' | 'contract_code' | 'pay_no' | 'pct' | 'amount' | 'status' | 'unlocked_on' | 'hold_until'>;
+  'contract_id' | 'contract_code' | 'product_display_name' | 'pay_no' | 'pct' | 'amount' | 'status' | 'unlocked_on' | 'hold_until'>;
 
 export function useCommissionExtraShopTranches(branchId: number | null) {
   return useQuery({
     queryKey: ['shop-commission', 'extra-queue', 'shop', branchId],
     queryFn: () => apiClient.get<Row[]>(
       `/v_commission_tranches?branch_id=eq.${branchId}&status=in.(READY,WAIT_DAY_CLOSE,WAIT_DAY_END,WAIT_HOLD)`
-      + '&select=contract_id,contract_code,pay_no,pct,amount,status,unlocked_on,hold_until&order=contract_code,pay_no',
+      + '&select=contract_id,contract_code,product_display_name,pay_no,pct,amount,status,unlocked_on,hold_until&order=contract_code,pay_no',
     ),
     enabled: branchId != null,
     staleTime: 10 * 1000,
@@ -73,9 +73,12 @@ export function CommissionExtraShopPanel({ shop, canBundle, onBundle }: {
     return [...m.values()];
   };
   const readyGroups = groupBy(ready, r => `c${r.contract_id}`, r => (
-    <Link to={`/admin/contracts/search/${r.contract_id}`} className="font-medium text-primary-fg hover:underline inline-flex items-center gap-1" onClick={e => e.stopPropagation()}>
-      {formatEntityCode(r.contract_code)}<ExternalLink size={12} />
-    </Link>
+    <>
+      <Link to={`/admin/contracts/search/${r.contract_id}`} className="font-medium text-primary-fg hover:underline inline-flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+        {formatEntityCode(r.contract_code)}<ExternalLink size={12} />
+      </Link>
+      {r.product_display_name && <span className="text-xs text-subtle truncate">{r.product_display_name}</span>}
+    </>
   ));
   const waitingGroups = groupBy(waiting, r => `${r.status}|${r.status === 'WAIT_HOLD' ? r.hold_until : r.unlocked_on}`, r => (
     <span className="min-w-0 truncate">
@@ -87,9 +90,12 @@ export function CommissionExtraShopPanel({ shop, canBundle, onBundle }: {
   const slice = (r: Row, showContract: boolean) => (
     <div key={`${r.contract_id}-${r.pay_no}`} className="pl-9 pr-3 py-1.5 border-t border-line-subtle flex items-center gap-2 text-sm">
       {showContract && (
-        <Link to={`/admin/contracts/search/${r.contract_id}`} className="text-primary-fg hover:underline inline-flex items-center gap-1" onClick={e => e.stopPropagation()}>
-          {formatEntityCode(r.contract_code)}<ExternalLink size={12} />
-        </Link>
+        <>
+          <Link to={`/admin/contracts/search/${r.contract_id}`} className="text-primary-fg hover:underline inline-flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+            {formatEntityCode(r.contract_code)}<ExternalLink size={12} />
+          </Link>
+          {r.product_display_name && <span className="text-xs text-subtle truncate">{r.product_display_name}</span>}
+        </>
       )}
       <span className="text-subtle">{payNoLabel(r.pay_no, t)} {Number(r.pct)}%</span>
       <span className="flex-1" />

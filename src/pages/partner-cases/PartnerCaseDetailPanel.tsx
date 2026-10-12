@@ -290,10 +290,9 @@ export function PartnerCaseDetailPanel({
         {/* The device, plus its photo album */}
         <Section icon={<Smartphone size={14} />} title={t('partnerCase.deviceTitle')}>
           <div className="grid grid-cols-2 gap-3">
-            <Field
-              label={t('partnerCase.model')}
-              value={asset?.variant_name ?? detail.variant_name ?? detail.model_name ?? '—'}
-            />
+            {/* The view's standard name (brand + model + storage + colour, mig
+             *  1422) — not the snapshot's bare variant, which hid the model. */}
+            <Field label={t('partnerCase.product')} value={detail.product_display_name ?? '—'} />
             <Field label={t('partnerCase.assetCode')} value={asset?.asset_code ?? detail.asset_code ?? '—'} />
             <Field
               label={t('partnerCase.condition')}

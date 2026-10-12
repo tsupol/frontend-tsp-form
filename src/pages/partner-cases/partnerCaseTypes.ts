@@ -58,6 +58,8 @@ export interface PartnerCase {
   model_name: string | null;
   variant_id: number | null;
   variant_name: string | null;
+  /** The standard name of the model/colour picked in the case (mig 1422) — show this, not model/variant. */
+  product_display_name: string | null;
   is_used_asset: boolean;
 
   /** Frozen at submit — the "ก้อน" the reviewer judged. */
@@ -180,6 +182,8 @@ export interface PartnerCaseQueueRow {
   model_name: string | null;
   variant_id: number | null;
   variant_name: string | null;
+  /** Standard product name (mig 1422). */
+  product_display_name: string | null;
   is_used_asset: boolean;
   agreed_price: number | null;
   down_payment: number | null;

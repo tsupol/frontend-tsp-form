@@ -281,6 +281,9 @@ function ReturnRow({ row, statusLabel, onPick }: {
         </span>
         <span className="text-xs text-subtle shrink-0 truncate">{row.device_code ?? '—'}</span>
       </div>
+      {row.product_display_name && (
+        <div className="text-xs text-subtle mt-0.5 truncate">{row.product_display_name}</div>
+      )}
 
       <div className="flex items-center gap-2 mt-0.5 flex-wrap">
         <span className="text-xs text-subtle">

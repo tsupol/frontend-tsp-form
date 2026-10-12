@@ -111,6 +111,8 @@ export interface PartnerReturn {
   updated_at: string | null;
   /** Only on `v_partner_returns` / `v_partner_return_queue`, not on the detail view. */
   transfer_shipped_at?: string | null;
+  /** The contract's standard product name (mig 1422) — list/queue views only. */
+  product_display_name?: string | null;
   warehouse_branch_id?: number | null;
   warehouse_branch_name?: string | null;
   received_branch_name?: string | null;
@@ -244,6 +246,10 @@ export interface ReturnBuybackPaidResult {
   close_block: PartnerReturnCloseBlock | null;
   /** Set when this press recorded into a closed fund day (mig 1411). */
   day_close_amended?: FundDayCloseAmended | null;
+  /** The buyback document's movement a slip belongs to (mig 1417); null =
+   *  nothing went through a bank. */
+  payment_id: number | null;
+  payment_ids: number[];
 }
 
 export interface ReturnShipResult {

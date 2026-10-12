@@ -53,10 +53,12 @@ interface PartnerSettlementReviewPanelProps {
    * it (only the queue does), so the page passes it down when it has it.
    */
   checkedByName?: string | null;
+  /** The contract's standard product name — also queue-only (mig 1422). */
+  productName?: string | null;
 }
 
 export function PartnerSettlementReviewPanel({
-  detail, loading, isMobile, onBack, checkedByName,
+  detail, loading, isMobile, onBack, checkedByName, productName,
 }: PartnerSettlementReviewPanelProps) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
@@ -163,6 +165,7 @@ export function PartnerSettlementReviewPanel({
       <div className="flex-1 overflow-auto better-scroll px-4 py-3 flex flex-col gap-4">
         <HeaderBlock
           detail={detail}
+          productName={productName ?? null}
           onOpenContract={() => navigate(`/admin/contracts/search/${detail.contract_id}`)}
         />
 
@@ -286,8 +289,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 /** Who this settlement belongs to, and how to get to the contract. */
-function HeaderBlock({ detail, onOpenContract }: {
+function HeaderBlock({ detail, productName, onOpenContract }: {
   detail: PartnerSettlementDetail;
+  productName: string | null;
   onOpenContract: () => void;
 }) {
   const { t } = useTranslation();
@@ -307,6 +311,7 @@ function HeaderBlock({ detail, onOpenContract }: {
             <ExternalLink size={12} />
           </button>
         </Field>
+        <Field label={t('partnerSettlement.product')}>{productName ?? '—'}</Field>
         <Field label={t('partnerSettlement.activatedAt')}>
           <DateTime value={detail.activated_at} showTime />
         </Field>

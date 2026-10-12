@@ -187,7 +187,7 @@ export function PendingApprovalPage({ view }: { view: PendingApprovalView }) {
                         <div className="text-sm mt-0.5 truncate">{r.customer_name ?? '—'}</div>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className="text-xs text-subtle truncate flex-1 min-w-0">
-                            {r.variant_name ?? r.model_name ?? '—'}
+                            {r.product_display_name ?? ''}
                           </span>
                           <span className="text-xs tabular-nums shrink-0">
                             {fmtCurrency(r.financed_amount)}

@@ -6314,6 +6314,7 @@
     "moneyTitle": "Figures",
     "agreedPrice": "Agreed price",
     "uplift": "Added amount",
+    "product": "Product",
     "downPayment": "Down payment",
     "financedAmount": "Financed",
     "installments": "Instalments",
@@ -6718,6 +6719,7 @@
     "ageDays": "{{count}} days since activation",
     "submittedAgeDays": "{{count}} days since submission",
     "submitCount": "Submitted {{count}} times",
+    "product": "Product",
     "noPayoutAccount": "Shop has no bank account for payment",
     "openPayout": "Open payout document",
     "checkedBadge": "Reviewed",
@@ -9641,6 +9643,7 @@
   },
   "shopCommission": {
     "plan": "Commission plan",
+    "product": "Product",
     "planClosedShort": "Plan closed — still in force",
     "planEffectHint": "The plan applies to contracts opened after it is set · contracts already open keep their plan to the end",
     "payNoOpening": "Opening day",

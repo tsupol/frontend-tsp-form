@@ -209,6 +209,7 @@ export function PartnerSettlementQueuePage() {
                   isMobile={isMobile}
                   onBack={goBack}
                   checkedByName={selectedRow?.finance_checked_by_name ?? null}
+                  productName={selectedRow?.product_display_name ?? null}
                 />
               </PageNavPanel>
             </div>
@@ -274,6 +275,9 @@ function QueueRow({ row, tab, statusLabel, onPick, onOpenPayout, onOpenAccountSe
           </span>
           <span className="text-xs tabular-nums shrink-0">{fmtCurrency(row.net_amount)}</span>
         </div>
+        {row.product_display_name && (
+          <div className="text-xs text-subtle mt-0.5 truncate">{row.product_display_name}</div>
+        )}
 
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
           {row.close_submitted_at && (

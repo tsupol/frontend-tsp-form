@@ -98,7 +98,10 @@ export function FundClawbackPage() {
             </span>
           </div>
 
-          <div className="text-sm mt-0.5 truncate">{r.branch_name}</div>
+          <div className="text-sm mt-0.5 truncate">
+            {r.branch_name}
+            {r.product_display_name && <span className="text-subtle"> · {r.product_display_name}</span>}
+          </div>
 
           <div className="text-xs text-subtle mt-0.5 flex flex-wrap gap-x-3">
             <span>{t('fundClawback.paidCount', { count: r.paid_count })}</span>

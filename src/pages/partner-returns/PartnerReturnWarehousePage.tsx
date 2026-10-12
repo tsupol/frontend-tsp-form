@@ -158,6 +158,9 @@ function WarehouseRow({ row, onOpen, onReceive }: {
         <div className="text-sm mt-0.5 truncate">
           {row.branch_name} · {row.customer_name ?? '—'}
         </div>
+        {row.product_display_name && (
+          <div className="text-xs text-subtle mt-0.5 truncate">{row.product_display_name}</div>
+        )}
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
           <button
             type="button"

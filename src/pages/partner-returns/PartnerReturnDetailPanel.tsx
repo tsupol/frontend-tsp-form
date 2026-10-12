@@ -107,6 +107,8 @@ export function PartnerReturnDetailPanel({ returnId, isMobile, onBack, queueRow 
   // live while a return is open; `v_partner_returns` answers once it is closed.
   const extras = queueRow ?? row ?? null;
   const warehouseName = extras?.warehouse_branch_name ?? null;
+  // Same story for the product name: the detail view has none (mig 1422).
+  const productName = extras?.product_display_name ?? null;
   const closeBlock = actions?.close_block ?? queueRow?.close_block ?? null;
 
   const footerActions = (actions?.actions ?? [])
@@ -248,6 +250,7 @@ export function PartnerReturnDetailPanel({ returnId, isMobile, onBack, queueRow 
                 </Fact>
                 <Fact label={t('partnerReturn.customer')}>{detail.customer_name ?? '—'}</Fact>
                 <Fact label={t('partnerReturn.device')}>
+                  {productName && <span className="block">{productName}</span>}
                   {detail.device_code ?? '—'}
                   {detail.device_bucket && (
                     <span className="text-xs text-subtle ml-1">

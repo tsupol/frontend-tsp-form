@@ -51,6 +51,7 @@ interface RailRow {
   contract_code: string;
   customer_name: string | null;
   branch_name: string | null;
+  /** The standard product name (mig 1422), blank when the view has none. */
   model_label: string | null;
   financed_amount: number | null;
   is_used_asset: boolean;
@@ -70,7 +71,7 @@ const fromQueue = (r: PartnerCaseQueueRow): RailRow => ({
   contract_code: r.contract_code,
   customer_name: r.customer_name,
   branch_name: r.branch_name,
-  model_label: r.variant_name ?? r.model_name,
+  model_label: r.product_display_name,
   financed_amount: r.financed_amount,
   is_used_asset: r.is_used_asset,
   submitted_by_name: r.submitted_by_name,
@@ -84,7 +85,7 @@ const fromHistory = (r: PartnerCase): RailRow => ({
   contract_code: r.contract_code,
   customer_name: r.customer_name,
   branch_name: r.branch_name,
-  model_label: r.variant_name ?? r.model_name,
+  model_label: r.product_display_name,
   financed_amount: r.financed_amount,
   is_used_asset: r.is_used_asset,
   submitted_by_name: r.submitted_by_name,
@@ -326,7 +327,7 @@ export function PartnerCaseQueuePage() {
                         <div className="text-sm mt-0.5 truncate">{r.customer_name ?? '—'}</div>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className="text-xs text-subtle truncate flex-1 min-w-0">
-                            {r.branch_name} · {r.model_label ?? '—'}
+                            {r.branch_name}{r.model_label ? ` · ${r.model_label}` : ''}
                           </span>
                           <span className="text-xs tabular-nums shrink-0">
                             {fmtCurrency(r.financed_amount)}

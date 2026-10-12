@@ -49,7 +49,10 @@ export interface ContractCommissionRow {
   branch_id?: number;
   branch_name?: string;
   customer_name: string | null;
+  /** Kept by the view; the screen shows `product_display_name` instead (mig 1422). */
   model_name: string | null;
+  /** "Apple iPhone 17 Pro 256GB Cosmic Orange" — the contract's standard name. */
+  product_display_name: string | null;
   activated_on: string;
   state: string;
   state_name: string | null;
@@ -80,6 +83,8 @@ export interface CommissionTrancheRow {
   contract_id: number;
   contract_code: string;
   branch_id?: number;
+  /** The contract's standard product name (mig 1422); computed only when selected. */
+  product_display_name?: string | null;
   pay_no: number;
   pct: number;
   amount: number;

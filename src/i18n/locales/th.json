@@ -6305,6 +6305,7 @@
     "moneyTitle": "ตัวเลข",
     "agreedPrice": "ราคาตกลง",
     "uplift": "ราคาเพิ่ม",
+    "product": "สินค้า",
     "downPayment": "เงินดาวน์",
     "financedAmount": "ยอดจัด",
     "installments": "ค่างวด",
@@ -6709,6 +6710,7 @@
     "ageDays": "ค้าง {{count}} วัน นับจากสัญญาเริ่ม",
     "submittedAgeDays": "ยื่นมาแล้ว {{count}} วัน",
     "submitCount": "ยื่นมาแล้ว {{count}} ครั้ง",
+    "product": "สินค้า",
     "noPayoutAccount": "ร้านยังไม่มีบัญชีรับเงิน",
     "openPayout": "เปิดใบจ่ายเงิน",
     "checkedBadge": "ตรวจแล้ว",
@@ -9627,6 +9629,7 @@
   },
   "shopCommission": {
     "plan": "แผนค่าคอม",
+    "product": "สินค้า",
     "planClosedShort": "แผนถูกปิดใช้ · ยังมีผลอยู่",
     "planEffectHint": "แผนมีผลกับสัญญาที่เปิดหลังจากตั้ง · สัญญาที่เปิดไปแล้วใช้แผนเดิมจนจบ",
     "payNoOpening": "วันเปิด",

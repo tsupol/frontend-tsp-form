@@ -132,6 +132,7 @@ export function FundClawbackIssueModal({
                       <span className="text-sm tabular-nums shrink-0">{fmtCurrency(r.claw_total)}</span>
                     </div>
                     <div className="text-xs text-subtle mt-0.5">
+                      {r.product_display_name && <>{r.product_display_name} · </>}
                       {t('fundClawback.paidCount', { count: r.paid_count })}
                       {r.tier_pct != null && <> · {t('fundClawback.tierPct', { pct: r.tier_pct })}</>}
                     </div>

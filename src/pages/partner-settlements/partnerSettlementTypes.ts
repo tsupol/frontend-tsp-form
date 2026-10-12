@@ -29,6 +29,8 @@ export interface PartnerSettlementQueueRow {
   branch_name: string | null;
   customer_id: number | null;
   customer_name: string | null;
+  /** The contract's standard product name (mig 1422). Queue/list views only — not on the detail view. */
+  product_display_name: string | null;
   status: PartnerSettlementStatus;
   is_open: boolean;
   is_paid: boolean;
@@ -97,6 +99,7 @@ export interface PartnerSettlementDetail extends Omit<
   PartnerSettlementQueueRow,
   'close_submit_count' | 'close_returned_reason_code' | 'submitted_age_days'
   | 'has_payout_account' | 'finance_checked_at' | 'finance_checked_by' | 'finance_checked_by_name'
+  | 'product_display_name'
 > {
   /** The fund's own commission rate. Null on the shop's view. */
   company_rate_percent: number | null;
