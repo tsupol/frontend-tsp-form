@@ -20,8 +20,26 @@ export type FundDirection = 'IN' | 'OUT';
  */
 export type FundSource = 'BILL' | 'FUND_BILL';
 
-/** The account with no bank account recorded. Shown, never reconcilable. */
+/**
+ * The account for a real transfer recorded without a bank account picked.
+ * Shown, never reconcilable. Since mig 1423 it holds only such transfers —
+ * money that never touched a bank sits in the summary's `internal` group.
+ */
 export const UNSPECIFIED_ACCOUNT = 'UNSPECIFIED';
+
+/**
+ * Keys for the two account-axis groups that are not accounts. They never come
+ * from the backend; the page uses them to say which list is expanded, and the
+ * lines hook turns them into a `tender_class` filter instead of an account one.
+ */
+export const INTERNAL_GROUP_KEY = '__INTERNAL__';
+export const WALLET_GROUP_KEY = '__WALLET__';
+
+/** A figure beside the accounts that is not an account: wallet money, internal money. */
+export interface FundDayGroupTotal {
+  amount: number;
+  item_count: number;
+}
 
 // ---------------------------------------------------------------------------
 // fn_fund_day_summary
@@ -73,7 +91,13 @@ export interface FundDaySummary {
   today: string;
   categories: FundDayCategory[];
   accounts: FundDayAccount[];
-  wallet: { amount: number; item_count: number };
+  wallet: FundDayGroupTotal;
+  /**
+   * Money that never touched a bank account (mig 1423): the company's share of
+   * a shop payout moved into the company's books, the contract fee the shop
+   * kept on the company's behalf. accounts' net + wallet + internal = money_net.
+   */
+  internal: FundDayGroupTotal;
   category_net: number;
   money_net: number;
   /** false = the two axes disagree. A warning band, never a reason to block saving. */
@@ -249,7 +273,16 @@ export interface FundBankLine extends FundLineBase {
   /** `INTERNAL` = recorded but never touched a bank account (mig 1290). */
   tender_class: 'BANK' | 'WALLET' | 'INTERNAL';
   method: string | null;
-  account_key: string;
+  /** null on WALLET and INTERNAL rows — there is no account to name. */
+  account_key: string | null;
+  // mig 1423 — the readable labels. What the row is, who it was with, which
+  // contract it belongs to. A fund document spanning several contracts and a
+  // payee outside the system both come down as null.
+  item_kind: string | null;
+  item_kind_name: string | null;
+  party_type: 'BRANCH' | 'COMPANY' | 'HOLDING' | 'CUSTOMER' | null;
+  party_name: string | null;
+  contract_code: string | null;
   bank_code: string | null;
   bank_name: string | null;
   account_number: string | null;
@@ -270,7 +303,7 @@ export interface FundBankLine extends FundLineBase {
 export type FundLine = FundMoneyLine | FundBankLine;
 
 export function isBankLine(line: FundLine): line is FundBankLine {
-  return 'account_key' in line;
+  return 'tender_class' in line;
 }
 
 // ---------------------------------------------------------------------------

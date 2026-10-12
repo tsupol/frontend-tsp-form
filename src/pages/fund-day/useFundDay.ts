@@ -7,6 +7,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { INTERNAL_GROUP_KEY, WALLET_GROUP_KEY } from './fundDayTypes';
 import type {
   FundBankLine,
   FundDayCloseCheck,
@@ -58,16 +59,37 @@ export function useFundMoneyLines(companyId: number | null, date: string, catego
   });
 }
 
-/** Rows behind one account card. */
-export function useFundBankLines(companyId: number | null, date: string, accountKey: string | null) {
+/**
+ * The columns FundLinesTable renders, and nothing more — the readable labels
+ * (mig 1423) are computed per row only when asked for, so asking for the whole
+ * view costs more on every expansion (notice 1423 §5).
+ */
+const BANK_LINE_COLUMNS = [
+  'money_date', 'source', 'tender_class', 'method', 'account_key', 'direction', 'amount', 'signed_amount',
+  'ref_table', 'ref_id', 'doc_code', 'contract_id', 'contract_code', 'branch_id',
+  'item_kind', 'item_kind_name', 'party_type', 'party_name', 'reference',
+  'transfer_at', 'sender_account_name', 'sender_bank', 'transaction_ref',
+].join(',');
+
+/**
+ * Rows behind one account card, or behind one of the two groups beside the
+ * accounts. An account is filtered by its key; the groups have no key (their
+ * rows carry `account_key = null`), so they are filtered by `tender_class`
+ * instead. The account filter pins `tender_class = BANK` so a group's rows can
+ * never land under an account.
+ */
+export function useFundBankLines(companyId: number | null, date: string, key: string | null) {
   return useQuery({
-    queryKey: ['fund-bank-lines', companyId, date, accountKey],
-    queryFn: () =>
-      apiClient.get<FundBankLine[]>(
-        `/v_fund_bank_lines?company_id=eq.${companyId}&money_date=eq.${date}`
-        + `&account_key=eq.${encodeURIComponent(accountKey ?? '')}&order=source,ref_id`,
-      ),
-    enabled: !!accountKey && !!date,
+    queryKey: ['fund-bank-lines', companyId, date, key],
+    queryFn: () => {
+      const params = [`company_id=eq.${companyId}`, `money_date=eq.${date}`];
+      if (key === INTERNAL_GROUP_KEY) params.push('tender_class=eq.INTERNAL');
+      else if (key === WALLET_GROUP_KEY) params.push('tender_class=eq.WALLET');
+      else params.push('tender_class=eq.BANK', `account_key=eq.${encodeURIComponent(key ?? '')}`);
+      params.push(`select=${BANK_LINE_COLUMNS}`, 'order=source,ref_id');
+      return apiClient.get<FundBankLine[]>(`/v_fund_bank_lines?${params.join('&')}`);
+    },
+    enabled: !!key && !!date,
   });
 }
 

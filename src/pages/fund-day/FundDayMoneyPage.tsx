@@ -12,7 +12,7 @@
 // it, and only exists when the summary says `day_close_enabled` — with the
 // holding's switch off this page looks exactly as it did before.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -21,7 +21,7 @@ import {
 } from 'tsp-form';
 import {
   AlertTriangle, ArrowRightFromLine, CheckCircle, ChevronDown, ChevronRight, ClipboardCheck, History,
-  Keyboard, Loader2, Lock, RefreshCw, Save, Wallet, X,
+  BookLock, Keyboard, Loader2, Lock, RefreshCw, Save, Wallet, X,
 } from 'lucide-react';
 import { CurrencyInput } from '../../components/CurrencyInput';
 import { DateTime } from '../../components/DateTime';
@@ -39,7 +39,7 @@ import {
   useFundBankLines, useFundCompanyId, useFundDayCloseCheck, useFundDaySummary, useFundMoneyLines,
 } from './useFundDay';
 import {
-  UNSPECIFIED_ACCOUNT, fundTodayISO,
+  INTERNAL_GROUP_KEY, UNSPECIFIED_ACCOUNT, WALLET_GROUP_KEY, fundTodayISO,
   type FundDayAccount, type FundDayCategory, type FundDayCloseCheck,
 } from './fundDayTypes';
 
@@ -374,6 +374,40 @@ export function FundDayMoneyPage() {
     );
   };
 
+  /**
+   * One of the two figures beside the accounts (wallet, internal). Same quiet
+   * look as before, plus the item count as the expander — the same control an
+   * account card has — so the rows behind it can be read the same way.
+   */
+  const renderGroupLine = (key: string, icon: ReactNode, label: string, itemCount: number) => {
+    const expanded = openAccount === key;
+    return (
+      <div key={key} className={expanded ? 'border border-line rounded-lg overflow-hidden' : ''}>
+        <div className={`flex items-center justify-between gap-3 flex-wrap text-sm text-subtle ${expanded ? 'px-4 py-3' : 'px-1'}`}>
+          <div className="flex items-center gap-2 min-w-0">
+            {icon}
+            <span>{label}</span>
+          </div>
+          {itemCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setOpenAccount(expanded ? null : key)}
+              className="text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer text-sm"
+            >
+              {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              {t('fundDay.itemCount', { count: itemCount })}
+            </button>
+          )}
+        </div>
+        {expanded && (
+          <div className="border-t border-line bg-surface-shallow">
+            <FundLinesTable lines={bankLines.data} loading={bankLines.isLoading} />
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <>
       <PageNav panels={['list']} className="h-dvh overflow-hidden">
@@ -610,17 +644,15 @@ export function FundDayMoneyPage() {
                           summary.accounts.map(renderAccountCard)
                         )}
 
-                        {/* Wallet money never touches a bank account, so it is a
-                            reference line, not a card that can be counted. */}
-                        <div className="flex items-center gap-2 text-sm text-subtle px-1">
-                          <Wallet size={14} className="shrink-0" />
-                          <span>
-                            {t('fundDay.walletReference', {
-                              amount: fmtCurrency(summary.wallet.amount),
-                              count: summary.wallet.item_count,
-                            })}
-                          </span>
-                        </div>
+                        {/* Wallet money and internal money never touch a bank
+                            account, so they are reference lines, not cards that
+                            can be counted — but each still opens to its rows. */}
+                        {renderGroupLine(WALLET_GROUP_KEY, <Wallet size={14} className="shrink-0" />,
+                          t('fundDay.walletReference', { amount: fmtCurrency(summary.wallet.amount) }),
+                          summary.wallet.item_count)}
+                        {renderGroupLine(INTERNAL_GROUP_KEY, <BookLock size={14} className="shrink-0" />,
+                          t('fundDay.internalReference', { amount: fmtCurrency(summary.internal.amount) }),
+                          summary.internal.item_count)}
                       </section>
                     </>
                   )}
