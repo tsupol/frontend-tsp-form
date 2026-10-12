@@ -25,7 +25,7 @@ import { FundBillDetailPanel } from './FundBillDetailPanel';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../../lib/format';
 import {
-  useFundBillCandidateBranches, useFundBillList, type FundBillListRow,
+  useFundBill, useFundBillCandidateBranches, useFundBillList, type FundBillListRow,
 } from './useFundBills';
 import {
   fundBillStatusColor,
@@ -69,6 +69,14 @@ export function FundBillsPage() {
   // A document opened by link is never in the build queue, so start on the
   // documents rather than a tab the selection cannot appear in.
   const [tab, setTab] = useState<TabKey>(selectedId ? 'DRAFT' : 'BUILD');
+  // …and once the linked document is known, stand on its own status tab so the
+  // rail shows it beside its neighbours rather than an empty draft list.
+  const { bill: linkedBill } = useFundBill(selectedId);
+  useEffect(() => {
+    if (linkedBill && linkedBill.bill_id === selectedId) setTab(linkedBill.status);
+    // Only when the link changes — a later status change is the user's own action here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, linkedBill?.bill_id]);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
   const [dateFrom, setDateFrom] = useState('');
