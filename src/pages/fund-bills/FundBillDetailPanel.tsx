@@ -27,7 +27,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Badge, Button, Tooltip } from 'tsp-form';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
   Building2, ExternalLink, FileQuestion, Landmark, Plus, Smartphone, Store, Trash2, Wallet, Wrench,
 } from 'lucide-react';
@@ -92,7 +92,6 @@ interface FundBillDetailPanelProps {
 
 export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelProps) {
   const { t, i18n } = useTranslation();
-  const navigate = useNavigate();
 
   const { bill, isLoading, isFetched } = useFundBill(billId);
   const { actions } = useFundBillActions(billId);
@@ -441,14 +440,13 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
                   <div key={line.line_id} className="px-3 py-2 border-t border-line">
                     <div className="flex items-center gap-2">
                       {line.contract_id ? (
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/admin/contracts/search/${line.contract_id}`)}
-                          className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
+                        <Link
+                          to={`/admin/contracts/search/${line.contract_id}`}
+                          className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1"
                         >
                           {formatEntityCode(line.contract_code)}
                           <ExternalLink size={12} />
-                        </button>
+                        </Link>
                       ) : (
                         <span className="text-sm">—</span>
                       )}
@@ -505,9 +503,21 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
                       <div className="px-3 py-2 bg-surface-shallow flex items-start gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-sm truncate">
-                              {group.settlement_code ?? '—'}
-                            </span>
+                            {/* The payment request opens its own review page —
+                             *  a real link so it honours ctrl/middle-click. */}
+                            {group.settlement_id != null ? (
+                              <Link
+                                to={`/admin/partner-settlements/${group.settlement_id}`}
+                                className="font-medium text-sm truncate text-primary-fg hover:underline inline-flex items-center gap-1"
+                              >
+                                {group.settlement_code ?? '—'}
+                                <ExternalLink size={12} className="shrink-0" />
+                              </Link>
+                            ) : (
+                              <span className="font-medium text-sm truncate">
+                                {group.settlement_code ?? '—'}
+                              </span>
+                            )}
                             <span className="flex-1" />
                             <span className="text-sm tabular-nums shrink-0 font-medium">
                               {fmtCurrency(settlementNet(group.settlement_id))}
@@ -517,14 +527,13 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
                            *  actually sold, so the code is the link — no separate
                            *  action button for it. */}
                           {group.contract_id && (
-                            <button
-                              type="button"
-                              onClick={() => navigate(`/admin/contracts/search/${group.contract_id}`)}
-                              className="text-sm text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer mt-0.5"
+                            <Link
+                              to={`/admin/contracts/search/${group.contract_id}`}
+                              className="text-sm text-primary-fg hover:underline inline-flex items-center gap-1 mt-0.5"
                             >
                               {formatEntityCode(group.contract_code)}
                               <ExternalLink size={12} />
-                            </button>
+                            </Link>
                           )}
                           {groupProduct(group) && (
                             <div className="text-xs text-subtle mt-0.5 truncate">{groupProduct(group)}</div>
@@ -600,11 +609,10 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
                   {t('fundBill.clearings')}
                 </div>
                 {clearings.rows.map(c => (
-                  <button
+                  <Link
                     key={c.clearing_bill_id}
-                    type="button"
-                    onClick={() => navigate(`/admin/fund-bills/${c.clearing_bill_id}`)}
-                    className="w-full text-left px-3 py-2.5 border-t border-line bg-transparent cursor-pointer"
+                    to={`/admin/fund-bills/${c.clearing_bill_id}`}
+                    className="block w-full text-left px-3 py-2.5 border-t border-line"
                   >
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-primary-fg">{c.clearing_bill_code}</span>
@@ -619,7 +627,7 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
                         ? c.purpose_name
                         : t(`fundBill.purpose_${c.bill_purpose}`, { defaultValue: c.bill_purpose })}
                     </div>
-                  </button>
+                  </Link>
                 ))}
               </div>
             )}
