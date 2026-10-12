@@ -22,7 +22,7 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Modal } from 'tsp-form';
 import { QRCodeSVG } from 'qrcode.react';
 import { CheckCircle, ImageIcon, Loader2, Plus, Smartphone, Trash2, XCircle } from 'lucide-react';
@@ -87,7 +87,8 @@ export function FundPaymentEvidence({ paymentId, canEdit = true }: FundPaymentEv
   const [error, setError] = useState<string | null>(null);
   const [removing, setRemoving] = useState<EvidenceRow | null>(null);
 
-  const { data: rows = [], refetch } = useQuery({
+  const queryClient = useQueryClient();
+  const { data: rows = [], refetch: refetchRows } = useQuery({
     queryKey: ['fund-payment-evidence', paymentId],
     // No usage_type filter: the phone's photos and the web's land in the same
     // album, and this is the query the backend states for both sides (§7).
@@ -97,6 +98,14 @@ export function FundPaymentEvidence({ paymentId, canEdit = true }: FundPaymentEv
     ),
     staleTime: 30 * 1000,
   });
+
+  /** The strip, and with it the document's history (EVIDENCE_ADDED /
+   *  EVIDENCE_REMOVED rows) and the movement's evidence count. */
+  const refetch = async () => {
+    await refetchRows();
+    void queryClient.invalidateQueries({ queryKey: ['fund-bills', 'log'] });
+    void queryClient.invalidateQueries({ queryKey: ['fund-bills', 'payments'] });
+  };
 
   const fullKeys = rows.map(m => {
     const k = pickFullKey(m);
