@@ -401,8 +401,8 @@ export function FundDayMoneyPage() {
           <span className="flex-1" />
           {clickable && (
             <span className="inline-flex items-center gap-1 text-primary-fg shrink-0">
-              {t('fundDay.itemCount', { count: itemCount })}
               {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              {t('fundDay.itemCount', { count: itemCount })}
             </span>
           )}
         </Row>
@@ -598,25 +598,30 @@ export function FundDayMoneyPage() {
                                       const expanded = openCategory === key;
                                       return (
                                         <div key={key} className="border-b border-line-subtle">
-                                          <div className="px-4 py-2 flex items-center gap-3 flex-wrap">
+                                          {/* The whole row toggles; the amount stays clean and the
+                                           *  chevron rides the count on the right, like every other
+                                           *  expander on this page. */}
+                                          <button
+                                            type="button"
+                                            onClick={() => setOpenCategory(expanded ? null : key)}
+                                            className="w-full text-left px-4 py-2 flex items-center gap-3 cursor-pointer hover:bg-surface-hover"
+                                          >
                                             <div className="flex-1 min-w-0 text-sm">
                                               {t(`fundDay.category.${row.category_code}`, { defaultValue: row.category_code })}
                                             </div>
-                                            <div className="text-xs text-subtle">
+                                            <span className="text-xs text-subtle shrink-0">
                                               {t(`fundDay.direction.${row.direction}`)}
-                                            </div>
-                                            <button
-                                              type="button"
-                                              onClick={() => setOpenCategory(expanded ? null : key)}
-                                              className="text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer text-sm tabular-nums font-medium"
-                                            >
-                                              {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                            </span>
+                                            <span className={`text-sm tabular-nums font-medium shrink-0 ${
+                                              row.direction === 'IN' ? 'text-success-fg' : 'text-danger-fg'
+                                            }`}>
                                               {row.direction === 'IN' ? '+' : '−'}{fmtCurrency(row.amount)}
-                                            </button>
-                                            <div className="text-xs text-subtle w-20 text-right">
+                                            </span>
+                                            <span className="inline-flex items-center gap-1 text-primary-fg text-xs shrink-0 w-24 justify-end">
+                                              {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                                               {t('fundDay.itemCount', { count: row.item_count })}
-                                            </div>
-                                          </div>
+                                            </span>
+                                          </button>
                                           {expanded && (
                                             <div className="border-t border-line-subtle bg-surface-shallow">
                                               <FundLinesTable lines={moneyLines.data} loading={moneyLines.isLoading} />

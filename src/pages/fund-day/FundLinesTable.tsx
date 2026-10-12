@@ -67,7 +67,15 @@ export function FundLinesTable({ lines, loading }: FundLinesTableProps) {
   );
 
   return (
-    <div className="overflow-x-auto better-scroll">
+    <div className="@container">
+      {/* Narrow panel: each line is a stacked card, so nothing wraps a column to
+       *  one letter per line. Wide panel: the statement-style table. */}
+      <div className="@2xl:hidden divide-y divide-line-subtle">
+        {lines.map((line, idx) => (
+          <FundLineCard key={`c-${line.ref_table}-${line.ref_id}-${idx}`} line={line} anySlip={anySlip} t={t} />
+        ))}
+      </div>
+      <div className="hidden @2xl:block overflow-x-auto better-scroll">
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-xs text-subtle border-b border-line">
@@ -147,6 +155,66 @@ export function FundLinesTable({ lines, loading }: FundLinesTableProps) {
           })}
         </tbody>
       </table>
+      </div>
+    </div>
+  );
+}
+
+/** One line as a stacked card for a narrow panel. Same data as a table row,
+ *  read top to bottom with labels so no column has to be squeezed. */
+function FundLineCard({ line, anySlip, t }: {
+  line: FundLine;
+  anySlip: boolean;
+  t: ReturnType<typeof useTranslation>['t'];
+}) {
+  const path = docPath(line);
+  const bank = isBankLine(line) ? line : null;
+  const kind = bank
+    ? (bank.item_kind_name ?? bank.item_kind)
+    : t(`fundDay.category.${line.category_code}`, { defaultValue: line.category_code });
+  const docLabel = line.doc_code ?? `#${line.ref_id ?? '—'}`;
+  const sub = [
+    t(`fundDay.source.${line.source}`, { defaultValue: line.source }),
+    bank && bank.tender_class !== 'BANK'
+      ? t(`fundDay.tender.${bank.tender_class}`, { defaultValue: bank.tender_class })
+      : null,
+  ].filter(Boolean).join(' · ');
+  const hasSlip = bank && (bank.transfer_at || bank.sender_account_name || bank.transaction_ref);
+  return (
+    <div className="px-3 py-2.5 text-sm">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="font-medium">{kind ?? t(`fundDay.source.${line.source}`, { defaultValue: line.source })}</div>
+          <div className="text-xs text-subtle">
+            <DateTime value={line.money_date} showTime={false} />{sub ? ` · ${sub}` : ''}
+          </div>
+        </div>
+        <span className={`tabular-nums shrink-0 ${line.signed_amount >= 0 ? 'text-success-fg' : 'text-danger-fg'}`}>
+          {line.signed_amount >= 0 ? '+' : '−'}{fmtCurrency(Math.abs(line.signed_amount))}
+        </span>
+      </div>
+      {bank?.party_name && (
+        <div className="mt-1 text-xs">
+          <span className="text-subtle">{t('fundDay.lineParty')}: </span>{bank.party_name}
+        </div>
+      )}
+      {(path || line.doc_code || bank?.contract_code) && (
+        <div className="mt-1 text-xs flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <span className="text-subtle">{t('fundDay.lineDoc')}:</span>
+          <EntityCodeLink to={path} code={docLabel} className="font-medium" />
+          {bank?.contract_code && <span className="text-subtle">{bank.contract_code}</span>}
+          {bank?.reference && <span className="text-subtle">{bank.reference}</span>}
+        </div>
+      )}
+      {anySlip && hasSlip && (
+        <div className="mt-1 text-xs text-subtle flex flex-wrap gap-x-3 gap-y-0.5">
+          {bank?.transfer_at && <span><DateTime value={bank.transfer_at} showTime /></span>}
+          {bank?.sender_account_name && (
+            <span>{bank.sender_account_name}{bank.sender_bank ? ` · ${bank.sender_bank}` : ''}</span>
+          )}
+          {bank?.transaction_ref && <span className="tabular-nums">{bank.transaction_ref}</span>}
+        </div>
+      )}
     </div>
   );
 }
