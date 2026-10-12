@@ -25,7 +25,7 @@ import { useNavigate } from 'react-router-dom';
 import { Building2, ExternalLink, Wallet } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency, formatEntityCode } from '../../lib/format';
-import { useFundBill, useFundBillLines, useFundBillBookLines } from '../fund-bills/useFundBills';
+import { useFundBill, useFundBillLines } from '../fund-bills/useFundBills';
 import { fundBillStatusColor, type FundBillLine } from '../fund-bills/fundBillTypes';
 
 /** A line's contribution, from the document's end. Memo rows carry no money. */
@@ -55,21 +55,12 @@ export function FundBookLineDrillModal({ open, billId, onClose }: FundBookLineDr
 
   const { bill } = useFundBill(billId);
   const lines = useFundBillLines(billId);
-  // Each owner's share is read from the money books' own entries for this
-  // document. Not from the lines (signs are written from the counterparty's
-  // end) and not from the payment rows (they leave out the company's share
-  // leaving the fund — 3,010 off on a two-contract payout, 2026-10-07).
-  const bookLines = useFundBillBookLines(billId);
-
-  /** What the books say each owner's share came to. Null before payment. */
-  const ownerNet = (() => {
-    const byOwner = new Map<string, number>();
-    for (const e of bookLines.rows) {
-      const owner = e.book_type === 'COMPANY' ? 'COMPANY' : 'HOLDING';
-      byOwner.set(owner, (byOwner.get(owner) ?? 0) + e.signed_amount);
-    }
-    return byOwner;
-  })();
+  /** What each book says the document did to it — the view's own figures
+   *  (mig 1421), never a sum of rows. Null before payment: nothing moved yet. */
+  const ownerNet = new Map<string, number>();
+  const moneyMoved = bill?.status === 'PAID' || bill?.status === 'PARTIAL';
+  if (moneyMoved && bill?.fund_book_net != null) ownerNet.set('HOLDING', bill.fund_book_net);
+  if (moneyMoved && bill?.company_book_net != null) ownerNet.set('COMPANY', bill.company_book_net);
 
   /**
    * The rows in owner order, the fund's first.
