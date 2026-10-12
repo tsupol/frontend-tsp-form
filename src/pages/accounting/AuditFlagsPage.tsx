@@ -10,6 +10,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
+import { ReportSideTag } from '../../components/ReportSideSelect';
 import { fmtCurrency, toLocalDateStr, parseLocalDate, makeDatePickerFormat } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { defaultScopeFor, scopeQuery, scopeKey } from '../../lib/scope';
@@ -116,6 +117,7 @@ export function AuditFlagsPage() {
           {!isMobile && (
             <div key="header" className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
               <h1 className="heading-2 shrink-0">{t('nav.auditFlags')}</h1>
+              <ReportSideTag />
             </div>
           )}
 

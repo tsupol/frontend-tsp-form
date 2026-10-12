@@ -27,6 +27,7 @@ import { fmtCurrency } from '../lib/format';
 import { DateTime } from '../components/DateTime';
 import { useAuth } from '../contexts/AuthContext';
 import { DashboardScopePicker } from '../components/DashboardScopePicker';
+import { ReportSideSelect, ReportSideTag } from '../components/ReportSideSelect';
 import { MonthPicker } from '../components/MonthPicker';
 import {
   ContractsOpenedChart,
@@ -403,6 +404,9 @@ export function DashboardPage() {
             )}
           </div>
           <div className="flex flex-col items-end gap-2 min-w-0">
+            {/* Holding-level users pick which side the report views show
+                (operating branches / one fund) — renders nothing for others. */}
+            <ReportSideSelect />
             <DashboardScopePicker scope={scope} onChange={setScope} />
             <ReceivingAccount
               show={isBranchUser}
@@ -415,6 +419,7 @@ export function DashboardPage() {
 
         {/* Mobile scope picker + receiving account */}
         <div className="mb-3 md:hidden flex flex-col gap-2">
+          <ReportSideSelect />
           <DashboardScopePicker scope={scope} onChange={setScope} />
           <ReceivingAccount
             show={isBranchUser}
@@ -542,6 +547,9 @@ export function DashboardPage() {
             <span className="ml-2 normal-case font-normal text-subtle">
               · {scopeLabel(scope, t)}
             </span>
+            {/* Fund side chosen above — repeat it next to the numbers so nobody
+                reads fund money as branch money. */}
+            <ReportSideTag className="ml-2 normal-case tracking-normal" />
           </h2>
 
           {todayQuery.isError ? (

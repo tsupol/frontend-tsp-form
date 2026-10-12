@@ -8,6 +8,7 @@ import { ArrowRightFromLine, AlertTriangle } from 'lucide-react';
 import { fmtCurrency } from '../../lib/format';
 import { flagTone } from '../call-center/callCenterApi';
 import { useBranchSummary, type BranchDunningSummary } from './managerApi';
+import { ReportSideTag } from '../../components/ReportSideSelect';
 
 function StatTile({ label, value, sub, danger }: { label: string; value: React.ReactNode; sub?: React.ReactNode; danger?: boolean }) {
   return (
@@ -137,7 +138,11 @@ export function BranchOverviewPage() {
       </MobileHeader>
 
       <div className="page-content flex flex-col gap-4 p-4">
-        <h1 className="heading-2 hidden md:block">{t('collectionsManager.branchOverviewTitle')}</h1>
+        <h1 className="heading-2 hidden md:flex items-center gap-2">
+          {t('collectionsManager.branchOverviewTitle')}
+          <ReportSideTag />
+        </h1>
+        <ReportSideTag className="md:hidden self-start" />
         {isLoading && <div className="text-subtle">{t('common.loading')}</div>}
         {isError && (
           <div className="alert alert-danger"><AlertTriangle size={18} /><span>{t('common.error')}</span></div>

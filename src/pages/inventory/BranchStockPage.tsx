@@ -12,6 +12,7 @@ import { fmtNum, getConditionLabel } from './inventoryUtils';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { useBarcodeScanner } from '../../components/BarcodeScanner';
 import { SearchInput } from '../../components/SearchInput';
+import { ReportSideTag } from '../../components/ReportSideSelect';
 import { RetailWriteOffModal, type RetailWriteOffTarget } from './RetailWriteOffModal';
 import { printWithMarker } from '../../lib/printDoc';
 import { downloadXlsx, type XlsxColumn } from '../../lib/xlsx';
@@ -451,6 +452,7 @@ export function BranchStockPage() {
             <Boxes size={18} />
             {t('nav.branchStock', { defaultValue: 'Branch Stock' })}
           </h1>
+          <ReportSideTag />
         </div>
       )}
 

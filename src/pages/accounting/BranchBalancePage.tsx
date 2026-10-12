@@ -5,6 +5,7 @@ import { ArrowRightFromLine, Building2, Store } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { fmtCurrency } from '../../lib/format';
+import { ReportSideTag } from '../../components/ReportSideSelect';
 import type { BranchBalanceRow, CompanyBalanceRow, Branch } from './accountingTypes';
 
 export function BranchBalancePage() {
@@ -51,10 +52,14 @@ export function BranchBalancePage() {
       <div className="page-content">
         <div className="flex items-center justify-between mb-4 max-md:hidden">
           <div>
-            <h1 className="heading-2">{t('nav.branchBalance')}</h1>
+            <h1 className="heading-2 flex items-center gap-2">
+              {t('nav.branchBalance')}
+              <ReportSideTag />
+            </h1>
             <p className="text-sm text-subtle mt-1">{t('accounting.balance.description')}</p>
           </div>
         </div>
+        <ReportSideTag className="md:hidden mb-3" />
 
         {/* Company rollup section */}
         {showCompanyRollup && companyRows.length > 0 && (
