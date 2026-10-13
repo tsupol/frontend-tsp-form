@@ -5278,7 +5278,15 @@
       "colNetAtClose": "Totals at close",
       "firstClosedAt": "First closed",
       "versionShort": "v{{version}}"
-    }
+    },
+    "party": {
+      "CUSTOMER": "customer",
+      "BRANCH": "shop",
+      "COMPANY": "company",
+      "HOLDING": "holding",
+      "VENDOR": "vendor"
+    },
+    "commissionToCompanyNote": "Moved into the company book (no bank transfer)"
   },
   "help": {
     "title": "Help",

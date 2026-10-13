@@ -5274,7 +5274,15 @@
       "colNetAtClose": "ยอด ณ ตอนปิด",
       "firstClosedAt": "ปิดครั้งแรก",
       "versionShort": "v{{version}}"
-    }
+    },
+    "party": {
+      "CUSTOMER": "ลูกค้า",
+      "BRANCH": "ร้าน",
+      "COMPANY": "บริษัท",
+      "HOLDING": "โฮลดิ้ง",
+      "VENDOR": "ผู้ขาย"
+    },
+    "commissionToCompanyNote": "ย้ายเข้าสมุดบริษัท (ไม่ผ่านธนาคาร)"
   },
   "help": {
     "title": "ช่วยเหลือ",

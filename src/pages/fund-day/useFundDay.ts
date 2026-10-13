@@ -42,9 +42,13 @@ export function useFundDaySummary(companyId: number | null, date: string) {
 }
 
 /** Rows behind one category cell. */
-export function useFundMoneyLines(companyId: number | null, date: string, categoryCode: string | null, source: string | null) {
+export function useFundMoneyLines(
+  companyId: number | null, date: string, categoryCode: string | null, source: string | null,
+  /** '' = the row has no party; the lines are filtered to match it. */
+  partyType: string | null,
+) {
   return useQuery({
-    queryKey: ['fund-money-lines', companyId, date, categoryCode, source],
+    queryKey: ['fund-money-lines', companyId, date, categoryCode, source, partyType],
     queryFn: () => {
       const params = [
         `company_id=eq.${companyId}`,
@@ -52,6 +56,7 @@ export function useFundMoneyLines(companyId: number | null, date: string, catego
         `category_code=eq.${encodeURIComponent(categoryCode ?? '')}`,
       ];
       if (source) params.push(`source=eq.${source}`);
+      if (partyType !== null) params.push(partyType ? `party_type=eq.${partyType}` : 'party_type=is.null');
       params.push('order=ref_id');
       return apiClient.get<FundMoneyLine[]>(`/v_fund_money_lines?${params.join('&')}`);
     },

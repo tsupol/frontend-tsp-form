@@ -50,11 +50,19 @@ export interface FundDayCategory {
   category_group: string;
   source: FundSource;
   category_code: string;
+  /**
+   * Who the money went to or came from (mig 1445). One category can now come
+   * down as several rows — a shop's commission and the company's share are
+   * separate — so a row is identified by source + code + party, not code alone.
+   */
+  party_type: FundPartyType | null;
   direction: FundDirection;
   amount: number;
   signed_amount: number;
   item_count: number;
 }
+
+export type FundPartyType = 'CUSTOMER' | 'BRANCH' | 'COMPANY' | 'HOLDING' | 'VENDOR';
 
 /** A reconciliation already written for one account on one day. */
 export interface FundDayRecon {
@@ -265,6 +273,8 @@ export interface FundMoneyLine extends FundLineBase {
   category_code: string;
   /** Whose money the line is — holding's, or the fund company's own. */
   owner_type: 'HOLDING' | 'COMPANY' | null;
+  /** Same party as the summary row this line sits under (mig 1445). */
+  party_type: FundPartyType | null;
   bill_type: string | null;
   line_id: number | null;
 }

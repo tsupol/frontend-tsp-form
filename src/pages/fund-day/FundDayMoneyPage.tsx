@@ -134,6 +134,7 @@ export function FundDayMoneyPage() {
     companyId, date,
     openCategoryParts ? openCategoryParts[1] : null,
     openCategoryParts ? openCategoryParts[0] : null,
+    openCategoryParts ? openCategoryParts[2] : null,
   );
   const bankLines = useFundBankLines(companyId, date, openAccount);
 
@@ -594,7 +595,8 @@ export function FundDayMoneyPage() {
                                       {t(`fundDay.source.${source}`, { defaultValue: source })}
                                     </div>
                                     {rows.map((row) => {
-                                      const key = `${row.source}|${row.category_code}`;
+                                      // One category can be several rows, one per party (mig 1445).
+                                      const key = `${row.source}|${row.category_code}|${row.party_type ?? ''}`;
                                       const expanded = openCategory === key;
                                       return (
                                         <div key={key} className="border-b border-line-subtle">
@@ -607,7 +609,18 @@ export function FundDayMoneyPage() {
                                             className="w-full text-left px-4 py-2 flex items-center gap-3 cursor-pointer hover:bg-surface-hover"
                                           >
                                             <div className="flex-1 min-w-0 text-sm">
-                                              {t(`fundDay.category.${row.category_code}`, { defaultValue: row.category_code })}
+                                              <div>
+                                                {t(`fundDay.category.${row.category_code}`, { defaultValue: row.category_code })}
+                                                {row.party_type && (
+                                                  <span className="text-subtle">
+                                                    {' '}{row.direction === 'OUT' ? '→' : '←'}{' '}
+                                                    {t(`fundDay.party.${row.party_type}`, { defaultValue: row.party_type })}
+                                                  </span>
+                                                )}
+                                              </div>
+                                              {row.category_code === 'COMMISSION' && row.party_type === 'COMPANY' && (
+                                                <div className="text-xs text-subtle">{t('fundDay.commissionToCompanyNote')}</div>
+                                              )}
                                             </div>
                                             <span className="text-xs text-subtle shrink-0">
                                               {t(`fundDay.direction.${row.direction}`)}
