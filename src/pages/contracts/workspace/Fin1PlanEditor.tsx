@@ -141,6 +141,20 @@ interface Props {
   /** True while the previewed plan differs from the one on the contract, so the
    *  footer can keep showing the saved plan and say it is out of date. */
   onDirtyChange?: (dirty: boolean) => void;
+  /** The plan the controls describe, and how to save it. The confirm button
+   *  lives in the panel's sticky footer, so the footer needs the preview it
+   *  will write (not the plan already on the contract). Null once saved. */
+  onConfirmStateChange?: (state: Fin1ConfirmState | null) => void;
+}
+
+export interface Fin1ConfirmState {
+  preview: Fin1PlanResponse | null;
+  /** Preview differs from the plan on the contract. */
+  differs: boolean;
+  canConfirm: boolean;
+  saving: boolean;
+  saveError: string;
+  confirm: () => void;
 }
 
 export function Fin1PlanEditor({
@@ -151,6 +165,7 @@ export function Fin1PlanEditor({
   initialPrice,
   onSaved,
   onDirtyChange,
+  onConfirmStateChange,
 }: Props) {
   const { t } = useTranslation();
 
@@ -438,6 +453,24 @@ export function Fin1PlanEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewDiffers]);
 
+  // Hand the footer what it needs to show and save the previewed plan. The
+  // confirm goes through a ref so the footer always calls the latest inputs.
+  const confirmRef = useRef(handleConfirm);
+  confirmRef.current = handleConfirm;
+  const canConfirm = !!preview && !previewing && !saving && !previewError;
+  useEffect(() => {
+    onConfirmStateChange?.(saved ? null : {
+      preview,
+      differs: previewDiffers,
+      canConfirm,
+      saving,
+      saveError,
+      confirm: () => confirmRef.current(),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saved, preview, previewDiffers, canConfirm, saving, saveError]);
+  useEffect(() => () => onConfirmStateChange?.(null), []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Saved receipt ────────────────────────────────────────────────────
   if (saved) {
     return (
@@ -657,23 +690,7 @@ export function Fin1PlanEditor({
         </div>
       )}
 
-      {saveError && (
-        <div className="alert alert-danger">
-          <XCircle size={16} />
-          <span>{saveError}</span>
-        </div>
-      )}
-
-      <div className="flex justify-end">
-        <Button
-          size="sm"
-          color="primary"
-          onClick={handleConfirm}
-          disabled={!preview || previewing || saving || !!previewError}
-        >
-          {saving ? t('common.saving') : t('fin1Plan.confirmPlan')}
-        </Button>
-      </div>
+      {/* Confirm button + save error live in the panel's sticky footer. */}
     </div>
   );
 }

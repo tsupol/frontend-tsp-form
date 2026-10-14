@@ -11,7 +11,7 @@ import { useWorkspace } from './WorkspaceContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import type { Quote } from './WorkspaceTypes';
 import { useBarcodeScanner } from '../../../components/BarcodeScanner';
-import { Fin1PlanEditor } from './Fin1PlanEditor';
+import { Fin1PlanEditor, type Fin1ConfirmState } from './Fin1PlanEditor';
 import { ColorSwatch } from '../../../components/ColorAutocomplete';
 import { lookupBarcode } from '../../../lib/barcodeLookup';
 import { translateApiError } from '../../../lib/apiErrors';
@@ -93,6 +93,9 @@ interface StockAsset {
   variant_name: string;
   brand_name: string;
   family_name: string;
+  /** Backend-built "Apple iPhone 17 Pro 256GB Cosmic Orange" — model + variant
+   *  joined without the storage/model words the variant name repeats. */
+  product_display_name: string | null;
   condition_grade: string;
   current_cost_basis: number;
   serial_no: string | null;
@@ -720,9 +723,11 @@ export function PanelProductPlan(_props: Props) {
   const [fin1Open, setFin1Open] = useState(contractIsFin1 && !!contract?.value_month);
   const [fin1Preparing, setFin1Preparing] = useState(false);
   const [fin1Error, setFin1Error] = useState('');
-  // The plan editor previews as the user drags; the footer keeps showing the
-  // plan on the contract and says it is out of date rather than following along.
+  // The plan editor previews as the user drags. While that preview isn't on
+  // the contract, the footer shows IT (marked unsaved) with the confirm button,
+  // so the button sits next to the figures it will save.
   const [fin1Dirty, setFin1Dirty] = useState(false);
+  const [fin1Confirm, setFin1Confirm] = useState<Fin1ConfirmState | null>(null);
 
   // Commit product + commercial model, then hand over to the plan editor.
   const handleOpenFin1 = async () => {
@@ -1009,7 +1014,10 @@ export function PanelProductPlan(_props: Props) {
                   </span>
                 )}
               </div>
-              <div className="text-xs text-subtle mt-0.5">{localBrandName} {localFamilyName} {localModelName} {localVariantName && `· ${localVariantName}`}</div>
+              <div className="text-xs text-subtle mt-0.5">
+                {(selectedAsset ? selectedAsset.product_display_name : contract?.product_display_name)
+                  || <>{localBrandName} {localFamilyName} {localModelName} {localVariantName && `· ${localVariantName}`}</>}
+              </div>
               <div className="text-sm text-subtle mt-1">{t('wizard.costBasis')} {fmtCurrency(selectedAsset?.current_cost_basis ?? contract?.target_asset_cost_basis ?? 0)}</div>
             </div>
             <button className="p-1.5 rounded hover:bg-surface-hover cursor-pointer text-subtle hover:text-fg transition-colors bg-transparent border-none" onClick={handleResetSelection} title={t('common.remove')}>
@@ -1111,7 +1119,7 @@ export function PanelProductPlan(_props: Props) {
                           {asset.physical_color && (asset.master_color_hex || asset.master_color_name_en) && (
                             <ColorSwatch hex={asset.master_color_hex} title={`${asset.physical_color}${asset.master_color_name_en ? ` · ${asset.master_color_name_en}` : ''}`} />
                           )}
-                          <span className="truncate">{asset.brand_name} {asset.family_name} {asset.model_name} · {asset.variant_name}</span>
+                          <span className="truncate">{asset.product_display_name || `${asset.brand_name} ${asset.family_name} ${asset.model_name} · ${asset.variant_name}`}</span>
                         </div>
                         <div className="flex items-center gap-3 text-xs text-subtle mt-0.5">
                           <span>{t('wizard.costBasis')} {fmtCurrency(asset.current_cost_basis)}</span>
@@ -1211,6 +1219,7 @@ export function PanelProductPlan(_props: Props) {
               initialUplift={contract.uplift_amount ?? null}
               initialPrice={contract.is_used_asset ? contract.snapshot_retail_price ?? null : null}
               onDirtyChange={setFin1Dirty}
+              onConfirmStateChange={setFin1Confirm}
               onSaved={() => {
                 setFin1Dirty(false);
                 invalidateContract();
@@ -1317,17 +1326,22 @@ export function PanelProductPlan(_props: Props) {
       {saveError && <div className="alert alert-danger"><XCircle size={16} /><span>{saveError}</span></div>}
     </div>
 
-    {/* Footer — selected plan summary doubles as the sticky action bar.
-        FIN1 writes its plan through its own editor (no local quote to
-        confirm), so its footer just mirrors what is on the contract, with the
-        lighter final installment spelled out when the plan isn't uniform. */}
+    {/* Footer — plan summary doubles as the sticky action bar, so the save
+        button is always on screen. Unsaved (warning tone) shows the plan the
+        button will write; saved (success tone) shows what is on the contract.
+        Same shape for FIN2's local quote and FIN1's editor preview. */}
     {localQuote ? (
       <div className={`shrink-0 border-t px-4 py-3 flex flex-col gap-3 ${hasChanges ? 'border-warning-border bg-warning-soft' : 'border-success-border bg-success-soft'}`}>
         <div>
           {hasChanges ? (
-            <div className="flex items-center gap-1.5 text-xs text-warning-fg font-medium mb-2">
-              <AlertTriangle size={12} />
-              {t('wizard.selectedPlanUnsaved')}
+            <div className="flex items-center gap-2 mb-2 min-h-7">
+              <span className="flex-1 flex items-center gap-1.5 text-xs text-warning-fg font-medium">
+                <AlertTriangle size={12} />
+                {t('wizard.selectedPlanUnsaved')}
+              </span>
+              <Button size="sm" color="primary" onClick={() => handleConfirm()} disabled={!canConfirm}>
+                {saving ? t('common.saving') : t('wizard.savePlan')}
+              </Button>
             </div>
           ) : (
             <div className="flex items-center gap-1.5 text-xs text-success-fg font-medium mb-2">
@@ -1354,29 +1368,54 @@ export function PanelProductPlan(_props: Props) {
             </div>
           </div>
         </div>
-        {hasChanges && (
-          <div className="flex justify-end">
-            <Button
-              size="sm"
-              color="primary"
-              onClick={() => handleConfirm()}
-              disabled={!canConfirm}
-            >
-              {saving ? t('common.saving') : t('wizard.savePlan')}
-            </Button>
+      </div>
+    ) : fin1Confirm?.preview && (fin1Confirm.differs || contract?.value_month == null) ? (
+      // FIN1 plan on the sliders that isn't on the contract yet: the bar shows
+      // the figures the button will save, never the older saved plan.
+      <div className="shrink-0 border-t border-warning-border bg-warning-soft px-4 py-3">
+        <div className="flex items-center gap-2 mb-2 min-h-7">
+          <span className="flex-1 flex items-center gap-1.5 text-xs text-warning-fg font-medium">
+            <AlertTriangle size={12} />
+            {t('wizard.selectedPlanUnsaved')}
+          </span>
+          <Button size="sm" color="primary" onClick={fin1Confirm.confirm} disabled={!fin1Confirm.canConfirm}>
+            {fin1Confirm.saving ? t('common.saving') : t('fin1Plan.confirmPlan')}
+          </Button>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div>
+            <div className="text-xs text-subtle">{t('wizard.financeModel')}</div>
+            <div className="text-sm font-medium">FIN1</div>
           </div>
+          <div>
+            <div className="text-xs text-subtle">{t('contract.termMonths')}</div>
+            <div className="text-sm font-medium">{fin1Confirm.preview.term_months} {t('contract.months')}</div>
+          </div>
+          <div>
+            <div className="text-xs text-subtle">{t('contract.downPayment')}</div>
+            <div className="text-sm font-medium">{fmtCurrency(fin1Confirm.preview.down_amount)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-subtle">{t('contract.installmentAmount')}</div>
+            <div className="text-sm font-medium text-primary-fg">
+              {formatInstallment({
+                installment_amount: fin1Confirm.preview.installment_amount,
+                last_installment_amount: fin1Confirm.preview.last_installment_amount,
+                is_uniform_installment: fin1Confirm.preview.plan.is_uniform,
+                value_month: fin1Confirm.preview.term_months,
+              }, t, fmtCurrency)}
+            </div>
+          </div>
+        </div>
+        {fin1Confirm.saveError && (
+          <div className="alert alert-danger mt-3"><XCircle size={16} /><span>{fin1Confirm.saveError}</span></div>
         )}
       </div>
     ) : contractIsFin1 && contract?.value_month != null && contract?.installment_amount != null ? (
-      <div className="shrink-0 border-t border-primary bg-primary-soft px-4 py-3">
-        <div className="flex items-center gap-2 mb-2 flex-wrap">
-          <span className="text-xs text-primary-fg font-medium">{t('wizard.selectedPlan')}</span>
-          {fin1Dirty && (
-            <span className="inline-flex items-center gap-1 text-xs text-warning-fg">
-              <AlertTriangle size={12} />
-              {t('fin1Plan.footerOutOfDate')}
-            </span>
-          )}
+      <div className="shrink-0 border-t border-success-border bg-success-soft px-4 py-3">
+        <div className="flex items-center gap-1.5 mb-2 text-xs text-success-fg font-medium">
+          <CheckCircle size={12} />
+          {t('wizard.savedPlan')}
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div>

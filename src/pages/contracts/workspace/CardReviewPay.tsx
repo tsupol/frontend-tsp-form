@@ -4,7 +4,15 @@ import { fmtCurrency } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
 import { SummaryCard } from './SummaryCard';
 
-export function CardReviewPay({ onEdit, active, disabled }: { onEdit?: () => void; active?: boolean; disabled?: boolean }) {
+export function CardReviewPay({ onEdit, active, disabled, title, lockedHint }: {
+  onEdit?: () => void;
+  active?: boolean;
+  disabled?: boolean;
+  /** A deal-partner shop collects the down payment and signs here — named for that. */
+  title?: string;
+  /** Why it's locked, when the reason is not "no draft yet". */
+  lockedHint?: string;
+}) {
   const { t } = useTranslation();
   const { contract } = useWorkspace();
 
@@ -16,7 +24,7 @@ export function CardReviewPay({ onEdit, active, disabled }: { onEdit?: () => voi
 
   return (
     <SummaryCard
-      title={t('workspace.cardReviewPay')}
+      title={title ?? t('workspace.cardReviewPay')}
       status={disabled ? 'locked' : 'warning'}
       icon={<CreditCard size={16} className="text-warning-fg shrink-0" />}
       onEdit={disabled ? undefined : onEdit}
@@ -24,7 +32,7 @@ export function CardReviewPay({ onEdit, active, disabled }: { onEdit?: () => voi
       disabled={disabled}
     >
       {disabled ? (
-        <div className="text-subtle text-xs">{t('workspace.needsDraft')}</div>
+        <div className="text-subtle text-xs">{lockedHint ?? t('workspace.needsDraft')}</div>
       ) : total > 0 ? (
         <div className="flex items-center gap-2">
           <span className="text-xs text-subtle">{t('workspace.total')}</span>

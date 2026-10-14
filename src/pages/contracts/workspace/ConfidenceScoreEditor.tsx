@@ -7,8 +7,9 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
-import { Star, Loader2, XCircle } from 'lucide-react';
+import { Star, Loader2, XCircle, AlertTriangle } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
+import { useAuth } from '../../../contexts/AuthContext';
 import { useWorkspace } from './WorkspaceContext';
 import { translateApiError } from '../../../lib/apiErrors';
 
@@ -20,8 +21,12 @@ const SCORE_TOOLTIPS: Record<number, string> = {
   5: 'workspace.score5',
 };
 
+/** Element id of the rating block, so a "not ready" reason can jump to it. */
+export const CONFIDENCE_SCORE_ANCHOR = 'confidence-score';
+
 export function ConfidenceScoreEditor() {
   const { t } = useTranslation();
+  const { isDealPartner } = useAuth();
   const { data, contract, invalidateContract } = useWorkspace();
   const queryClient = useQueryClient();
 
@@ -62,11 +67,26 @@ export function ConfidenceScoreEditor() {
     }
   };
 
+  // Missing score blocks the contract, so it gets a warning frame and says what
+  // it blocks — same wording as the Documents card.
+  const missing = !score;
+  const needsScoreBeforeSubmit = isDealPartner
+    && (contract?.commercial_model == null || contract.commercial_model === 'FIN1');
+
   return (
-    <div className="flex flex-col gap-2">
+    <div
+      id={CONFIDENCE_SCORE_ANCHOR}
+      className={`flex flex-col gap-2 scroll-mt-3 ${missing ? 'rounded-lg border border-warning-border bg-warning-soft p-3' : ''}`}
+    >
       <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider">
         {t('workspace.confidenceLabel')}
       </h3>
+      {missing && (
+        <div className="flex items-center gap-1.5 text-sm text-warning-fg">
+          <AlertTriangle size={14} />
+          <span>{t(needsScoreBeforeSubmit ? 'workspace.confidenceRequiredBeforeSubmit' : 'workspace.confidenceRequired')}</span>
+        </div>
+      )}
       <div className="flex items-center gap-1" onMouseLeave={() => setHoverStar(0)}>
         {[1, 2, 3, 4, 5].map(n => {
           const filled = n <= (hoverStar || score || 0);
@@ -79,7 +99,7 @@ export function ConfidenceScoreEditor() {
               disabled={scoreSaving}
               title={t(SCORE_TOOLTIPS[n])}
             >
-              <Star size={28} className={filled ? 'text-warning-fg fill-warning' : 'text-fg/20'} />
+              <Star size={28} className={filled ? 'text-warning-fg fill-warning' : 'text-subtler'} />
             </button>
           );
         })}

@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { CheckCircle, AlertTriangle, Star } from 'lucide-react';
+import { useAuth } from '../../../contexts/AuthContext';
 import { useWorkspace } from './WorkspaceContext';
 import { SummaryCard } from './SummaryCard';
 
@@ -11,6 +12,11 @@ export function CardDocuments({ onEdit, active, shake }: { onEdit?: () => void; 
   const hasIdPhoto = customer?.hasIdPhoto ?? false;
   const score = contract?.staff_confidence_score;
   const hasScore = !!score;
+  // A deal-partner FIN1 shop is refused at "submit for approval" without the
+  // score, long before payment — same test the approval card uses to show.
+  const { isDealPartner } = useAuth();
+  const needsScoreBeforeSubmit = isDealPartner
+    && (contract?.commercial_model == null || contract.commercial_model === 'FIN1');
 
   // Signature is captured on the bridge after the snapshot, not at draft — the
   // draft document requirement is the ID card only. The customer confidence
@@ -62,7 +68,7 @@ export function CardDocuments({ onEdit, active, shake }: { onEdit?: () => void; 
           ) : (
             <span className="inline-flex items-center gap-1 text-xs text-warning-fg">
               <AlertTriangle size={12} />
-              <span>{t('workspace.confidenceRequired')}</span>
+              <span>{t(needsScoreBeforeSubmit ? 'workspace.confidenceRequiredBeforeSubmit' : 'workspace.confidenceRequired')}</span>
             </span>
           )}
         </div>

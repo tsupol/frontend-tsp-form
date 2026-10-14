@@ -116,7 +116,11 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
     enabled: !!contractId,
     staleTime: 0,
   });
-  const notReadyErrors = readiness && !readiness.ready ? readiness.errors : undefined;
+  // "Needs credit approval" isn't something to fill in on this page — the
+  // approval card owns it — so it's left out of the what's-missing list.
+  const notReadyErrors = readiness && !readiness.ready
+    ? readiness.errors.filter(e => e.code !== 'CONTRACT.STATE.PARTNER_APPROVAL_REQUIRED')
+    : undefined;
 
   // All ID cards for everyone on the contract (lessee + co-lessees). One
   // batched query keyed on the full customer-id set so we don't N+1.
@@ -232,17 +236,14 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
       {/* ── Customer confidence rating (readiness prerequisite) ─────── */}
       <ConfidenceScoreEditor />
 
-      {/* ── Signatory selection (lessor + witnesses) ────────────────── */}
-      <div className="flex flex-col gap-2">
-        <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider">
-          {t('workspace.cardSignatory')}
-        </h3>
-        <SignatoryEditor />
-      </div>
-
-      {/* ── Whole-packet actions — preview-all / print-all ──────────── */}
-      <div className="flex flex-wrap items-center gap-2">
+      {/* ── The contract document: who signs as lessor, and its preview /
+          print / read-on-phone buttons — one box, since both are about the
+          same printed contract. ─────────────────────────────────────── */}
+      <SignatoryEditor
+        title={t('workspace.contractDocBox')}
+        footer={<>
         <Button
+          size="sm"
           variant="outline"
           startIcon={<Eye size={14} />}
           onAuxClick={(e) => { if (e.button === 1) { e.preventDefault(); openPreviewAll(true); } }}
@@ -252,6 +253,7 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
           {t('contract.previewContract', { defaultValue: 'Preview' })}
         </Button>
         <Button
+          size="sm"
           color="primary"
           startIcon={printing ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
           onClick={handlePrintAll}
@@ -260,6 +262,7 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
           {printing ? t('common.loading') : t('contract.printContractPdf', { defaultValue: 'Print contract PDF' })}
         </Button>
         <Button
+          size="sm"
           variant="outline"
           startIcon={<MonitorSmartphone size={14} />}
           onClick={() => setViewQrOpen(true)}
@@ -267,7 +270,8 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
         >
           {t('workspace.contractViewQr', { defaultValue: 'Read on phone' })}
         </Button>
-      </div>
+        </>}
+      />
 
       {/* ── Contract photos — same album + widget as the signing tab: inline
           multi-file upload (computer/iPad) AND capture-from-phone (QR). ─ */}

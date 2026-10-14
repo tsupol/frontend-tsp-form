@@ -9,6 +9,7 @@
 // without the submit permission simply sees no button.
 
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Badge, Button } from 'tsp-form';
@@ -21,7 +22,7 @@ import {
   usePartnerCaseReturnReasons,
 } from './usePartnerCases';
 import { outcomeBadgeColor, type PartnerCase } from './partnerCaseTypes';
-import { PartnerCaseSubmitModal } from './PartnerCaseSubmitModal';
+import { PartnerCaseSubmitModal, type ReasonFix } from './PartnerCaseSubmitModal';
 import { PartnerCaseWithdrawModal } from './PartnerCaseWithdrawModal';
 
 interface PartnerCaseCardProps {
@@ -34,6 +35,12 @@ interface PartnerCaseCardProps {
   /** Card chrome. `plain` for a bordered card in a detail panel, `flush` inside the wizard's card column. */
   variant?: 'plain' | 'flush';
   className?: string;
+  /** Passed to the submit window: where to send the shop to fix a "not ready" reason. */
+  fixReason?: (code: string) => ReasonFix | null;
+  /** Render the submit / withdraw buttons into this element instead of the
+   *  card — the wizard keeps its one next action in a pinned bar, while the
+   *  card stays in the step list showing only where the request stands. */
+  actionsTarget?: HTMLElement | null;
 }
 
 /** Actions the contract's capability RPC exposes for this flow. */
@@ -51,6 +58,8 @@ export function PartnerCaseCard({
   contractState,
   variant = 'plain',
   className,
+  fixReason,
+  actionsTarget,
 }: PartnerCaseCardProps) {
   const { t, i18n } = useTranslation();
   const { isDealPartner } = useAuth();
@@ -128,6 +137,21 @@ export function PartnerCaseCard({
     : isReturned ? t('partnerCase.stateReturned')
     : null;
 
+  const actionButtons = (canSubmit || canWithdraw) ? (
+    <>
+      {canWithdraw && (
+        <Button size="sm" variant="outline" onClick={() => setWithdrawOpen(true)}>
+          {t('partnerCase.withdraw')}
+        </Button>
+      )}
+      {canSubmit && (
+        <Button size="sm" color="primary" onClick={() => setSubmitOpen(true)}>
+          {latest ? t('partnerCase.resubmit') : t('partnerCase.submit')}
+        </Button>
+      )}
+    </>
+  ) : null;
+
   const wrapperClass = variant === 'flush'
     ? `border-b border-line px-4 py-4 ${className ?? ''}`
     : `rounded-md border border-line bg-surface px-4 py-3 ${className ?? ''}`;
@@ -202,7 +226,7 @@ export function PartnerCaseCard({
           )}
         </div>
 
-        {(canSubmit || canWithdraw || history.length > 0) && (
+        {((!actionsTarget && (canSubmit || canWithdraw)) || history.length > 0) && (
           <div className="mt-3 flex items-center gap-2 flex-wrap">
             {history.length > 0 && (
               <button
@@ -215,18 +239,10 @@ export function PartnerCaseCard({
               </button>
             )}
             <div className="flex-1" />
-            {canWithdraw && (
-              <Button size="sm" variant="outline" onClick={() => setWithdrawOpen(true)}>
-                {t('partnerCase.withdraw')}
-              </Button>
-            )}
-            {canSubmit && (
-              <Button size="sm" color="primary" onClick={() => setSubmitOpen(true)}>
-                {latest ? t('partnerCase.resubmit') : t('partnerCase.submit')}
-              </Button>
-            )}
+            {!actionsTarget && actionButtons}
           </div>
         )}
+        {actionsTarget && createPortal(actionButtons, actionsTarget)}
 
         {showHistory && history.length > 0 && (
           <div className="mt-3 rounded-md border border-line overflow-hidden">
@@ -248,6 +264,7 @@ export function PartnerCaseCard({
         contractCode={contractCode}
         isResubmit={!!latest}
         onClose={() => setSubmitOpen(false)}
+        fixReason={fixReason}
       />
       <PartnerCaseWithdrawModal
         open={withdrawOpen}

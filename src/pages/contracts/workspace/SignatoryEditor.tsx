@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Select, Button } from 'tsp-form';
-import { CheckCircle, XCircle, Info, ExternalLink, Loader2, AlertTriangle } from 'lucide-react';
+import { CheckCircle, XCircle, Info, ExternalLink, Loader2, AlertTriangle, PenLine, FileText } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { translateApiError } from '../../../lib/apiErrors';
 import { useWorkspace } from './WorkspaceContext';
@@ -16,13 +16,21 @@ import { SignatureThumb } from './SignatureThumb';
 const USE_DEFAULT = '__default__';
 
 /**
- * Per-contract LESSOR selection. Witnesses are no longer picked at draft — they
- * are chosen at signing time (mig 345/346). The lessor picker is OPTIONAL:
- * leave it empty and contract-open auto-binds the branch default lessor (mig
- * 350/351). Staff only need to touch it to switch lessor when a company has
- * more than one. Calls fn_contract_signatory_bind (4-arg).
+ * Per-contract LESSOR, as a box like the photo box: who signs as lessor, their
+ * signature, and whether that is already on the contract. Witnesses are not
+ * picked here — they are chosen at signing time (mig 345/346).
+ *
+ * Choosing is OPTIONAL: left alone, contract-open binds the branch default
+ * lessor (mig 350/351). "Change" appears only when the company has someone
+ * else to pick, and opens the picker in place. Calls fn_contract_signatory_bind.
  */
-export function SignatoryEditor() {
+export function SignatoryEditor({ title, footer }: {
+  /** Box heading. The documents step titles it as the contract document, since
+   *  the lessor sits on the contract next to its preview / print buttons. */
+  title?: string;
+  /** Rendered at the bottom of the box — the contract's preview / print buttons. */
+  footer?: ReactNode;
+} = {}) {
   const { t } = useTranslation();
   const { contract, signatories, invalidateSignatories } = useWorkspace();
   const branchId = contract?.branch_id ?? null;
@@ -34,26 +42,39 @@ export function SignatoryEditor() {
 
   const lessorDefault = defaults.find(d => d.slot === 'LESSOR');
   const lessorDefaultId = lessorDefault?.lessor_id ?? null;
+  const activeLessors = lessorPool.filter(l => l.is_active);
+  const noLessorsAtAll = !lessorsLoading && activeLessors.length === 0;
 
-  const noLessorsAtAll = !lessorsLoading && lessorPool.length === 0;
+  const bound = signatories.find(x => x.slot === 'LESSOR');
+  const boundId = bound?.lessor_id_ref ?? null;
 
-  // Pending selection:
-  //   null = nothing chosen yet
-  //   USE_DEFAULT = bind with branch default
-  //   "<id>" = explicit override to that lessor id
+  // Who signs, as things stand: the bound lessor, else the branch default.
+  const currentId = boundId ?? lessorDefaultId;
+  const currentIsDefault = currentId != null && currentId === lessorDefaultId;
+  const currentLessor = activeLessors.find(l => l.lessor_id === currentId);
+  const currentName = bound
+    ? composeName(bound.prefix, bound.first_name, bound.last_name)
+    : currentLessor
+      ? composeName(currentLessor.prefix, currentLessor.first_name, currentLessor.last_name)
+      : lessorDefault
+        ? composeName(lessorDefault.person_prefix, lessorDefault.person_first_name, lessorDefault.person_last_name)
+        : '';
+  const currentSignature = bound?.signature_media_id
+    ?? currentLessor?.signature_media_id
+    ?? (currentIsDefault ? lessorDefault?.signature_media_id : null)
+    ?? null;
+  // Someone else to pick? Then "Change" earns its place.
+  const canChange = activeLessors.some(l => l.lessor_id !== currentId);
+
+  const [editing, setEditing] = useState(false);
   const [pending, setPending] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const bound = signatories.find(x => x.slot === 'LESSOR');
-    const boundId = bound?.lessor_id_ref ?? null;
-    if (bound) {
-      setPending(boundId != null && boundId === lessorDefaultId ? USE_DEFAULT : (boundId != null ? String(boundId) : null));
-    } else {
-      setPending(lessorDefaultId != null ? USE_DEFAULT : null);
-    }
-  }, [signatories, lessorDefaultId]);
+    if (editing) return;
+    setPending(currentId == null ? null : currentIsDefault ? USE_DEFAULT : String(currentId));
+  }, [editing, currentId, currentIsDefault]);
 
   const options: { value: string; label: string }[] = [];
   if (lessorDefault && lessorDefaultId != null) {
@@ -63,48 +84,31 @@ export function SignatoryEditor() {
       label: defName ? `${t('workspace.signatoryDefaultShort')} — ${defName}` : t('workspace.signatoryUseDefault'),
     });
   }
-  for (const l of lessorPool) {
-    if (!l.is_active) continue;
+  for (const l of activeLessors) {
+    if (l.lessor_id === lessorDefaultId) continue; // already offered as the default
     options.push({ value: String(l.lessor_id), label: composeName(l.prefix, l.first_name, l.last_name) });
   }
 
-  const previewMediaId: number | null = (() => {
-    if (pending === null) return null;
-    if (pending === USE_DEFAULT) return lessorDefault?.signature_media_id ?? null;
-    return lessorPool.find(l => l.lessor_id === Number(pending))?.signature_media_id ?? null;
-  })();
-
-  const bound = signatories.find(x => x.slot === 'LESSOR');
-  const boundId = bound?.lessor_id_ref ?? null;
   const targetId =
     pending === null ? null
     : pending === USE_DEFAULT ? lessorDefaultId
     : Number(pending);
-  const boundMatches = bound != null && targetId != null && boundId === targetId;
+  const unchanged = bound != null && targetId != null && boundId === targetId;
 
   const handleBind = async () => {
-    if (!contractId || pending === null) return;
+    if (!contractId || targetId == null) return;
     setError('');
-
-    let lessorId: number | null;
-    if (pending === USE_DEFAULT) {
-      if (lessorDefaultId == null) return;
-      lessorId = lessorDefaultId;
-    } else {
-      lessorId = Number(pending);
-    }
-
-    if (bound && boundId === lessorId) return;
-
+    if (unchanged) { setEditing(false); return; }
     setBusy(true);
     try {
       await apiClient.rpc('fn_contract_signatory_bind', {
         p_contract_id: contractId,
         p_slot: 'LESSOR',
-        p_lessor_id: lessorId,
+        p_lessor_id: targetId,
         p_witness_id: null,
       });
       invalidateSignatories();
+      setEditing(false);
     } catch (err) {
       if (err instanceof ApiError) {
         setError(translateApiError(err, t));
@@ -126,8 +130,18 @@ export function SignatoryEditor() {
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="text-xs text-subtle">{t('workspace.signatoryLessorOptionalHint')}</div>
+    <div className="border border-line rounded-md px-4 py-3 flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider flex items-center gap-1.5 flex-wrap">
+          {title ? <FileText size={13} /> : <PenLine size={13} />}
+          {title ?? t('workspace.cardSignatory')}
+        </h3>
+        {canChange && !editing && (
+          <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+            {t('workspace.signatoryChange')}
+          </Button>
+        )}
+      </div>
 
       {noLessorsAtAll && (
         <div className="alert alert-warning">
@@ -144,7 +158,7 @@ export function SignatoryEditor() {
         </div>
       )}
 
-      {!noLessorsAtAll && lessorDefaultId == null && (
+      {!noLessorsAtAll && !lessorsLoading && lessorDefaultId == null && !bound && (
         <div className="alert alert-warning">
           <Info size={16} />
           <div>
@@ -159,16 +173,14 @@ export function SignatoryEditor() {
         </div>
       )}
 
-      {lessorsLoading && (
+      {lessorsLoading && !currentName ? (
         <div className="flex items-center gap-2 text-subtle text-sm">
           <Loader2 size={14} className="animate-spin" />
           <span>{t('common.loading')}</span>
         </div>
-      )}
-
-      <div className="flex items-center gap-2">
-        <label className="form-label mb-0 w-20 shrink-0">{t('workspace.signatoryLessor')}</label>
-        <div className="flex-1 min-w-0">
+      ) : editing ? (
+        // In-place picker: pick, then save or back out.
+        <div className="flex flex-col gap-2">
           <Select
             options={options}
             value={pending}
@@ -178,13 +190,42 @@ export function SignatoryEditor() {
             clearable={false}
             size="sm"
           />
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="ghost" onClick={() => { setEditing(false); setError(''); }} disabled={busy}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              size="sm"
+              color="primary"
+              onClick={handleBind}
+              disabled={busy || targetId == null}
+              startIcon={busy ? <Loader2 size={14} className="animate-spin" /> : undefined}
+            >
+              {busy ? t('common.saving') : t('common.save')}
+            </Button>
+          </div>
         </div>
-        {previewMediaId != null && <SignatureThumb mediaId={previewMediaId} size={28} />}
-        {previewMediaId == null && bound?.signature_media_id != null && (
-          <SignatureThumb mediaId={bound.signature_media_id} size={28} />
-        )}
-        {boundMatches && <CheckCircle size={14} className="text-success shrink-0" />}
-      </div>
+      ) : currentName ? (
+        <div className="flex items-center gap-3">
+          <SignatureThumb mediaId={currentSignature} size={32} />
+          <div className="min-w-0">
+            {title && <div className="text-xs text-subtle">{t('workspace.cardSignatory')}</div>}
+            <div className="text-sm font-medium truncate">{currentName}</div>
+            <div className="text-xs text-subtle flex flex-wrap items-center gap-x-1.5">
+              <span>{currentIsDefault ? t('workspace.signatoryIsBranchDefault') : t('workspace.signatoryChosenForContract')}</span>
+              <span>·</span>
+              {bound ? (
+                <span className="text-success-fg inline-flex items-center gap-1">
+                  <CheckCircle size={12} />
+                  {t('workspace.signatoryOnContract')}
+                </span>
+              ) : (
+                <span>{t('workspace.signatoryAutoAtOpen')}</span>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {error && (
         <div className="alert alert-danger">
@@ -193,17 +234,11 @@ export function SignatoryEditor() {
         </div>
       )}
 
-      <div className="flex justify-end">
-        <Button
-          color="primary"
-          size="sm"
-          onClick={handleBind}
-          disabled={busy || noLessorsAtAll || boundMatches || pending === null}
-          startIcon={busy ? <Loader2 size={14} className="animate-spin" /> : undefined}
-        >
-          {busy ? t('common.saving') : t('common.save')}
-        </Button>
-      </div>
+      <div className="text-xs text-subtle">{t('workspace.signatoryWitnessesLater')}</div>
+
+      {footer && (
+        <div className="pt-3 border-t border-line flex flex-wrap items-center gap-2">{footer}</div>
+      )}
     </div>
   );
 }

@@ -8,8 +8,9 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Button, TextArea } from 'tsp-form';
+import { ArrowRight } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
-import { translateApiError } from '../../lib/apiErrors';
+import { translateApiError, translateErrorCode } from '../../lib/apiErrors';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { usePartnerCaseInvalidate } from './usePartnerCases';
@@ -22,6 +23,15 @@ interface PartnerCaseSubmitModalProps {
   /** Latest request's seq_no, if any — a resubmit after a return says "ยื่นใหม่". */
   isResubmit: boolean;
   onClose: () => void;
+  /** Where to send the shop to fix a "not ready" reason, by its code: the link
+   *  label naming the action, and what it does. Null for a reason this screen
+   *  can't take them to. The modal closes first. */
+  fixReason?: (code: string) => ReasonFix | null;
+}
+
+export interface ReasonFix {
+  label: string;
+  run: () => void;
 }
 
 /** A failed readiness check, as the RPC reports it. */
@@ -32,7 +42,7 @@ interface ReadyError {
 }
 
 export function PartnerCaseSubmitModal({
-  open, contractId, contractCode, isResubmit, onClose,
+  open, contractId, contractCode, isResubmit, onClose, fixReason,
 }: PartnerCaseSubmitModalProps) {
   const { t } = useTranslation();
   const invalidate = usePartnerCaseInvalidate();
@@ -122,21 +132,6 @@ export function PartnerCaseSubmitModal({
 
               <p className="text-sm text-subtle mt-3">{t('partnerCase.submitHint')}</p>
 
-              {readyErrors.length > 0 && (
-                <div className="mt-3 rounded-md border border-danger-border bg-danger-soft px-3 py-2.5">
-                  <div className="text-sm font-medium text-danger-fg">
-                    {t('partnerCase.notReadyTitle')}
-                  </div>
-                  <ul className="mt-1.5 flex flex-col gap-1">
-                    {readyErrors.map((e, i) => (
-                      <li key={i} className="text-sm text-danger-fg">
-                        {t(e.code.toLowerCase(), { ns: 'apiErrors', defaultValue: e.code })}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
               <div className="form-grid mt-4">
                 <div className="flex flex-col">
                   <label className="form-label">{t('partnerCase.submitNote')}</label>
@@ -150,7 +145,38 @@ export function PartnerCaseSubmitModal({
               </div>
             </div>
 
-            <ModalErrorBand message={error} onDismiss={() => setError(null)} />
+            {/* The reasons live in the band beside the button that failed — one
+                place, in view, each with its way out where the screen has one. */}
+            <ModalErrorBand
+              message={readyErrors.length > 0 ? t('partnerCase.notReadyTitle') : error}
+              onDismiss={() => { setError(null); setReadyErrors([]); }}
+              action={readyErrors.length > 0 ? (
+                <ul className="flex flex-col gap-1">
+                  {readyErrors.map((e, i) => {
+                    const fix = fixReason?.(e.code) ?? null;
+                    return (
+                      <li key={i} className="flex flex-wrap items-center gap-x-2">
+                        <span>
+                          {translateErrorCode(e.code, {}, t)
+                            || translateErrorCode(e.code.toLowerCase(), {}, t)
+                            || e.code}
+                        </span>
+                        {fix && (
+                          <button
+                            type="button"
+                            className="font-medium text-primary-fg hover:underline inline-flex items-center gap-0.5 bg-transparent border-none p-0 cursor-pointer"
+                            onClick={() => { forceClose(); fix.run(); }}
+                          >
+                            {fix.label}
+                            <ArrowRight size={14} />
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : undefined}
+            />
 
             <div className="modal-footer">
               <Button variant="ghost" onClick={handleClose} disabled={saving}>

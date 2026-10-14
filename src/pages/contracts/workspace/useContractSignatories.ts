@@ -74,6 +74,7 @@ export interface ContractSignatory {
   source_kind: ContractSourceKind;
   lessor_id_ref: number | null;
   witness_id_ref: number | null;
+  prefix?: string | null;
   first_name: string;
   last_name: string | null;
   role: SourceKind;

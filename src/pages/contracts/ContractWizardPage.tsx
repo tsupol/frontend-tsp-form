@@ -33,6 +33,19 @@ import { CardContactRef } from './workspace/CardContactRef';
 import { PanelContactRef } from './workspace/PanelContactRef';
 import type { ModalId } from './workspace/WorkspaceTypes';
 import { PartnerCaseCard } from '../partner-cases/PartnerCaseCard';
+import { CONFIDENCE_SCORE_ANCHOR } from './workspace/ConfidenceScoreEditor';
+
+/** After opening a step, wait for one of its blocks to mount, then scroll it
+ *  to the top of its panel. Gives up quietly if it never appears. */
+function revealAnchor(id: string) {
+  let tries = 0;
+  const tick = () => {
+    const el = document.getElementById(id);
+    if (el) { el.scrollIntoView({ block: 'start', behavior: 'smooth' }); return; }
+    if (++tries < 30) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
 
 interface Branch {
   id: number;
@@ -43,7 +56,7 @@ function WorkspaceContent() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { contractId: paramContractId } = useParams<{ contractId?: string }>();
-  const { user } = useAuth();
+  const { user, isDealPartner } = useAuth();
   const navGuard = useNavGuard();
   const loadedRef = useRef(false);
   const { data, contract, updateData, resetData, openModal, setOpenModal, isPostPayment, getCardStatus, panelDirtyRef, pendingModal, confirmPanelSwitch, cancelPanelSwitch } = useWorkspace();
@@ -53,6 +66,8 @@ function WorkspaceContent() {
   const [shakingCards] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState(false);
   const reviewPayCardRef = useRef<HTMLDivElement | null>(null);
+  // The pinned bar's button slot — the approval card renders its buttons into it.
+  const [partnerActionBar, setPartnerActionBar] = useState<HTMLDivElement | null>(null);
 
   // When Review & Pay becomes the active panel, scroll the left summary list
   // so its card is in view. Slight delay so the panel transition / layout
@@ -353,7 +368,29 @@ function WorkspaceContent() {
           return s === 'complete' || (id === 'co_lessee' && s === 'warning');
         };
         const allCardsComplete = data.contractId != null && requiredCards.every(isCardSatisfied);
-        const reviewPayReady = allCardsComplete || !!data.billId;
+        // A deal-partner shop's FIN1 contract goes through credit approval first:
+        // its last step (down payment + signing) opens only once approved, and
+        // the approval card is the next action until then, so it is pinned.
+        const isPartnerFin1 = isDealPartner
+          && (contract?.commercial_model == null || contract.commercial_model === 'FIN1');
+        const partnerApproved = contract?.state === 'APPROVED';
+        const reviewPayReady = isPartnerFin1
+          ? partnerApproved || !!data.billId
+          : allCardsComplete || !!data.billId;
+        const reviewPayLockedHint = isPartnerFin1 && data.contractId ? t('workspace.opensAfterApproval') : undefined;
+        const partnerCaseCard = data.contractId ? (
+          <PartnerCaseCard
+            contractId={data.contractId}
+            contractCode={data.contractCode ?? contract?.code_display ?? ''}
+            commercialModel={contract?.commercial_model}
+            contractState={contract?.state}
+            variant="flush"
+            actionsTarget={isPartnerFin1 ? partnerActionBar : undefined}
+            fixReason={(code) => code === 'CONTRACT.VALIDATION.STAFF_CONFIDENCE_SCORE_REQUIRED'
+              ? { label: t('workspace.goRateConfidence'), run: () => { handleEditOpen('documents'); revealAnchor(CONFIDENCE_SCORE_ANCHOR); } }
+              : null}
+          />
+        ) : null;
 
         // An approved shop contract comes here to collect its down payment — the
         // screen is not "new contract" for it, so the title says the job.
@@ -440,25 +477,38 @@ function WorkspaceContent() {
                     <CardCoLessee onEdit={() => handleEditOpen('co_lessee')} active={isCardActive('co_lessee')} shake={shakingCards.has('co_lessee')} />
                     <CardDocuments onEdit={() => handleEditOpen('documents')} active={isCardActive('documents')} shake={shakingCards.has('documents')} />
 
-                    {/* Deal-partner FIN1: the shop can't open the bill until the
-                        company's credit team approves, so the request card sits
-                        directly above Review & Pay. Renders nothing for anyone else. */}
-                    {data.contractId && (
-                      <PartnerCaseCard
-                        contractId={data.contractId}
-                        contractCode={data.contractCode ?? contract?.code_display ?? ''}
-                        commercialModel={contract?.commercial_model}
-                        contractState={contract?.state}
-                        variant="flush"
-                      />
-                    )}
+                    {/* Deal-partner FIN1: the credit-approval step, in order —
+                        after documents, before the down payment. It shows where
+                        the request stands; its buttons sit in the pinned bar.
+                        Renders nothing for anyone else. */}
+                    {partnerCaseCard}
 
                     <div ref={reviewPayCardRef}>
-                      {!data.billConfirmed && data.contractId && <CardReviewPay onEdit={reviewPayReady ? () => handleEditOpen('reviewPay') : undefined} active={isCardActive('reviewPay')} disabled={!reviewPayReady} />}
+                      {!data.billConfirmed && data.contractId && <CardReviewPay
+                        onEdit={reviewPayReady ? () => handleEditOpen('reviewPay') : undefined}
+                        active={isCardActive('reviewPay')}
+                        disabled={!reviewPayReady}
+                        title={isPartnerFin1 ? t('workspace.cardCollectAndSign') : undefined}
+                        lockedHint={reviewPayLockedHint}
+                      />}
                       {data.billConfirmed && <CardPostPayment onEdit={() => handleEditOpen('reviewPay')} active={isCardActive('reviewPay')} />}
                     </div>
                   </div>
                 </div>
+
+                {/* Pinned bar for a shop: just the one next action — submit /
+                    withdraw (placed here by the approval card), then collecting
+                    the down payment once approved. Hidden when it holds nothing. */}
+                {isPartnerFin1 && data.contractId && !data.billConfirmed && (
+                  <div className="shrink-0 border-t border-line bg-bg px-4 py-3 flex items-center justify-end gap-2 has-[>*:empty:only-child]:hidden">
+                    <div ref={setPartnerActionBar} className="flex items-center justify-end gap-2 empty:hidden" />
+                    {partnerApproved && (
+                      <Button size="sm" color="primary" onClick={() => handleEditOpen('reviewPay')}>
+                        {t('workspace.cardCollectAndSign')}
+                      </Button>
+                    )}
+                  </div>
+                )}
 
                 {isMobile && isPostPayment && (
                   <div className="shrink-0 border-t border-line bg-bg px-4 py-3 flex items-center justify-end gap-2">

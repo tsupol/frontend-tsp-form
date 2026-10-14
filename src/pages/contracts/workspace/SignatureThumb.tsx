@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { PenLine } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
 import { useMediaUrl } from '../../../hooks/useMediaUrl';
 
@@ -25,20 +26,27 @@ function fetchMedia(mediaId: number): Promise<MediaRow | null> {
 /** Resolves a `core.media.id` to a displayable thumbnail URL. */
 export function SignatureThumb({ mediaId, size = 36, className }: { mediaId: number | null; size?: number; className?: string }) {
   const [storageKey, setStorageKey] = useState<string | null>(null);
+  // The lookup answered with nothing — e.g. a deal-partner shop can't read the
+  // company lessor's signature row. Stop pulsing; there is nothing coming.
+  const [missing, setMissing] = useState(false);
 
   useEffect(() => {
+    setMissing(false);
     if (!mediaId) { setStorageKey(null); return; }
     let cancelled = false;
     fetchMedia(mediaId).then(row => {
       if (cancelled) return;
-      if (!row) { setStorageKey(null); return; }
+      if (!row) { setStorageKey(null); setMissing(true); return; }
       const sm = row.variants_json?.sm ?? row.variants_json?.md ?? null;
       setStorageKey((sm ?? row.storage_path).replace(/^\//, ''));
     });
     return () => { cancelled = true; };
   }, [mediaId]);
 
-  const { url } = useMediaUrl(storageKey);
+  const { url, loading, error } = useMediaUrl(storageKey);
+  // Nothing to show (no signature on file, or one this user can't read) —
+  // a quiet pen icon, never an endless pulse.
+  const failed = !mediaId || missing || (!!storageKey && !loading && !url) || !!error;
 
   return (
     <div
@@ -48,6 +56,8 @@ export function SignatureThumb({ mediaId, size = 36, className }: { mediaId: num
     >
       {url ? (
         <img src={url} alt="" className="max-w-full max-h-full object-contain" />
+      ) : failed ? (
+        <PenLine size={Math.round(size * 0.45)} className="text-subtler" />
       ) : (
         <div className="w-full h-full bg-surface-shallow animate-pulse" />
       )}
