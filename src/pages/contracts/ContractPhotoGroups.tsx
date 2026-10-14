@@ -21,20 +21,25 @@
 // reorder in the React Query cache during the drag, persist on drop, restore
 // the snapshot if the server refuses.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Modal, Button, PopOver, MenuItem, MenuSeparator, Select, Badge } from 'tsp-form';
+import { Modal, Button, PopOver, MenuItem, MenuSeparator, Badge } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
 import {
-  DndContext, DragOverlay, pointerWithin, useDroppable,
-  type DragStartEvent, type DragOverEvent, type DragEndEvent,
+  DndContext, DragOverlay, pointerWithin, useDroppable, MeasuringStrategy,
+  MouseSensor, TouchSensor, KeyboardSensor, useSensor, useSensors,
+  type DragStartEvent, type DragOverEvent, type DragEndEvent, type DragMoveEvent,
 } from '@dnd-kit/core';
-import { SortableContext, useSortable, rectSortingStrategy, arrayMove } from '@dnd-kit/sortable';
+import {
+  SortableContext, useSortable, rectSortingStrategy, horizontalListSortingStrategy, arrayMove,
+  sortableKeyboardCoordinates,
+} from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
   XCircle, Plus, ImageOff, MoreHorizontal, FolderInput, RefreshCw, Trash2, X,
-  GripVertical, Lock, CheckCircle2, AlertCircle,
+  ZoomIn, Lock, CheckCircle2, AlertCircle,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -45,6 +50,10 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { MediaLightboxKeyGallery } from '../../components/MediaLightbox';
 import { translateApiError } from '../../lib/apiErrors';
 import { uploadContractPhoto } from './uploadContractPhoto';
+import {
+  photosKey, statusKey, useContractPhotoStatus, useContractAlbumPhotos,
+  type PhotoStatus, type PhotoStatusSlot, type ContractPhoto,
+} from './contractPhotoStatus';
 import { SingleImageUploader } from '../../components/SingleImageUploader';
 
 const ENTITY_TYPE = 'CONTRACT';
@@ -64,52 +73,9 @@ interface PhotoSlotRef {
   sort_order: number;
 }
 
-/** One group's line in fn_contract_photo_status. */
-interface PhotoStatusSlot {
-  slot: string;
-  label_th: string;
-  label_en: string;
-  required: boolean;
-  min: number;
-  max: number | null;
-  count: number;
-  ok: boolean;
-  locks_with_settlement: boolean;
-}
-
-interface PhotoStatus {
-  contract_id: number;
-  complete: boolean;
-  missing: string[];
-  total_photos: number;
-  /** false → every group with locks_with_settlement is frozen. */
-  editable: boolean;
-  /** `lock_kind` names which document froze the album: SETTLEMENT or RETURN. */
-  lock: {
-    code?: string;
-    lock_kind?: string;
-    settlement_status?: string;
-    settlement_code?: string;
-    return_code?: string;
-    return_status?: string;
-  } | null;
-  slots: PhotoStatusSlot[];
-}
-
-interface ContractPhoto {
-  entity_media_id: number;
-  media_id: number;
-  usage_type: string;
-  sort_order: number;
-  caption: string | null;
-  storage_path: string;
-  variants_json: Record<string, string> | null;
-}
 
 // ── keys / helpers ───────────────────────────────────────────────────────────
 
-const photosKey = (contractId: number) => ['contract-photo-groups', contractId] as const;
-const statusKey = (contractId: number) => ['contract-photo-status', contractId] as const;
 
 // dnd ids: photos are `p{entity_media_id}`, group drop areas are `g:{slot}`.
 const photoDndId = (p: ContractPhoto) => `p${p.entity_media_id}`;
@@ -138,9 +104,27 @@ function translateErr(err: unknown, t: ReturnType<typeof useTranslation>['t']): 
 
 // ── main component ───────────────────────────────────────────────────────────
 
-export function ContractPhotoGroups({ contractId, className }: {
+/** Pieces a host lays out itself — the photo window pins one group in a band
+ *  above its scrolling list. Both sit inside one drag context, so a photo can
+ *  be dragged from the pinned group into any group below. */
+export interface PhotoGroupsLayoutParts {
+  pinned: ReactNode;
+  body: ReactNode;
+}
+
+export function ContractPhotoGroups({ contractId, className, hideBanner, pinnedSlot, scrollRef, renderLayout, onDraggingChange }: {
   contractId: number;
   className?: string;
+  /** The host pins its own checklist (ChecklistSummary) outside the scroll. */
+  hideBanner?: boolean;
+  /** Group drawn as a one-row strip in `parts.pinned` instead of in the list. */
+  pinnedSlot?: string;
+  /** The list's scroll container — scrolled while a photo is held near its edge. */
+  scrollRef?: RefObject<HTMLElement | null>;
+  renderLayout?: (parts: PhotoGroupsLayoutParts) => ReactNode;
+  /** True while a photo is held — the host's window ignores Escape then, since
+   *  Escape is how a drag is cancelled. */
+  onDraggingChange?: (dragging: boolean) => void;
 }) {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
@@ -149,7 +133,6 @@ export function ContractPhotoGroups({ contractId, className }: {
 
   const [error, setError] = useState('');
   const [addGroup, setAddGroup] = useState<PhotoStatusSlot | null>(null);
-  const [movePhoto, setMovePhoto] = useState<{ photo: ContractPhoto; from: string } | null>(null);
   const [replacePhoto, setReplacePhoto] = useState<ContractPhoto | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<ContractPhoto | null>(null);
   const [lightbox, setLightbox] = useState<{ slot: string; index: number } | null>(null);
@@ -163,26 +146,9 @@ export function ContractPhotoGroups({ contractId, className }: {
     staleTime: 60 * 60 * 1000,
   });
 
-  // The checklist — the only source of "complete", "missing" and "editable".
-  const { data: status } = useQuery({
-    queryKey: statusKey(contractId),
-    queryFn: () => apiClient.rpc<PhotoStatus>('fn_contract_photo_status', { p_contract_id: contractId }),
-    staleTime: 15 * 1000,
-  });
+  const { data: status } = useContractPhotoStatus(contractId);
 
-  // Every photo in the album, all groups in one read.
-  const slotList = slotRefs.map(s => s.usage_type);
-  const { data: photos = [], isLoading } = useQuery({
-    queryKey: photosKey(contractId),
-    queryFn: () => apiClient.get<ContractPhoto[]>(
-      `/v_entity_media?entity_type=eq.${ENTITY_TYPE}&entity_id=eq.${contractId}`
-      + `&usage_type=in.(${slotList.join(',')})`
-      + '&select=entity_media_id,media_id,usage_type,sort_order,caption,storage_path,variants_json'
-      + '&order=usage_type,sort_order',
-    ),
-    enabled: slotList.length > 0,
-    staleTime: 30 * 1000,
-  });
+  const { data: photos = [], isLoading } = useContractAlbumPhotos(contractId, slotRefs.map(s => s.usage_type));
 
   const refresh = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: photosKey(contractId) });
@@ -213,6 +179,8 @@ export function ContractPhotoGroups({ contractId, className }: {
 
   const [activeDragPhoto, setActiveDragPhoto] = useState<ContractPhoto | null>(null);
   const [dragOverGroup, setDragOverGroup] = useState<string | null>(null);
+  const [grabOffset, setGrabOffset] = useState<{ x: number; y: number } | null>(null);
+  useEffect(() => { onDraggingChange?.(activeDragPhoto != null); }, [activeDragPhoto, onDraggingChange]);
   const dragSnapshotRef = useRef<ContractPhoto[] | null>(null);
 
   const setPhotosCache = useCallback((updater: (prev: ContractPhoto[]) => ContractPhoto[]) => {
@@ -220,7 +188,54 @@ export function ContractPhotoGroups({ contractId, className }: {
     if (prev) queryClient.setQueryData<ContractPhoto[]>(photosKey(contractId), updater(prev));
   }, [contractId, queryClient]);
 
+  // Edge auto-scroll. dnd-kit only scrolls the dragged tile's own scrolling
+  // ancestors, and a tile picked up from the pinned strip has none in common
+  // with the list — so the list is scrolled here while the pointer sits near
+  // its top or bottom edge. The pointer is the press point plus the drag delta.
+  const pointerStartY = useRef<number | null>(null);
+  const pointerY = useRef<number | null>(null);
+  const [, bumpMeasure] = useReducer((x: number) => x + 1, 0);
+  const handleDragMove = useCallback((event: DragMoveEvent) => {
+    if (pointerStartY.current != null) pointerY.current = pointerStartY.current + event.delta.y;
+  }, []);
+  useEffect(() => {
+    if (!activeDragPhoto || !scrollRef?.current) return;
+    const el = scrollRef.current;
+    const EDGE = 64;
+    let frame = 0;
+    const tick = () => {
+      const y = pointerY.current;
+      if (y != null) {
+        const r = el.getBoundingClientRect();
+        let step = 0;
+        if (y > r.bottom - EDGE) step = Math.min(20, 4 + (y - (r.bottom - EDGE)) / 3);
+        else if (y < r.top + EDGE && y > r.top - EDGE * 3) step = -Math.min(20, 4 + ((r.top + EDGE) - y) / 3);
+        if (step !== 0) {
+          const before = el.scrollTop;
+          el.scrollTop += step;
+          if (el.scrollTop !== before) bumpMeasure();
+        }
+      }
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [activeDragPhoto, scrollRef]);
+
   const handleDragStart = useCallback((event: DragStartEvent) => {
+    const ev = event.activatorEvent as PointerEvent | TouchEvent | MouseEvent;
+    const startY = 'touches' in ev ? ev.touches[0]?.clientY : (ev as PointerEvent).clientY;
+    const startX = 'touches' in ev ? ev.touches[0]?.clientX : (ev as PointerEvent).clientX;
+    // Where in the tile it was grabbed — the small copy is centred there, so
+    // it sits under the pointer whatever the tile's size.
+    // Read from the tile itself: the library hasn't measured it yet here.
+    const tileEl = (ev.target as Element | null)?.closest?.('[data-photo-tile]');
+    const rect = tileEl?.getBoundingClientRect();
+    setGrabOffset(rect && startX != null && startY != null
+      ? { x: startX - rect.left, y: startY - rect.top }
+      : null);
+    pointerStartY.current = startY ?? null;
+    pointerY.current = startY ?? null;
     const emId = parsePhotoDndId(event.active.id);
     if (emId == null) return;
     const current = queryClient.getQueryData<ContractPhoto[]>(photosKey(contractId)) ?? [];
@@ -287,6 +302,7 @@ export function ContractPhotoGroups({ contractId, className }: {
   }, [contractId, queryClient, setPhotosCache, status, lockedGroup]);
 
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    pointerY.current = null;
     setActiveDragPhoto(null);
     setDragOverGroup(null);
     const snapshot = dragSnapshotRef.current;
@@ -329,6 +345,7 @@ export function ContractPhotoGroups({ contractId, className }: {
   }, [contractId, queryClient, refresh, t]);
 
   const handleDragCancel = useCallback(() => {
+    pointerY.current = null;
     setActiveDragPhoto(null);
     setDragOverGroup(null);
     const snap = dragSnapshotRef.current;
@@ -346,13 +363,18 @@ export function ContractPhotoGroups({ contractId, className }: {
     onError: (err) => { setError(translateErr(err, t)); setConfirmRemove(null); },
   });
 
+  // Picked straight from the photo's ⋯ menu — one tap, no dialog.
+  const moveTo = useMutation({
+    mutationFn: ({ photo, slot }: { photo: ContractPhoto; slot: string }) =>
+      apiClient.rpc('fn_contract_photo_move', { p_entity_media_id: photo.entity_media_id, p_to_slot: slot }),
+    onSuccess: () => { setError(''); refresh(); },
+    onError: (err) => setError(translateErr(err, t)),
+  });
+
   // Keep modal bodies alive through the close transition.
   const lastAdd = useRef(addGroup);
   if (addGroup) lastAdd.current = addGroup;
   const addData = addGroup ?? lastAdd.current;
-  const lastMove = useRef(movePhoto);
-  if (movePhoto) lastMove.current = movePhoto;
-  const moveData = movePhoto ?? lastMove.current;
   const lastReplace = useRef(replacePhoto);
   if (replacePhoto) lastReplace.current = replacePhoto;
   const replaceData = replacePhoto ?? lastReplace.current;
@@ -375,8 +397,36 @@ export function ContractPhotoGroups({ contractId, className }: {
     locks_with_settlement: s.locks_with_settlement,
   }));
 
-  return (
-    <div className={className}>
+  // Whole-tile drag: mouse after a few pixels, touch after a short hold so a
+  // swipe still scrolls. Keyboard keeps the tile reachable without a pointer.
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  // One row per group, minus the one the host pins.
+  const groupProps = (group: PhotoStatusSlot) => ({
+    group,
+    label: isThai ? group.label_th : group.label_en,
+    photos: photosIn(group.slot),
+    locked: lockedGroup(group.slot),
+    busy: remove.isPending || moveTo.isPending,
+    isDropTarget: dragOverGroup === group.slot,
+    moveTargets: groups
+      .filter(g => g.slot !== group.slot && !lockedGroup(g.slot) && !isFull(g.count, g.max))
+      .map(g => ({ slot: g.slot, label: isThai ? g.label_th : g.label_en })),
+    onAdd: () => setAddGroup(group),
+    onView: (index: number) => setLightbox({ slot: group.slot, index }),
+    onMoveTo: (p: ContractPhoto, slot: string) => moveTo.mutate({ photo: p, slot }),
+    onReplace: (p: ContractPhoto) => setReplacePhoto(p),
+    onRemove: (p: ContractPhoto) => setConfirmRemove(p),
+  });
+  const pinnedGroup = pinnedSlot ? groups.find(g => g.slot === pinnedSlot) : undefined;
+  const listGroups = pinnedGroup ? groups.filter(g => g.slot !== pinnedSlot) : groups;
+
+  const head = (
+    <>
       {error && (
         <div className="alert alert-danger mb-3">
           <XCircle size={16} />
@@ -384,42 +434,22 @@ export function ContractPhotoGroups({ contractId, className }: {
         </div>
       )}
 
-      {status && <ChecklistBanner status={status} isThai={isThai} />}
+      {status && !hideBanner && <ChecklistBanner status={status} isThai={isThai} />}
 
       {isLoading && photos.length === 0 && (
         <div className="p-6 text-center text-subtle text-sm">{t('common.loading')}</div>
       )}
+    </>
+  );
 
-      <DndContext
-        collisionDetection={pointerWithin}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragEnd={handleDragEnd}
-        onDragCancel={handleDragCancel}
-      >
-        <div className="flex flex-col gap-3">
-          {groups.map(group => (
-            <GroupSection
-              key={group.slot}
-              group={group}
-              label={isThai ? group.label_th : group.label_en}
-              photos={photosIn(group.slot)}
-              locked={lockedGroup(group.slot)}
-              busy={remove.isPending}
-              isDropTarget={dragOverGroup === group.slot}
-              onAdd={() => setAddGroup(group)}
-              onView={(index) => setLightbox({ slot: group.slot, index })}
-              onMove={(p) => setMovePhoto({ photo: p, from: group.slot })}
-              onReplace={(p) => setReplacePhoto(p)}
-              onRemove={(p) => setConfirmRemove(p)}
-            />
-          ))}
-        </div>
-        <DragOverlay dropAnimation={null}>
-          {activeDragPhoto && <PhotoDragGhost photo={activeDragPhoto} />}
-        </DragOverlay>
-      </DndContext>
+  const list = (
+    <div className="flex flex-col gap-3">
+      {listGroups.map(group => <GroupSection key={group.slot} {...groupProps(group)} />)}
+    </div>
+  );
 
+  const dialogs = (
+    <>
       <AddPhotoModal
         open={addGroup != null}
         onClose={() => setAddGroup(null)}
@@ -428,16 +458,6 @@ export function ContractPhotoGroups({ contractId, className }: {
         label={addData ? (isThai ? addData.label_th : addData.label_en) : ''}
         existingCount={addData ? photosIn(addData.slot).length : 0}
         onAdded={() => { setAddGroup(null); refresh(); }}
-      />
-
-      <MovePhotoModal
-        open={movePhoto != null}
-        onClose={() => setMovePhoto(null)}
-        data={moveData}
-        groups={groups}
-        isThai={isThai}
-        lockedGroup={lockedGroup}
-        onMoved={() => { setMovePhoto(null); refresh(); }}
       />
 
       <ReplacePhotoModal
@@ -465,6 +485,47 @@ export function ContractPhotoGroups({ contractId, className }: {
         onIndexChange={(i) => setLightbox(lb => (lb ? { ...lb, index: i } : lb))}
         alt={t('contractPhotos.title')}
       />
+    </>
+  );
+
+  const dnd = (children: ReactNode) => (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={pointerWithin}
+      // Re-measure drop areas while dragging: the list can scroll under a tile
+      // held from the pinned strip, and its boxes move with it.
+      measuring={{ droppable: { strategy: MeasuringStrategy.WhileDragging, frequency: 100 } }}
+      onDragStart={handleDragStart}
+      onDragMove={handleDragMove}
+      onDragOver={handleDragOver}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
+      {children}
+      {/* At page level: inside the photo window the window's own transform
+          becomes the overlay's frame, and the copy lands offset by the
+          window's position instead of under the pointer. */}
+      {createPortal(
+        <DragOverlay dropAnimation={null} zIndex={10000}>
+          {activeDragPhoto && <PhotoDragGhost photo={activeDragPhoto} grab={grabOffset} />}
+        </DragOverlay>,
+        document.body,
+      )}
+    </DndContext>
+  );
+
+  if (renderLayout) {
+    return dnd(renderLayout({
+      pinned: pinnedGroup ? <GroupSection {...groupProps(pinnedGroup)} variant="strip" /> : null,
+      body: <div className={className}>{head}{list}{dialogs}</div>,
+    }));
+  }
+
+  return (
+    <div className={className}>
+      {head}
+      {dnd(list)}
+      {dialogs}
     </div>
   );
 }
@@ -523,11 +584,51 @@ function ChecklistBanner({ status, isThai }: { status: PhotoStatus; isThai: bool
   );
 }
 
+/** Same facts as ChecklistBanner, as plain lines for a pinned band — the photo
+ *  window keeps it on screen while the groups scroll under it. */
+export function ChecklistSummary({ contractId }: { contractId: number }) {
+  const { t, i18n } = useTranslation();
+  const { data: status } = useContractPhotoStatus(contractId);
+  if (!status) return null;
+  const isThai = i18n.language === 'th';
+  const missingLabels = status.missing
+    .map(code => status.slots.find(s => s.slot === code))
+    .filter((s): s is PhotoStatusSlot => !!s)
+    .map(s => (isThai ? s.label_th : s.label_en));
+
+  return (
+    <div className="flex flex-col gap-1 text-sm">
+      {status.editable === false && (
+        <div className="flex items-start gap-1.5 text-warning-fg">
+          <Lock size={14} className="mt-0.5 shrink-0" />
+          <span>
+            {t(lockedNoticeKey(status.lock?.settlement_status))}
+            {status.lock?.settlement_code ? ` (${status.lock.settlement_code})` : ''}
+          </span>
+        </div>
+      )}
+      {status.complete ? (
+        <div className="flex items-start gap-1.5 text-success-fg font-medium">
+          <CheckCircle2 size={14} className="mt-0.5 shrink-0" />
+          <span>{t('contractPhotos.checklistComplete')}</span>
+        </div>
+      ) : status.editable !== false && missingLabels.length > 0 ? (
+        <div className="flex items-start gap-1.5 text-warning-fg font-medium">
+          <AlertCircle size={14} className="mt-0.5 shrink-0" />
+          <span>{t('contractPhotos.checklistMissing', { groups: missingLabels.join(' · ') })}</span>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 // ── Group section ────────────────────────────────────────────────────────────
 
+interface MoveTarget { slot: string; label: string }
+
 function GroupSection({
-  group, label, photos, locked, busy, isDropTarget,
-  onAdd, onView, onMove, onReplace, onRemove,
+  group, label, photos, locked, busy, isDropTarget, moveTargets, variant = 'grid',
+  onAdd, onView, onMoveTo, onReplace, onRemove,
 }: {
   group: PhotoStatusSlot;
   label: string;
@@ -535,16 +636,68 @@ function GroupSection({
   locked: boolean;
   busy: boolean;
   isDropTarget: boolean;
+  /** Groups a photo here can move to (not this one, not frozen, not full). */
+  moveTargets: MoveTarget[];
+  /** `strip` = one row that scrolls sideways, for a pinned band. */
+  variant?: 'grid' | 'strip';
   onAdd: () => void;
   onView: (index: number) => void;
-  onMove: (p: ContractPhoto) => void;
+  onMoveTo: (p: ContractPhoto, slot: string) => void;
   onReplace: (p: ContractPhoto) => void;
   onRemove: (p: ContractPhoto) => void;
 }) {
   const { t } = useTranslation();
   const full = isFull(photos.length, group.max);
+  const strip = variant === 'strip';
   // The whole box is a drop target so a photo can land in an empty group.
   const { setNodeRef } = useDroppable({ id: groupDndId(group.slot), disabled: locked });
+
+  const tile = (p: ContractPhoto, i: number) => (
+    <PhotoTile
+      key={p.entity_media_id}
+      photo={p}
+      locked={locked}
+      busy={busy}
+      compact={strip}
+      moveTargets={moveTargets}
+      onView={() => onView(i)}
+      onMoveTo={(slot) => onMoveTo(p, slot)}
+      onReplace={() => onReplace(p)}
+      onRemove={() => onRemove(p)}
+    />
+  );
+
+  if (strip) {
+    return (
+      <div
+        ref={setNodeRef}
+        className={`min-w-0 rounded-md border px-2 py-1.5 transition-colors ${
+          isDropTarget ? 'border-primary bg-primary-soft' : 'border-line'
+        }`}
+      >
+        <div className="flex items-center gap-2 mb-1.5">
+          <span className="text-xs font-medium">{label}</span>
+          <span className="text-xs text-subtle tabular-nums">{photos.length}</span>
+          {!locked && (
+            <div className="ml-auto">
+              <Button variant="ghost" size="sm" startIcon={<Plus size={14} />} onClick={onAdd} disabled={full}>
+                {t('contractPhotos.addPhoto')}
+              </Button>
+            </div>
+          )}
+        </div>
+        <SortableContext id={group.slot} items={photos.map(photoDndId)} strategy={horizontalListSortingStrategy}>
+          {photos.length === 0 ? (
+            <div className="h-14 flex items-center text-xs text-subtler">{t('contractPhotos.pinnedEmpty')}</div>
+          ) : (
+            <div className="flex gap-1.5 overflow-x-auto better-scroll pb-1">
+              {photos.map((p, i) => <div key={p.entity_media_id} className="w-14 shrink-0">{tile(p, i)}</div>)}
+            </div>
+          )}
+        </SortableContext>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -590,18 +743,7 @@ function GroupSection({
           <div className="text-xs text-subtler py-2">{t('contractPhotos.emptyGroup')}</div>
         ) : (
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-            {photos.map((p, i) => (
-              <PhotoTile
-                key={p.entity_media_id}
-                photo={p}
-                locked={locked}
-                busy={busy}
-                onView={() => onView(i)}
-                onMove={() => onMove(p)}
-                onReplace={() => onReplace(p)}
-                onRemove={() => onRemove(p)}
-              />
-            ))}
+            {photos.map((p, i) => tile(p, i))}
           </div>
         )}
       </SortableContext>
@@ -611,15 +753,20 @@ function GroupSection({
 
 // ── Photo tile ───────────────────────────────────────────────────────────────
 
-function PhotoTile({ photo, locked, busy, onView, onMove, onReplace, onRemove }: {
+function PhotoTile({ photo, locked, busy, compact, moveTargets, onView, onMoveTo, onReplace, onRemove }: {
   photo: ContractPhoto;
   locked: boolean;
   busy: boolean;
+  /** Small tile in a pinned strip — smaller handle and menu buttons. */
+  compact?: boolean;
+  moveTargets: MoveTarget[];
   onView: () => void;
-  onMove: () => void;
+  onMoveTo: (slot: string) => void;
   onReplace: () => void;
   onRemove: () => void;
 }) {
+  const knob = compact ? 'w-5 h-5' : 'w-6 h-6';
+  const knobIcon = compact ? 12 : 14;
   const { t } = useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
   const { url } = useMediaUrl(normalizeKey(thumbKey(photo)));
@@ -628,34 +775,38 @@ function PhotoTile({ photo, locked, busy, onView, onMove, onReplace, onRemove }:
     disabled: locked,
   });
 
+  // The whole photo is the drag handle; zoom is the small button. Mouse drags
+  // after a few pixels; touch after a short press-and-hold (sensors on the
+  // album), so a swipe still scrolls the list and the strip.
   return (
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition: transition ?? undefined }}
-      className={`relative rounded-md border border-line overflow-hidden bg-surface aspect-square ${isDragging ? 'opacity-30' : ''}`}
+      className={`relative rounded-md border border-line overflow-hidden bg-surface aspect-square select-none ${
+        locked ? '' : 'cursor-grab active:cursor-grabbing'
+      } ${isDragging ? 'opacity-30' : ''}`}
+      data-photo-tile
+      aria-label={locked ? undefined : t('contractPhotos.dragToGroup')}
+      {...(locked ? {} : attributes)}
+      {...(locked ? {} : listeners)}
     >
       {url ? (
-        <button
-          type="button"
-          onClick={onView}
-          className="w-full h-full cursor-zoom-in bg-transparent border-none p-0"
-          aria-label={t('common.view', { defaultValue: 'View' })}
-        >
-          <img src={url} alt="" className="w-full h-full object-cover" />
-        </button>
+        <img src={url} alt="" draggable={false} className="w-full h-full object-cover pointer-events-none" />
       ) : (
         <div className="w-full h-full flex items-center justify-center text-subtler"><ImageOff size={18} /></div>
       )}
 
-      {!locked && (
+      {url && (
         <button
           type="button"
-          className="absolute top-1 left-1 w-6 h-6 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center cursor-grab active:cursor-grabbing touch-none border-none p-0"
-          aria-label={t('contractPhotos.dragToGroup')}
-          {...attributes}
-          {...listeners}
+          onClick={onView}
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          className={`absolute top-1 left-1 ${knob} rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center cursor-zoom-in border-none p-0`}
+          aria-label={t('common.view', { defaultValue: 'View' })}
         >
-          <GripVertical size={14} />
+          <ZoomIn size={knobIcon} />
         </button>
       )}
 
@@ -670,22 +821,36 @@ function PhotoTile({ photo, locked, busy, onView, onMove, onReplace, onRemove }:
             trigger={
               <button
                 type="button"
-                className="w-6 h-6 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center cursor-pointer border-none p-0"
+                className={`${knob} rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center cursor-pointer border-none p-0`}
                 onClick={(e) => { e.stopPropagation(); setMenuOpen(o => !o); }}
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
                 aria-label={t('contractPhotos.photoActions')}
               >
-                <MoreHorizontal size={14} />
+                <MoreHorizontal size={knobIcon} />
               </button>
             }
           >
             {/* Rows only raise intent — the dialogs live at album level so they
-                outlive this menu (a modal inside a popover strands the backdrop). */}
-            <div className="py-1 min-w-[170px]">
-              <MenuItem
-                icon={<FolderInput size={14} />}
-                label={t('contractPhotos.moveToGroup')}
-                onClick={() => { setMenuOpen(false); onMove(); }}
-              />
+                outlive this menu (a modal inside a popover strands the backdrop).
+                Moving is one tap: the groups it can go to are listed right here. */}
+            <div className="py-1 min-w-[200px] max-w-[280px]">
+              {moveTargets.length > 0 && (
+                <>
+                  <div className="px-3 pt-1 pb-1 text-xs text-subtle">{t('contractPhotos.moveTo')}</div>
+                  {moveTargets.map(g => (
+                    <MenuItem
+                      key={g.slot}
+                      icon={<FolderInput size={14} />}
+                      label={g.label}
+                      disabled={busy}
+                      onClick={() => { setMenuOpen(false); onMoveTo(g.slot); }}
+                    />
+                  ))}
+                  <MenuSeparator />
+                </>
+              )}
               <MenuItem
                 icon={<RefreshCw size={14} />}
                 label={t('contractPhotos.replace')}
@@ -707,15 +872,27 @@ function PhotoTile({ photo, locked, busy, onView, onMove, onReplace, onRemove }:
   );
 }
 
-function PhotoDragGhost({ photo }: { photo: ContractPhoto }) {
+/** A small lifted thumbnail centred on the grab point — big tiles are hard to
+ *  aim, and a small copy leaves the drop area visible around it. */
+const GHOST = 64;
+function PhotoDragGhost({ photo, grab }: { photo: ContractPhoto; grab: { x: number; y: number } | null }) {
   const { url } = useMediaUrl(normalizeKey(thumbKey(photo)));
   return (
-    <div className="rounded-md border border-primary overflow-hidden bg-surface aspect-square shadow-lg cursor-grabbing">
-      {url ? (
-        <img src={url} alt="" className="w-full h-full object-cover" />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center text-subtler"><ImageOff size={18} /></div>
-      )}
+    <div className="relative w-full h-full pointer-events-none">
+      <div
+        className="absolute rounded-md border-2 border-primary overflow-hidden bg-surface shadow-lg cursor-grabbing"
+        style={{
+          width: GHOST, height: GHOST,
+          left: (grab?.x ?? GHOST / 2) - GHOST / 2,
+          top: (grab?.y ?? GHOST / 2) - GHOST / 2,
+        }}
+      >
+        {url ? (
+          <img src={url} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-subtler"><ImageOff size={18} /></div>
+        )}
+      </div>
     </div>
   );
 }
@@ -810,76 +987,6 @@ function AddPhotoModal({ open, onClose, contractId, group, label, existingCount,
         <Button onClick={onClose} disabled={save.isPending}>{t('common.cancel')}</Button>
         <Button color="primary" disabled={!picked || save.isPending} onClick={() => save.mutate()}>
           {save.isPending ? t('common.loading') : t('common.add', { defaultValue: 'Add' })}
-        </Button>
-      </div>
-    </Modal>
-  );
-}
-
-// ── Move modal (the touch path for what drag does with a mouse) ───────────────
-
-function MovePhotoModal({ open, onClose, data, groups, isThai, lockedGroup, onMoved }: {
-  open: boolean;
-  onClose: () => void;
-  data: { photo: ContractPhoto; from: string } | null;
-  groups: PhotoStatusSlot[];
-  isThai: boolean;
-  lockedGroup: (slot: string) => boolean;
-  onMoved: () => void;
-}) {
-  const { t } = useTranslation();
-  const [target, setTarget] = useState('');
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (open) { setTarget(''); setError(''); }
-  }, [open]);
-
-  // Offer only groups that can actually take it: not the current one, not
-  // frozen, not already full.
-  const options = groups
-    .filter(g => g.slot !== data?.from && !lockedGroup(g.slot) && !isFull(g.count, g.max))
-    .map(g => ({
-      value: g.slot,
-      label: `${isThai ? g.label_th : g.label_en}${g.max != null ? ` (${g.count}/${g.max})` : ''}`,
-    }));
-
-  const move = useMutation({
-    mutationFn: () => apiClient.rpc('fn_contract_photo_move', {
-      p_entity_media_id: data!.photo.entity_media_id,
-      p_to_slot: target,
-    }),
-    onSuccess: () => onMoved(),
-    onError: (err) => setError(translateErr(err, t)),
-  });
-
-  return (
-    <Modal open={open} onClose={onClose} maxWidth="24rem" width="100%">
-      <div className="modal-header">
-        <h2 className="modal-title">{t('contractPhotos.moveTitle')}</h2>
-        <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
-      </div>
-      <div className="modal-content">
-        <div className="form-grid">
-          <div className="flex flex-col">
-            <label className="form-label">{t('contractPhotos.moveTarget')}</label>
-            <div>
-              <Select
-                options={options}
-                value={target || null}
-                onChange={(v) => setTarget((v as string) ?? '')}
-                placeholder={t('contractPhotos.selectGroup')}
-                showChevron
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-      {error && <div className="alert alert-danger mx-4 mb-2"><XCircle size={16} /><span>{error}</span></div>}
-      <div className="modal-footer">
-        <Button onClick={onClose} disabled={move.isPending}>{t('common.cancel')}</Button>
-        <Button color="primary" disabled={!target || move.isPending} onClick={() => move.mutate()}>
-          {move.isPending ? t('common.loading') : t('contractPhotos.moveToGroup')}
         </Button>
       </div>
     </Modal>

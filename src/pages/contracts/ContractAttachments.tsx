@@ -1,65 +1,47 @@
-// Contract photo album (CONTRACT / ATTACHMENT) — compact trigger on the page,
-// full management in a modal.
+// Contract photo album — a per-group summary on the page, full management in a
+// modal.
 //
-// One album per contract (registry kind CONTRACT/ATTACHMENT, parent
-// sale.contract). NOT per signing snapshot. Photos attach via two paths that
-// both land in the same album:
-//   - In-app: "Add photo" → nested single-image modal (camera/file → crop +
-//     resize to sm/md webp) → fn_media_attach.
-//   - QR / Mobile Capture Bridge: phone scans, uploads, auto-attaches; we mint
-//     the session + render the QR and poll (useMobileCaptureSession).
+// One album per contract, organised into groups (mig 1252): the required
+// handover groups, optional ones, and "general" (ATTACHMENT), where phone
+// captures land. Photos attach via two paths:
+//   - In-app: a group's "Add photo" → fn_media_attach.
+//   - QR / Mobile Capture Bridge: phone scans, uploads, auto-attaches into
+//     "general"; we mint the session + render the QR and poll.
 //
-// The manage modal shows the live thumbnail list (updates as QR uploads arrive)
-// alongside the QR — same theme as the draft wizard's capture modal.
+// The page box answers "are the required photos in?" — one row per required
+// group with its thumbnails, optional groups only once they hold photos. The
+// checklist (fn_contract_photo_status) decides done-ness; never counted here.
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Modal, useSnackbarContext, resizeToVariants } from 'tsp-form';
+import { useQueryClient } from '@tanstack/react-query';
+import { Button, Modal } from 'tsp-form';
 import { QRCodeSVG } from 'qrcode.react';
 import {
-  Plus, XCircle, ImageOff, Image as ImageIcon, CheckCircle, Camera, Loader2,
+  Plus, XCircle, ImageOff, Image as ImageIcon, Loader2, CheckCircle2, AlertCircle,
 } from 'lucide-react';
-import { apiClient, ApiError } from '../../lib/api';
-import { useAuth } from '../../contexts/AuthContext';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
-import { mimeFromKey } from '../../lib/upload';
-import { toStoragePath, normalizeKey } from '../../lib/mediaPath';
+import { normalizeKey } from '../../lib/mediaPath';
 import { MediaLightboxKeyGallery } from '../../components/MediaLightbox';
+import { useMobileCaptureSession, type MobileCaptureSession } from './workspace/useMobileCaptureSession';
+import { ContractPhotoGroups, ChecklistSummary } from './ContractPhotoGroups';
 import {
-  beMediaUpload,
-  beMediaDelete,
-  CONTRACT_EVIDENCE_TYPE,
-  CONTRACT_EVIDENCE_SIZES,
-  CONTRACT_EVIDENCE_RESIZE,
-  CONTRACT_EVIDENCE_MAX,
-} from '../../lib/beMedia';
-import { useMobileCaptureSession } from './workspace/useMobileCaptureSession';
-import { translateApiError } from '../../lib/apiErrors';
-import { ContractPhotoGroups } from './ContractPhotoGroups';
+  useContractPhotoStatus, useContractAlbumPhotos, photosKey, statusKey,
+  type ContractPhoto, type PhotoStatusSlot,
+} from './contractPhotoStatus';
 
-const ENTITY_TYPE = 'CONTRACT';
 const USAGE_TYPE = 'ATTACHMENT';
-const STRIP_LIMIT = 5; // inline thumbnails before "+N more"
+const ROW_THUMBS = 3; // thumbnails per group row before "+N"
 
-interface ContractAttachment {
-  entity_media_id: number;
-  media_id: number;
-  sort_order: number;
-  caption: string | null;
-  storage_path: string;
-  variants_json: Record<string, string> | null;
-}
-
-function pickThumbKey(m: ContractAttachment): string | null {
+function pickThumbKey(m: ContractPhoto): string | null {
   const v = m.variants_json ?? {};
   return v.sm || v.md || v.lg || v.original || m.storage_path || null;
 }
-function pickFullKey(m: ContractAttachment): string | null {
+function pickFullKey(m: ContractPhoto): string | null {
   const v = m.variants_json ?? {};
   return v.md || v.lg || v.original || v.sm || m.storage_path || null;
 }
-// ── Page section — compact strip + a single button into the manage modal ─────
+// ── Page section — per-group summary + a single button into the manage modal ──
 
 export function ContractAttachments({
   contractId,
@@ -70,52 +52,63 @@ export function ContractAttachments({
   contractCode: string | null;
   className?: string;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isThai = i18n.language === 'th';
   const queryClient = useQueryClient();
   const [manageOpen, setManageOpen] = useState(false);
-  // Index into `photos` — the viewer pages through the album.
+  // Index into `shown` — the viewer pages through every photo the box shows.
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  // Keep polling the album while a mobile-capture session is live, even after
-  // the Manage-photos modal closes — the phone may keep uploading until the
-  // backend session TTL. Holds the session's expiry; polling stops once past.
-  const [captureExpiresAt, setCaptureExpiresAt] = useState<string | null>(null);
 
-  const { data: photos = [], refetch } = useQuery({
-    queryKey: ['contract-attachments', contractId],
-    queryFn: () => apiClient.get<ContractAttachment[]>(
-      `/v_entity_media?entity_type=eq.${ENTITY_TYPE}&entity_id=eq.${contractId}&usage_type=eq.${USAGE_TYPE}&select=entity_media_id,media_id,sort_order,caption,storage_path,variants_json&order=sort_order`,
-    ),
-    staleTime: 30 * 1000,
-    refetchInterval: captureExpiresAt && new Date(captureExpiresAt).getTime() > Date.now() ? 3000 : false,
-  });
+  const { data: status } = useContractPhotoStatus(contractId);
+  const slots: PhotoStatusSlot[] = status?.slots ?? [];
+  const { data: photos = [] } = useContractAlbumPhotos(contractId, slots.map(s => s.slot));
 
   const refresh = () => {
-    refetch();
+    queryClient.invalidateQueries({ queryKey: photosKey(contractId) });
+    queryClient.invalidateQueries({ queryKey: statusKey(contractId) });
+    queryClient.invalidateQueries({ queryKey: ['contract-attachments', contractId] });
     queryClient.invalidateQueries({ queryKey: ['contract-attachments-count', contractId] });
     // Keep the detail panel's own photo list (ContractDetailPanel uses a
     // separate 'contract-media' query) in sync when photos change here.
     queryClient.invalidateQueries({ queryKey: ['contract-media', contractId] });
   };
 
-  const strip = photos.slice(0, STRIP_LIMIT);
-  const overflow = photos.length - strip.length;
-  // Keys for ALL photos, not just the visible strip — the viewer pages through
-  // the whole album, so a strip index (strip is a prefix of photos) still lines
-  // up and the hidden overflow photos are reachable by arrowing past the last
-  // visible tile.
-  const photoKeys = photos.map(m => {
-    const k = pickFullKey(m);
-    return k ? normalizeKey(k) : '';
-  });
+  // Phone capture lives here, not in the window: closing the window must not
+  // end it. One QR per visit — reopening shows the same code until the session
+  // expires or is used up, and photos the phone sends meanwhile still land.
+  const capture = useMobileCaptureSession(contractId, contractCode);
+  useEffect(() => {
+    if (manageOpen && (capture.phase === 'idle' || capture.phase === 'done' || capture.phase === 'error')) capture.start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [manageOpen]);
+  useEffect(() => {
+    if (capture.uploadCount > 0) refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [capture.uploadCount]);
+
+  const photosIn = (slot: string) => photos.filter(p => p.usage_type === slot);
+  const label = (s: PhotoStatusSlot) => (isThai ? s.label_th : s.label_en);
+  const requiredRows = slots.filter(s => s.required);
+  const otherRows = slots.filter(s => !s.required && photosIn(s.slot).length > 0);
+  // Required rows first, then the optional groups that hold photos — the
+  // viewer pages through exactly what the box shows, in that order.
+  const shown = [...requiredRows, ...otherRows].flatMap(s => photosIn(s.slot));
+  const shownKeys = shown.map(m => { const k = pickFullKey(m); return k ? normalizeKey(k) : ''; });
+  const indexOf = (p: ContractPhoto) => shown.findIndex(x => x.entity_media_id === p.entity_media_id);
+  const missingCount = requiredRows.filter(s => !s.ok).length;
 
   return (
     <div className={`border border-line rounded-md px-4 py-3 ${className ?? ''}`}>
       <div className="flex items-center justify-between gap-2 mb-2">
-        <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider flex items-center gap-1.5">
+        <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider flex items-center gap-1.5 flex-wrap">
           <ImageIcon size={13} />
           {t('contract.attachments', { defaultValue: 'Photos' })}
-          {photos.length > 0 && (
-            <span className="normal-case font-normal text-subtler">{photos.length}</span>
+          {status && requiredRows.length > 0 && (
+            missingCount > 0 ? (
+              <span className="normal-case font-medium text-warning-fg">{t('contractPhotos.summaryMissing', { count: missingCount })}</span>
+            ) : (
+              <span className="normal-case font-medium text-success-fg">{t('contractPhotos.ok')}</span>
+            )
           )}
         </h3>
         <Button
@@ -128,26 +121,37 @@ export function ContractAttachments({
         </Button>
       </div>
 
-      {photos.length === 0 ? (
-        <button
-          type="button"
-          onClick={() => setManageOpen(true)}
-          className="w-full text-xs text-subtler italic py-3 text-center border border-dashed border-line rounded-md hover:bg-surface-hover transition-colors cursor-pointer bg-transparent"
-        >
-          {t('contract.attachmentsEmpty', { defaultValue: 'No photos yet. Add one.' })}
-        </button>
+      {!status ? (
+        <div className="py-3 flex justify-center"><Loader2 size={16} className="animate-spin text-subtler" /></div>
       ) : (
-        <div className="flex items-center gap-2">
-          {strip.map((m, i) => (
-            <StripThumb key={m.entity_media_id} media={m} onPreview={() => setLightboxIndex(i)} />
+        <div className="flex flex-col">
+          {requiredRows.map(s => (
+            <GroupRow
+              key={s.slot}
+              label={label(s)}
+              ok={s.ok}
+              photos={photosIn(s.slot)}
+              onOpen={() => setManageOpen(true)}
+              onPreview={(p) => setLightboxIndex(indexOf(p))}
+            />
           ))}
-          {overflow > 0 && (
+          {otherRows.length > 0 && (
             <button
               type="button"
               onClick={() => setManageOpen(true)}
-              className="w-14 h-14 shrink-0 rounded-md border border-line bg-surface text-subtle text-xs font-medium flex items-center justify-center hover:bg-surface-hover hover:text-fg transition-colors cursor-pointer"
+              className="mt-1 pt-2 border-t border-line text-left text-xs text-subtle bg-transparent border-x-0 border-b-0 p-0 cursor-pointer hover:text-fg"
             >
-              +{overflow}
+              {t('contractPhotos.summaryOthers')}{' '}
+              {otherRows.map(s => `${label(s)} ${photosIn(s.slot).length}`).join(' · ')}
+            </button>
+          )}
+          {requiredRows.length === 0 && otherRows.length === 0 && (
+            <button
+              type="button"
+              onClick={() => setManageOpen(true)}
+              className="w-full text-xs text-subtler italic py-3 text-center border border-dashed border-line rounded-md hover:bg-surface-hover transition-colors cursor-pointer bg-transparent"
+            >
+              {t('contract.attachmentsEmpty', { defaultValue: 'No photos yet. Add one.' })}
             </button>
           )}
         </div>
@@ -156,7 +160,7 @@ export function ContractAttachments({
       <MediaLightboxKeyGallery
         open={lightboxIndex != null}
         onClose={() => setLightboxIndex(null)}
-        mediaKeys={photoKeys}
+        mediaKeys={shownKeys}
         index={lightboxIndex ?? 0}
         onIndexChange={setLightboxIndex}
         alt={t('contract.attachments', { defaultValue: 'Photos' })}
@@ -166,11 +170,43 @@ export function ContractAttachments({
         open={manageOpen}
         onClose={() => setManageOpen(false)}
         contractId={contractId}
-        contractCode={contractCode}
-        photos={photos}
-        onChanged={refresh}
-        onSessionActive={setCaptureExpiresAt}
+        capture={capture}
       />
+    </div>
+  );
+}
+
+/** One required group: tick or warning, its name, and its first thumbnails —
+ *  or a dashed empty tile. The row opens the window; a thumbnail zooms. */
+function GroupRow({ label, ok, photos, onOpen, onPreview }: {
+  label: string;
+  ok: boolean;
+  photos: ContractPhoto[];
+  onOpen: () => void;
+  onPreview: (p: ContractPhoto) => void;
+}) {
+  const visible = photos.slice(0, ROW_THUMBS);
+  const more = photos.length - visible.length;
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}
+      className="flex items-center gap-2 py-1.5 rounded-md hover:bg-surface-hover cursor-pointer -mx-1 px-1"
+    >
+      {ok
+        ? <CheckCircle2 size={14} className="text-success shrink-0" />
+        : <AlertCircle size={14} className="text-warning-fg shrink-0" />}
+      <span className={`text-sm flex-1 min-w-0 truncate ${ok ? '' : 'text-warning-fg'}`}>{label}</span>
+      <div className="flex items-center gap-1 shrink-0">
+        {visible.length === 0 ? (
+          <span className="w-10 h-10 rounded-md border border-dashed border-warning-border" />
+        ) : visible.map(p => (
+          <StripThumb key={p.entity_media_id} media={p} onPreview={() => onPreview(p)} />
+        ))}
+        {more > 0 && <span className="text-xs text-subtle w-6 text-center">+{more}</span>}
+      </div>
     </div>
   );
 }
@@ -179,7 +215,7 @@ function StripThumb({
   media,
   onPreview,
 }: {
-  media: ContractAttachment;
+  media: ContractPhoto;
   onPreview: () => void;
 }) {
   const thumbKey = pickThumbKey(media);
@@ -187,273 +223,100 @@ function StripThumb({
   return (
     <button
       type="button"
-      onClick={onPreview}
-      className="w-14 h-14 shrink-0 rounded-md border border-line overflow-hidden bg-surface flex items-center justify-center cursor-zoom-in p-0"
+      onClick={(e) => { e.stopPropagation(); onPreview(); }}
+      className="w-10 h-10 shrink-0 rounded-md border border-line overflow-hidden bg-surface flex items-center justify-center cursor-zoom-in p-0"
       aria-label="Preview photo"
     >
       {url ? (
         <img src={url} alt={media.caption ?? ''} className="w-full h-full object-cover" />
       ) : (
-        <ImageOff size={16} className="text-subtler" />
+        <ImageOff size={14} className="text-subtler" />
       )}
     </button>
   );
 }
 
-// ── Manage modal — live photo list + inline add (resize only) + QR ───────────
+// ── Manage modal — pinned band (QR + checklist + "general") over the groups ──
+//
+// The band never scrolls: the QR, what's still missing, and the "general"
+// group the phone's photos land in. The handover groups scroll below it, and a
+// photo is dragged from the band down into its group (or moved from its ⋯ menu).
 
 function ManageModal({
   open,
   onClose,
   contractId,
-  contractCode,
-  photos,
-  onChanged,
-  onSessionActive,
+  capture,
 }: {
   open: boolean;
   onClose: () => void;
   contractId: number;
-  contractCode: string | null;
-  photos: ContractAttachment[];
-  onChanged: () => void;
-  /** Reports the live capture session's expiry so the album keeps polling after
-   *  this modal closes. */
-  onSessionActive?: (expiresAt: string) => void;
+  /** Owned by the page section so it outlives this window. */
+  capture: MobileCaptureSession;
 }) {
   const { t } = useTranslation();
-  const { user } = useAuth();
-  const { addSnackbar } = useSnackbarContext();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const photoKeys = photos.map(m => {
-    const k = pickFullKey(m);
-    return k ? normalizeKey(k) : '';
-  });
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState('');
-
-  // QR session — live, mirrors the draft wizard capture modal. Photos uploaded
-  // from the phone auto-attach and show up in the same list via onChanged.
-  const { phase, session, status, error: qrError, uploadCount, start, stop } =
-    useMobileCaptureSession(contractId, contractCode);
-
-  // Closing/unmounting only stops local polling — the capture session lives on
-  // (phone may still be uploading; backend expires it on TTL).
-  useEffect(() => {
-    if (open) start();
-    else stop();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-  useEffect(() => () => { stop(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (uploadCount > 0) onChanged();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [uploadCount]);
-  // Report the session's TTL up so the album keeps polling after close.
-  useEffect(() => {
-    if (session?.expires_at) onSessionActive?.(session.expires_at);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.expires_at]);
-
-  // Resize-only to sm/md webp → upload each variant → attach. No crop:
-  // delivery evidence keeps the whole frame. `sortOrder` is the target index
-  // for this photo — passed in so a multi-file loop can advance it per file
-  // instead of reading the stale `photos.length`.
-  const uploadOne = async (file: File, holdingId: number, sortOrder: number) => {
-    const uploaded: Record<string, string> = {};
-    try {
-      const variants = await resizeToVariants(file, CONTRACT_EVIDENCE_RESIZE);
-      for (const sz of CONTRACT_EVIDENCE_SIZES) {
-        const f = variants[sz]?.file;
-        if (!f) continue;
-        const r = await beMediaUpload({
-          type: CONTRACT_EVIDENCE_TYPE,
-          file: f,
-          size: sz,
-          params: { contract_id: contractId, idx: sortOrder },
-        });
-        uploaded[sz] = r.key;
-      }
-      // Primary = md (1280px) so the lightbox viewer loads full-res; variants_json
-      // carries both sizes so thumbs use sm and the viewer uses md. Private paths
-      // in variants_json are accepted since mig 282 (chk_media_variants_keys allows
-      // an all-private map); ChatThreadPanel does the same.
-      const primary = uploaded.md ?? uploaded.sm ?? Object.values(uploaded)[0];
-      if (!primary) throw new Error('Upload returned no key');
-      const variantsJson: Record<string, string> = {};
-      for (const sz of CONTRACT_EVIDENCE_SIZES) {
-        if (uploaded[sz]) variantsJson[sz] = toStoragePath(uploaded[sz]);
-      }
-
-      await apiClient.rpc('fn_media_attach', {
-        p_holding_id: holdingId,
-        p_storage_path: toStoragePath(primary),
-        p_variants_json: variantsJson,
-        p_media_type: 'IMAGE',
-        p_access_level: 'CONFIDENTIAL',
-        p_mime_type: mimeFromKey(primary),
-        p_file_size_bytes: null,
-        p_original_filename: file.name || null,
-        p_entity_type: ENTITY_TYPE,
-        p_entity_id: contractId,
-        p_usage_type: USAGE_TYPE,
-        p_sort_order: sortOrder,
-        p_caption: null,
-      });
-    } catch (err) {
-      // Roll back this file's uploaded variants; let the caller surface the error.
-      if (Object.keys(uploaded).length > 0) beMediaDelete(Object.values(uploaded)).catch(() => {});
-      throw err;
-    }
-  };
-
-  // Pick one or many (file/photo library) → upload sequentially, capped at the
-  // remaining slots up to CONTRACT_EVIDENCE_MAX.
-  const handlePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    e.target.value = '';
-    if (files.length === 0) return;
-    if (!user?.holding_id) { setError(t('common.error')); return; }
-
-    const remaining = CONTRACT_EVIDENCE_MAX - photos.length;
-    const batch = files.slice(0, Math.max(0, remaining));
-    if (batch.length === 0) return;
-
-    setUploading(true);
-    setError('');
-    let done = 0;
-    try {
-      // Sequential so sort_order stays stable and be-media isn't hammered.
-      for (let i = 0; i < batch.length; i++) {
-        await uploadOne(batch[i], user.holding_id, photos.length + i);
-        done++;
-      }
-      addSnackbar({
-        message: <div className="alert alert-success"><CheckCircle size={16} /><span>{t('contract.attachmentsAddedCount', { count: done, defaultValue: '{{count}} photo(s) added' })}</span></div>,
-      });
-      onChanged();
-    } catch (err) {
-      // Some may have succeeded before the failure — refresh so they show,
-      // and report the error for the file that broke.
-      if (done > 0) onChanged();
-      setError(formatApiError(err, t));
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const atMax = photos.length >= CONTRACT_EVIDENCE_MAX;
+  const { phase, session, status, error: qrError, uploadCount } = capture;
+  const { data: photoStatus } = useContractPhotoStatus(contractId);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // Escape cancels a drag; it must not also close the window. The flag drops
+  // a moment after the drag ends, since the window may hear the key second.
+  const draggingRef = useRef(false);
+  const handleDragging = useCallback((d: boolean) => {
+    if (d) draggingRef.current = true;
+    else setTimeout(() => { draggingRef.current = false; }, 300);
+  }, []);
+  const guardedClose = () => { if (!draggingRef.current) onClose(); };
   const friendlyQrError = qrError ? (t(qrError, { ns: 'apiErrors', defaultValue: '' }) || qrError) : '';
 
   return (
-    <Modal open={open} onClose={onClose} maxWidth="40rem" width="100%">
+    <Modal open={open} onClose={guardedClose} maxWidth="40rem" width="100%">
       <div className="modal-header">
         <h2 className="modal-title">{t('contract.attachmentsManageTitle', { defaultValue: 'Manage photos' })}</h2>
         <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
       </div>
 
-      <div className="modal-content">
-        {error && (
-          <div className="alert alert-danger mb-4">
-            <XCircle size={16} />
-            <span>{error}</span>
-          </div>
-        )}
-
-        {/* Hidden input — opens the file / photo library (computer + iPad) and
-            allows picking several images at once. No `capture`: it would force
-            a single rear-camera shot and disable multi-select. iPad's picker
-            still offers "Take Photo". Resize-only, no crop. */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          className="hidden"
-          onChange={handlePick}
-        />
-
-        {/* Grouped album (mig 1252) — the four handover groups plus "general",
-            which is this album's original flat contents. Owns its own add /
-            move / replace / remove; the quick-add tile below stays for dropping
-            a batch straight into "general". */}
-        <ContractPhotoGroups contractId={contractId} className="mb-5" />
-
-        <div className="flex items-center gap-2 mb-5">
-          {!atMax && (
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="h-9 px-3 rounded-md border border-dashed border-line flex items-center justify-center gap-1.5 text-subtle text-xs hover:border-primary hover:text-primary hover:bg-surface-hover transition-colors cursor-pointer bg-transparent disabled:opacity-50"
-            >
-              {uploading
-                ? <Loader2 size={14} className="animate-spin" />
-                : <><Camera size={14} /><span className="font-medium">{t('contract.attachmentsAddGeneral', { defaultValue: 'Add to general' })}</span></>}
-            </button>
-          )}
-        </div>
-        {atMax && (
-          <div className="alert alert-warning mb-5">
-            <XCircle size={16} />
-            <span>{t('contract.attachmentsAtMax', { defaultValue: 'Maximum number of photos reached.', count: CONTRACT_EVIDENCE_MAX })}</span>
-          </div>
-        )}
-
-        {/* QR — capture from a phone, auto-attaches into the list above */}
-        <div className="border-t border-line pt-4">
-          <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-3">
-            {t('contract.attachmentsQrTitle', { defaultValue: 'Or capture from a phone' })}
-          </h3>
-          {phase === 'error' ? (
-            <div className="alert alert-danger"><XCircle size={16} /><span>{friendlyQrError}</span></div>
-          ) : !session ? (
-            <div className="flex items-center justify-center py-6 text-subtle text-sm">
-              {t('common.loading', { defaultValue: 'Loading...' })}
-            </div>
-          ) : (
-            <div className="flex items-center gap-4">
-              <div className="rounded-lg border border-line bg-white p-3 shrink-0">
-                <QRCodeSVG value={session.qr_payload} size={132} />
+      <ContractPhotoGroups
+        contractId={contractId}
+        hideBanner
+        pinnedSlot={USAGE_TYPE}
+        scrollRef={scrollRef}
+        onDraggingChange={handleDragging}
+        renderLayout={({ pinned, body }) => (
+          <>
+            <div className="flex-none border-b border-line px-4 py-3 flex items-start gap-3">
+              <div className="shrink-0 flex flex-col items-center gap-1 w-[104px]">
+                <div className="w-[104px] h-[104px] rounded-md border border-line bg-white p-2 flex items-center justify-center">
+                  {session && phase !== 'error' ? (
+                    <QRCodeSVG value={session.qr_payload} size={88} />
+                  ) : phase === 'error' ? (
+                    <XCircle size={20} className="text-danger" />
+                  ) : (
+                    <Loader2 size={18} className="animate-spin text-subtler" />
+                  )}
+                </div>
+                <span className="text-[11px] leading-tight text-subtle text-center">
+                  {phase === 'error'
+                    ? friendlyQrError
+                    : <>{t('contract.attachmentsQrShort')}{session && <> · {uploadCount}/{status?.max_uploads ?? session.max_uploads}</>}</>}
+                </span>
               </div>
-              <div className="text-sm text-subtle min-w-0">
-                <p>{t('contract.attachmentsQrHint', { defaultValue: 'Scan to open the camera. Photos attach automatically.' })}</p>
-                <p className="mt-1 font-medium text-fg">
-                  {t('contract.attachmentsQrCount', {
-                    defaultValue: '{{count}} / {{max}} uploaded',
-                    count: uploadCount,
-                    max: status?.max_uploads ?? session.max_uploads,
-                  })}
-                </p>
+              <div className="min-w-0 flex-1 flex flex-col gap-2">
+                <ChecklistSummary contractId={contractId} />
+                {pinned}
               </div>
             </div>
-          )}
-        </div>
-      </div>
-
-      <div className="modal-footer">
-        <Button onClick={onClose}>{t('common.close', { defaultValue: 'Close' })}</Button>
-      </div>
-
-      <MediaLightboxKeyGallery
-        open={lightboxIndex != null}
-        onClose={() => setLightboxIndex(null)}
-        mediaKeys={photoKeys}
-        index={lightboxIndex ?? 0}
-        onIndexChange={setLightboxIndex}
-        alt={t('contract.attachments', { defaultValue: 'Photos' })}
+            <div ref={scrollRef} className="modal-content">{body}</div>
+          </>
+        )}
       />
+
+      {/* Photos save as they're added, so this finishes rather than discards —
+          and becomes the main button once the required groups are filled. */}
+      <div className="modal-footer">
+        <Button color={photoStatus?.complete ? 'primary' : undefined} onClick={onClose}>
+          {t('common.done')}
+        </Button>
+      </div>
     </Modal>
   );
-}
-
-// ── helpers ──────────────────────────────────────────────────────────────────
-
-function formatApiError(err: unknown, t: ReturnType<typeof useTranslation>['t']): string {
-  if (err instanceof ApiError) {
-    const translated = translateApiError(err, t);
-    return translated || err.message;
-  }
-  return err instanceof Error ? err.message : String(err);
 }
