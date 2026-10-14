@@ -226,7 +226,7 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
   if (!contractId) return null;
 
   return (
-    <div className="p-4 flex flex-col gap-8 max-w-2xl">
+    <div className="p-4 flex flex-col gap-8">
       {error && <div className="alert alert-danger"><XCircle size={18} /><div><div className="alert-description">{error}</div></div></div>}
 
       {/* ── Customer confidence rating (readiness prerequisite) ─────── */}

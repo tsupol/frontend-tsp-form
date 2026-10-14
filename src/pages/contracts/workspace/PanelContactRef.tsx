@@ -60,7 +60,7 @@ export function PanelContactRef({ onClose: _onClose }: Props) {
   if (!customerId) return null;
 
   return (
-    <div className="p-4 flex flex-col max-w-2xl">
+    <div className="p-4 flex flex-col">
       <PanelSection title={t('workspace.contacts')} count={contacts.length}>
         {contacts.length > 0 && (
           <div className="flex flex-col gap-2 mb-4">

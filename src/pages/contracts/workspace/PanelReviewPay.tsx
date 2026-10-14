@@ -581,7 +581,7 @@ export function PanelReviewPay({ onClose: _onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="flex flex-col h-full max-w-2xl">
+    <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto better-scroll p-4 flex flex-col gap-5">
 
         {/* ── Section 1: Bill / Cart ───────────────────────────── */}

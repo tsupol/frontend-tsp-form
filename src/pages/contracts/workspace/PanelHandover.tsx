@@ -91,7 +91,7 @@ export function PanelHandover({ onClose: _onClose }: Props) {
   if (!contractId) return null;
 
   return (
-    <div className="flex flex-col h-full max-w-xl">
+    <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto better-scroll p-4 flex flex-col gap-5">
         {assetBox && (
           <div className="flex flex-col gap-2">

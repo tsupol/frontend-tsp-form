@@ -977,7 +977,7 @@ export function PanelProductPlan(_props: Props) {
     : !!localModelId && !saving && hasChanges;
 
   return (
-    <div className="flex flex-col h-full max-w-2xl">
+    <div className="flex flex-col h-full">
     {scannerEl}
     <div className="flex-1 overflow-y-auto better-scroll p-4 flex flex-col gap-3">
 
@@ -1400,8 +1400,21 @@ export function PanelProductPlan(_props: Props) {
         </div>
       </div>
     ) : (
-      <div className="shrink-0 border-t border-danger bg-danger-soft px-4 py-4 text-center text-sm text-danger-fg">
-        {t('wizard.pleaseSelectPlan')}
+      // Same frame as the selected-plan bar, values dashed out — says where the
+      // plan will show up instead of reading as an error.
+      <div className="shrink-0 border-t border-line bg-surface-shallow px-4 py-3">
+        <div className="flex items-center gap-1.5 mb-2 text-xs text-warning-fg">
+          <AlertTriangle size={12} />
+          {t('wizard.pleaseSelectPlan')}
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[t('wizard.financeModel'), t('contract.termMonths'), t('contract.downPayment'), t('contract.installmentAmount')].map((label) => (
+            <div key={label}>
+              <div className="text-xs text-subtle">{label}</div>
+              <div className="text-sm text-subtler">—</div>
+            </div>
+          ))}
+        </div>
       </div>
     )}
     </div>

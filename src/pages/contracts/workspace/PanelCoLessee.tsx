@@ -270,7 +270,7 @@ export function PanelCoLessee({ onClose: _onClose }: Props) {
   const hasCoLessees = coLessees.length > 0;
 
   return (
-    <div className="p-4 flex flex-col max-w-2xl">
+    <div className="p-4 flex flex-col">
       <PanelSection title={t('workspace.cardCoLessee')} count={coLessees.length}
         alert={
           removeError ? <div className="alert alert-danger"><XCircle size={14} /><span>{removeError}</span></div>

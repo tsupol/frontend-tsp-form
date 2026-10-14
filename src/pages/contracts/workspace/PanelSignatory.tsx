@@ -7,7 +7,7 @@ interface Props { onClose: () => void }
 // the Documents panel — that's the primary surface for editing signatories.
 export function PanelSignatory({ onClose: _onClose }: Props) {
   return (
-    <div className="p-4 max-w-2xl">
+    <div className="p-4">
       <SignatoryEditor />
     </div>
   );
