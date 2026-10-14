@@ -374,10 +374,37 @@ function WorkspaceContent() {
         const isPartnerFin1 = isDealPartner
           && (contract?.commercial_model == null || contract.commercial_model === 'FIN1');
         const partnerApproved = contract?.state === 'APPROVED';
+        // Staff can't pay without the customer rating (the payment itself is
+        // refused), so it gates this step and is named in the reason too.
+        const hasRating = !!contract?.staff_confidence_score;
         const reviewPayReady = isPartnerFin1
           ? partnerApproved || !!data.billId
-          : allCardsComplete || !!data.billId;
-        const reviewPayLockedHint = isPartnerFin1 && data.contractId ? t('workspace.opensAfterApproval') : undefined;
+          : (allCardsComplete && hasRating) || !!data.billId;
+        // Why the last step is still locked, in the shop's / staff's terms: a
+        // shop waits for approval; everyone else is waiting on the named cards.
+        const unfinishedCards = [
+          ...requiredCards.filter(id => !isCardSatisfied(id)).map(id => panelTitle[id]),
+          ...(hasRating ? [] : [t('workspace.confidence')]),
+        ];
+        const reviewPayLockedHint = !data.contractId ? undefined
+          : isPartnerFin1 ? t('workspace.opensAfterApproval')
+          : unfinishedCards.length > 0 ? t('workspace.finishCardsFirst', { cards: unfinishedCards.join(' · ') })
+          : undefined;
+        // The last step. Staff: pinned to the bottom of the column, so the way
+        // to summary & pay is always in view. Shop: stays in the list.
+        const reviewPayBlock = (
+          <div ref={reviewPayCardRef}>
+            {!data.billConfirmed && data.contractId && <CardReviewPay
+              onEdit={reviewPayReady ? () => handleEditOpen('reviewPay') : undefined}
+              active={isCardActive('reviewPay')}
+              disabled={!reviewPayReady}
+              title={isPartnerFin1 ? t('workspace.cardCollectAndSign') : undefined}
+              lockedHint={reviewPayLockedHint}
+            />}
+            {data.billConfirmed && <CardPostPayment onEdit={() => handleEditOpen('reviewPay')} active={isCardActive('reviewPay')} />}
+          </div>
+        );
+
         const partnerCaseCard = data.contractId ? (
           <PartnerCaseCard
             contractId={data.contractId}
@@ -483,16 +510,9 @@ function WorkspaceContent() {
                         Renders nothing for anyone else. */}
                     {partnerCaseCard}
 
-                    <div ref={reviewPayCardRef}>
-                      {!data.billConfirmed && data.contractId && <CardReviewPay
-                        onEdit={reviewPayReady ? () => handleEditOpen('reviewPay') : undefined}
-                        active={isCardActive('reviewPay')}
-                        disabled={!reviewPayReady}
-                        title={isPartnerFin1 ? t('workspace.cardCollectAndSign') : undefined}
-                        lockedHint={reviewPayLockedHint}
-                      />}
-                      {data.billConfirmed && <CardPostPayment onEdit={() => handleEditOpen('reviewPay')} active={isCardActive('reviewPay')} />}
-                    </div>
+                    {/* A shop's last step stays in order in the list (its next
+                        action is the pinned bar); for staff it is pinned below. */}
+                    {isPartnerFin1 && reviewPayBlock}
                   </div>
                 </div>
 
@@ -508,6 +528,11 @@ function WorkspaceContent() {
                       </Button>
                     )}
                   </div>
+                )}
+
+                {/* Staff: the last-step card itself, pinned. */}
+                {!isPartnerFin1 && data.contractId && (
+                  <div className="shrink-0 border-t border-line bg-bg">{reviewPayBlock}</div>
                 )}
 
                 {isMobile && isPostPayment && (

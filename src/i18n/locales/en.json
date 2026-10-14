@@ -9588,6 +9588,7 @@
     "selectToEdit": "Select a section to edit",
     "savingWallet": "Saving Wallet",
     "cardCollectAndSign": "Collect down payment & sign",
+    "finishCardsFirst": "Still to do: {{cards}}",
     "opensAfterApproval": "Opens after credit approval",
     "cardReviewPay": "Review & Pay",
     "reviewPayHint": "Review and confirm to activate",

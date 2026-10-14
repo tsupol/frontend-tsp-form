@@ -9577,6 +9577,7 @@
     "selectToEdit": "เลือกรายการเพื่อแก้ไข",
     "savingWallet": "กระเป๋าออม",
     "cardCollectAndSign": "เก็บเงินดาวน์และเซ็น",
+    "finishCardsFirst": "ยังต้องทำ: {{cards}}",
     "opensAfterApproval": "เปิดได้หลังอนุมัติสินเชื่อ",
     "cardReviewPay": "สรุปและชำระ",
     "reviewPayHint": "ตรวจสอบและยืนยันเพื่อเปิดสัญญา",
