@@ -157,6 +157,9 @@ export default defineConfig({
     enrollStringsPlugin(),
     enrollPageRewrite(),
   ],
+  // Listen on the LAN too, so an iPad/phone on the same wifi can open the dev
+  // app (https://<this machine's 192.168.x.x>:5173) — see .claude/skills/ipad-test.
+  server: { host: true },
   build: {
     rollupOptions: {
       input: {

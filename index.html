@@ -13,6 +13,44 @@
     <title>NNF System</title>
     <style>@layer theme, base, components, utilities;</style>
 
+    <!-- Boot error catcher — only with ?debug=1 (or remoteLog already on).
+         The real remote logger (src/lib/remoteLog.ts) installs from main.tsx, i.e.
+         only after the WHOLE module graph has loaded. If a module fails to load or
+         parse on a device (old iPad Safari, cert trouble), it never runs and the
+         page is just blank. This classic script runs first and ships those errors
+         to the same devlog sink. Plain ES5 on purpose. -->
+    <script>
+      (function () {
+        var on = /[?&]debug=1\b/.test(location.search);
+        try { on = on || localStorage.getItem('remoteLog') === '1'; } catch (e) {}
+        if (!on) return;
+        var session = 'boot-' + Math.random().toString(36).slice(2, 8);
+        function send(level, msg) {
+          try {
+            fetch('https://devlog.krat.uk/log', {
+              method: 'POST', keepalive: true,
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify([{ ts: Date.now(), level: level, session: session, args: [msg], url: location.pathname + location.search }])
+            })['catch'](function () {});
+          } catch (e) {}
+        }
+        send('info', '[boot] html loaded');
+        window.addEventListener('error', function (e) {
+          var t = e.target;
+          if (t && t !== window && (t.src || t.href)) send('error', '[boot] failed to load ' + (t.src || t.href));
+          else send('error', '[boot] ' + (e.message || 'error') + ' @ ' + (e.filename || '?') + ':' + (e.lineno || 0) + ':' + (e.colno || 0));
+        }, true);
+        window.addEventListener('unhandledrejection', function (e) {
+          var r = e.reason;
+          send('error', '[boot] unhandled rejection: ' + (r && (r.stack || r.message) || String(r)));
+        });
+        setTimeout(function () {
+          var root = document.getElementById('root');
+          if (!root || !root.childNodes.length) send('error', '[boot] #root still empty after 10s — the app never rendered');
+        }, 10000);
+      })();
+    </script>
+
     <!-- Boot splash — /mdm-enroll ONLY.
          The admin app deliberately has none: staff open it once and keep the tab
          all day, so a splash is in the way far more often than it helps.
