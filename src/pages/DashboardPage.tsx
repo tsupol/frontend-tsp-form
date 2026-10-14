@@ -21,11 +21,13 @@ import {
   QrCode,
   CalendarRange,
   Trophy,
+  Store,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../lib/api';
 import { fmtCurrency } from '../lib/format';
 import { DateTime } from '../components/DateTime';
 import { useAuth } from '../contexts/AuthContext';
+import { useMyPermissions } from '../hooks/useMyPermissions';
 import { DashboardScopePicker } from '../components/DashboardScopePicker';
 import { ReportSideSelect, ReportSideTag } from '../components/ReportSideSelect';
 import { MonthPicker } from '../components/MonthPicker';
@@ -57,6 +59,16 @@ import {
 } from './accounting/accountingTypes';
 
 const APPROVER_ROLES = new Set(['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV']);
+
+// Holding any of these means the user does (or oversees) a branch's daily
+// money — closing days, checking slips, fixing bills. The day-close / slips /
+// mismatch cards and the signing / device-bind cards are that work. A fund's
+// credit desk holds none of them (UI_SUMMARY/151 §2: its job is the shop-case
+// queue), so for them those cards are someone else's jobs dressed as theirs.
+// Measured on DEV 2026-10-15: every other role checked (holding, company
+// admin, accountant, branch manager/staff, fund finance, fund admin) holds at
+// least one.
+const MONEY_WORK_PREFIXES = ['BILL.', 'DAY_CLOSE.', 'FUND.DAY_CLOSE', 'FUND.RECON_SAVE', 'PAYMENT.SUBMISSION_REVIEW'];
 
 // Dashboard summary views (GROUPING SETS rollup) — see UI_SUMMARY/95.
 // One row per scope level; sqr filter picks the row matching the current scope.
@@ -130,9 +142,16 @@ interface TodayRollup {
 
 export function DashboardPage() {
   const { t, i18n } = useTranslation();
-  const { user } = useAuth();
+  const { user, isFundCompany } = useAuth();
   const canApprove = !!user?.role_code && APPROVER_ROLES.has(user.role_code);
   const isBranchUser = !!user?.branch_id;
+  const { permissions, hasPermission } = useMyPermissions();
+  // An empty list means "not known" (still loading, or the view refuses this
+  // user — a deal-partner shop gets 403), so only a loaded list can hide cards.
+  const showMoneyWork = permissions.length === 0
+    || permissions.some(p => MONEY_WORK_PREFIXES.some(code => p.permission_code.startsWith(code)));
+  // Same gate as the side menu's shop-case entry, read from the permission.
+  const canReviewPartnerCases = isFundCompany && hasPermission('PARTNER.CREDIT_APPROVE');
   const today = todayISO();
 
   // Today's receiving accounts — both channel slots (STORE_FRONT + INSTALLMENT),
@@ -211,16 +230,33 @@ export function DashboardPage() {
     refetchInterval: 60_000,
   });
 
+  // Shop credit requests waiting in this reviewer's pool — the same list and
+  // default filter the review queue page opens on, so the number matches it.
+  const partnerCasesQuery = useQuery({
+    queryKey: ['dashboard', 'partner-case-queue-count'],
+    queryFn: () =>
+      apiClient.getPaginated<{ case_id: number }>(
+        '/v_partner_case_queue?select=case_id&in_my_pool=eq.true',
+        { page: 1, pageSize: 1 },
+      ),
+    enabled: canReviewPartnerCases,
+    refetchInterval: 60_000,
+  });
+  const partnerCaseCount = partnerCasesQuery.data?.totalCount ?? 0;
+
   const unclosedRow = unclosedQuery.data?.[0];
   const approvalsRow = approvalsQuery.data?.[0];
   const submissionsRow = submissionsQuery.data?.[0];
   const reconRow = reconQuery.data?.[0];
 
   const actionCount =
-    (unclosedRow?.unclosed_day_count ?? 0) +
+    (showMoneyWork
+      ? (unclosedRow?.unclosed_day_count ?? 0) +
+        (submissionsRow?.pending_count ?? 0) +
+        (reconRow?.mismatch_count ?? 0)
+      : 0) +
     (canApprove ? (approvalsRow?.pending_count ?? 0) : 0) +
-    (submissionsRow?.pending_count ?? 0) +
-    (reconRow?.mismatch_count ?? 0);
+    (canReviewPartnerCases ? partnerCaseCount : 0);
 
   // ── Pending tasks: contracts awaiting device bind ────────────────────
   // Plain (non-rollup) view, scoped via standard sq filter. One round-trip
@@ -430,31 +466,47 @@ export function DashboardPage() {
         </div>
 
         {/* ── Action band ──────────────────────────────────────────────── */}
+        {(showMoneyWork || canApprove || canReviewPartnerCases) && (
         <section className="mb-6">
           <h2 className="text-sm font-semibold text-subtle mb-3 uppercase tracking-wide">
             {t('dashboard.actionRequired')}
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-            <CountCard
-              icon={<CalendarX size={20} />}
-              title={t('dashboard.unclosedDays')}
-              count={unclosedRow?.unclosed_day_count ?? 0}
-              isLoading={unclosedQuery.isLoading}
-              isError={unclosedQuery.isError}
-              error={unclosedQuery.error}
-              subtitle={
-                (unclosedRow?.max_days_overdue ?? 0) > 0
-                  ? t('dashboard.unclosedSubtitle', {
-                      branches: unclosedRow!.unclosed_branch_count ?? 0,
-                      maxDays: unclosedRow!.max_days_overdue ?? 0,
-                      amount: fmtCurrency(unclosedRow!.unclosed_amount),
-                    })
-                  : undefined
-              }
-              to="/admin/accounting/day-close"
-              emptyText={t('dashboard.allClosed')}
-            />
+            {canReviewPartnerCases && (
+              <CountCard
+                icon={<Store size={20} />}
+                title={t('dashboard.partnerCasesWaiting')}
+                count={partnerCaseCount}
+                isLoading={partnerCasesQuery.isLoading}
+                isError={partnerCasesQuery.isError}
+                error={partnerCasesQuery.error}
+                to="/admin/partner-cases"
+                emptyText={t('dashboard.noPartnerCases')}
+              />
+            )}
+
+            {showMoneyWork && (
+              <CountCard
+                icon={<CalendarX size={20} />}
+                title={t('dashboard.unclosedDays')}
+                count={unclosedRow?.unclosed_day_count ?? 0}
+                isLoading={unclosedQuery.isLoading}
+                isError={unclosedQuery.isError}
+                error={unclosedQuery.error}
+                subtitle={
+                  (unclosedRow?.max_days_overdue ?? 0) > 0
+                    ? t('dashboard.unclosedSubtitle', {
+                        branches: unclosedRow!.unclosed_branch_count ?? 0,
+                        maxDays: unclosedRow!.max_days_overdue ?? 0,
+                        amount: fmtCurrency(unclosedRow!.unclosed_amount),
+                      })
+                    : undefined
+                }
+                to="/admin/accounting/day-close"
+                emptyText={t('dashboard.allClosed')}
+              />
+            )}
 
             {canApprove && (
               <CountCard
@@ -474,46 +526,53 @@ export function DashboardPage() {
               />
             )}
 
-            <CountCard
-              icon={<Receipt size={20} />}
-              title={t('dashboard.pendingSlips')}
-              count={submissionsRow?.pending_count ?? 0}
-              isLoading={submissionsQuery.isLoading}
-              isError={submissionsQuery.isError}
-              error={submissionsQuery.error}
-              subtitle={
-                (submissionsRow?.pending_count ?? 0) > 0
-                  ? t('dashboard.amountTotal', { amount: fmtCurrency(submissionsRow!.pending_amount) })
-                  : undefined
-              }
-              to="/admin/payment-submissions"
-              emptyText={t('dashboard.noSlips')}
-            />
+            {showMoneyWork && (
+              <>
+                <CountCard
+                  icon={<Receipt size={20} />}
+                  title={t('dashboard.pendingSlips')}
+                  count={submissionsRow?.pending_count ?? 0}
+                  isLoading={submissionsQuery.isLoading}
+                  isError={submissionsQuery.isError}
+                  error={submissionsQuery.error}
+                  subtitle={
+                    (submissionsRow?.pending_count ?? 0) > 0
+                      ? t('dashboard.amountTotal', { amount: fmtCurrency(submissionsRow!.pending_amount) })
+                      : undefined
+                  }
+                  to="/admin/payment-submissions"
+                  emptyText={t('dashboard.noSlips')}
+                />
 
-            <CountCard
-              icon={<AlertCircle size={20} />}
-              title={t('dashboard.reconMismatches')}
-              count={reconRow?.mismatch_count ?? 0}
-              isLoading={reconQuery.isLoading}
-              isError={reconQuery.isError}
-              error={reconQuery.error}
-              subtitle={
-                (reconRow?.mismatch_count ?? 0) > 0
-                  ? t('dashboard.amountTotal', { amount: fmtCurrency(reconRow!.mismatch_amount) })
-                  : undefined
-              }
-              to="/admin/accounting/bills"
-              emptyText={t('dashboard.noMismatches')}
-              dangerWhenNonZero
-            />
+                <CountCard
+                  icon={<AlertCircle size={20} />}
+                  title={t('dashboard.reconMismatches')}
+                  count={reconRow?.mismatch_count ?? 0}
+                  isLoading={reconQuery.isLoading}
+                  isError={reconQuery.isError}
+                  error={reconQuery.error}
+                  subtitle={
+                    (reconRow?.mismatch_count ?? 0) > 0
+                      ? t('dashboard.amountTotal', { amount: fmtCurrency(reconRow!.mismatch_amount) })
+                      : undefined
+                  }
+                  to="/admin/accounting/bills"
+                  emptyText={t('dashboard.noMismatches')}
+                  dangerWhenNonZero
+                />
+              </>
+            )}
           </div>
         </section>
+        )}
 
         {/* ── Pending tasks ─────────────────────────────────────────────── */}
         {/* Always render both cards (zero shows a green-check empty state, like
             the action band) — hiding a card on zero looked broken next to the
-            always-on action cards. Skip only on a hard query error. */}
-        {(!pendingSignQuery.isError || !deviceBindQuery.isError) && (
+            always-on action cards. Skip only on a hard query error, or for a
+            user with no branch-money work (signing and device binding are
+            branch jobs too). */}
+        {showMoneyWork && (!pendingSignQuery.isError || !deviceBindQuery.isError) && (
           <section className="mb-6">
             <h2 className="text-sm font-semibold text-subtle mb-3 uppercase tracking-wide">
               {t('dashboard.pendingTasks')}

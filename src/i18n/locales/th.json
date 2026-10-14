@@ -4032,6 +4032,8 @@
     "unclosedSubtitle": "{{branches}} สาขา · ค้างสูงสุด {{maxDays}} วัน · {{amount}}",
     "pendingApprovals": "รออนุมัติ",
     "noApprovals": "ไม่มีรายการรออนุมัติ",
+    "partnerCasesWaiting": "เคสร้านรออนุมัติสินเชื่อ",
+    "noPartnerCases": "ไม่มีเคสรออนุมัติ",
     "pendingSlips": "สลิปรอตรวจสอบ",
     "noSlips": "ไม่มีสลิปค้าง",
     "auditFlags": "แจ้งเตือนปิดวัน",

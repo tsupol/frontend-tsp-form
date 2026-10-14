@@ -4036,6 +4036,8 @@
     "unclosedSubtitle": "{{branches}} br · max {{maxDays}}d · {{amount}}",
     "pendingApprovals": "Pending approvals",
     "noApprovals": "No pending approvals",
+    "partnerCasesWaiting": "Shop credit cases waiting",
+    "noPartnerCases": "No cases waiting",
     "pendingSlips": "Slips to review",
     "noSlips": "No slips waiting",
     "auditFlags": "Day-close audit flags",
