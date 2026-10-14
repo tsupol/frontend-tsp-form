@@ -202,7 +202,13 @@ export function PartnerCaseDetailPanel({
             <ArrowLeft size={18} />
           </button>
         )}
-        <span className="font-semibold truncate">{detail.contract_code}</span>
+        {/* The full contract (payment plan, signing tab, history) is one click
+            away — without the link the reviewer had to go and search for it. */}
+        <EntityCodeLink
+          to={`/admin/contracts/search/${detail.contract_id}`}
+          code={detail.contract_code}
+          className="font-semibold min-w-0 truncate"
+        />
         <Badge color={outcomeBadgeColor(detail.outcome)} size="sm">
           {t(`partnerCase.status_${detail.status}`)}
         </Badge>
