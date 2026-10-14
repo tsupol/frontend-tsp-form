@@ -112,11 +112,14 @@ export interface PhotoGroupsLayoutParts {
   body: ReactNode;
 }
 
-export function ContractPhotoGroups({ contractId, className, hideBanner, pinnedSlot, scrollRef, renderLayout, onDraggingChange }: {
+export function ContractPhotoGroups({ contractId, className, hideBanner, hideRequired, pinnedSlot, scrollRef, renderLayout, onDraggingChange }: {
   contractId: number;
   className?: string;
   /** The host pins its own checklist (ChecklistSummary) outside the scroll. */
   hideBanner?: boolean;
+  /** Before signing: the handover photos can't all exist yet, so no group
+   *  says "required" or "done" — just what's in it. */
+  hideRequired?: boolean;
   /** Group drawn as a one-row strip in `parts.pinned` instead of in the list. */
   pinnedSlot?: string;
   /** The list's scroll container — scrolled while a photo is held near its edge. */
@@ -408,6 +411,7 @@ export function ContractPhotoGroups({ contractId, className, hideBanner, pinnedS
   // One row per group, minus the one the host pins.
   const groupProps = (group: PhotoStatusSlot) => ({
     group,
+    hideRequired,
     label: isThai ? group.label_th : group.label_en,
     photos: photosIn(group.slot),
     locked: lockedGroup(group.slot),
@@ -442,9 +446,25 @@ export function ContractPhotoGroups({ contractId, className, hideBanner, pinnedS
     </>
   );
 
+  // Editable groups first. Frozen ones share one reason (said once, above), so
+  // they sit together at the bottom in one muted section instead of repeating
+  // "locked" on every box between the ones the shop can still change.
+  const openGroups = listGroups.filter(g => !lockedGroup(g.slot));
+  const frozenGroups = listGroups.filter(g => lockedGroup(g.slot));
   const list = (
     <div className="flex flex-col gap-3">
-      {listGroups.map(group => <GroupSection key={group.slot} {...groupProps(group)} />)}
+      {openGroups.map(group => <GroupSection key={group.slot} {...groupProps(group)} />)}
+      {frozenGroups.length > 0 && (
+        <div className="rounded-md border border-line bg-surface-shallow px-3 py-2">
+          <div className="flex items-center gap-1.5 text-xs text-subtle py-1">
+            <Lock size={12} />
+            {t('contractPhotos.lockedSection')}
+          </div>
+          <div className="flex flex-col divide-y divide-line">
+            {frozenGroups.map(group => <GroupSection key={group.slot} {...groupProps(group)} variant="flat" />)}
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -627,7 +647,7 @@ export function ChecklistSummary({ contractId }: { contractId: number }) {
 interface MoveTarget { slot: string; label: string }
 
 function GroupSection({
-  group, label, photos, locked, busy, isDropTarget, moveTargets, variant = 'grid',
+  group, label, photos, locked, busy, isDropTarget, moveTargets, variant = 'grid', hideRequired,
   onAdd, onView, onMoveTo, onReplace, onRemove,
 }: {
   group: PhotoStatusSlot;
@@ -638,8 +658,10 @@ function GroupSection({
   isDropTarget: boolean;
   /** Groups a photo here can move to (not this one, not frozen, not full). */
   moveTargets: MoveTarget[];
-  /** `strip` = one row that scrolls sideways, for a pinned band. */
-  variant?: 'grid' | 'strip';
+  hideRequired?: boolean;
+  /** `strip` = one row that scrolls sideways, for a pinned band.
+   *  `flat` = no box of its own — a row inside the frozen section. */
+  variant?: 'grid' | 'strip' | 'flat';
   onAdd: () => void;
   onView: (index: number) => void;
   onMoveTo: (p: ContractPhoto, slot: string) => void;
@@ -658,7 +680,7 @@ function GroupSection({
       photo={p}
       locked={locked}
       busy={busy}
-      compact={strip}
+      compact
       moveTargets={moveTargets}
       onView={() => onView(i)}
       onMoveTo={(slot) => onMoveTo(p, slot)}
@@ -679,7 +701,7 @@ function GroupSection({
           <span className="text-xs font-medium">{label}</span>
           <span className="text-xs text-subtle tabular-nums">{photos.length}</span>
           {!locked && (
-            <div className="ml-auto">
+            <div className="ml-auto shrink-0 whitespace-nowrap">
               <Button variant="ghost" size="sm" startIcon={<Plus size={14} />} onClick={onAdd} disabled={full}>
                 {t('contractPhotos.addPhoto')}
               </Button>
@@ -699,16 +721,17 @@ function GroupSection({
     );
   }
 
+  const flat = variant === 'flat';
   return (
     <div
       ref={setNodeRef}
-      className={`rounded-md border p-3 transition-colors ${
+      className={flat ? 'py-2' : `rounded-md border p-3 transition-colors ${
         isDropTarget ? 'border-primary bg-primary-soft' : 'border-line'
       }`}
     >
       <div className="flex items-center gap-2 mb-2 flex-wrap">
         <span className="text-sm font-medium">{label}</span>
-        {group.required && (
+        {group.required && !hideRequired && (
           <Badge size="xs" color={group.ok ? 'success' : 'warning'}>
             {group.ok ? t('contractPhotos.ok') : t('contractPhotos.required')}
           </Badge>
@@ -718,12 +741,15 @@ function GroupSection({
           {group.max != null ? `${photos.length} / ${group.max}` : photos.length}
         </span>
         {locked ? (
-          <span className="ml-auto inline-flex items-center gap-1 text-xs text-subtle">
-            <Lock size={12} />
-            {t('contractPhotos.locked')}
-          </span>
+          // The frozen section's own heading already says why.
+          flat ? null : (
+            <span className="ml-auto inline-flex items-center gap-1 text-xs text-subtle">
+              <Lock size={12} />
+              {t('contractPhotos.locked')}
+            </span>
+          )
         ) : (
-          <div className="ml-auto">
+          <div className="ml-auto shrink-0 whitespace-nowrap">
             <Button
               variant="outline"
               size="sm"
@@ -742,8 +768,8 @@ function GroupSection({
         {photos.length === 0 ? (
           <div className="text-xs text-subtler py-2">{t('contractPhotos.emptyGroup')}</div>
         ) : (
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-            {photos.map((p, i) => tile(p, i))}
+          <div className="flex flex-wrap gap-2">
+            {photos.map((p, i) => <div key={p.entity_media_id} className="w-20 shrink-0">{tile(p, i)}</div>)}
           </div>
         )}
       </SortableContext>

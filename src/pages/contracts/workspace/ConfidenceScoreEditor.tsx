@@ -76,7 +76,7 @@ export function ConfidenceScoreEditor() {
   return (
     <div
       id={CONFIDENCE_SCORE_ANCHOR}
-      className={`flex flex-col gap-2 scroll-mt-3 ${missing ? 'rounded-lg border border-warning-border bg-warning-soft p-3' : ''}`}
+      className={`flex flex-col gap-2 scroll-mt-3 rounded-md border px-4 py-3 ${missing ? 'border-warning-border bg-warning-soft' : 'border-line'}`}
     >
       <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider">
         {t('workspace.confidenceLabel')}

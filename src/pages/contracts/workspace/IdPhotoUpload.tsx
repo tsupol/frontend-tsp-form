@@ -79,12 +79,16 @@ export function IdPhotoUpload({ icon, label, type, fileUrl, uploading, onUpload,
     }
   };
 
+  // Same box as the documents step's other sections: title row inside, its
+  // status beside the title, the picture below.
   return (
-    <div>
-      <div className="flex items-center gap-2 mb-2">
-        {hasPhoto ? <CheckCircle size={14} className="text-success" /> : <span className="w-3.5 h-3.5 rounded-full border-2 border-fg/30" />}
-        {icon}
-        <label className="form-label mb-0">{label}</label>
+    <div className="border border-line rounded-md px-4 py-3">
+      <div className="flex items-center gap-1.5 mb-2">
+        <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider flex items-center gap-1.5">
+          {icon}
+          {label}
+        </h3>
+        {hasPhoto && <CheckCircle size={13} className="text-success shrink-0" />}
         {uploading && <span className="text-xs text-subtle">{t('common.loading')}</span>}
       </div>
 

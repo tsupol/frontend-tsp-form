@@ -1,8 +1,8 @@
-import { useState, useEffect, type ReactNode } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Select, Button } from 'tsp-form';
-import { CheckCircle, XCircle, Info, ExternalLink, Loader2, AlertTriangle, PenLine, FileText } from 'lucide-react';
+import { XCircle, Info, ExternalLink, Loader2, AlertTriangle } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { translateApiError } from '../../../lib/apiErrors';
 import { useWorkspace } from './WorkspaceContext';
@@ -11,26 +11,19 @@ import {
   useBranchSignatoryDefaults,
   composeName,
 } from './useContractSignatories';
-import { SignatureThumb } from './SignatureThumb';
 
 const USE_DEFAULT = '__default__';
 
 /**
- * Per-contract LESSOR, as a box like the photo box: who signs as lessor, their
- * signature, and whether that is already on the contract. Witnesses are not
- * picked here — they are chosen at signing time (mig 345/346).
+ * Who signs as LESSOR, as one quiet line — "ผู้ให้เช่า: <name> · branch default".
+ * It sits in the sample-contract box: nothing here is required, so it must not
+ * read like a task. Witnesses are chosen at signing time (mig 345/346).
  *
  * Choosing is OPTIONAL: left alone, contract-open binds the branch default
  * lessor (mig 350/351). "Change" appears only when the company has someone
  * else to pick, and opens the picker in place. Calls fn_contract_signatory_bind.
  */
-export function SignatoryEditor({ title, footer }: {
-  /** Box heading. The documents step titles it as the contract document, since
-   *  the lessor sits on the contract next to its preview / print buttons. */
-  title?: string;
-  /** Rendered at the bottom of the box — the contract's preview / print buttons. */
-  footer?: ReactNode;
-} = {}) {
+export function SignatoryEditor() {
   const { t } = useTranslation();
   const { contract, signatories, invalidateSignatories } = useWorkspace();
   const branchId = contract?.branch_id ?? null;
@@ -59,10 +52,6 @@ export function SignatoryEditor({ title, footer }: {
       : lessorDefault
         ? composeName(lessorDefault.person_prefix, lessorDefault.person_first_name, lessorDefault.person_last_name)
         : '';
-  const currentSignature = bound?.signature_media_id
-    ?? currentLessor?.signature_media_id
-    ?? (currentIsDefault ? lessorDefault?.signature_media_id : null)
-    ?? null;
   // Someone else to pick? Then "Change" earns its place.
   const canChange = activeLessors.some(l => l.lessor_id !== currentId);
 
@@ -130,19 +119,7 @@ export function SignatoryEditor({ title, footer }: {
   }
 
   return (
-    <div className="border border-line rounded-md px-4 py-3 flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider flex items-center gap-1.5 flex-wrap">
-          {title ? <FileText size={13} /> : <PenLine size={13} />}
-          {title ?? t('workspace.cardSignatory')}
-        </h3>
-        {canChange && !editing && (
-          <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-            {t('workspace.signatoryChange')}
-          </Button>
-        )}
-      </div>
-
+    <div className="flex flex-col gap-2">
       {noLessorsAtAll && (
         <div className="alert alert-warning">
           <AlertTriangle size={16} />
@@ -173,12 +150,7 @@ export function SignatoryEditor({ title, footer }: {
         </div>
       )}
 
-      {lessorsLoading && !currentName ? (
-        <div className="flex items-center gap-2 text-subtle text-sm">
-          <Loader2 size={14} className="animate-spin" />
-          <span>{t('common.loading')}</span>
-        </div>
-      ) : editing ? (
+      {editing ? (
         // In-place picker: pick, then save or back out.
         <div className="flex flex-col gap-2">
           <Select
@@ -206,24 +178,26 @@ export function SignatoryEditor({ title, footer }: {
           </div>
         </div>
       ) : currentName ? (
-        <div className="flex items-center gap-3">
-          <SignatureThumb mediaId={currentSignature} size={32} />
-          <div className="min-w-0">
-            {title && <div className="text-xs text-subtle">{t('workspace.cardSignatory')}</div>}
-            <div className="text-sm font-medium truncate">{currentName}</div>
-            <div className="text-xs text-subtle flex flex-wrap items-center gap-x-1.5">
-              <span>{currentIsDefault ? t('workspace.signatoryIsBranchDefault') : t('workspace.signatoryChosenForContract')}</span>
-              <span>·</span>
-              {bound ? (
-                <span className="text-success-fg inline-flex items-center gap-1">
-                  <CheckCircle size={12} />
-                  {t('workspace.signatoryOnContract')}
-                </span>
-              ) : (
-                <span>{t('workspace.signatoryAutoAtOpen')}</span>
-              )}
-            </div>
-          </div>
+        <div className="text-sm flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          <span className="text-subtle">{t('workspace.cardSignatory')}</span>
+          <span className="font-medium">{currentName}</span>
+          <span className="text-xs text-subtle">
+            {currentIsDefault ? t('workspace.signatoryIsBranchDefault') : t('workspace.signatoryChosenForContract')}
+          </span>
+          {canChange && (
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="text-xs text-primary-fg hover:underline bg-transparent border-none p-0 cursor-pointer"
+            >
+              {t('workspace.signatoryChange')}
+            </button>
+          )}
+        </div>
+      ) : lessorsLoading ? (
+        <div className="flex items-center gap-2 text-subtle text-sm">
+          <Loader2 size={14} className="animate-spin" />
+          <span>{t('common.loading')}</span>
         </div>
       ) : null}
 
@@ -232,12 +206,6 @@ export function SignatoryEditor({ title, footer }: {
           <XCircle size={14} />
           <span>{error}</span>
         </div>
-      )}
-
-      <div className="text-xs text-subtle">{t('workspace.signatoryWitnessesLater')}</div>
-
-      {footer && (
-        <div className="pt-3 border-t border-line flex flex-wrap items-center gap-2">{footer}</div>
       )}
     </div>
   );

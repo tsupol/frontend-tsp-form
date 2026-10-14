@@ -18,7 +18,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Button, Modal } from 'tsp-form';
 import { QRCodeSVG } from 'qrcode.react';
 import {
-  Plus, XCircle, ImageOff, Image as ImageIcon, Loader2, CheckCircle2, AlertCircle,
+  Plus, XCircle, ImageOff, Image as ImageIcon, Loader2, CheckCircle2, AlertCircle, Info,
 } from 'lucide-react';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
 import { normalizeKey } from '../../lib/mediaPath';
@@ -47,11 +47,17 @@ export function ContractAttachments({
   contractId,
   contractCode,
   className,
+  stage = 'signing',
 }: {
   contractId: number;
   contractCode: string | null;
   className?: string;
+  /** `draft` = the new-contract screen. These are handover photos, taken at
+   *  signing and handover, so before that nothing says "required" or
+   *  "missing" — a note says when they're taken; counts stay neutral. */
+  stage?: 'draft' | 'signing';
 }) {
+  const draft = stage === 'draft';
   const { t, i18n } = useTranslation();
   const isThai = i18n.language === 'th';
   const queryClient = useQueryClient();
@@ -100,10 +106,9 @@ export function ContractAttachments({
   return (
     <div className={`border border-line rounded-md px-4 py-3 ${className ?? ''}`}>
       <div className="flex items-center justify-between gap-2 mb-2">
-        <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider flex items-center gap-1.5 flex-wrap">
+        <h3 className="min-w-0 text-xs font-semibold text-subtle uppercase tracking-wider flex items-center gap-1.5 flex-wrap">
           <ImageIcon size={13} />
-          {t('contract.attachments', { defaultValue: 'Photos' })}
-          {status && requiredRows.length > 0 && (
+          {draft ? t('contractPhotos.handoverTitle') : t('contract.attachments', { defaultValue: 'Photos' })}          {!draft && status && requiredRows.length > 0 && (
             missingCount > 0 ? (
               <span className="normal-case font-medium text-warning-fg">{t('contractPhotos.summaryMissing', { count: missingCount })}</span>
             ) : (
@@ -114,12 +119,20 @@ export function ContractAttachments({
         <Button
           variant="outline"
           size="sm"
+          className="shrink-0 whitespace-nowrap"
           startIcon={<Plus size={14} />}
           onClick={() => setManageOpen(true)}
         >
           {t('contract.attachmentsManage', { defaultValue: 'Add / manage' })}
         </Button>
       </div>
+
+      {draft && (
+        <div className="alert alert-info mb-3">
+          <Info size={16} />
+          <span>{t('contractPhotos.draftNote')}</span>
+        </div>
+      )}
 
       {!status ? (
         <div className="py-3 flex justify-center"><Loader2 size={16} className="animate-spin text-subtler" /></div>
@@ -130,6 +143,7 @@ export function ContractAttachments({
               key={s.slot}
               label={label(s)}
               ok={s.ok}
+              neutral={draft}
               photos={photosIn(s.slot)}
               onOpen={() => setManageOpen(true)}
               onPreview={(p) => setLightboxIndex(indexOf(p))}
@@ -171,6 +185,7 @@ export function ContractAttachments({
         onClose={() => setManageOpen(false)}
         contractId={contractId}
         capture={capture}
+        draft={draft}
       />
     </div>
   );
@@ -178,9 +193,11 @@ export function ContractAttachments({
 
 /** One required group: tick or warning, its name, and its first thumbnails —
  *  or a dashed empty tile. The row opens the window; a thumbnail zooms. */
-function GroupRow({ label, ok, photos, onOpen, onPreview }: {
+function GroupRow({ label, ok, neutral, photos, onOpen, onPreview }: {
   label: string;
   ok: boolean;
+  /** No tick / warning — before signing nothing is "missing" yet. */
+  neutral?: boolean;
   photos: ContractPhoto[];
   onOpen: () => void;
   onPreview: (p: ContractPhoto) => void;
@@ -195,13 +212,13 @@ function GroupRow({ label, ok, photos, onOpen, onPreview }: {
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}
       className="flex items-center gap-2 py-1.5 rounded-md hover:bg-surface-hover cursor-pointer -mx-1 px-1"
     >
-      {ok
+      {neutral ? null : ok
         ? <CheckCircle2 size={14} className="text-success shrink-0" />
         : <AlertCircle size={14} className="text-warning-fg shrink-0" />}
-      <span className={`text-sm flex-1 min-w-0 truncate ${ok ? '' : 'text-warning-fg'}`}>{label}</span>
+      <span className={`text-sm flex-1 min-w-0 truncate ${ok || neutral ? '' : 'text-warning-fg'}`}>{label}</span>
       <div className="flex items-center gap-1 shrink-0">
         {visible.length === 0 ? (
-          <span className="w-10 h-10 rounded-md border border-dashed border-warning-border" />
+          <span className={`w-10 h-10 rounded-md border border-dashed ${neutral ? 'border-line' : 'border-warning-border'}`} />
         ) : visible.map(p => (
           <StripThumb key={p.entity_media_id} media={p} onPreview={() => onPreview(p)} />
         ))}
@@ -247,12 +264,15 @@ function ManageModal({
   onClose,
   contractId,
   capture,
+  draft,
 }: {
   open: boolean;
   onClose: () => void;
   contractId: number;
   /** Owned by the page section so it outlives this window. */
   capture: MobileCaptureSession;
+  /** Before signing: the note instead of "missing", no required badges. */
+  draft?: boolean;
 }) {
   const { t } = useTranslation();
   const { phase, session, status, error: qrError, uploadCount } = capture;
@@ -278,6 +298,7 @@ function ManageModal({
       <ContractPhotoGroups
         contractId={contractId}
         hideBanner
+        hideRequired={draft}
         pinnedSlot={USAGE_TYPE}
         scrollRef={scrollRef}
         onDraggingChange={handleDragging}
@@ -301,7 +322,9 @@ function ManageModal({
                 </span>
               </div>
               <div className="min-w-0 flex-1 flex flex-col gap-2">
-                <ChecklistSummary contractId={contractId} />
+                {draft
+                  ? <p className="text-sm text-subtle">{t('contractPhotos.draftNote')}</p>
+                  : <ChecklistSummary contractId={contractId} />}
                 {pinned}
               </div>
             </div>
@@ -313,7 +336,7 @@ function ManageModal({
       {/* Photos save as they're added, so this finishes rather than discards —
           and becomes the main button once the required groups are filled. */}
       <div className="modal-footer">
-        <Button color={photoStatus?.complete ? 'primary' : undefined} onClick={onClose}>
+        <Button color={photoStatus?.complete || draft ? 'primary' : undefined} onClick={onClose}>
           {t('common.done')}
         </Button>
       </div>

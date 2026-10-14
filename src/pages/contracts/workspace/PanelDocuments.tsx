@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, useSnackbarContext, type UploadedImage } from 'tsp-form';
-import { XCircle, CreditCard, Eye, Printer, Loader2, MonitorSmartphone, AlertTriangle } from 'lucide-react';
+import { FileText, XCircle, CreditCard, Eye, Printer, Loader2, MonitorSmartphone } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { invalidateMediaUrl } from '../../../lib/upload';
 import { beMediaUploadFromImage, BeMediaError } from '../../../lib/beMedia';
@@ -26,11 +26,6 @@ interface CustomerDocument {
   file_url: string;
   is_active: boolean;
   uploaded_at: string;
-}
-
-interface ReadinessError {
-  code: string;
-  detail?: Record<string, unknown>;
 }
 
 interface Props { onClose: () => void }
@@ -102,25 +97,6 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
   };
 
   const { data: coLessees = [] } = useContractCoLessees(contractId);
-
-  // BE readiness — same validator the "open bill" button uses. When not ready
-  // the document can't be previewed/signed; the Contract & signature section
-  // shows WHY (these typed codes) instead of the preview + signature cards.
-  // Shares the ['contract-readiness', id] cache with PanelReviewPay.
-  const { data: readiness } = useQuery({
-    queryKey: ['contract-readiness', contractId],
-    queryFn: () => apiClient.rpc<{ ready: boolean; errors: ReadinessError[] }>(
-      'fn_contract_validate_ready',
-      { p_contract_id: contractId },
-    ),
-    enabled: !!contractId,
-    staleTime: 0,
-  });
-  // "Needs credit approval" isn't something to fill in on this page — the
-  // approval card owns it — so it's left out of the what's-missing list.
-  const notReadyErrors = readiness && !readiness.ready
-    ? readiness.errors.filter(e => e.code !== 'CONTRACT.STATE.PARTNER_APPROVAL_REQUIRED')
-    : undefined;
 
   // All ID cards for everyone on the contract (lessee + co-lessees). One
   // batched query keyed on the full customer-id set so we don't N+1.
@@ -236,50 +212,6 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
       {/* ── Customer confidence rating (readiness prerequisite) ─────── */}
       <ConfidenceScoreEditor />
 
-      {/* ── The contract document: who signs as lessor, and its preview /
-          print / read-on-phone buttons — one box, since both are about the
-          same printed contract. ─────────────────────────────────────── */}
-      <SignatoryEditor
-        title={t('workspace.contractDocBox')}
-        footer={<>
-        <Button
-          size="sm"
-          variant="outline"
-          startIcon={<Eye size={14} />}
-          onAuxClick={(e) => { if (e.button === 1) { e.preventDefault(); openPreviewAll(true); } }}
-          onClick={(e) => openPreviewAll(e.ctrlKey || e.metaKey)}
-          disabled={!previewContract || !prereqsMet}
-        >
-          {t('contract.previewContract', { defaultValue: 'Preview' })}
-        </Button>
-        <Button
-          size="sm"
-          color="primary"
-          startIcon={printing ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
-          onClick={handlePrintAll}
-          disabled={!previewContract || !prereqsMet || printing}
-        >
-          {printing ? t('common.loading') : t('contract.printContractPdf', { defaultValue: 'Print contract PDF' })}
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          startIcon={<MonitorSmartphone size={14} />}
-          onClick={() => setViewQrOpen(true)}
-          disabled={!previewContract || !prereqsMet}
-        >
-          {t('workspace.contractViewQr', { defaultValue: 'Read on phone' })}
-        </Button>
-        </>}
-      />
-
-      {/* ── Contract photos — same album + widget as the signing tab: inline
-          multi-file upload (computer/iPad) AND capture-from-phone (QR). ─ */}
-      <ContractAttachments
-        contractId={contractId}
-        contractCode={contract?.code_display ?? null}
-      />
-
       {/* ── Lessee block — unchanged layout ─────────────────────────── */}
       <IdPhotoUpload
         icon={<CreditCard size={14} />}
@@ -291,24 +223,6 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
         disabled={!customerId}
         cacheBust={cacheBust}
       />
-
-      {/* Why-not-ready — the BE readiness list (preview/print/sign live in the
-          action buttons above; this just explains what's still missing). */}
-      {notReadyErrors && notReadyErrors.length > 0 && (
-        <div className="alert alert-warning">
-          <AlertTriangle size={16} />
-          <div className="flex flex-col gap-0.5 min-w-0">
-            <div className="alert-title">
-              {t('workspace.docNotReadyTitle', { defaultValue: 'Complete these before previewing or signing' })}
-            </div>
-            <ul className="alert-description list-disc pl-5 flex flex-col gap-0.5">
-              {notReadyErrors.map((err, i) => (
-                <li key={`${err.code}-${i}`}>{readinessLabel(err, t)}</li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      )}
 
       {/* ── Co-lessee blocks — ID card only (signing happens on the bridge) ── */}
       {coLessees.map(g => {
@@ -334,6 +248,63 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
         );
       })}
 
+      {/* ── Sample contract — optional, at the end: the required items come
+          first. A watermarked copy for the customer to read before paying;
+          the real one is signed later on the signing page. Nothing here is a
+          task, so no blue button: who signs as lessor, then three plain ways
+          to look at it. ──────────────────────────────────────────── */}
+      <div className="border border-line rounded-md px-4 py-3 flex flex-col gap-3">
+        <div>
+          <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider flex items-center gap-1.5">
+            <FileText size={13} />
+            {t('workspace.sampleContractTitle')}
+          </h3>
+          <p className="text-xs text-subtle mt-1">{t('workspace.sampleContractHint')}</p>
+        </div>
+
+        <SignatoryEditor />
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            startIcon={<Eye size={14} />}
+            onAuxClick={(e) => { if (e.button === 1) { e.preventDefault(); openPreviewAll(true); } }}
+            onClick={(e) => openPreviewAll(e.ctrlKey || e.metaKey)}
+            disabled={!previewContract || !prereqsMet}
+          >
+            {t('contract.previewContract', { defaultValue: 'Preview' })}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            startIcon={printing ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
+            onClick={handlePrintAll}
+            disabled={!previewContract || !prereqsMet || printing}
+          >
+            {printing ? t('common.loading') : t('contract.printContractPdf', { defaultValue: 'Print contract PDF' })}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            startIcon={<MonitorSmartphone size={14} />}
+            onClick={() => setViewQrOpen(true)}
+            disabled={!previewContract || !prereqsMet}
+          >
+            {t('workspace.contractViewQrForCustomer')}
+          </Button>
+        </div>
+      </div>
+
+      {/* ── Handover photos — last, with a note. Most are taken at signing and
+          handover, after this screen, so nothing here says required or missing
+          (the signing page does). The customer-with-ID one can be taken now. ─ */}
+      <ContractAttachments
+        contractId={contractId}
+        contractCode={contract?.code_display ?? null}
+        stage="draft"
+      />
+
       {/* preview-all: SAMPLE packet of everything to sign */}
       <ContractPreviewModal
         open={previewAllOpen}
@@ -351,22 +322,4 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
       />
     </div>
   );
-}
-
-// BE readiness error → human line. SIGNATORY_INCOMPLETE carries detail.missing
-// (LESSOR / WITNESS_1 / WITNESS_2) so we append the specific slot.
-function readinessLabel(
-  err: ReadinessError,
-  t: ReturnType<typeof useTranslation>['t'],
-): string {
-  const base = t(err.code, { ns: 'apiErrors', defaultValue: err.code });
-  const missing = err.detail?.missing;
-  if (typeof missing === 'string' && missing) {
-    const slot = t(
-      `workspace.signatory${missing === 'LESSOR' ? 'Lessor' : missing === 'WITNESS_1' ? 'Witness1' : missing === 'WITNESS_2' ? 'Witness2' : ''}`,
-      { defaultValue: missing },
-    );
-    return `${base} — ${slot}`;
-  }
-  return base;
 }
