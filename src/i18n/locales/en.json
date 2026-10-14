@@ -6413,7 +6413,6 @@
     "voidBillFirstReviewer": "The shop has an open bill on this contract. It must be voided first.",
     "snapshotStaleWarning": "The contract changed after it was submitted. Send it back instead of approving it.",
     "submitNoteLabel": "Note from the shop",
-    "slotsEmpty": "Missing photos ({{count}})",
     "showAllContracts": "Show {{count}} more",
     "showFewer": "Show fewer",
     "tabQueue": "Waiting",

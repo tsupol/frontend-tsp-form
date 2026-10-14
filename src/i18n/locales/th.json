@@ -6404,7 +6404,6 @@
     "voidBillFirstReviewer": "ร้านเปิดบิลสัญญานี้ไปแล้ว ต้องยกเลิกบิลก่อน",
     "snapshotStaleWarning": "ข้อมูลสัญญาเปลี่ยนหลังยื่น กรุณาส่งกลับแทนการอนุมัติ",
     "submitNoteLabel": "หมายเหตุจากร้าน",
-    "slotsEmpty": "รูปที่ยังไม่มี ({{count}})",
     "showAllContracts": "ดูอีก {{count}} รายการ",
     "showFewer": "ย่อรายการ",
     "tabQueue": "รอตรวจ",

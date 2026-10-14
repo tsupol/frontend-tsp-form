@@ -151,7 +151,7 @@ export function PartnerCaseDetailPanel({
     return i18n.language === 'th' ? row.name_th : row.name_en;
   };
 
-  const emptySlots = evidence.filter(s => s.photo_count === 0);
+  const filledSlots = evidence.filter(s => s.photo_count > 0);
 
   // A long-standing customer can have twenty contracts; showing them all buries
   // the decision buttons. Lead with the most recent, expand on demand.
@@ -308,45 +308,30 @@ export function PartnerCaseDetailPanel({
             )}
           </div>
 
+          {/* Only the photos that exist. Device photos are not needed to decide
+              a case (UI_SUMMARY/139: "รูปไม่ใช่ด่านยื่น") and almost every case
+              arrives without them, so listing empty slots as "missing" read as
+              a problem the reviewer had to act on. */}
           <div className="mt-3 flex flex-col gap-3">
-            {evidence.length === 0 ? (
+            {filledSlots.length === 0 ? (
               <div className="text-sm text-subtler flex items-center gap-2">
                 <ImageOff size={14} /> {t('partnerCase.noPhotos')}
               </div>
-            ) : (
-              <>
-                {/* Filled slots first, each with its strip of thumbnails. */}
-                {evidence.filter(s => s.photo_count > 0).map(slot => (
-                  <div key={slot.slot}>
-                    <div className="text-xs font-medium text-subtle mb-1.5">{slot.label_th}</div>
-                    <div className="flex flex-wrap gap-2">
-                      {(slot.photos ?? []).map((p, i) => (
-                        <MediaThumbButton
-                          key={p.entity_media_id}
-                          mediaKey={p.variants_json?.sm ?? p.storage_path}
-                          alt={slot.label_th}
-                          onClick={() => openSlotLightbox(slot, i)}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-                {/* Empty ones are a single wrapped line of labels — a reviewer
-                    needs to know which shots are missing, not six empty rows. */}
-                {emptySlots.length > 0 && (
-                  <div>
-                    <div className="text-xs font-medium text-subtle mb-1.5">
-                      {t('partnerCase.slotsEmpty', { count: emptySlots.length })}
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {emptySlots.map(slot => (
-                        <Badge key={slot.slot} color="warning" size="sm">{slot.label_th}</Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
+            ) : filledSlots.map(slot => (
+              <div key={slot.slot}>
+                <div className="text-xs font-medium text-subtle mb-1.5">{slot.label_th}</div>
+                <div className="flex flex-wrap gap-2">
+                  {(slot.photos ?? []).map((p, i) => (
+                    <MediaThumbButton
+                      key={p.entity_media_id}
+                      mediaKey={p.variants_json?.sm ?? p.storage_path}
+                      alt={slot.label_th}
+                      onClick={() => openSlotLightbox(slot, i)}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         </Section>
 
