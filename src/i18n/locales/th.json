@@ -6472,7 +6472,21 @@
     "contactType_LINE": "LINE",
     "contactType_FACEBOOK": "Facebook",
     "contactType_OTHER": "อื่น ๆ",
-    "recordScopeNote": "เห็นเฉพาะสัญญาของกองทุนนี้ สัญญาที่สาขาอื่นในเครือไม่แสดงในหน้านี้"
+    "recordScopeNote": "เห็นเฉพาะสัญญาของกองทุนนี้ สัญญาที่สาขาอื่นในเครือไม่แสดงในหน้านี้",
+    "markPayNo": "งวด {{n}}",
+    "mark_onTime": "จ่ายตรง",
+    "mark_late": "จ่ายช้า {{days}} วัน",
+    "mark_overdue": "ค้าง {{days}} วัน",
+    "mark_partial": "จ่ายบางส่วน",
+    "mark_due": "ใกล้ครบกำหนด",
+    "mark_future": "ยังไม่ถึงกำหนด",
+    "mark_ended": "สัญญาจบแล้ว ไม่ต้องจ่าย",
+    "markDueOn": "ครบกำหนด",
+    "markPaidOn": "จ่ายเมื่อ",
+    "legend_onTime": "จ่ายตรง",
+    "legend_late": "จ่ายช้า",
+    "legend_overdue": "ค้าง",
+    "legend_future": "ยังไม่ถึง"
   },
   "partnerPools": {
     "title": "ผู้ตรวจร้าน deal partner",

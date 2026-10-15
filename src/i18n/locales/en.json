@@ -6481,7 +6481,21 @@
     "contactType_LINE": "LINE",
     "contactType_FACEBOOK": "Facebook",
     "contactType_OTHER": "Other",
-    "recordScopeNote": "Only this fund's contracts show here; contracts at other branches in the group are not visible"
+    "recordScopeNote": "Only this fund's contracts show here; contracts at other branches in the group are not visible",
+    "markPayNo": "Instalment {{n}}",
+    "mark_onTime": "Paid on time",
+    "mark_late": "Paid {{days}} days late",
+    "mark_overdue": "Overdue {{days}} days",
+    "mark_partial": "Part paid",
+    "mark_due": "Due soon",
+    "mark_future": "Not due yet",
+    "mark_ended": "Contract ended — not owed",
+    "markDueOn": "Due",
+    "markPaidOn": "Paid",
+    "legend_onTime": "On time",
+    "legend_late": "Late",
+    "legend_overdue": "Overdue",
+    "legend_future": "Not due"
   },
   "partnerPools": {
     "title": "Partner Shop Reviewers",

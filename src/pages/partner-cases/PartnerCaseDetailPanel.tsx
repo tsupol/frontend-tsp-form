@@ -47,9 +47,6 @@ interface PartnerCaseDetailPanelProps {
   onDecided?: () => void;
 }
 
-/** How many earlier contracts show before the "see all" toggle. */
-const PAYMENT_RECORD_PREVIEW = 5;
-
 /** One slot of the device's photo album, as `v_asset_evidence` returns it. */
 interface EvidenceSlot {
   asset_id: number;
@@ -131,12 +128,29 @@ interface CustomerContractRow {
   activated_at: string | null;
 }
 
-/** `v_installments` — just enough to tell paid-on-time from paid-late. */
+/** `v_installments` — one mark per instalment in the payment record. */
 interface InstallmentRow {
   contract_id: number;
+  pay_no: number;
   due_date: string;
   paid_at: string | null;
+  /** PAID · PARTIAL · OVERDUE · DUE_TODAY · UPCOMING · FUTURE · TERMINATED */
+  payment_state: string;
+  days_past_due: number | null;
 }
+
+/** How one instalment reads in the record. */
+type MarkKind = 'onTime' | 'late' | 'overdue' | 'partial' | 'due' | 'future' | 'ended';
+
+const MARK_CLASS: Record<MarkKind, string> = {
+  onTime: 'bg-success border-success',
+  late: 'bg-warning border-warning',
+  overdue: 'bg-danger border-danger',
+  partial: 'bg-warning-soft border-warning',
+  due: 'bg-transparent border-subtle',
+  future: 'bg-transparent border-line',
+  ended: 'bg-transparent border-line border-dashed',
+};
 
 /** Row of `v_contract_photo_slots` — the group names for the contract's photos. */
 interface PhotoSlotRef {
@@ -185,7 +199,6 @@ export function PartnerCaseDetailPanel({
   const [returnOpen, setReturnOpen] = useState(false);
   const [lightbox, setLightbox] = useState<{ keys: string[]; index: number } | null>(null);
   const [showUnopened, setShowUnopened] = useState(false);
-  const [showAllRan, setShowAllRan] = useState(false);
 
   const { actions } = usePartnerCaseActions(detail?.case_id ?? null);
   const returnReasons = usePartnerCaseReturnReasons();
@@ -290,7 +303,8 @@ export function PartnerCaseDetailPanel({
   const { data: installments = [] } = useQuery({
     queryKey: ['partner-case-installments', ranIds.join(',')],
     queryFn: () => apiClient.get<InstallmentRow[]>(
-      `/v_installments?contract_id=in.(${ranIds.join(',')})&paid_at=not.is.null&select=contract_id,due_date,paid_at`,
+      `/v_installments?contract_id=in.(${ranIds.join(',')})`
+      + '&select=contract_id,pay_no,due_date,paid_at,payment_state,days_past_due&order=contract_id,pay_no',
     ),
     enabled: ranIds.length > 0,
     staleTime: 30 * 1000,
@@ -347,8 +361,32 @@ export function PartnerCaseDetailPanel({
   // newest first within each; a long record shows its first few until asked.
   const problemRank = (c: CustomerContractRow) =>
     (c.overdue_count ?? 0) > 0 ? 0 : lateBy.has(c.contract_id) ? 1 : 2;
+  // A customer rarely has more than one or two earlier contracts (real data:
+  // 99% have one), so every one is shown in full.
   const sortedRan = [...ranContracts].sort((a, b) => problemRank(a) - problemRank(b));
-  const shownRan = showAllRan ? sortedRan : sortedRan.slice(0, PAYMENT_RECORD_PREVIEW);
+  const marksOf = (contractId: number) => installments.filter(i => i.contract_id === contractId);
+  const lateDays = (i: InstallmentRow) => (i.paid_at ? dayDiff(i.due_date, bangkokDay(i.paid_at)) : 0);
+  const markKind = (i: InstallmentRow): MarkKind => {
+    if (i.payment_state === 'TERMINATED') return 'ended';
+    if (i.paid_at && i.payment_state === 'PAID') return lateDays(i) > 0 ? 'late' : 'onTime';
+    if (i.payment_state === 'OVERDUE') return 'overdue';
+    if (i.payment_state === 'PARTIAL') return 'partial';
+    if (i.payment_state === 'DUE_TODAY' || i.payment_state === 'UPCOMING') return 'due';
+    return 'future';
+  };
+  const markLabel = (i: InstallmentRow, kind: MarkKind) =>
+    `${t('partnerCase.markPayNo', { n: i.pay_no })} · ${t(`partnerCase.mark_${kind}`, {
+      days: kind === 'late' ? lateDays(i) : (i.days_past_due ?? 0),
+    })}`;
+  const markTip = (i: InstallmentRow, kind: MarkKind) => (
+    <div className="flex flex-col gap-0.5">
+      <div className="font-medium">{markLabel(i, kind)}</div>
+      <div className="text-xs opacity-90">{t('partnerCase.markDueOn')} <DateTime value={i.due_date} showTime={false} /></div>
+      {i.paid_at && (
+        <div className="text-xs opacity-90">{t('partnerCase.markPaidOn')} <DateTime value={i.paid_at} showTime={false} /></div>
+      )}
+    </div>
+  );
   const totalLate = [...lateBy.values()].reduce((n, r) => n + r.lateCount, 0);
   const worstLate = Math.max(0, ...[...lateBy.values()].map(r => r.worstDays));
   const totalOverdue = ranContracts.reduce((n, c) => n + (c.overdue_count ?? 0), 0);
@@ -662,11 +700,21 @@ export function PartnerCaseDetailPanel({
               scoped by company), so a customer behind on a contract at another
               branch of the group looks clean here. Say so where it matters. */}
           <div className="text-xs text-subtle mb-2">{t('partnerCase.recordScopeNote')}</div>
+          {ranContracts.length > 0 && (
+            <div className="flex flex-wrap gap-x-3 gap-y-1 mb-2 text-xs text-subtle">
+              {(['onTime', 'late', 'overdue', 'future'] as const).map(k => (
+                <span key={k} className="inline-flex items-center gap-1">
+                  <span className={`block w-3 h-3 rounded-sm border ${MARK_CLASS[k]}`} />
+                  {t(`partnerCase.legend_${k}`)}
+                </span>
+              ))}
+            </div>
+          )}
           {ranContracts.length === 0 ? (
             <div className="text-sm text-subtler">{t('partnerCase.noPaymentRecord')}</div>
           ) : (
             <div className="rounded-md border border-line overflow-hidden">
-              {shownRan.map(c => {
+              {sortedRan.map(c => {
                 const late = lateBy.get(c.contract_id);
                 const overdue = c.overdue_count ?? 0;
                 const paid = c.paid_installment_count ?? 0;
@@ -698,20 +746,26 @@ export function PartnerCaseDetailPanel({
                         <Badge color="success" size="xs">{t('partnerCase.onTime')}</Badge>
                       ) : null}
                     </div>
+                    {/* One mark per instalment, in order — how this customer
+                        actually pays, not just a count. Hover for the dates. */}
+                    {marksOf(c.contract_id).length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {marksOf(c.contract_id).map(i => {
+                          const kind = markKind(i);
+                          return (
+                            <Tooltip key={i.pay_no} content={markTip(i, kind)} placement="top">
+                              <span
+                                className={`block w-3.5 h-3.5 rounded-sm border ${MARK_CLASS[kind]}`}
+                                aria-label={markLabel(i, kind)}
+                              />
+                            </Tooltip>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 );
               })}
-              {sortedRan.length > PAYMENT_RECORD_PREVIEW && (
-                <button
-                  type="button"
-                  onClick={() => setShowAllRan(v => !v)}
-                  className="w-full px-3 py-2 text-sm text-primary-fg hover:underline bg-transparent border-none cursor-pointer text-left"
-                >
-                  {showAllRan
-                    ? t('partnerCase.showFewer')
-                    : t('partnerCase.showAllContracts', { count: sortedRan.length - PAYMENT_RECORD_PREVIEW })}
-                </button>
-              )}
             </div>
           )}
           {/* Drafts that expired or were cancelled never ran, so they say
