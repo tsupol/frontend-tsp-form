@@ -394,10 +394,13 @@ export const AppSideNav = () => {
       path: '/admin/contracts',
       children: isDealPartner ? shopContractChildren : staffContractChildren,
     },
-    {
-      key: 'customers', icon: <UserSearch size="1rem" />, label: t('nav.customers'),
-      path: '/admin/customers',
-    },
+    // Roles without customer access (repo, inventory) got an empty page.
+    ...(can('CUSTOMER.READ')
+      ? [{
+          key: 'customers', icon: <UserSearch size="1rem" />, label: t('nav.customers'),
+          path: '/admin/customers',
+        }]
+      : []),
     ...(canReviewSlips
       ? [{
           key: 'payment-submissions',

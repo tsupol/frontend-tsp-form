@@ -8,6 +8,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
 import { bangkokDay, dayDiff } from '../pages/partner-cases/customerRisk';
 
 /** `v_customer_contracts` — this customer's contracts the viewer may see. */
@@ -15,8 +16,10 @@ export interface CustomerContractRow {
   contract_id: number;
   contract_code: string;
   state: string;
-  /** PRIMARY · CO_LESSEE */
-  role: string | null;
+  /** OPEN · CLOSED */
+  state_scope: string | null;
+  /** PRIMARY · CO_LESSEE (absent on a shop's list) */
+  role?: string | null;
   branch_name: string | null;
   product_display_name: string | null;
   paid_installment_count: number | null;
@@ -56,14 +59,21 @@ export interface PaymentRecord {
   totalPaid: number;
 }
 
+const RECORD_COLUMNS = 'state,state_scope,branch_name,product_display_name,paid_installment_count,total_installments,overdue_count,overdue_amount,activated_at';
+
 export function usePaymentRecord(customerId: number | null, excludeContractId?: number | null): PaymentRecord {
+  // A deal-partner shop has no copy of the customer's contract list (its
+  // session reads only the shop view set), so it reads its own contracts list
+  // — the same columns, renamed; contracts where this customer is only the
+  // co-lessee don't show there.
+  const { isDealPartner } = useAuth();
   const { data: contracts = [] } = useQuery({
-    queryKey: ['customer-contracts-record', customerId],
-    queryFn: () => apiClient.get<CustomerContractRow[]>(
-      `/v_customer_contracts?customer_id=eq.${customerId}`
-      + '&select=contract_id,contract_code,state,role,branch_name,product_display_name,paid_installment_count,total_installments,overdue_count,overdue_amount,activated_at'
-      + '&order=activated_at.desc.nullslast,contract_id.desc',
-    ),
+    queryKey: ['customer-contracts-record', customerId, isDealPartner],
+    queryFn: () => apiClient.get<CustomerContractRow[]>(isDealPartner
+      ? `/v_contracts?customer_id=eq.${customerId}&select=contract_id:id,contract_code:code_display,${RECORD_COLUMNS}`
+        + '&order=activated_at.desc.nullslast,id.desc'
+      : `/v_customer_contracts?customer_id=eq.${customerId}&select=contract_id,contract_code,role,${RECORD_COLUMNS}`
+        + '&order=activated_at.desc.nullslast,contract_id.desc'),
     enabled: customerId != null,
     staleTime: 30 * 1000,
   });

@@ -25,7 +25,8 @@ import {
   usePartnerCaseStatusRef,
 } from './usePartnerCases';
 import { PartnerCaseDetailPanel } from './PartnerCaseDetailPanel';
-import { riskTone, useCustomerRisk, type CustomerRisk } from './customerRisk';
+import { useCustomerRisk } from './customerRisk';
+import { CustomerRiskBadge } from '../../components/CustomerRiskBadge';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   outcomeBadgeColor,
@@ -334,7 +335,7 @@ export function PartnerCaseQueuePage() {
                         </div>
                         <div className="flex items-center gap-2 mt-0.5 min-w-0">
                           <span className="text-sm truncate">{r.customer_name ?? '—'}</span>
-                          <RiskBadge risk={risk?.get(r.customer_id)} />
+                          <CustomerRiskBadge risk={risk?.get(r.customer_id)} />
                         </div>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className="text-xs text-subtle truncate flex-1 min-w-0">
@@ -391,14 +392,3 @@ export function PartnerCaseQueuePage() {
 }
 
 /** The one word that matters about a customer's record, if anything. */
-function RiskBadge({ risk }: { risk: CustomerRisk | undefined }) {
-  const { t } = useTranslation();
-  const tone = riskTone(risk);
-  if (!risk || !tone) return null;
-  const label = risk.blacklisted
-    ? t('partnerCase.riskBlacklisted')
-    : risk.overdueInstallments > 0
-      ? t('partnerCase.riskOverdue', { count: risk.overdueInstallments })
-      : t('partnerCase.riskLate', { count: risk.lateInstallments });
-  return <Badge color={tone === 'bad' ? 'danger' : 'warning'} size="sm" className="shrink-0">{label}</Badge>;
-}

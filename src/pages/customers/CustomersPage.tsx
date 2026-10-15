@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, DataTableFooter, Input, Select, Button, Badge, Modal, LabeledCheckbox, FormErrorMessage, Tooltip, useSnackbarContext } from 'tsp-form';
-import { ArrowRightFromLine, ArrowLeft, Users, User, Phone, History, ImageOff, CheckCircle, XCircle, Trash2, Star, Plus, Pencil, MapPin, UserPlus, ShieldAlert, ShieldOff } from 'lucide-react';
+import { PageNav, PageNavPanel, MobileHeader, DataTable, Input, Select, Button, Badge, Modal, LabeledCheckbox, FormErrorMessage, Tooltip, useSnackbarContext } from 'tsp-form';
+import { ArrowRightFromLine, ArrowLeft, Users, User, ImageOff, Award, CheckCircle, XCircle, Trash2, Star, Plus, Pencil, UserPlus, ShieldAlert, ShieldOff } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { toLocalDateStr, parseLocalDate, formatTel, formatCid } from '../../lib/format';
@@ -15,18 +15,19 @@ import { PhoneInput } from '../../components/PhoneInput';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { CustomerLoginCard, useInvalidateLoginInfo } from '../../components/CustomerLoginCard';
 import { EditIdentityModal } from '../../components/EditIdentityModal';
-import { DetailSection, DetailLine } from '../../components/DetailLine';
+import { OverflowTabs } from '../../components/OverflowTabs';
 import { TelLink, ValidMark } from '../../components/TelLink';
 import { PaymentRecordList } from '../../components/PaymentRecord';
 import { usePaymentRecord } from '../../hooks/usePaymentRecord';
+import { useCustomerPoints } from '../../hooks/useCustomerPoints';
 import { MediaLightboxKeyGallery, MediaThumbButton } from '../../components/MediaLightbox';
 import { normalizeKey } from '../../lib/mediaPath';
 import { passesThaiCidChecksum } from '../../lib/ocr/extractIdCard';
-import { ageFrom } from '../partner-cases/customerRisk';
+import { ageFrom, useCustomerRisk } from '../partner-cases/customerRisk';
+import { CustomerRiskBadge } from '../../components/CustomerRiskBadge';
 import { useAuth } from '../../contexts/AuthContext';
 import { SearchInput } from '../../components/SearchInput';
 import { AddToBlacklistModal, LiftBlacklistModal } from './BlacklistModals';
-import { CustomerRewardSection } from './CustomerRewardSection';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -179,6 +180,10 @@ const PREFIX_OPTIONS = [
   { value: 'Ms.', label: 'Ms.' },
 ];
 
+/** First letter of a name for the list's round badge — past a leading Thai
+ *  vowel (เ แ โ ใ ไ), which is written before the consonant it follows. */
+const initialOf = (name: string) => (name.replace(/^[เแโใไ]/, '').charAt(0) || '?').toUpperCase();
+
 const formatAddress = (a: CustomerAddress): string => {
   const parts = [a.address_line1];
   if (a.address_line2) parts.push(a.address_line2);
@@ -196,8 +201,11 @@ export function CustomersPage() {
   const { customerId: customerIdParam } = useParams<{ customerId?: string }>();
   const selectedId = customerIdParam ? Number(customerIdParam) : null;
 
+  // Picking another customer keeps the detail tab that is open.
+  const [searchParams] = useSearchParams();
   const setSelectedId = (id: number | null) => {
-    if (id) navigate(`/admin/customers/${id}`, { replace: true });
+    const search = searchParams.toString();
+    if (id) navigate({ pathname: `/admin/customers/${id}`, search: search ? `?${search}` : '' }, { replace: true });
     else navigate('/admin/customers', { replace: true });
   };
 
@@ -240,6 +248,9 @@ export function CustomersPage() {
   });
   const customers = customersData?.data ?? [];
   const totalCount = customersData?.totalCount ?? 0;
+  // The worst word about each customer on this page (blacklisted / owing /
+  // paid late), read for the whole page at once.
+  const { data: risk } = useCustomerRisk(customers.map(c => c.id));
 
   // Fallback fetch when deep-linked customer isn't in the current list page
   // Only a FULL row counts as "in list" — a masked search row still needs the
@@ -255,7 +266,7 @@ export function CustomersPage() {
   });
 
   return (
-    <PageNav panels={['list', 'detail']} defaultPanel={selectedId ? 'detail' : 'list'} className="h-dvh">
+    <PageNav panels={['list', 'detail']} defaultPanel={selectedId ? 'detail' : 'list'} className="h-dvh overflow-hidden">
       {({ isMobile, isRoot, goTo, goBack }) => {
         // Only a full view row can drive the detail panel. A search row (masked,
         // partial) falls through to selectedFromApi, which re-fetches the raw row.
@@ -314,48 +325,50 @@ export function CustomersPage() {
                     className="w-full"
                   />
                 </div>
-                <div className={`data-table-content better-scroll ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
-                  {customers.length === 0 ? (
-                    <div className="p-8 text-center text-subtler">{t('customer.noCustomers')}</div>
-                  ) : (
-                    <div className="flex flex-col">
-                      {customers.map(c => (
-                        <button
-                          key={c.id}
-                          className={`w-full text-left px-4 py-2.5 border-b border-line transition-colors cursor-pointer ${
-                            c.id === selectedId ? 'bg-primary-soft' : 'hover:bg-surface-hover'
-                          }`}
-                          onClick={() => handleSelect(c)}
-                        >
-                          <div className="flex items-center justify-between mb-0.5">
+                <DataTable<CustomerListRow>
+                  data={customers}
+                  getRowProps={row => ({ 'data-state': row.original.id === selectedId ? 'selected' : undefined })}
+                  enableKeyboardNav={!isMobile}
+                  keyboardActivateMode="manual"
+                  onRowActivate={row => setSelectedId(row.original.id)}
+                  renderRow={row => {
+                    const c = row.original;
+                    return (
+                      <button
+                        type="button"
+                        className="w-full text-left px-4 py-2.5 flex items-center gap-3 transition-colors cursor-pointer"
+                        onClick={() => handleSelect(c)}
+                      >
+                        <span className="w-9 h-9 rounded-full bg-surface-soft border border-line flex items-center justify-center shrink-0 text-sm font-medium text-subtle">
+                          {initialOf(c.first_name || c.full_name)}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 min-w-0">
                             <span className="font-medium text-sm truncate">{c.full_name}</span>
                             {!c.is_active && <Badge size="xs" color="default">{t('customer.inactive')}</Badge>}
+                            <span className="flex-1" />
+                            <CustomerRiskBadge risk={risk?.get(c.id)} />
                           </div>
-                          <div className="text-xs text-subtle tabular-nums">
+                          <div className="text-xs text-subtle tabular-nums truncate mt-0.5">
                             {/* search results return a pre-masked id_number
                                 (1-****-****1-52-7); only run formatCid on the
                                 raw 13-digit form from the browse view. */}
-                            {c.id_number?.includes('*') ? c.id_number : formatCid(c.id_number)} · {formatTel(c.tel)}
+                            {c.id_number?.includes('*') ? c.id_number : formatCid(c.id_number)}
+                            {c.tel && <> · {formatTel(c.tel)}</>}
                           </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {totalCount > 0 && (
-                  <div className="flex-none border-t border-line p-2">
-                    <DataTableFooter
-                      currentPage={pageIndex + 1}
-                      totalPages={Math.ceil(totalCount / pageSize) || 1}
-                      onPageChange={(p) => setPageIndex(p - 1)}
-                      pageSize={pageSize}
-                      pageSizeOptions={[15, 25, 50]}
-                      onPageSizeChange={(ps) => { setPageSize(ps); setPageIndex(0); }}
-                      totalRows={totalCount}
-                    />
-                  </div>
-                )}
+                        </div>
+                      </button>
+                    );
+                  }}
+                  enablePagination
+                  pageIndex={pageIndex}
+                  pageSize={pageSize}
+                  pageSizeOptions={[15, 25, 50]}
+                  rowCount={totalCount}
+                  onPageChange={({ pageIndex: pi, pageSize: ps }) => { setPageIndex(pi); setPageSize(ps); }}
+                  className={`flex-1 min-h-0 panel-datatable ${isFetching ? 'opacity-60' : ''} transition-opacity`}
+                  noResults={<div className="p-8 text-center text-subtler">{t('customer.noCustomers')}</div>}
+                />
               </PageNavPanel>
 
               {/* ── Detail Panel ── */}
@@ -380,15 +393,40 @@ export function CustomersPage() {
 }
 
 // ── Customer Detail ─────────────────────────────────────────────────────────
-// Reads top to bottom: who they are, how they have paid, how to reach them,
-// then their app account and points. Same parts as the credit reviewer's case
-// view (phone links with a format check, the payment record with one mark per
-// instalment), so a customer reads the same wherever staff meet them.
+// Built around who opens it. At the counter (branch staff and managers) the
+// question is "who is this, can we sell to them, what is going on with their
+// contracts"; a collector wants to reach them; an accountant or a fund's
+// credit approver only reads. So:
+//   - the header answers who they are and how to call them, and a blacklist
+//     shows there in red — it is the one thing everyone must see;
+//   - the first tab is their contracts, with how each was paid and the points
+//     each instalment earned (points are earned per paid instalment, so they
+//     belong with the contract, not in a list of their own);
+//   - contact details and the app account sit in their own tabs.
+// Edit buttons show only to roles that may change a customer (CUSTOMER.UPDATE);
+// the blacklist and app-account buttons follow their own permissions.
+
+type DetailTab = 'contracts' | 'contact' | 'app';
+const DETAIL_TABS: readonly DetailTab[] = ['contracts', 'contact', 'app'];
 
 function CustomerDetail({ customerId, customer }: { customerId: number; customer: Customer | null }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
+  const { user, can } = useAuth();
+  const canEdit = can('CUSTOMER.UPDATE');
+  const canEditIdentity = can('CUSTOMER.UPDATE');
+
+  // The tab lives in the address, so back/forward and a copied link keep it.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab') as DetailTab | null;
+  const tab: DetailTab = tabParam && DETAIL_TABS.includes(tabParam) ? tabParam : 'contracts';
+  const setTab = (next: DetailTab) => {
+    const params = new URLSearchParams(searchParams);
+    if (next === 'contracts') params.delete('tab');
+    else params.set('tab', next);
+    setSearchParams(params);
+  };
 
   // Sub-queries
   const { data: addresses = [] } = useQuery({
@@ -425,8 +463,10 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
     enabled: customer?.is_blacklisted === true,
   });
 
-  // Every contract of theirs this user may see, with how each was paid.
+  // Every contract of theirs this user may see, how each was paid, and the
+  // points each instalment earned.
   const record = usePaymentRecord(customerId);
+  const points = useCustomerPoints(customerId);
 
   const homeAddress = addresses.find(a => a.address_type === 'HOME');
   const workAddress = addresses.find(a => a.address_type === 'WORK');
@@ -457,8 +497,6 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
   }, [customerId]);
 
   const invalidateLogin = useInvalidateLoginInfo();
-  const { can } = useAuth();
-  const canEditIdentity = can('CUSTOMER.UPDATE');
 
   const refreshAll = () => {
     queryClient.invalidateQueries({ queryKey: ['customers'] });
@@ -487,27 +525,48 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
   const otherContacts = contacts.filter(c => !PHONE_TYPES.includes(c.contact_type));
   const contactLabel = (c: CustomerContact) =>
     [t(`partnerCase.contactType_${c.contact_type}`, { defaultValue: c.contact_type }), c.label].filter(Boolean).join(' · ');
+  const hasAnyContact = !!customer.tel || !!customer.tel2 || contacts.length > 0 || !!customer.line_id || !!customer.facebook;
 
   const { ran, unopened, totalOverdue, totalLate, worstLate, totalPaid } = record;
-  const recordStatus = totalOverdue > 0 ? 'bad' : totalLate > 0 ? 'warn' : 'ok';
-  const recordSummary = [
+  const contractCount = ran.length + unopened.length;
+  const recordTone = totalOverdue > 0 ? 'text-danger-fg' : totalLate > 0 ? 'text-warning-fg' : 'text-subtle';
+  const recordSummary = ran.length === 0 ? null : [
     totalOverdue > 0 ? t('partnerCase.chkRecordOverdue', { count: totalOverdue }) : null,
     totalLate > 0 ? t('partnerCase.chkRecordLate', { count: totalLate, days: worstLate }) : null,
     totalOverdue === 0 && totalLate === 0
       ? (totalPaid > 0 ? t('partnerCase.chkRecordOnTime', { count: ran.length }) : t('partnerCase.chkRecordNotDue'))
       : null,
   ].filter(Boolean).join(' · ');
+  const fmtPoints = (n: number) =>
+    n.toLocaleString(i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
-    <div className="flex-1 overflow-auto better-scroll">
-      <div className="px-4 md:px-6 py-4 max-w-2xl flex flex-col gap-4">
-        {/* ── Header ── */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="text-lg font-semibold">{customer.full_name}</h2>
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5 text-sm">
-              <span className="text-subtle">{t(`contract.idType_${customer.id_type}`, { defaultValue: customer.id_type })}</span>
-              <span className="tabular-nums">{customer.id_type === 'CITIZEN_ID' ? formatCid(customer.id_number) : customer.id_number}</span>
+    <div className="flex-1 min-h-0 flex flex-col">
+      {/* ── Header: who they are and how to call them ── */}
+      <div className="flex-none px-4 md:px-6 pt-4 pb-3 flex flex-col gap-3">
+        <div className="flex items-start gap-3">
+          {idPhotoKeys.length > 0 ? (
+            <MediaThumbButton
+              mediaKey={idPhotoKeys[0]}
+              alt={t('partnerCase.idCardPhoto')}
+              onClick={() => setPhotoIndex(0)}
+              className="w-16 h-12 shrink-0 rounded border border-line overflow-hidden cursor-zoom-in hover:opacity-80 transition-opacity bg-surface-shallow"
+            />
+          ) : (
+            <Tooltip content={t('customer.noIdPhoto')} placement="top">
+              <span className="w-16 h-12 shrink-0 rounded border border-dashed border-line flex items-center justify-center text-subtler">
+                <ImageOff size={16} />
+              </span>
+            </Tooltip>
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <h2 className="text-lg font-semibold truncate">{customer.full_name}</h2>
+              {!customer.is_active && <Badge size="xs" color="default">{t('customer.inactive')}</Badge>}
+            </div>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-subtle">
+              <span>{t(`contract.idType_${customer.id_type}`, { defaultValue: customer.id_type })}</span>
+              <span className="tabular-nums text-fg">{customer.id_type === 'CITIZEN_ID' ? formatCid(customer.id_number) : customer.id_number}</span>
               {cidValid !== null && (
                 <ValidMark ok={cidValid} tip={cidValid ? t('partnerCase.cidValid') : t('partnerCase.cidInvalid')} />
               )}
@@ -522,7 +581,11 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
                   />
                 </Tooltip>
               )}
-              {!customer.is_active && <Badge size="xs" color="default">{t('customer.inactive')}</Badge>}
+            </div>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-subtle mt-0.5">
+              {customer.tel && <TelLink tel={customer.tel} />}
+              {age != null && <span>{t('partnerCase.ageYears', { age })}</span>}
+              <span>{t('customer.registeredAt')} <DateTime value={customer.created_at} showTime={false} /></span>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -550,14 +613,16 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
                   {t('blacklist.add.action')}
                 </Button>
               )}
-            <Button variant="outline" size="sm" startIcon={<Pencil size={14} />} onClick={() => setEditInfoOpen(true)}>
-              {t('common.edit')}
-            </Button>
+            {canEdit && (
+              <Button variant="outline" size="sm" startIcon={<Pencil size={14} />} onClick={() => setEditInfoOpen(true)}>
+                {t('common.edit')}
+              </Button>
+            )}
           </div>
         </div>
 
-        {/* A blacklisted customer can't open a new contract — say so first,
-            with why, rather than as a small badge beside the name. */}
+        {/* A blacklisted customer can't open a new contract — every role
+            must see it first, with why. */}
         {customer.is_blacklisted && (
           <div className="alert alert-danger">
             <ShieldAlert size={16} className="shrink-0" />
@@ -572,133 +637,136 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
             </div>
           </div>
         )}
+      </div>
 
-        {/* ── Who they are ── */}
-        <DetailSection icon={<User size={14} />} title={t('customer.infoTitle')}>
-          <DetailLine label={t('customer.dateOfBirth')}>
-            {customer.date_of_birth ? (
-              <>
-                <DateTime value={customer.date_of_birth} showTime={false} />
-                {age != null && <span className="text-subtle">· {t('partnerCase.ageYears', { age })}</span>}
-              </>
-            ) : <span className="text-subtler">—</span>}
-          </DetailLine>
-          <DetailLine label={t('customer.registeredAt')}>
-            <DateTime value={customer.created_at} showTime={false} />
-          </DetailLine>
-          <DetailLine label={t('partnerCase.idCardPhoto')}>
-            {idPhotoKeys.length === 0 ? (
-              <span className="text-subtler inline-flex items-center gap-1.5"><ImageOff size={14} />{t('customer.noIdPhoto')}</span>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {idPhotoKeys.map((key, i) => (
-                  <MediaThumbButton key={key} mediaKey={key} alt={t('partnerCase.idCardPhoto')} onClick={() => setPhotoIndex(i)} />
-                ))}
-              </div>
-            )}
-          </DetailLine>
-        </DetailSection>
+      <OverflowTabs
+        tabs={DETAIL_TABS}
+        activeTab={tab}
+        onTabChange={setTab}
+        renderLabel={(k) => k === 'contracts' && contractCount > 0
+          ? `${t(`customer.tab_${k}`)} (${contractCount})`
+          : t(`customer.tab_${k}`)}
+      />
 
-        {/* ── How they have paid ── */}
-        <DetailSection
-          icon={<History size={14} />}
-          title={t('customer.contractsTitle', { count: ran.length + unopened.length })}
-        >
-          {ran.length > 0 && (
-            <div className={`text-sm ${recordStatus === 'bad' ? 'text-danger-fg' : recordStatus === 'warn' ? 'text-warning-fg' : 'text-subtle'}`}>
-              {recordSummary}
-            </div>
+      <div className="flex-1 min-h-0 overflow-auto better-scroll">
+        <div className="px-4 md:px-6 py-4 max-w-2xl flex flex-col gap-5">
+          {tab === 'contracts' && (
+            <>
+              {/* How they pay, in one line, and the points they hold. */}
+              {(recordSummary || points.balances.length > 0) && (
+                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                  {recordSummary ? <span className={`text-sm font-medium ${recordTone}`}>{recordSummary}</span> : <span />}
+                  {points.balances.length > 0 && (
+                    <span className="text-sm text-subtle inline-flex flex-wrap items-center gap-x-2">
+                      <Award size={14} />
+                      {points.balances.map(b => (
+                        <span key={b.company_id}>
+                          <span className="text-fg font-medium tabular-nums">{t('customer.reward.points', { value: fmtPoints(b.points) })}</span>
+                          {points.balances.length > 1 && <> · {b.company_name}</>}
+                        </span>
+                      ))}
+                    </span>
+                  )}
+                </div>
+              )}
+              {/* A company user sees only their own company's contracts; one
+                  that owes elsewhere in the group looks clean here. */}
+              {user?.company_name && contractCount > 0 && (
+                <div className="text-xs text-subtle -mt-3">{t('customer.contractsScope', { company: user.company_name })}</div>
+              )}
+              <PaymentRecordList
+                key={customerId}
+                record={record}
+                points={points}
+                byStage
+                showBranch
+                emptyText={t('customer.noContracts')}
+              />
+            </>
           )}
-          <PaymentRecordList record={record} emptyText={t('customer.noRunningContracts')} showBranch />
-        </DetailSection>
 
-        {/* ── How to reach them ── */}
-        <DetailSection
-          icon={<Phone size={14} />}
-          title={t('customer.contactTitle')}
-          action={<Button variant="ghost" size="sm" startIcon={<Plus size={14} />} onClick={() => setAddContactOpen(true)}>{t('customer.addContact')}</Button>}
-        >
-          <div className="rounded-md border border-line divide-y divide-line">
-            {/* The record's own numbers are edited with the customer's details;
-                the extra ones are their own rows and can be deleted. */}
-            {customer.tel && (
-              <ContactLine label={t('partnerCase.mainPhone')} value={customer.tel} isPhone>
-                <EditIconButton label={t('customer.editCustomerInfo')} onClick={() => setEditInfoOpen(true)} />
-              </ContactLine>
-            )}
-            {customer.tel2 && (
-              <ContactLine label={t('customer.phone2')} value={customer.tel2} isPhone>
-                <EditIconButton label={t('customer.editCustomerInfo')} onClick={() => setEditInfoOpen(true)} />
-              </ContactLine>
-            )}
-            {phoneContacts.map(c => (
-              <ContactLine key={c.id} label={contactLabel(c)} value={c.value} isPhone primary={c.is_primary}>
-                <DeleteContactButton contact={c} onDeleted={() => { refreshAll(); showSuccess(t('customer.contactDeleted')); }} />
-              </ContactLine>
-            ))}
-            {otherContacts.map(c => (
-              <ContactLine key={c.id} label={contactLabel(c)} value={c.value} primary={c.is_primary}>
-                <DeleteContactButton contact={c} onDeleted={() => { refreshAll(); showSuccess(t('customer.contactDeleted')); }} />
-              </ContactLine>
-            ))}
-            {customer.line_id && <ContactLine label="LINE" value={customer.line_id} />}
-            {customer.facebook && <ContactLine label="Facebook" value={customer.facebook} />}
-            {!customer.tel && !customer.tel2 && contacts.length === 0 && !customer.line_id && !customer.facebook && (
-              <div className="px-3 py-2.5 text-sm text-subtler">{t('customer.noContacts')}</div>
-            )}
-          </div>
-        </DetailSection>
+          {tab === 'contact' && (
+            <>
+              <TabSection
+                title={t('partnerCase.phones')}
+                action={canEdit && <Button variant="ghost" size="sm" startIcon={<Plus size={14} />} onClick={() => setAddContactOpen(true)}>{t('customer.addContact')}</Button>}
+              >
+                {hasAnyContact ? (
+                  <div className="rounded-md border border-line divide-y divide-line">
+                    {/* The record's own numbers are edited with the customer's
+                        details; the extra ones are rows of their own. */}
+                    {customer.tel && (
+                      <ContactLine label={t('partnerCase.mainPhone')} value={customer.tel} isPhone>
+                        {canEdit && <EditIconButton label={t('customer.editCustomerInfo')} onClick={() => setEditInfoOpen(true)} />}
+                      </ContactLine>
+                    )}
+                    {customer.tel2 && (
+                      <ContactLine label={t('customer.phone2')} value={customer.tel2} isPhone>
+                        {canEdit && <EditIconButton label={t('customer.editCustomerInfo')} onClick={() => setEditInfoOpen(true)} />}
+                      </ContactLine>
+                    )}
+                    {[...phoneContacts, ...otherContacts].map(c => (
+                      <ContactLine key={c.id} label={contactLabel(c)} value={c.value} isPhone={PHONE_TYPES.includes(c.contact_type)} primary={c.is_primary}>
+                        {canEdit && <DeleteContactButton contact={c} onDeleted={() => { refreshAll(); showSuccess(t('customer.contactDeleted')); }} />}
+                      </ContactLine>
+                    ))}
+                    {customer.line_id && <ContactLine label="LINE" value={customer.line_id} />}
+                    {customer.facebook && <ContactLine label="Facebook" value={customer.facebook} />}
+                  </div>
+                ) : (
+                  <div className="text-sm text-subtler">{t('customer.noContacts')}</div>
+                )}
+              </TabSection>
 
-        <DetailSection icon={<MapPin size={14} />} title={t('customer.addresses')}>
-          <div className="flex flex-col gap-3">
-            <AddressLine label={t('customer.addressHome')} address={homeAddress} onEdit={() => setEditAddressType('HOME')} />
-            <AddressLine label={t('customer.addressWork')} address={workAddress} onEdit={() => setEditAddressType('WORK')} />
-            <AddressLine label={t('customer.addressShipping')} address={shippingAddress} onEdit={() => setEditAddressType('SHIPPING')} />
-          </div>
-        </DetailSection>
+              <TabSection title={t('customer.addresses')}>
+                <div className="flex flex-col gap-3">
+                  <AddressLine label={t('customer.addressHome')} address={homeAddress} onEdit={canEdit ? () => setEditAddressType('HOME') : undefined} />
+                  <AddressLine label={t('customer.addressWork')} address={workAddress} onEdit={canEdit ? () => setEditAddressType('WORK') : undefined} />
+                  <AddressLine label={t('customer.addressShipping')} address={shippingAddress} onEdit={canEdit ? () => setEditAddressType('SHIPPING') : undefined} />
+                </div>
+              </TabSection>
 
-        <DetailSection
-          icon={<Users size={14} />}
-          title={`${t('customer.references')} (${references.length})`}
-          action={<Button variant="ghost" size="sm" startIcon={<UserPlus size={14} />} onClick={() => setAddReferenceOpen(true)}>{t('customer.addReference')}</Button>}
-        >
-          {references.length === 0 ? (
-            <div className="text-sm text-subtler">{t('customer.noReferences')}</div>
-          ) : (
-            <div className="rounded-md border border-line divide-y divide-line">
-              {references.map(r => (
-                <ReferenceRow
-                  key={r.id}
-                  reference={r}
-                  onEdit={() => setEditReference(r)}
-                  onDeleted={() => { refreshAll(); showSuccess(t('customer.referenceDeleted')); }}
-                />
-              ))}
-            </div>
+              <TabSection
+                title={`${t('customer.references')} (${references.length})`}
+                action={canEdit && <Button variant="ghost" size="sm" startIcon={<UserPlus size={14} />} onClick={() => setAddReferenceOpen(true)}>{t('customer.addReference')}</Button>}
+              >
+                {references.length === 0 ? (
+                  <div className="text-sm text-subtler">{t('customer.noReferences')}</div>
+                ) : (
+                  <div className="rounded-md border border-line divide-y divide-line">
+                    {references.map(r => (
+                      <ReferenceRow
+                        key={r.id}
+                        reference={r}
+                        onEdit={canEdit ? () => setEditReference(r) : undefined}
+                        onDeleted={canEdit ? () => { refreshAll(); showSuccess(t('customer.referenceDeleted')); } : undefined}
+                      />
+                    ))}
+                  </div>
+                )}
+              </TabSection>
+            </>
           )}
-        </DetailSection>
 
-        {/* ── App account and points ── */}
-        <section className="rounded-md border border-line px-3 py-3">
-          <CustomerLoginCard
-            noCard
-            customer={{
-              id: customer.id,
-              full_name: customer.full_name,
-              id_number: customer.id_number,
-              tel: customer.tel,
-              username: customer.username,
-              has_login: customer.has_login,
-              last_login_at: customer.last_login_at,
-              failed_login_count: customer.failed_login_count,
-              locked_until: customer.locked_until,
-              is_currently_locked: customer.is_currently_locked,
-            }}
-            onChanged={() => { invalidateLogin(customer.id); refreshAll(); }}
-          />
-        </section>
-
-        <CustomerRewardSection customerId={customerId} />
+          {tab === 'app' && (
+            <CustomerLoginCard
+              noCard
+              customer={{
+                id: customer.id,
+                full_name: customer.full_name,
+                id_number: customer.id_number,
+                tel: customer.tel,
+                username: customer.username,
+                has_login: customer.has_login,
+                last_login_at: customer.last_login_at,
+                failed_login_count: customer.failed_login_count,
+                locked_until: customer.locked_until,
+                is_currently_locked: customer.is_currently_locked,
+              }}
+              onChanged={() => { invalidateLogin(customer.id); refreshAll(); }}
+            />
+          )}
+        </div>
       </div>
 
       {/* ── Modals ── */}
@@ -779,12 +847,27 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
   );
 }
 
+// ── A titled part of a tab (no box — the tab is the container) ─────────────
+
+function TabSection({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className="flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-2 min-h-7">
+        <h3 className="text-sm font-medium">{title}</h3>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 // ── Address line (read-only, edit/add on the right) ────────────────────────
 
 function AddressLine({ label, address, onEdit }: {
   label: string;
   address: CustomerAddress | undefined;
-  onEdit: () => void;
+  /** Left out for a user who may not change the customer. */
+  onEdit?: () => void;
 }) {
   const { t } = useTranslation();
   const recipient = [address?.recipient_name, address?.recipient_tel ? formatTel(address.recipient_tel) : null].filter(Boolean).join(' · ');
@@ -801,15 +884,17 @@ function AddressLine({ label, address, onEdit }: {
           <div className="text-sm mt-0.5 text-subtler">—</div>
         )}
       </div>
-      <Tooltip content={address ? t('customer.editAddress') : t('common.add')} placement="top">
-        <Button
-          variant="ghost"
-          className="btn-icon-xs shrink-0"
-          onClick={onEdit}
-          startIcon={address ? <Pencil size={12} /> : <Plus size={12} />}
-          aria-label={address ? t('customer.editAddress') : t('common.add')}
-        />
-      </Tooltip>
+      {onEdit && (
+        <Tooltip content={address ? t('customer.editAddress') : t('common.add')} placement="top">
+          <Button
+            variant="ghost"
+            className="btn-icon-xs shrink-0"
+            onClick={onEdit}
+            startIcon={address ? <Pencil size={12} /> : <Plus size={12} />}
+            aria-label={address ? t('customer.editAddress') : t('common.add')}
+          />
+        </Tooltip>
+      )}
     </div>
   );
 }
@@ -1353,7 +1438,10 @@ function AddReferenceModal({ open, onClose, customerId, onSuccess }: {
 // Writes go through RPCs — v_customer_references is read-only (mig 441).
 
 function ReferenceRow({ reference, onEdit, onDeleted }: {
-  reference: CustomerReference; onEdit: () => void; onDeleted: () => void;
+  reference: CustomerReference;
+  /** Both left out for a user who may not change the customer. */
+  onEdit?: () => void;
+  onDeleted?: () => void;
 }) {
   const { t } = useTranslation();
   const { addSnackbar } = useSnackbarContext();
@@ -1365,7 +1453,7 @@ function ReferenceRow({ reference, onEdit, onDeleted }: {
     try {
       await apiClient.rpc('fn_customer_reference_delete', { p_reference_id: reference.id });
       setConfirming(false);
-      onDeleted();
+      onDeleted?.();
     } catch (err) {
       // A delete that silently does nothing reads as success — surface it.
       const msg = err instanceof ApiError ? translateApiError(err, t) : (err instanceof Error ? err.message : String(err));
@@ -1385,14 +1473,14 @@ function ReferenceRow({ reference, onEdit, onDeleted }: {
         {reference.relation && <div className="text-xs text-subtle truncate">{reference.relation}</div>}
       </div>
       {reference.tel && <TelLink tel={reference.tel} />}
-      <div className="flex items-center gap-1 shrink-0">
+      {onEdit && onDeleted && <div className="flex items-center gap-1 shrink-0">
         <Tooltip content={t('customer.editReference')} placement="top">
           <Button variant="ghost" className="btn-icon-xs" onClick={onEdit} startIcon={<Pencil size={12} />} aria-label={t('customer.editReference')} />
         </Tooltip>
         <Tooltip content={t('common.delete')} placement="top">
           <Button variant="ghost" className="btn-icon-xs text-subtle hover:text-danger" onClick={() => setConfirming(true)} startIcon={<Trash2 size={12} />} aria-label={t('common.delete')} />
         </Tooltip>
-      </div>
+      </div>}
       <ConfirmDialog
         open={confirming}
         onClose={() => setConfirming(false)}
