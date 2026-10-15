@@ -778,8 +778,8 @@ export function PartnerCaseDetailPanel({
                 onClick={() => setShowUnopened(v => !v)}
                 className="text-xs text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none cursor-pointer p-0"
               >
-                {showUnopened ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                 {t('partnerCase.showUnopened', { count: unopenedContracts.length })}
+                {showUnopened ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
               </button>
               {showUnopened && (
                 <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
@@ -828,15 +828,23 @@ export function PartnerCaseDetailPanel({
 
         {/* The device, plus its own photo album when it has one */}
         <Section icon={<Smartphone size={14} />} title={t('partnerCase.deviceTitle')}>
-          <div className="grid grid-cols-2 gap-3">
-            {/* The view's standard name (brand + model + storage + colour, mig
-             *  1422) — not the snapshot's bare variant, which hid the model. */}
-            <Field label={t('partnerCase.product')} value={detail.product_display_name ?? '—'} />
-            <Field label={t('partnerCase.assetCode')} value={asset?.asset_code ?? detail.asset_code ?? '—'} />
+          {/* The product name is the long one (brand + model + storage +
+              colour), so it gets the row and wraps rather than cutting off;
+              the condition is one word and sits beside it. */}
+          <div className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-3">
+            {/* The view's standard name (mig 1422) — not the snapshot's bare
+             *  variant, which hid the model. */}
+            <div className="min-w-0">
+              <div className="text-xs text-subtle">{t('partnerCase.product')}</div>
+              <div className="text-sm">{detail.product_display_name ?? '—'}</div>
+            </div>
             <Field
               label={t('partnerCase.condition')}
               value={detail.is_used_asset ? t('partnerCase.used') : t('partnerCase.new')}
             />
+          </div>
+          <div className="grid grid-cols-2 gap-3 mt-3">
+            <Field label={t('partnerCase.assetCode')} value={asset?.asset_code ?? detail.asset_code ?? '—'} />
             {(asset?.imei || asset?.serial_no) && (
               <Field label={asset?.imei ? 'IMEI' : t('partnerCase.serialNo')} value={asset?.imei ?? asset?.serial_no ?? '—'} />
             )}
