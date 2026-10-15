@@ -150,7 +150,28 @@ export interface PartnerCaseSnapshot {
     id_type?: string;
     id_number?: string;
     tel?: string;
-    address?: Record<string, unknown>;
+    date_of_birth?: string | null;
+    customer_id?: number;
+    /** The address written on the contract (one row of `v_customer_addresses`). */
+    address?: {
+      address_type?: string;
+      address_line1: string;
+      address_line2: string | null;
+      soi: string | null;
+      road: string | null;
+      sub_district: string;
+      district: string;
+      province: string;
+      postal_code: string;
+    } | null;
+    /** The reference people submitted with the contract. */
+    references?: Array<{
+      id?: number;
+      name: string | null;
+      last_name: string | null;
+      tel: string | null;
+      relation: string | null;
+    }>;
   }>;
   rated?: Record<string, unknown>;
   /** The hashed slice. Show `agreed`/`asset`/`parties` instead — this is plumbing. */
