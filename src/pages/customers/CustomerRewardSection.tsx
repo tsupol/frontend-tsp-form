@@ -3,9 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { DataTableFooter } from 'tsp-form';
 import { Link } from 'react-router-dom';
-import { ExternalLink } from 'lucide-react';
+import { Award, ExternalLink } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
+import { DetailSection } from '../../components/DetailLine';
 import { fmtCurrency } from '../../lib/format';
 
 // ── Reward points (mig 1371, by amount since mig 1378) ──────────────────────
@@ -84,13 +85,9 @@ export function CustomerRewardSection({ customerId }: { customerId: number }) {
     balances.length > 1 ? balances.find(b => b.company_id === id)?.company_name : undefined;
 
   return (
-    <>
-      <div className="flex items-center justify-between mb-2 mt-2">
-        <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider">{t('customer.reward.title')}</h3>
-      </div>
-
+    <DetailSection icon={<Award size={14} />} title={t('customer.reward.title')}>
       {/* Balance — one line per company the customer has points with. */}
-      <div className="mb-3 px-3 py-2.5 rounded-md bg-surface border border-line text-sm space-y-1.5">
+      <div className="text-sm space-y-1.5">
         {balances.length === 0 ? (
           <div className="flex items-start justify-between gap-4">
             <span className="text-subtle">{t('customer.reward.balance')}</span>
@@ -107,7 +104,7 @@ export function CustomerRewardSection({ customerId }: { customerId: number }) {
       </div>
 
       {/* History — newest first. */}
-      <div className={`rounded-md bg-surface border border-line transition-opacity ${historyFetching ? 'opacity-60' : ''} ${historyTotal > PAGE_SIZE_OPTIONS[0] ? 'mb-2' : 'mb-4'}`}>
+      <div className={`rounded-md border border-line transition-opacity ${historyFetching ? 'opacity-60' : ''}`}>
         {history.length === 0 ? (
           <div className="px-3 py-3 text-sm text-subtler">{t('customer.reward.noHistory')}</div>
         ) : (
@@ -152,7 +149,7 @@ export function CustomerRewardSection({ customerId }: { customerId: number }) {
         )}
       </div>
       {historyTotal > PAGE_SIZE_OPTIONS[0] && (
-        <div className="mb-4">
+        <div>
           <DataTableFooter
             currentPage={page} // the footer counts pages from 1, like getPaginated
             totalPages={totalPages}
@@ -165,6 +162,6 @@ export function CustomerRewardSection({ customerId }: { customerId: number }) {
           />
         </div>
       )}
-    </>
+    </DetailSection>
   );
 }

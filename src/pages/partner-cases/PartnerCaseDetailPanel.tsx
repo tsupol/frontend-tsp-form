@@ -25,7 +25,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Badge, Button, Tooltip } from 'tsp-form';
 import {
   ArrowLeft, Clock, FileText, Smartphone, User, Wallet, MapPin, Phone, Users,
-  History, AlertTriangle, ImageOff, Star, ChevronDown, ChevronRight,
+  History, AlertTriangle, ImageOff, Star, ChevronRight,
   CheckCircle2, XCircle, Info, MessageCircle,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
@@ -37,7 +37,10 @@ import { normalizeKey } from '../../lib/mediaPath';
 import { useContractAlbumPhotos } from '../contracts/contractPhotoStatus';
 import { passesThaiCidChecksum } from '../../lib/ocr/extractIdCard';
 import { thaiPhoneReason } from '../../lib/validators';
-import { bangkokDay, dayDiff } from './customerRisk';
+import { TelLink, ValidMark } from '../../components/TelLink';
+import { PaymentRecordList } from '../../components/PaymentRecord';
+import { usePaymentRecord } from '../../hooks/usePaymentRecord';
+import { ageFrom } from './customerRisk';
 import { usePartnerCaseActions, usePartnerCaseReturnReasons } from './usePartnerCases';
 import { outcomeBadgeColor, type PartnerCaseDetail } from './partnerCaseTypes';
 import { PartnerCaseApproveModal } from './PartnerCaseApproveModal';
@@ -120,63 +123,12 @@ interface ReferencePerson {
   relation: string | null;
 }
 
-/** `v_customer_contracts` — this customer's contracts in the holding. */
-interface CustomerContractRow {
-  contract_id: number;
-  contract_code: string;
-  state: string;
-  product_display_name: string | null;
-  paid_installment_count: number | null;
-  total_installments: number | null;
-  overdue_count: number | null;
-  overdue_amount: number | null;
-  activated_at: string | null;
-}
-
-/** `v_installments` — one mark per instalment in the payment record. */
-interface InstallmentRow {
-  contract_id: number;
-  pay_no: number;
-  due_date: string;
-  paid_at: string | null;
-  /** PAID · PARTIAL · OVERDUE · DUE_TODAY · UPCOMING · FUTURE · TERMINATED */
-  payment_state: string;
-  days_past_due: number | null;
-}
-
-/** How one instalment reads in the record. */
-type MarkKind = 'onTime' | 'late' | 'overdue' | 'partial' | 'due' | 'future' | 'ended';
-
-const MARK_CLASS: Record<MarkKind, string> = {
-  onTime: 'bg-success border-success',
-  late: 'bg-warning border-warning',
-  overdue: 'bg-danger border-danger',
-  partial: 'bg-warning-soft border-warning',
-  due: 'bg-transparent border-subtle',
-  future: 'bg-transparent border-line',
-  ended: 'bg-transparent border-line border-dashed',
-};
-
 /** Row of `v_contract_photo_slots` — the group names for the contract's photos. */
 interface PhotoSlotRef {
   usage_type: string;
   label_th: string;
   label_en: string;
   sort_order: number;
-}
-
-/** Late record of one earlier contract. */
-interface LateRecord {
-  lateCount: number;
-  worstDays: number;
-}
-
-function ageFrom(dob: string | null | undefined): number | null {
-  if (!dob) return null;
-  const today = bangkokDay(new Date().toISOString());
-  const [y, m, d] = dob.split('-').map(Number);
-  const [ty, tm, td] = today.split('-').map(Number);
-  return ty - y - (tm < m || (tm === m && td < d) ? 1 : 0);
 }
 
 function formatAddress(a: Pick<CustomerAddress, 'address_line1' | 'address_line2' | 'soi' | 'road' | 'sub_district' | 'district' | 'province' | 'postal_code'>): string {
@@ -196,7 +148,6 @@ export function PartnerCaseDetailPanel({
   const [approveOpen, setApproveOpen] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
   const [lightbox, setLightbox] = useState<{ keys: string[]; index: number } | null>(null);
-  const [showUnopened, setShowUnopened] = useState(false);
   const identityRef = useRef<HTMLElement>(null);
   const reachRef = useRef<HTMLElement>(null);
   const recordRef = useRef<HTMLElement>(null);
@@ -283,35 +234,8 @@ export function PartnerCaseDetailPanel({
     staleTime: 30 * 1000,
   });
 
-  const { data: customerContracts = [] } = useQuery({
-    queryKey: ['customer-contracts-record', customerId],
-    queryFn: () => apiClient.get<CustomerContractRow[]>(
-      `/v_customer_contracts?customer_id=eq.${customerId}`
-      + '&select=contract_id,contract_code,state,product_display_name,paid_installment_count,total_installments,overdue_count,overdue_amount,activated_at'
-      + '&order=activated_at.desc.nullslast',
-    ),
-    enabled: customerId != null,
-    staleTime: 30 * 1000,
-  });
-
-  // Earlier contracts that actually started — not this one, and not ones
-  // that never reached their first instalment.
-  const ranContracts = customerContracts.filter(c => c.contract_id !== contractId && c.activated_at);
-  const unopenedContracts = customerContracts.filter(c => c.contract_id !== contractId && !c.activated_at);
-  const ranIds = ranContracts.map(c => c.contract_id);
-
-  // Paid-late history. The backend's contract list only says what is owed
-  // *now*; nothing returns "was this customer ever late", so it is counted
-  // here from each paid instalment's date against its due date.
-  const { data: installments = [] } = useQuery({
-    queryKey: ['partner-case-installments', ranIds.join(',')],
-    queryFn: () => apiClient.get<InstallmentRow[]>(
-      `/v_installments?contract_id=in.(${ranIds.join(',')})`
-      + '&select=contract_id,pay_no,due_date,paid_at,payment_state,days_past_due&order=contract_id,pay_no',
-    ),
-    enabled: ranIds.length > 0,
-    staleTime: 30 * 1000,
-  });
+  // How they paid before — every other contract of theirs this fund can see.
+  const record = usePaymentRecord(customerId, contractId);
 
   const { data: evidence = [] } = useQuery({
     queryKey: ['asset-evidence', assetId],
@@ -350,50 +274,7 @@ export function PartnerCaseDetailPanel({
     return i18n.language === 'th' ? row.name_th : row.name_en;
   };
 
-  const lateBy = new Map<number, LateRecord>();
-  for (const ins of installments) {
-    if (!ins.paid_at) continue;
-    const days = dayDiff(ins.due_date, bangkokDay(ins.paid_at));
-    if (days <= 0) continue;
-    const rec = lateBy.get(ins.contract_id) ?? { lateCount: 0, worstDays: 0 };
-    rec.lateCount += 1;
-    rec.worstDays = Math.max(rec.worstDays, days);
-    lateBy.set(ins.contract_id, rec);
-  }
-  // Contracts with something to look at first (owing now, then paid late),
-  // newest first within each; a long record shows its first few until asked.
-  const problemRank = (c: CustomerContractRow) =>
-    (c.overdue_count ?? 0) > 0 ? 0 : lateBy.has(c.contract_id) ? 1 : 2;
-  // A customer rarely has more than one or two earlier contracts (real data:
-  // 99% have one), so every one is shown in full.
-  const sortedRan = [...ranContracts].sort((a, b) => problemRank(a) - problemRank(b));
-  const marksOf = (contractId: number) => installments.filter(i => i.contract_id === contractId);
-  const lateDays = (i: InstallmentRow) => (i.paid_at ? dayDiff(i.due_date, bangkokDay(i.paid_at)) : 0);
-  const markKind = (i: InstallmentRow): MarkKind => {
-    if (i.payment_state === 'TERMINATED') return 'ended';
-    if (i.paid_at && i.payment_state === 'PAID') return lateDays(i) > 0 ? 'late' : 'onTime';
-    if (i.payment_state === 'OVERDUE') return 'overdue';
-    if (i.payment_state === 'PARTIAL') return 'partial';
-    if (i.payment_state === 'DUE_TODAY' || i.payment_state === 'UPCOMING') return 'due';
-    return 'future';
-  };
-  const markLabel = (i: InstallmentRow, kind: MarkKind) =>
-    `${t('partnerCase.markPayNo', { n: i.pay_no })} · ${t(`partnerCase.mark_${kind}`, {
-      days: kind === 'late' ? lateDays(i) : (i.days_past_due ?? 0),
-    })}`;
-  const markTip = (i: InstallmentRow, kind: MarkKind) => (
-    <div className="flex flex-col gap-0.5">
-      <div className="font-medium">{markLabel(i, kind)}</div>
-      <div className="text-xs opacity-90">{t('partnerCase.markDueOn')} <DateTime value={i.due_date} showTime={false} /></div>
-      {i.paid_at && (
-        <div className="text-xs opacity-90">{t('partnerCase.markPaidOn')} <DateTime value={i.paid_at} showTime={false} /></div>
-      )}
-    </div>
-  );
-  const totalLate = [...lateBy.values()].reduce((n, r) => n + r.lateCount, 0);
-  const worstLate = Math.max(0, ...[...lateBy.values()].map(r => r.worstDays));
-  const totalOverdue = ranContracts.reduce((n, c) => n + (c.overdue_count ?? 0), 0);
-  const totalPaid = ranContracts.reduce((n, c) => n + (c.paid_installment_count ?? 0), 0);
+  const { ran: ranContracts, totalOverdue, totalLate, worstLate, totalPaid } = record;
 
   // The contract's address and reference people are the ones submitted; the
   // work address and phone numbers are the customer record's.
@@ -787,99 +668,7 @@ export function PartnerCaseDetailPanel({
               scoped by company), so a customer behind on a contract at another
               branch of the group looks clean here. Say so where it matters. */}
           <div className="text-xs text-subtle mb-2">{t('partnerCase.recordScopeNote')}</div>
-          {ranContracts.length > 0 && (
-            <div className="flex flex-wrap gap-x-3 gap-y-1 mb-2 text-xs text-subtle">
-              {(['onTime', 'late', 'overdue', 'future'] as const).map(k => (
-                <span key={k} className="inline-flex items-center gap-1">
-                  <span className={`block w-3 h-3 rounded-sm border ${MARK_CLASS[k]}`} />
-                  {t(`partnerCase.legend_${k}`)}
-                </span>
-              ))}
-            </div>
-          )}
-          {ranContracts.length === 0 ? (
-            <div className="text-sm text-subtler">{t('partnerCase.noPaymentRecord')}</div>
-          ) : (
-            <div className="rounded-md border border-line overflow-hidden">
-              {sortedRan.map(c => {
-                const late = lateBy.get(c.contract_id);
-                const overdue = c.overdue_count ?? 0;
-                const paid = c.paid_installment_count ?? 0;
-                return (
-                  <div key={c.contract_id} className="px-3 py-2 border-b border-line last:border-b-0">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <EntityCodeLink
-                        to={`/admin/contracts/search/${c.contract_id}`}
-                        code={c.contract_code}
-                        className="text-sm font-medium shrink-0"
-                      />
-                      <Badge size="sm">{t(`contract.state_${c.state}`, { defaultValue: c.state })}</Badge>
-                      <span className="flex-1 min-w-0 truncate text-xs text-subtle">{c.product_display_name ?? ''}</span>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-1.5 mt-1 text-xs">
-                      <span className="text-subtle tabular-nums">
-                        {t('partnerCase.paidOf', { paid, total: c.total_installments ?? 0 })}
-                      </span>
-                      {overdue > 0 && (
-                        <Badge color="danger" size="xs">
-                          {t('partnerCase.overdueNow', { count: overdue, amount: fmtCurrency(c.overdue_amount ?? 0) })}
-                        </Badge>
-                      )}
-                      {late ? (
-                        <Badge color="warning" size="xs">
-                          {t('partnerCase.paidLate', { count: late.lateCount, days: late.worstDays })}
-                        </Badge>
-                      ) : paid > 0 && overdue === 0 ? (
-                        <Badge color="success" size="xs">{t('partnerCase.onTime')}</Badge>
-                      ) : null}
-                    </div>
-                    {/* One mark per instalment, in order — how this customer
-                        actually pays, not just a count. Hover for the dates. */}
-                    {marksOf(c.contract_id).length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1.5">
-                        {marksOf(c.contract_id).map(i => {
-                          const kind = markKind(i);
-                          return (
-                            <Tooltip key={i.pay_no} content={markTip(i, kind)} placement="top">
-                              <span
-                                className={`block w-3.5 h-3.5 rounded-sm border ${MARK_CLASS[kind]}`}
-                                aria-label={markLabel(i, kind)}
-                              />
-                            </Tooltip>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          {/* Contracts that never started paying (drafts, expired or
-              cancelled ones, and ones still on their way) say nothing about
-              how this customer pays — counted, out of the way, openable. */}
-          {unopenedContracts.length > 0 && (
-            <div className="mt-2">
-              <button
-                type="button"
-                onClick={() => setShowUnopened(v => !v)}
-                className="text-xs text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none cursor-pointer p-0"
-              >
-                {t('partnerCase.showUnopened', { count: unopenedContracts.length })}
-                {showUnopened ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-              </button>
-              {showUnopened && (
-                <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
-                  {unopenedContracts.map(c => (
-                    <span key={c.contract_id} className="text-xs inline-flex items-center gap-1">
-                      <EntityCodeLink to={`/admin/contracts/search/${c.contract_id}`} code={c.contract_code} iconSize={10} />
-                      <span className="text-subtle">{t(`contract.state_${c.state}`, { defaultValue: c.state })}</span>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+          <PaymentRecordList record={record} emptyText={t('partnerCase.noPaymentRecord')} />
         </Section>
 
         {/* 6. The deal: the money, exactly as submitted */}
@@ -1047,37 +836,6 @@ function AddressBlock({ label, value }: { label: string; value: string | null })
       <SubLabel icon={<MapPin size={12} />}>{label}</SubLabel>
       <div className={`text-sm mt-1.5 leading-relaxed ${value ? '' : 'text-subtler'}`}>{value ?? '—'}</div>
     </div>
-  );
-}
-
-/** A phone number that dials on a phone (tel: link), with its format check. */
-function TelLink({ tel }: { tel: string }) {
-  const { t } = useTranslation();
-  const reason = thaiPhoneReason(tel);
-  const d = tel.replace(/\D/g, '');
-  return (
-    <span className="inline-flex items-center gap-1.5 shrink-0">
-      <a
-        href={`tel:${d}`}
-        className="text-sm text-primary-fg hover:underline inline-flex items-center gap-1 tabular-nums"
-      >
-        <Phone size={12} />{formatTel(d)}
-      </a>
-      {reason && <ValidMark ok={false} tip={t(`partnerCase.phoneInvalid_${reason}`)} />}
-    </span>
-  );
-}
-
-/** Tick or warning beside a number that was checked, with why on hover. */
-function ValidMark({ ok, tip }: { ok: boolean; tip: string }) {
-  return (
-    <Tooltip content={tip} placement="top">
-      <span className="inline-flex" aria-label={tip}>
-        {ok
-          ? <CheckCircle2 size={13} className="text-success-fg" />
-          : <AlertTriangle size={13} className="text-danger-fg" />}
-      </span>
-    </Tooltip>
   );
 }
 

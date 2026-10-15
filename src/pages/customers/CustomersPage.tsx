@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, DataTableFooter, Input, Select, Button, Badge, Modal, LabeledCheckbox, FormErrorMessage, useSnackbarContext } from 'tsp-form';
-import { ArrowRightFromLine, ArrowLeft, Users, CheckCircle, XCircle, Trash2, Star, Plus, Pencil, MapPin, UserPlus, ExternalLink, ShieldAlert, ShieldOff } from 'lucide-react';
+import { PageNav, PageNavPanel, MobileHeader, DataTableFooter, Input, Select, Button, Badge, Modal, LabeledCheckbox, FormErrorMessage, Tooltip, useSnackbarContext } from 'tsp-form';
+import { ArrowRightFromLine, ArrowLeft, Users, User, Phone, History, ImageOff, CheckCircle, XCircle, Trash2, Star, Plus, Pencil, MapPin, UserPlus, ShieldAlert, ShieldOff } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { toLocalDateStr, parseLocalDate, formatTel, formatCid } from '../../lib/format';
@@ -15,7 +15,14 @@ import { PhoneInput } from '../../components/PhoneInput';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { CustomerLoginCard, useInvalidateLoginInfo } from '../../components/CustomerLoginCard';
 import { EditIdentityModal } from '../../components/EditIdentityModal';
-import { ContractDetailPanel } from '../contracts/ContractDetailPanel';
+import { DetailSection, DetailLine } from '../../components/DetailLine';
+import { TelLink, ValidMark } from '../../components/TelLink';
+import { PaymentRecordList } from '../../components/PaymentRecord';
+import { usePaymentRecord } from '../../hooks/usePaymentRecord';
+import { MediaLightboxKeyGallery, MediaThumbButton } from '../../components/MediaLightbox';
+import { normalizeKey } from '../../lib/mediaPath';
+import { passesThaiCidChecksum } from '../../lib/ocr/extractIdCard';
+import { ageFrom } from '../partner-cases/customerRisk';
 import { useAuth } from '../../contexts/AuthContext';
 import { SearchInput } from '../../components/SearchInput';
 import { AddToBlacklistModal, LiftBlacklistModal } from './BlacklistModals';
@@ -135,11 +142,18 @@ interface CustomerReference {
   created_at: string;
 }
 
-interface ContractSummary {
+/** `v_customer_documents` — the image lives in `file_url`, a storage key. */
+interface CustomerDocument {
   id: number;
-  code_display: string;
-  state: string;
-  branch_name: string | null;
+  doc_type: string;
+  file_url: string | null;
+}
+
+/** `v_blacklist` — the active entry, for its reason and date. */
+interface BlacklistEntry {
+  id: number;
+  reason: string | null;
+  created_at: string;
 }
 
 interface PostalLookup {
@@ -151,17 +165,9 @@ interface PostalLookup {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-const stateColor = (state: string) => {
-  switch (state) {
-    case 'ACTIVE': return 'success';
-    case 'COMPLETED': return 'info';
-    case 'TERMINATED': case 'VOIDED': return 'danger';
-    case 'DRAFT': return 'default';
-    default: return 'warning';
-  }
-};
-
 const CONTACT_TYPES = ['MOBILE', 'HOME', 'WORK', 'LINE', 'FACEBOOK', 'OTHER'];
+/** Contact types that are a number to call. */
+const PHONE_TYPES = ['MOBILE', 'HOME', 'WORK'];
 
 const PREFIX_OPTIONS = [
   { value: '', label: '-' },
@@ -374,6 +380,10 @@ export function CustomersPage() {
 }
 
 // ── Customer Detail ─────────────────────────────────────────────────────────
+// Reads top to bottom: who they are, how they have paid, how to reach them,
+// then their app account and points. Same parts as the credit reviewer's case
+// view (phone links with a format check, the payment record with one mark per
+// instalment), so a customer reads the same wherever staff meet them.
 
 function CustomerDetail({ customerId, customer }: { customerId: number; customer: Customer | null }) {
   const { t } = useTranslation();
@@ -399,11 +409,24 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
     enabled: !!customerId,
   });
 
-  const { data: contracts = [] } = useQuery({
-    queryKey: ['customer-contracts', customerId],
-    queryFn: () => apiClient.get<ContractSummary[]>(`/v_contracts?customer_id=eq.${customerId}&select=id,code_display,state,branch_name&order=id.desc&limit=20`),
+  const { data: documents = [] } = useQuery({
+    queryKey: ['customer-documents', customerId],
+    queryFn: () => apiClient.get<CustomerDocument[]>(
+      `/v_customer_documents?customer_id=eq.${customerId}&is_active=eq.true&order=uploaded_at.desc`,
+    ),
     enabled: !!customerId,
   });
+
+  const { data: blacklist = [] } = useQuery({
+    queryKey: ['customer-blacklist-entry', customerId],
+    queryFn: () => apiClient.get<BlacklistEntry[]>(
+      `/v_blacklist?customer_id=eq.${customerId}&is_active=eq.true&select=id,reason,created_at&order=created_at.desc`,
+    ),
+    enabled: customer?.is_blacklisted === true,
+  });
+
+  // Every contract of theirs this user may see, with how each was paid.
+  const record = usePaymentRecord(customerId);
 
   const homeAddress = addresses.find(a => a.address_type === 'HOME');
   const workAddress = addresses.find(a => a.address_type === 'WORK');
@@ -415,10 +438,10 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
   const [addContactOpen, setAddContactOpen] = useState(false);
   const [addReferenceOpen, setAddReferenceOpen] = useState(false);
   const [editReference, setEditReference] = useState<CustomerReference | null>(null);
-  const [contractModalId, setContractModalId] = useState<number | null>(null);
   const [editIdentityOpen, setEditIdentityOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [liftOpen, setLiftOpen] = useState(false);
+  const [photoIndex, setPhotoIndex] = useState<number | null>(null);
 
   // Reset modals when customer changes
   useEffect(() => {
@@ -430,6 +453,7 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
     setEditIdentityOpen(false);
     setAddOpen(false);
     setLiftOpen(false);
+    setPhotoIndex(null);
   }, [customerId]);
 
   const invalidateLogin = useInvalidateLoginInfo();
@@ -450,32 +474,55 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
 
   if (!customer) return null;
 
+  // Only a citizen ID has a check digit to test — and only when this user is
+  // shown the whole number (a holding-level user gets it masked).
+  const idDigits = (customer.id_number ?? '').replace(/\D/g, '');
+  const cidValid = customer.id_type === 'CITIZEN_ID' && idDigits.length === 13
+    ? passesThaiCidChecksum(idDigits)
+    : null;
+  const age = ageFrom(customer.date_of_birth);
+  const idPhotoKeys = documents.filter(d => d.file_url).map(d => normalizeKey(d.file_url!));
+
+  const phoneContacts = contacts.filter(c => PHONE_TYPES.includes(c.contact_type));
+  const otherContacts = contacts.filter(c => !PHONE_TYPES.includes(c.contact_type));
+  const contactLabel = (c: CustomerContact) =>
+    [t(`partnerCase.contactType_${c.contact_type}`, { defaultValue: c.contact_type }), c.label].filter(Boolean).join(' · ');
+
+  const { ran, unopened, totalOverdue, totalLate, worstLate, totalPaid } = record;
+  const recordStatus = totalOverdue > 0 ? 'bad' : totalLate > 0 ? 'warn' : 'ok';
+  const recordSummary = [
+    totalOverdue > 0 ? t('partnerCase.chkRecordOverdue', { count: totalOverdue }) : null,
+    totalLate > 0 ? t('partnerCase.chkRecordLate', { count: totalLate, days: worstLate }) : null,
+    totalOverdue === 0 && totalLate === 0
+      ? (totalPaid > 0 ? t('partnerCase.chkRecordOnTime', { count: ran.length }) : t('partnerCase.chkRecordNotDue'))
+      : null,
+  ].filter(Boolean).join(' · ');
+
   return (
     <div className="flex-1 overflow-auto better-scroll">
-      <div className="px-4 md:px-6 py-4 max-w-2xl">
+      <div className="px-4 md:px-6 py-4 max-w-2xl flex flex-col gap-4">
         {/* ── Header ── */}
-        <div className="flex items-center justify-between mb-4">
-          <div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
             <h2 className="text-lg font-semibold">{customer.full_name}</h2>
-            <div className="flex items-center gap-2 mt-0.5">
-              <Badge size="xs" color={customer.is_active ? 'success' : 'default'}>
-                {customer.is_active ? t('customer.active') : t('customer.inactive')}
-              </Badge>
-              {customer.is_blacklisted && (
-                <Badge size="xs" color="danger">{t('blacklist.badge')}</Badge>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5 text-sm">
+              <span className="text-subtle">{t(`contract.idType_${customer.id_type}`, { defaultValue: customer.id_type })}</span>
+              <span className="tabular-nums">{customer.id_type === 'CITIZEN_ID' ? formatCid(customer.id_number) : customer.id_number}</span>
+              {cidValid !== null && (
+                <ValidMark ok={cidValid} tip={cidValid ? t('partnerCase.cidValid') : t('partnerCase.cidInvalid')} />
               )}
-              <span className="text-xs text-subtle tabular-nums">{customer.id_type}: {formatCid(customer.id_number)}</span>
               {canEditIdentity && (
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center w-6 h-6 rounded cursor-pointer bg-transparent border-none text-subtle transition-colors hover:text-primary-fg hover:bg-surface-hover"
-                  onClick={() => setEditIdentityOpen(true)}
-                  title={t('customer.editIdentity.title')}
-                  aria-label={t('customer.editIdentity.title')}
-                >
-                  <Pencil size={12} />
-                </button>
+                <Tooltip content={t('customer.editIdentity.title')} placement="top">
+                  <Button
+                    variant="ghost"
+                    className="btn-icon-xs"
+                    startIcon={<Pencil size={12} />}
+                    onClick={() => setEditIdentityOpen(true)}
+                    aria-label={t('customer.editIdentity.title')}
+                  />
+                </Tooltip>
               )}
+              {!customer.is_active && <Badge size="xs" color="default">{t('customer.inactive')}</Badge>}
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -509,23 +556,132 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
           </div>
         </div>
 
-        {/* ── Basic Info ── */}
-        <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line text-sm space-y-1.5">
-          <DetailRow label={t('customer.phone')} value={formatTel(customer.tel)} mono />
-          {customer.tel2 && <DetailRow label={`${t('customer.phone')} 2`} value={formatTel(customer.tel2)} mono />}
-          <DetailRow label={t('customer.dateOfBirth')}>
-            {customer.date_of_birth ? <DateTime value={customer.date_of_birth} showTime={false} /> : <span>—</span>}
-          </DetailRow>
-          {customer.facebook && <DetailRow label={t('customer.facebook')} value={customer.facebook} />}
-          {customer.line_id && <DetailRow label={t('customer.lineId')} value={customer.line_id} />}
-          <DetailRow label="Created">
-            <DateTime value={customer.created_at} showTime={false} />
-          </DetailRow>
-        </div>
+        {/* A blacklisted customer can't open a new contract — say so first,
+            with why, rather than as a small badge beside the name. */}
+        {customer.is_blacklisted && (
+          <div className="alert alert-danger">
+            <ShieldAlert size={16} className="shrink-0" />
+            <div className="min-w-0">
+              <div className="font-medium">{t('blacklist.badge')}</div>
+              {blacklist[0] && (
+                <div className="text-sm">
+                  {blacklist[0].reason && <>{blacklist[0].reason} · </>}
+                  {t('customer.blacklistedOn')} <DateTime value={blacklist[0].created_at} showTime={false} />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
-        {/* ── App Login ── */}
-        <div className="mb-4">
+        {/* ── Who they are ── */}
+        <DetailSection icon={<User size={14} />} title={t('customer.infoTitle')}>
+          <DetailLine label={t('customer.dateOfBirth')}>
+            {customer.date_of_birth ? (
+              <>
+                <DateTime value={customer.date_of_birth} showTime={false} />
+                {age != null && <span className="text-subtle">· {t('partnerCase.ageYears', { age })}</span>}
+              </>
+            ) : <span className="text-subtler">—</span>}
+          </DetailLine>
+          <DetailLine label={t('customer.registeredAt')}>
+            <DateTime value={customer.created_at} showTime={false} />
+          </DetailLine>
+          <DetailLine label={t('partnerCase.idCardPhoto')}>
+            {idPhotoKeys.length === 0 ? (
+              <span className="text-subtler inline-flex items-center gap-1.5"><ImageOff size={14} />{t('customer.noIdPhoto')}</span>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {idPhotoKeys.map((key, i) => (
+                  <MediaThumbButton key={key} mediaKey={key} alt={t('partnerCase.idCardPhoto')} onClick={() => setPhotoIndex(i)} />
+                ))}
+              </div>
+            )}
+          </DetailLine>
+        </DetailSection>
+
+        {/* ── How they have paid ── */}
+        <DetailSection
+          icon={<History size={14} />}
+          title={t('customer.contractsTitle', { count: ran.length + unopened.length })}
+        >
+          {ran.length > 0 && (
+            <div className={`text-sm ${recordStatus === 'bad' ? 'text-danger-fg' : recordStatus === 'warn' ? 'text-warning-fg' : 'text-subtle'}`}>
+              {recordSummary}
+            </div>
+          )}
+          <PaymentRecordList record={record} emptyText={t('customer.noRunningContracts')} showBranch />
+        </DetailSection>
+
+        {/* ── How to reach them ── */}
+        <DetailSection
+          icon={<Phone size={14} />}
+          title={t('customer.contactTitle')}
+          action={<Button variant="ghost" size="sm" startIcon={<Plus size={14} />} onClick={() => setAddContactOpen(true)}>{t('customer.addContact')}</Button>}
+        >
+          <div className="rounded-md border border-line divide-y divide-line">
+            {/* The record's own numbers are edited with the customer's details;
+                the extra ones are their own rows and can be deleted. */}
+            {customer.tel && (
+              <ContactLine label={t('partnerCase.mainPhone')} value={customer.tel} isPhone>
+                <EditIconButton label={t('customer.editCustomerInfo')} onClick={() => setEditInfoOpen(true)} />
+              </ContactLine>
+            )}
+            {customer.tel2 && (
+              <ContactLine label={t('customer.phone2')} value={customer.tel2} isPhone>
+                <EditIconButton label={t('customer.editCustomerInfo')} onClick={() => setEditInfoOpen(true)} />
+              </ContactLine>
+            )}
+            {phoneContacts.map(c => (
+              <ContactLine key={c.id} label={contactLabel(c)} value={c.value} isPhone primary={c.is_primary}>
+                <DeleteContactButton contact={c} onDeleted={() => { refreshAll(); showSuccess(t('customer.contactDeleted')); }} />
+              </ContactLine>
+            ))}
+            {otherContacts.map(c => (
+              <ContactLine key={c.id} label={contactLabel(c)} value={c.value} primary={c.is_primary}>
+                <DeleteContactButton contact={c} onDeleted={() => { refreshAll(); showSuccess(t('customer.contactDeleted')); }} />
+              </ContactLine>
+            ))}
+            {customer.line_id && <ContactLine label="LINE" value={customer.line_id} />}
+            {customer.facebook && <ContactLine label="Facebook" value={customer.facebook} />}
+            {!customer.tel && !customer.tel2 && contacts.length === 0 && !customer.line_id && !customer.facebook && (
+              <div className="px-3 py-2.5 text-sm text-subtler">{t('customer.noContacts')}</div>
+            )}
+          </div>
+        </DetailSection>
+
+        <DetailSection icon={<MapPin size={14} />} title={t('customer.addresses')}>
+          <div className="flex flex-col gap-3">
+            <AddressLine label={t('customer.addressHome')} address={homeAddress} onEdit={() => setEditAddressType('HOME')} />
+            <AddressLine label={t('customer.addressWork')} address={workAddress} onEdit={() => setEditAddressType('WORK')} />
+            <AddressLine label={t('customer.addressShipping')} address={shippingAddress} onEdit={() => setEditAddressType('SHIPPING')} />
+          </div>
+        </DetailSection>
+
+        <DetailSection
+          icon={<Users size={14} />}
+          title={`${t('customer.references')} (${references.length})`}
+          action={<Button variant="ghost" size="sm" startIcon={<UserPlus size={14} />} onClick={() => setAddReferenceOpen(true)}>{t('customer.addReference')}</Button>}
+        >
+          {references.length === 0 ? (
+            <div className="text-sm text-subtler">{t('customer.noReferences')}</div>
+          ) : (
+            <div className="rounded-md border border-line divide-y divide-line">
+              {references.map(r => (
+                <ReferenceRow
+                  key={r.id}
+                  reference={r}
+                  onEdit={() => setEditReference(r)}
+                  onDeleted={() => { refreshAll(); showSuccess(t('customer.referenceDeleted')); }}
+                />
+              ))}
+            </div>
+          )}
+        </DetailSection>
+
+        {/* ── App account and points ── */}
+        <section className="rounded-md border border-line px-3 py-3">
           <CustomerLoginCard
+            noCard
             customer={{
               id: customer.id,
               full_name: customer.full_name,
@@ -540,93 +696,8 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
             }}
             onChanged={() => { invalidateLogin(customer.id); refreshAll(); }}
           />
-        </div>
+        </section>
 
-        {/* ── Addresses ── */}
-        <SectionHeader title={t('customer.addresses')} />
-
-        <AddressCard
-          label={t('customer.addressHome')}
-          address={homeAddress}
-          onEdit={() => setEditAddressType('HOME')}
-        />
-        <AddressCard
-          label={t('customer.addressWork')}
-          address={workAddress}
-          onEdit={() => setEditAddressType('WORK')}
-        />
-        <AddressCard
-          label={t('customer.addressShipping')}
-          address={shippingAddress}
-          onEdit={() => setEditAddressType('SHIPPING')}
-        />
-
-        {/* ── Contacts ── */}
-        <SectionHeader
-          title={`${t('customer.contacts')} (${contacts.length})`}
-          action={<Button variant="ghost" size="sm" startIcon={<Plus size={14} />} onClick={() => setAddContactOpen(true)}>{t('customer.addContact')}</Button>}
-        />
-        <div className="mb-4 rounded-md bg-surface border border-line">
-          {contacts.length === 0 ? (
-            <div className="px-3 py-3 text-sm text-subtler">{t('customer.noContacts')}</div>
-          ) : (
-            <div className="divide-y divide-line">
-              {contacts.map(c => (
-                <ContactRow key={c.id} contact={c} onDeleted={() => { refreshAll(); showSuccess(t('customer.contactDeleted')); }} />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* ── References ── */}
-        <SectionHeader
-          title={`${t('customer.references')} (${references.length})`}
-          action={<Button variant="ghost" size="sm" startIcon={<UserPlus size={14} />} onClick={() => setAddReferenceOpen(true)}>{t('customer.addReference')}</Button>}
-        />
-        <div className="mb-4 rounded-md bg-surface border border-line">
-          {references.length === 0 ? (
-            <div className="px-3 py-3 text-sm text-subtler">{t('customer.noReferences')}</div>
-          ) : (
-            <div className="divide-y divide-line">
-              {references.map(r => (
-                <ReferenceRow
-                  key={r.id}
-                  reference={r}
-                  onEdit={() => setEditReference(r)}
-                  onDeleted={() => { refreshAll(); showSuccess(t('customer.referenceDeleted')); }}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* ── Related Contracts ── */}
-        <SectionHeader title={`${t('customer.relatedContracts')} (${contracts.length})`} />
-        <div className="mb-4 rounded-md bg-surface border border-line">
-          {contracts.length === 0 ? (
-            <div className="px-3 py-3 text-sm text-subtler">{t('customer.noContracts')}</div>
-          ) : (
-            <div className="divide-y divide-line">
-              {contracts.map(c => (
-                <div key={c.id} className="px-3 py-2.5 flex items-center justify-between">
-                  <div>
-                    <Link
-                      to={`/admin/contracts/search/${c.id}`}
-                      className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1"
-                    >
-                      {c.code_display}
-                      <ExternalLink size={12} />
-                    </Link>
-                    {c.branch_name && <div className="text-xs text-subtle">{c.branch_name}</div>}
-                  </div>
-                  <Badge size="xs" color={stateColor(c.state)}>{t(`contract.state_${c.state}`, { defaultValue: c.state })}</Badge>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* ── Reward points ── */}
         <CustomerRewardSection customerId={customerId} />
       </div>
 
@@ -696,62 +767,95 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
         onSuccess={() => { setEditReference(null); refreshAll(); showSuccess(t('customer.referenceUpdated')); }}
       />
 
-      <Modal open={!!contractModalId} onClose={() => setContractModalId(null)} maxWidth="56rem" width="100%">
-        <div className="h-[80dvh] flex flex-col">
-          {contractModalId && <ContractDetailPanel contractId={contractModalId} isMobile={false} />}
-        </div>
-      </Modal>
+      <MediaLightboxKeyGallery
+        open={photoIndex !== null}
+        onClose={() => setPhotoIndex(null)}
+        mediaKeys={idPhotoKeys}
+        index={photoIndex ?? 0}
+        onIndexChange={setPhotoIndex}
+        alt={customer.full_name}
+      />
     </div>
   );
 }
 
-// ── Section Header ──────────────────────────────────────────────────────────
+// ── Address line (read-only, edit/add on the right) ────────────────────────
 
-function SectionHeader({ title, action }: { title: string; action?: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between mb-2 mt-2">
-      <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider">{title}</h3>
-      {action}
-    </div>
-  );
-}
-
-// ── Address Card (read-only) ────────────────────────────────────────────────
-
-function AddressCard({ label, address, onEdit }: {
+function AddressLine({ label, address, onEdit }: {
   label: string;
   address: CustomerAddress | undefined;
   onEdit: () => void;
 }) {
+  const { t } = useTranslation();
+  const recipient = [address?.recipient_name, address?.recipient_tel ? formatTel(address.recipient_tel) : null].filter(Boolean).join(' · ');
   return (
-    <div className="mb-3 px-3 py-2.5 rounded-md bg-surface border border-line">
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-sm font-medium flex items-center gap-1.5">
-          <MapPin size={13} className="text-subtle" />
-          {label}
-        </span>
-        <Button variant="ghost" className="btn-icon-xs" onClick={onEdit} startIcon={address ? <Pencil size={12} /> : <Plus size={12} />} />
+    <div className="flex items-start gap-2">
+      <div className="min-w-0 flex-1">
+        <div className="text-xs text-subtle">{label}</div>
+        {address ? (
+          <>
+            <div className="text-sm mt-0.5 leading-relaxed">{formatAddress(address)}</div>
+            {recipient && <div className="text-xs text-subtle mt-0.5">{t('customer.recipientName')}: {recipient}</div>}
+          </>
+        ) : (
+          <div className="text-sm mt-0.5 text-subtler">—</div>
+        )}
       </div>
-      {address ? (
-        <div className="text-sm text-subtle">{formatAddress(address)}</div>
-      ) : (
-        <div className="text-sm text-subtler">—</div>
-      )}
+      <Tooltip content={address ? t('customer.editAddress') : t('common.add')} placement="top">
+        <Button
+          variant="ghost"
+          className="btn-icon-xs shrink-0"
+          onClick={onEdit}
+          startIcon={address ? <Pencil size={12} /> : <Plus size={12} />}
+          aria-label={address ? t('customer.editAddress') : t('common.add')}
+        />
+      </Tooltip>
     </div>
   );
 }
 
-// ── Contact Row ─────────────────────────────────────────────────────────────
+// ── Contact line: label, the number or handle, one action ──────────────────
 
-function ContactRow({ contact, onDeleted }: { contact: CustomerContact; onDeleted: () => void }) {
+function ContactLine({ label, value, isPhone, primary, children }: {
+  label: string;
+  value: string;
+  isPhone?: boolean;
+  primary?: boolean;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 text-sm min-h-10">
+      <span className="text-subtle flex-1 min-w-0 truncate inline-flex items-center gap-1.5">
+        {primary && <Star size={12} className="text-warning-fg fill-warning shrink-0" />}
+        {label}
+      </span>
+      {isPhone ? <TelLink tel={value} /> : <span className="truncate">{value}</span>}
+      <span className="w-6 shrink-0 flex justify-end">{children}</span>
+    </div>
+  );
+}
+
+function EditIconButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <Tooltip content={label} placement="top">
+      <Button variant="ghost" className="btn-icon-xs" onClick={onClick} startIcon={<Pencil size={12} />} aria-label={label} />
+    </Tooltip>
+  );
+}
+
+// ── Delete a contact (asks first) ───────────────────────────────────────────
+
+function DeleteContactButton({ contact, onDeleted }: { contact: CustomerContact; onDeleted: () => void }) {
   const { t } = useTranslation();
   const { addSnackbar } = useSnackbarContext();
+  const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const handleDelete = async () => {
     setDeleting(true);
     try {
       await apiClient.rpc('fn_customer_contact_delete', { p_id: contact.id });
+      setConfirming(false);
       onDeleted();
     } catch (err) {
       // A delete that silently does nothing reads as success — surface it.
@@ -761,28 +865,25 @@ function ContactRow({ contact, onDeleted }: { contact: CustomerContact; onDelete
   };
 
   return (
-    <div className="flex items-center justify-between px-3 py-2 text-sm">
-      <div className="flex items-center gap-2">
-        {contact.is_primary && <Star size={12} className="text-warning-fg fill-warning" />}
-        <Badge size="xs" color="info">{contact.contact_type}</Badge>
-        <span className="tabular-nums">{contact.value}</span>
-        {contact.label && <span className="text-subtle text-xs">({contact.label})</span>}
-      </div>
-      <Button variant="ghost" className="btn-icon-xs text-subtle hover:text-danger" onClick={handleDelete} disabled={deleting} startIcon={<Trash2 size={12} />} />
-    </div>
-  );
-}
-
-// ── Detail Row ──────────────────────────────────────────────────────────────
-
-function DetailRow({ label, value, mono, children }: {
-  label: string; value?: string; mono?: boolean; children?: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-start justify-between gap-4">
-      <span className="text-subtle shrink-0">{label}</span>
-      {children ?? <span className={`text-right ${mono ? 'tabular-nums' : ''}`}>{value}</span>}
-    </div>
+    <>
+      <Tooltip content={t('common.delete')} placement="top">
+        <Button
+          variant="ghost"
+          className="btn-icon-xs text-subtle hover:text-danger"
+          onClick={() => setConfirming(true)}
+          startIcon={<Trash2 size={12} />}
+          aria-label={t('common.delete')}
+        />
+      </Tooltip>
+      <ConfirmDialog
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        onConfirm={handleDelete}
+        message={t('customer.confirmDeleteContact', { value: contact.value })}
+        confirmLabel={t('common.delete')}
+        pending={deleting}
+      />
+    </>
   );
 }
 
@@ -1272,18 +1373,25 @@ function ReferenceRow({ reference, onEdit, onDeleted }: {
     } finally { setDeleting(false); }
   };
 
+  const name = [reference.name, reference.last_name].filter(Boolean).join(' ') || '—';
+
   return (
-    <div className="flex items-center justify-between px-3 py-2.5 text-sm">
-      <div className="min-w-0">
-        <div>
-          <span className="font-medium">{reference.name} {reference.last_name}</span>
-          {reference.relation && <span className="text-subtle ml-1.5">({reference.relation})</span>}
-        </div>
-        {reference.tel && <div className="text-xs tabular-nums text-subtle">{reference.tel}</div>}
+    <div className="flex items-center gap-3 px-3 py-2">
+      <span className="w-8 h-8 rounded-full bg-surface-soft border border-line flex items-center justify-center shrink-0 text-subtle">
+        <User size={14} />
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium truncate">{name}</div>
+        {reference.relation && <div className="text-xs text-subtle truncate">{reference.relation}</div>}
       </div>
+      {reference.tel && <TelLink tel={reference.tel} />}
       <div className="flex items-center gap-1 shrink-0">
-        <Button variant="ghost" className="btn-icon-xs" onClick={onEdit} startIcon={<Pencil size={12} />} />
-        <Button variant="ghost" className="btn-icon-xs text-subtle hover:text-danger" onClick={() => setConfirming(true)} startIcon={<Trash2 size={12} />} />
+        <Tooltip content={t('customer.editReference')} placement="top">
+          <Button variant="ghost" className="btn-icon-xs" onClick={onEdit} startIcon={<Pencil size={12} />} aria-label={t('customer.editReference')} />
+        </Tooltip>
+        <Tooltip content={t('common.delete')} placement="top">
+          <Button variant="ghost" className="btn-icon-xs text-subtle hover:text-danger" onClick={() => setConfirming(true)} startIcon={<Trash2 size={12} />} aria-label={t('common.delete')} />
+        </Tooltip>
       </div>
       <ConfirmDialog
         open={confirming}

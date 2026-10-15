@@ -19,6 +19,14 @@ export const bangkokDay = (iso: string) =>
 export const dayDiff = (from: string, to: string) =>
   Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000);
 
+/** Age in whole years today (Bangkok) from a YYYY-MM-DD birth date. */
+export function ageFrom(dob: string | null | undefined): number | null {
+  if (!dob) return null;
+  const [y, m, d] = dob.split('-').map(Number);
+  const [ty, tm, td] = bangkokDay(new Date().toISOString()).split('-').map(Number);
+  return ty - y - (tm < m || (tm === m && td < d) ? 1 : 0);
+}
+
 export interface CustomerRisk {
   blacklisted: boolean;
   /** Instalments past due and unpaid, across this fund's contracts. */
