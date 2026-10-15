@@ -1,11 +1,11 @@
 import { useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Badge, PopOver, Tooltip } from 'tsp-form';
 import {
   Bell, MessageSquare, FileText, CreditCard, AlertTriangle, CheckCheck,
-  ExternalLink, ClipboardCheck, Info,
+  ClipboardCheck, Info,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { apiClient } from '../lib/api';
@@ -208,6 +208,38 @@ function MissingField({ field }: { field: string }) {
   );
 }
 
+// One row of the list. A real link when it leads somewhere, so ctrl/middle
+// click opens it in a new tab; a plain click marks it read and closes the list.
+function RowShell({ to, onOpen, children }: {
+  to: string | null;
+  onOpen: (newTab: boolean) => void;
+  children: React.ReactNode;
+}) {
+  const cls = 'block w-full text-left px-3 py-2.5 transition-colors border-b border-line/60 last:border-b-0 no-underline text-inherit';
+  if (!to) return <div className={cls}>{children}</div>;
+  return (
+    <Link
+      to={to}
+      className={clsx(cls, 'hover:bg-item-hover-bg cursor-pointer')}
+      onClick={(e) => onOpen(e.ctrlKey || e.metaKey || e.shiftKey)}
+      onAuxClick={(e) => { if (e.button === 1) onOpen(true); }}
+    >
+      {children}
+    </Link>
+  );
+}
+
+// The line under the contract: what to do next, or why it came back. One
+// line per event, so the title stays a short name for what happened.
+function detailFor(row: NotificationRow, t: ReturnType<typeof useTranslation>['t']): string | null {
+  switch (row.event_type) {
+    case 'partner_case_approved_staff': return t('notifCenter.detail.partner_case_approved_staff');
+    case 'partner_case_returned_staff': return row.payload?.reason_text?.trim() || null;
+    case 'partner_case_submitted_staff': return row.payload?.branch_name?.trim() || null;
+    default: return null;
+  }
+}
+
 // ── Collapse rule ───────────────────────────────────────────────────────────
 
 type DisplayItem =
@@ -259,7 +291,6 @@ type Props = {
 
 export function NotificationMenuItem({ collapsed, isMobile, unreadCount }: Props) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -293,18 +324,11 @@ export function NotificationMenuItem({ collapsed, isMobile, unreadCount }: Props
     },
   });
 
-  const navigateRow = (row: NotificationRow) => {
-    if (!row.is_read) markRead.mutate(row.notification_id);
-    const link = deeplinkFor(row);
-    setOpen(false);
-    if (link) navigate(link);
-  };
-
-  const handleRowClick = (row: NotificationRow) => navigateRow(row);
-
-  const handleContractClick = (e: React.MouseEvent, row: NotificationRow) => {
-    e.stopPropagation();
-    navigateRow(row);
+  // The row's link does the navigating; this marks it read, and closes the
+  // list unless it opened in a new tab.
+  const openRows = (rows: NotificationRow[], newTab: boolean) => {
+    rows.forEach(r => { if (!r.is_read) markRead.mutate(r.notification_id); });
+    if (!newTab) setOpen(false);
   };
 
   const items = useMemo(() => collapseRows(data?.items ?? []), [data?.items]);
@@ -378,17 +402,11 @@ export function NotificationMenuItem({ collapsed, isMobile, unreadCount }: Props
               if (item.kind === 'group') {
                 const anyUnread = item.rows.some(r => !r.is_read);
                 const latest = item.rows[0];
-                const navigateGroup = () => {
-                  item.rows.forEach(r => { if (!r.is_read) markRead.mutate(r.notification_id); });
-                  setOpen(false);
-                  navigate(`/admin/chat?contract=${item.contractId}`);
-                };
                 return (
-                  <button
+                  <RowShell
                     key={`group-${item.contractId}-${latest.notification_id}`}
-                    type="button"
-                    className="w-full text-left px-3 py-2.5 hover:bg-item-hover-bg transition-colors border-b border-line/60 last:border-b-0 cursor-pointer bg-transparent"
-                    onClick={navigateGroup}
+                    to={`/admin/chat?contract=${item.contractId}`}
+                    onOpen={(newTab) => openRows(item.rows, newTab)}
                   >
                     <div className="flex items-start gap-2">
                       <span className={clsx('mt-1.5 w-1.5 h-1.5 rounded-full shrink-0', anyUnread ? 'bg-primary' : 'bg-line')} />
@@ -404,17 +422,14 @@ export function NotificationMenuItem({ collapsed, isMobile, unreadCount }: Props
                           {item.customerDisplay ? <span className="text-subtle truncate">{item.customerDisplay}</span> : <MissingField field="customer_full_name" />}
                           <span className="text-subtle">·</span>
                           {item.contractDisplay ? (
-                            <span className="text-primary-fg hover:underline inline-flex items-center gap-1 shrink-0">
-                              {item.contractDisplay}
-                              <ExternalLink size={11} />
-                            </span>
+                            <span className="text-primary-fg shrink-0">{item.contractDisplay}</span>
                           ) : (
                             <MissingField field="contract_code" />
                           )}
                         </div>
                       </div>
                     </div>
-                  </button>
+                  </RowShell>
                 );
               }
 
@@ -441,13 +456,16 @@ export function NotificationMenuItem({ collapsed, isMobile, unreadCount }: Props
                 extras.push(<span key="new-lessee" className="text-subtle truncate">→ {row.payload.new_lessee_name}</span>);
               }
               const actor = row.payload?.staff_name;
+              const detail = detailFor(row, t);
+              // Every message about a contract reads the same: what happened,
+              // then whose contract it is, then (if any) what to do next.
+              const contractShaped = row.event_type.startsWith('partner_case_') || (templated && cat !== 'approval');
 
               return (
-                <button
+                <RowShell
                   key={row.notification_id}
-                  type="button"
-                  className="w-full text-left px-3 py-2.5 hover:bg-item-hover-bg transition-colors border-b border-line/60 last:border-b-0 cursor-pointer bg-transparent"
-                  onClick={() => handleRowClick(row)}
+                  to={deeplinkFor(row)}
+                  onOpen={(newTab) => openRows([row], newTab)}
                 >
                   <div className="flex items-start gap-2">
                     <span className={clsx('mt-1.5 w-1.5 h-1.5 rounded-full shrink-0', dotClass)} />
@@ -461,23 +479,16 @@ export function NotificationMenuItem({ collapsed, isMobile, unreadCount }: Props
                           {relativeTime(t, row.created_at)}
                         </span>
                       </div>
-                      {row.event_type.startsWith('partner_case_') ? (
-                        // Shop credit request: the contract, then who sent it
-                        // (credit desk) or why it came back (shop).
-                        <div className="text-xs leading-snug mt-0.5 min-w-0">
-                          <div className="inline-flex items-center gap-1.5 min-w-0 max-w-full">
-                            {code && <span className="text-primary-fg font-medium shrink-0">{code}</span>}
-                            {row.event_type === 'partner_case_submitted_staff' && row.payload?.branch_name && (
-                              <><span className="text-subtle">·</span><span className="text-subtle truncate">{row.payload.branch_name}</span></>
-                            )}
-                          </div>
-                          {row.event_type === 'partner_case_returned_staff' && row.payload?.reason_text && (
-                            <div className="text-subtle line-clamp-2">{row.payload.reason_text}</div>
-                          )}
+                      {contractShaped ? (
+                        <div className="text-xs leading-snug truncate mt-0.5 inline-flex items-center gap-1.5 min-w-0 max-w-full">
+                          {customer ? <span className="text-subtle truncate">{customer}</span> : <MissingField field="customer_full_name" />}
+                          <span className="text-subtle">·</span>
+                          {code ? <span className="text-primary-fg shrink-0">{code}</span> : <MissingField field="contract_code" />}
+                          {extras}
                         </div>
                       ) : cat === 'approval' ? (
                         <div className="text-xs leading-snug truncate mt-0.5 inline-flex items-center gap-1.5 min-w-0 flex-wrap">
-                          {row.payload?.po_code && <span className="text-primary-fg font-medium truncate">{row.payload.po_code}</span>}
+                          {row.payload?.po_code && <span className="text-primary-fg truncate">{row.payload.po_code}</span>}
                           {row.payload?.branch_name && (
                             <><span className="text-subtle">·</span><span className="text-subtle truncate">{row.payload.branch_name}</span></>
                           )}
@@ -485,7 +496,7 @@ export function NotificationMenuItem({ collapsed, isMobile, unreadCount }: Props
                             <><span className="text-subtle">·</span><span className="text-subtle tabular-nums shrink-0">฿{fmtCurrency(Number(row.payload.amount))}</span></>
                           )}
                         </div>
-                      ) : !templated ? (
+                      ) : (
                         // No FE template — the contract-shaped subtitle doesn't
                         // apply, so show the server-rendered body (or nothing).
                         subtitleFallback && (
@@ -493,35 +504,18 @@ export function NotificationMenuItem({ collapsed, isMobile, unreadCount }: Props
                             {subtitleFallback}
                           </div>
                         )
-                      ) : (
-                        <div className="text-xs leading-snug truncate mt-0.5 inline-flex items-center gap-1.5 min-w-0 flex-wrap">
-                          {customer ? <span className="text-subtle truncate">{customer}</span> : <MissingField field="customer_full_name" />}
-                          <span className="text-subtle">·</span>
-                          {code ? (
-                            <span
-                              role="link"
-                              tabIndex={0}
-                              onClick={(e) => handleContractClick(e, row)}
-                              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleContractClick(e as unknown as React.MouseEvent, row); }}
-                              className="text-primary-fg hover:underline inline-flex items-center gap-1 cursor-pointer shrink-0"
-                            >
-                              {code}
-                              <ExternalLink size={11} />
-                            </span>
-                          ) : (
-                            <MissingField field="contract_code" />
-                          )}
-                          {extras}
-                        </div>
+                      )}
+                      {detail && (
+                        <div className="text-xs leading-snug text-subtle mt-0.5 line-clamp-2">{detail}</div>
                       )}
                       {actor && (
-                        <div className="text-[11px] text-subtle/80 mt-0.5 truncate">
+                        <div className="text-[11px] text-subtle mt-0.5 truncate">
                           {t('notifCenter.actorBy', { name: actor })}
                         </div>
                       )}
                     </div>
                   </div>
-                </button>
+                </RowShell>
               );
             })}
           </div>
