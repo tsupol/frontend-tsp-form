@@ -64,3 +64,17 @@ export function identifierFormatReason(
 export function isAppleBrand(brand: string | null | undefined): boolean {
   return (brand ?? '').trim().toUpperCase() === 'APPLE';
 }
+
+/**
+ * Why a stored Thai phone number does not look dialable, or null when it does.
+ * Mobile: 10 digits starting 06 / 08 / 09. Landline: 9 digits starting 02–07.
+ * For display checks on numbers already saved — input uses the masked field.
+ */
+export type ThaiPhoneReason = 'length' | 'prefix';
+
+export function thaiPhoneReason(raw: string | null | undefined): ThaiPhoneReason | null {
+  const d = (raw ?? '').replace(/\D/g, '');
+  if (/^0[689]/.test(d)) return d.length === 10 ? null : 'length';
+  if (/^0[2-7]/.test(d)) return d.length === 9 ? null : 'length';
+  return 'prefix';
+}

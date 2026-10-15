@@ -25,6 +25,7 @@ import {
   usePartnerCaseStatusRef,
 } from './usePartnerCases';
 import { PartnerCaseDetailPanel } from './PartnerCaseDetailPanel';
+import { riskTone, useCustomerRisk, type CustomerRisk } from './customerRisk';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   outcomeBadgeColor,
@@ -49,6 +50,7 @@ const TABS: TabKey[] = ['QUEUE', 'APPROVED', 'RETURNED', 'WITHDRAWN', 'ALL'];
 interface RailRow {
   case_id: number;
   contract_code: string;
+  customer_id: number;
   customer_name: string | null;
   branch_name: string | null;
   /** The standard product name (mig 1422), blank when the view has none. */
@@ -69,6 +71,7 @@ interface RailRow {
 const fromQueue = (r: PartnerCaseQueueRow): RailRow => ({
   case_id: r.case_id,
   contract_code: r.contract_code,
+  customer_id: r.customer_id,
   customer_name: r.customer_name,
   branch_name: r.branch_name,
   model_label: r.product_display_name,
@@ -83,6 +86,7 @@ const fromQueue = (r: PartnerCaseQueueRow): RailRow => ({
 const fromHistory = (r: PartnerCase): RailRow => ({
   case_id: r.case_id,
   contract_code: r.contract_code,
+  customer_id: r.customer_id,
   customer_name: r.customer_name,
   branch_name: r.branch_name,
   model_label: r.product_display_name,
@@ -137,6 +141,10 @@ export function PartnerCaseQueuePage() {
     [isQueue, queue.rows, history.rows],
   );
   const totalCount = isQueue ? queue.totalCount : history.totalCount;
+
+  // The worst thing on each customer's record, so a case that needs care
+  // stands out before it is opened (same rule as the case view's checklist).
+  const { data: risk } = useCustomerRisk(rows.map(r => r.customer_id));
   const isFetching = isQueue ? queue.isFetching : history.isFetching;
 
   const { detail, isLoading: detailLoading } = usePartnerCaseDetail(selectedId);
@@ -324,7 +332,10 @@ export function PartnerCaseQueuePage() {
                             </>
                           )}
                         </div>
-                        <div className="text-sm mt-0.5 truncate">{r.customer_name ?? '—'}</div>
+                        <div className="flex items-center gap-2 mt-0.5 min-w-0">
+                          <span className="text-sm truncate">{r.customer_name ?? '—'}</span>
+                          <RiskBadge risk={risk?.get(r.customer_id)} />
+                        </div>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className="text-xs text-subtle truncate flex-1 min-w-0">
                             {r.branch_name}{r.model_label ? ` · ${r.model_label}` : ''}
@@ -377,4 +388,17 @@ export function PartnerCaseQueuePage() {
       }}
     </PageNav>
   );
+}
+
+/** The one word that matters about a customer's record, if anything. */
+function RiskBadge({ risk }: { risk: CustomerRisk | undefined }) {
+  const { t } = useTranslation();
+  const tone = riskTone(risk);
+  if (!risk || !tone) return null;
+  const label = risk.blacklisted
+    ? t('partnerCase.riskBlacklisted')
+    : risk.overdueInstallments > 0
+      ? t('partnerCase.riskOverdue', { count: risk.overdueInstallments })
+      : t('partnerCase.riskLate', { count: risk.lateInstallments });
+  return <Badge color={tone === 'bad' ? 'danger' : 'warning'} size="sm" className="shrink-0">{label}</Badge>;
 }

@@ -3,7 +3,8 @@
 // Built for this one job, on purpose not from the contract page's parts, so it
 // can be shaped around the decision. It reads top to bottom in the order a
 // reviewer decides:
-//   1. the red flags at a glance (blacklist, the shop's rating, payment record)
+//   1. a checklist — identity, blacklist, payment record, reach, shop rating —
+//      each line coloured only when it needs a look, and opening its section
 //   2. who asked, when, and what they said
 //   3. who the customer is — identity plus every photo of them (ID card and
 //      the photos the shop took with the contract)
@@ -18,13 +19,14 @@
 // The two buttons come from the request's capability RPC; a reviewer outside
 // this branch's pool sees them disabled with the reason.
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Badge, Button, Tooltip } from 'tsp-form';
 import {
   ArrowLeft, Clock, FileText, Smartphone, User, Wallet, MapPin, Phone, Users,
-  History, AlertTriangle, ImageOff, Star, ShieldAlert, ShieldCheck, ChevronDown, ChevronRight,
+  History, AlertTriangle, ImageOff, Star, ChevronDown, ChevronRight,
+  CheckCircle2, XCircle, Info, MessageCircle,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
@@ -33,6 +35,9 @@ import { fmtCurrency, formatTel, formatCid } from '../../lib/format';
 import { MediaLightboxKeyGallery, MediaThumbButton } from '../../components/MediaLightbox';
 import { normalizeKey } from '../../lib/mediaPath';
 import { useContractAlbumPhotos } from '../contracts/contractPhotoStatus';
+import { passesThaiCidChecksum } from '../../lib/ocr/extractIdCard';
+import { thaiPhoneReason } from '../../lib/validators';
+import { bangkokDay, dayDiff } from './customerRisk';
 import { usePartnerCaseActions, usePartnerCaseReturnReasons } from './usePartnerCases';
 import { outcomeBadgeColor, type PartnerCaseDetail } from './partnerCaseTypes';
 import { PartnerCaseApproveModal } from './PartnerCaseApproveModal';
@@ -166,13 +171,6 @@ interface LateRecord {
   worstDays: number;
 }
 
-/** Bangkok calendar day of a timestamp, as YYYY-MM-DD. */
-const bangkokDay = (iso: string) =>
-  new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
-
-const dayDiff = (from: string, to: string) =>
-  Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000);
-
 function ageFrom(dob: string | null | undefined): number | null {
   if (!dob) return null;
   const today = bangkokDay(new Date().toISOString());
@@ -199,6 +197,11 @@ export function PartnerCaseDetailPanel({
   const [returnOpen, setReturnOpen] = useState(false);
   const [lightbox, setLightbox] = useState<{ keys: string[]; index: number } | null>(null);
   const [showUnopened, setShowUnopened] = useState(false);
+  const identityRef = useRef<HTMLElement>(null);
+  const reachRef = useRef<HTMLElement>(null);
+  const recordRef = useRef<HTMLElement>(null);
+  const jumpTo = (ref: React.RefObject<HTMLElement | null>) =>
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   const { actions } = usePartnerCaseActions(detail?.case_id ?? null);
   const returnReasons = usePartnerCaseReturnReasons();
@@ -397,18 +400,38 @@ export function PartnerCaseDetailPanel({
   const contractAddress = lessee?.address ?? null;
   const workAddress = addresses.find(a => a.address_type === 'WORK') ?? null;
   const references: ReferencePerson[] = (lessee?.references?.length ? lessee.references : liveReferences);
-  const extraPhones = [
-    ...(customer?.tel2 ? [{ key: 'tel2', label: t('partnerCase.contactType_MOBILE'), value: formatTel(customer.tel2) }] : []),
+  // Every number the customer can be called on, the contract's own first, each
+  // once; then the non-phone channels.
+  const digits = (v: string | null | undefined) => (v ?? '').replace(/\D/g, '');
+  const phones: Array<{ key: string; label: string; raw: string }> = [];
+  const seen = new Set<string>();
+  const addPhone = (key: string, label: string, raw: string | null | undefined) => {
+    const d = digits(raw);
+    if (!d || seen.has(d)) return;
+    seen.add(d);
+    phones.push({ key, label, raw: d });
+  };
+  addPhone('main', t('partnerCase.mainPhone'), lessee?.tel);
+  addPhone('tel2', t('partnerCase.contactType_MOBILE'), customer?.tel2);
+  for (const c of contacts) {
+    if (['MOBILE', 'HOME', 'WORK'].includes(c.contact_type)) {
+      addPhone(`c${c.id}`, t(`partnerCase.contactType_${c.contact_type}`), c.value);
+    }
+  }
+  const channels = [
     ...contacts
-      .filter(c => formatTel(c.value) !== formatTel(lessee?.tel))
-      .map(c => ({
-        key: `c${c.id}`,
-        label: t(`partnerCase.contactType_${c.contact_type}`, { defaultValue: c.contact_type }),
-        value: ['MOBILE', 'HOME', 'WORK'].includes(c.contact_type) ? formatTel(c.value) : c.value,
-      })),
+      .filter(c => !['MOBILE', 'HOME', 'WORK'].includes(c.contact_type))
+      .map(c => ({ key: `c${c.id}`, label: t(`partnerCase.contactType_${c.contact_type}`, { defaultValue: c.contact_type }), value: c.value })),
     ...(customer?.line_id ? [{ key: 'line', label: 'LINE', value: customer.line_id }] : []),
     ...(customer?.facebook ? [{ key: 'fb', label: 'Facebook', value: customer.facebook }] : []),
   ];
+  const badPhones = phones.filter(ph => thaiPhoneReason(ph.raw) !== null).length
+    + references.filter(r => r.tel && thaiPhoneReason(r.tel) !== null).length;
+
+  // The ID number: only a citizen ID has a check digit to test.
+  const cidDigits = digits(lessee?.id_number);
+  const cidChecked = (lessee?.id_type ?? 'CITIZEN_ID') === 'CITIZEN_ID' && cidDigits.length > 0;
+  const cidValid = cidChecked ? passesThaiCidChecksum(cidDigits) : null;
 
   // Every photo of the customer in one strip: the ID card, then the groups the
   // shop photographed with the contract. One gallery walks through all of them.
@@ -507,48 +530,77 @@ export function PartnerCaseDetailPanel({
           </div>
         )}
 
-        {/* 1. The flags a reviewer looks for first */}
-        <div className="flex flex-wrap gap-1.5">
-          {customer?.is_blacklisted ? (
-            <Signal tone="danger" icon={<ShieldAlert size={13} />}>{t('partnerCase.sigBlacklisted')}</Signal>
-          ) : customer ? (
-            <Signal tone="success" icon={<ShieldCheck size={13} />}>{t('partnerCase.sigNotBlacklisted')}</Signal>
-          ) : null}
+        {/* 1. The checklist: one line per thing a reviewer decides, in page
+            order. Only problems are coloured; a line opens its section. */}
+        <div className="rounded-md border border-line divide-y divide-line">
+          <CheckRow
+            status={cidValid === false ? 'bad' : idDocs.length === 0 ? 'warn' : 'ok'}
+            label={t('partnerCase.chkIdentity')}
+            detail={cidValid === false
+              ? t('partnerCase.chkCidInvalid')
+              : idDocs.length === 0
+                ? t('partnerCase.chkIdentityNoId')
+                : contractPhotos.length > 0
+                  ? t('partnerCase.chkIdentityOk', { count: contractPhotos.length })
+                  : t('partnerCase.chkIdentityIdOnly')}
+            onJump={() => jumpTo(identityRef)}
+          />
+          {customer && (
+            <CheckRow
+              status={customer.is_blacklisted ? 'bad' : 'ok'}
+              label={t('partnerCase.chkBlacklist')}
+              detail={customer.is_blacklisted
+                ? (blacklist[0]?.reason || t('partnerCase.chkBlacklisted'))
+                : t('partnerCase.chkNotBlacklisted')}
+            />
+          )}
+          <CheckRow
+            status={totalOverdue > 0 ? 'bad' : totalLate > 0 ? 'warn' : totalPaid > 0 ? 'ok' : 'info'}
+            label={t('partnerCase.chkRecord')}
+            detail={ranContracts.length === 0
+              ? t('partnerCase.chkRecordNone')
+              : [
+                totalOverdue > 0 ? t('partnerCase.chkRecordOverdue', { count: totalOverdue }) : null,
+                totalLate > 0 ? t('partnerCase.chkRecordLate', { count: totalLate, days: worstLate }) : null,
+                totalOverdue === 0 && totalLate === 0
+                  ? (totalPaid > 0
+                    ? t('partnerCase.chkRecordOnTime', { count: ranContracts.length })
+                    : t('partnerCase.chkRecordNotDue'))
+                  : null,
+              ].filter(Boolean).join(' · ')}
+            onJump={() => jumpTo(recordRef)}
+          />
+          <CheckRow
+            status={!contractAddress || references.length === 0 || badPhones > 0 ? 'warn' : 'ok'}
+            label={t('partnerCase.chkReach')}
+            detail={!contractAddress
+              ? t('partnerCase.chkReachNoAddress')
+              : references.length === 0
+                ? t('partnerCase.chkReachNoRef')
+                : badPhones > 0
+                  ? t('partnerCase.chkReachBadPhone', { count: badPhones })
+                  : t('partnerCase.chkReachOk', {
+                    addresses: (contractAddress ? 1 : 0) + (workAddress ? 1 : 0),
+                    phones: phones.length,
+                    refs: references.length,
+                  })}
+            onJump={() => jumpTo(reachRef)}
+          />
           {rating != null && (
-            <Signal tone={rating <= 2 ? 'warning' : 'neutral'} icon={<Star size={13} />}>
-              {t('partnerCase.sigRating', { score: rating })}
-            </Signal>
+            <CheckRow
+              status={rating <= 2 ? 'warn' : 'info'}
+              label={t('partnerCase.chkRating')}
+              detail={
+                <span className="inline-flex items-center gap-0.5">
+                  {[1, 2, 3, 4, 5].map(n => (
+                    <Star key={n} size={12} className={n <= rating ? 'text-warning-fg fill-warning' : 'text-subtler'} />
+                  ))}
+                  <span className="ml-1">{t('partnerCase.chkRatingScore', { score: rating })}</span>
+                </span>
+              }
+            />
           )}
-          {ranContracts.length === 0 ? (
-            <Signal tone="neutral" icon={<History size={13} />}>{t('partnerCase.sigNewCustomer')}</Signal>
-          ) : (
-            <>
-              <Signal tone="neutral" icon={<History size={13} />}>
-                {t('partnerCase.sigPastContracts', { count: ranContracts.length })}
-              </Signal>
-              {totalOverdue > 0 && (
-                <Signal tone="danger">{t('partnerCase.sigOverdueNow', { count: totalOverdue })}</Signal>
-              )}
-              {totalLate > 0 ? (
-                <Signal tone="warning">{t('partnerCase.sigPaidLate', { count: totalLate, days: worstLate })}</Signal>
-              ) : totalPaid > 0 && totalOverdue === 0 ? (
-                <Signal tone="success">{t('partnerCase.sigAlwaysOnTime')}</Signal>
-              ) : null}
-            </>
-          )}
-          {age != null && <Signal tone="neutral">{t('partnerCase.sigAge', { age })}</Signal>}
         </div>
-
-        {customer?.is_blacklisted && blacklist[0] && (
-          <div className="alert alert-danger">
-            <ShieldAlert size={16} className="shrink-0" />
-            <div>
-              <div className="font-medium">{t('partnerCase.blacklistTitle')}</div>
-              {blacklist[0].reason && <div className="text-sm">{blacklist[0].reason}</div>}
-              <div className="text-xs opacity-80 mt-0.5"><DateTime value={blacklist[0].created_at} showTime={false} /></div>
-            </div>
-          </div>
-        )}
 
         {/* 2. Who asked, when, and what they said */}
         <section className="border border-line rounded-md px-4 py-3">
@@ -588,7 +640,7 @@ export function PartnerCaseDetailPanel({
         </section>
 
         {/* 3. Who the customer is, with every photo of them */}
-        <Section icon={<User size={14} />} title={t('partnerCase.customerTitle')}>
+        <Section icon={<User size={14} />} title={t('partnerCase.customerTitle')} sectionRef={identityRef}>
           <div className="flex items-center gap-2 min-w-0">
             <Badge color="primary" size="sm">{t('partnerCase.role_LESSEE')}</Badge>
             {/* The customer page has the rest (all addresses, edit history,
@@ -602,14 +654,29 @@ export function PartnerCaseDetailPanel({
             />
           </div>
           <div className="grid grid-cols-2 gap-3 mt-3">
-            {lessee?.id_number && <Field label={t('partnerCase.idNumber')} value={formatCid(lessee.id_number)} />}
+            {lessee?.id_number && (
+              <Field
+                label={t('partnerCase.idNumber')}
+                value={
+                  <span className="inline-flex items-center gap-1.5">
+                    {formatCid(lessee.id_number)}
+                    {cidValid !== null && (
+                      <ValidMark
+                        ok={cidValid}
+                        tip={cidValid ? t('partnerCase.cidValid') : t('partnerCase.cidInvalid')}
+                      />
+                    )}
+                  </span>
+                }
+              />
+            )}
             {lessee?.date_of_birth && (
               <Field
                 label={t('partnerCase.dateOfBirth')}
                 value={<><DateTime value={lessee.date_of_birth} showTime={false} />{age != null && <span className="text-subtle"> · {t('partnerCase.ageYears', { age })}</span>}</>}
               />
             )}
-            {lessee?.tel && <Field label={t('partnerCase.tel')} value={formatTel(lessee.tel)} />}
+            {lessee?.tel && <Field label={t('partnerCase.tel')} value={<TelLink tel={lessee.tel} />} />}
           </div>
 
           {otherParties.map((p, i) => (
@@ -649,43 +716,63 @@ export function PartnerCaseDetailPanel({
         </Section>
 
         {/* 4. How to reach them */}
-        <Section icon={<Phone size={14} />} title={t('partnerCase.reachTitle')}>
-          <div className="flex flex-col gap-3">
-            <AddressLine
+        <Section icon={<Phone size={14} />} title={t('partnerCase.reachTitle')} sectionRef={reachRef}>
+          <div className="flex flex-col gap-4">
+            <AddressBlock
               label={t('partnerCase.contractAddress')}
               value={contractAddress ? formatAddress(contractAddress) : null}
             />
-            <AddressLine
+            <AddressBlock
               label={t('partnerCase.workAddress')}
               value={workAddress ? formatAddress(workAddress) : null}
             />
+
             <div>
-              <div className="text-xs text-subtle">{t('partnerCase.otherContacts')}</div>
-              {extraPhones.length === 0 ? (
-                <div className="text-sm text-subtler">—</div>
+              <SubLabel icon={<Phone size={12} />}>{t('partnerCase.phones')}</SubLabel>
+              {phones.length === 0 ? (
+                <div className="text-sm text-subtler mt-1.5">—</div>
               ) : (
-                <div className="flex flex-col gap-0.5 mt-0.5">
-                  {extraPhones.map(c => (
-                    <div key={c.key} className="text-sm flex gap-2">
-                      <span className="text-subtle w-20 shrink-0">{c.label}</span>
-                      <span className="tabular-nums truncate">{c.value}</span>
+                <div className="mt-1.5 rounded-md border border-line divide-y divide-line">
+                  {phones.map(ph => (
+                    <div key={ph.key} className="flex items-center gap-2 px-3 py-2 text-sm">
+                      <span className="text-subtle flex-1 min-w-0 truncate">{ph.label}</span>
+                      <TelLink tel={ph.raw} />
                     </div>
                   ))}
                 </div>
               )}
             </div>
+
+            {channels.length > 0 && (
+              <div>
+                <SubLabel icon={<MessageCircle size={12} />}>{t('partnerCase.otherContacts')}</SubLabel>
+                <div className="mt-1.5 rounded-md border border-line divide-y divide-line">
+                  {channels.map(c => (
+                    <div key={c.key} className="flex items-center gap-2 px-3 py-2 text-sm">
+                      <span className="text-subtle flex-1 min-w-0 truncate">{c.label}</span>
+                      <span className="truncate">{c.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div>
-              <div className="text-xs text-subtle flex items-center gap-1"><Users size={12} />{t('partnerCase.references')}</div>
+              <SubLabel icon={<Users size={12} />}>{t('partnerCase.references')}</SubLabel>
               {references.length === 0 ? (
-                <div className="text-sm text-subtler">—</div>
+                <div className="text-sm text-subtler mt-1.5">{t('partnerCase.noReferences')}</div>
               ) : (
-                <div className="flex flex-col gap-1 mt-1">
+                <div className="mt-1.5 rounded-md border border-line divide-y divide-line">
                   {references.map((r, i) => (
-                    <div key={r.id ?? i} className="text-sm flex items-baseline gap-2 min-w-0">
-                      <span className="font-medium truncate">{[r.name, r.last_name].filter(Boolean).join(' ')}</span>
-                      {r.relation && <span className="text-subtle text-xs shrink-0">{r.relation}</span>}
-                      <span className="flex-1" />
-                      {r.tel && <span className="tabular-nums shrink-0">{formatTel(r.tel)}</span>}
+                    <div key={r.id ?? i} className="flex items-center gap-3 px-3 py-2">
+                      <span className="w-8 h-8 rounded-full bg-surface-soft border border-line flex items-center justify-center shrink-0 text-subtle">
+                        <User size={14} />
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{[r.name, r.last_name].filter(Boolean).join(' ') || '—'}</div>
+                        {r.relation && <div className="text-xs text-subtle truncate">{r.relation}</div>}
+                      </div>
+                      {r.tel && <TelLink tel={r.tel} />}
                     </div>
                   ))}
                 </div>
@@ -695,7 +782,7 @@ export function PartnerCaseDetailPanel({
         </Section>
 
         {/* 5. How they paid before */}
-        <Section icon={<History size={14} />} title={t('partnerCase.paymentRecordTitle')}>
+        <Section icon={<History size={14} />} title={t('partnerCase.paymentRecordTitle')} sectionRef={recordRef}>
           {/* A reviewer reads only their own fund's contracts (the views are
               scoped by company), so a customer behind on a contract at another
               branch of the group looks clean here. Say so where it matters. */}
@@ -920,13 +1007,15 @@ export function PartnerCaseDetailPanel({
   );
 }
 
-function Section({ icon, title, children }: {
+function Section({ icon, title, children, sectionRef }: {
   icon: React.ReactNode;
   title: string;
   children: React.ReactNode;
+  /** For the checklist's jump links. */
+  sectionRef?: React.Ref<HTMLElement>;
 }) {
   return (
-    <section className="border border-line rounded-md px-4 py-3">
+    <section ref={sectionRef} className="border border-line rounded-md px-4 py-3 scroll-mt-3">
       <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-3 flex items-center gap-1.5">
         {icon}{title}
       </h3>
@@ -948,30 +1037,83 @@ function Field({ label, value, emphasis }: {
   );
 }
 
-function AddressLine({ label, value }: { label: string; value: string | null }) {
+function SubLabel({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
+  return <div className="text-xs text-subtle flex items-center gap-1">{icon}{children}</div>;
+}
+
+function AddressBlock({ label, value }: { label: string; value: string | null }) {
   return (
     <div>
-      <div className="text-xs text-subtle flex items-center gap-1"><MapPin size={12} />{label}</div>
-      <div className={`text-sm ${value ? '' : 'text-subtler'}`}>{value ?? '—'}</div>
+      <SubLabel icon={<MapPin size={12} />}>{label}</SubLabel>
+      <div className={`text-sm mt-1.5 leading-relaxed ${value ? '' : 'text-subtler'}`}>{value ?? '—'}</div>
     </div>
   );
 }
 
-/** One flag in the top row — a soft pill, coloured only when it means something. */
-function Signal({ tone, icon, children }: {
-  tone: 'danger' | 'warning' | 'success' | 'neutral';
-  icon?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  const cls = {
-    danger: 'bg-danger-soft text-danger-fg border-danger-border',
-    warning: 'bg-warning-soft text-warning-fg border-warning-border',
-    success: 'bg-success-soft text-success-fg border-success-border',
-    neutral: 'bg-surface-soft text-fg border-line',
-  }[tone];
+/** A phone number that dials on a phone (tel: link), with its format check. */
+function TelLink({ tel }: { tel: string }) {
+  const { t } = useTranslation();
+  const reason = thaiPhoneReason(tel);
+  const d = tel.replace(/\D/g, '');
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${cls}`}>
-      {icon}{children}
+    <span className="inline-flex items-center gap-1.5 shrink-0">
+      <a
+        href={`tel:${d}`}
+        className="text-sm text-primary-fg hover:underline inline-flex items-center gap-1 tabular-nums"
+      >
+        <Phone size={12} />{formatTel(d)}
+      </a>
+      {reason && <ValidMark ok={false} tip={t(`partnerCase.phoneInvalid_${reason}`)} />}
     </span>
+  );
+}
+
+/** Tick or warning beside a number that was checked, with why on hover. */
+function ValidMark({ ok, tip }: { ok: boolean; tip: string }) {
+  return (
+    <Tooltip content={tip} placement="top">
+      <span className="inline-flex" aria-label={tip}>
+        {ok
+          ? <CheckCircle2 size={13} className="text-success-fg" />
+          : <AlertTriangle size={13} className="text-danger-fg" />}
+      </span>
+    </Tooltip>
+  );
+}
+
+type CheckStatus = 'ok' | 'warn' | 'bad' | 'info';
+
+/** One line of the checklist. With onJump it opens its section below. */
+function CheckRow({ status, label, detail, onJump }: {
+  status: CheckStatus;
+  label: string;
+  detail: React.ReactNode;
+  onJump?: () => void;
+}) {
+  const icon = {
+    ok: <CheckCircle2 size={15} className="text-success-fg" />,
+    warn: <AlertTriangle size={15} className="text-warning-fg" />,
+    bad: <XCircle size={15} className="text-danger-fg" />,
+    info: <Info size={15} className="text-subtle" />,
+  }[status];
+  const detailClass = status === 'bad' ? 'text-danger-fg' : status === 'warn' ? 'text-warning-fg' : 'text-subtle';
+  const body = (
+    <>
+      <span className="shrink-0 mt-0.5">{icon}</span>
+      <span className="text-sm font-medium w-28 shrink-0">{label}</span>
+      <span className={`text-sm flex-1 min-w-0 ${detailClass}`}>{detail}</span>
+      {onJump && <ChevronRight size={14} className="text-subtle shrink-0 mt-0.5" />}
+    </>
+  );
+  return onJump ? (
+    <button
+      type="button"
+      onClick={onJump}
+      className="w-full flex items-start gap-2 px-3 py-2 text-left bg-transparent border-none cursor-pointer hover:bg-item-hover-bg transition-colors"
+    >
+      {body}
+    </button>
+  ) : (
+    <div className="flex items-start gap-2 px-3 py-2">{body}</div>
   );
 }
