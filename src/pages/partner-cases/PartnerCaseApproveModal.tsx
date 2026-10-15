@@ -15,7 +15,7 @@ import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
-import { usePartnerCaseInvalidate } from './usePartnerCases';
+import { usePartnerCaseInvalidate, useAssetEvidence } from './usePartnerCases';
 import type { PartnerCaseApproveResult, PartnerCaseDetail } from './partnerCaseTypes';
 
 interface PartnerCaseApproveModalProps {
@@ -56,6 +56,8 @@ export function PartnerCaseApproveModal({ open, detail, onClose, onApproved }: P
   // The modal keeps rendering through its close transition, so hold the last
   // request rather than blanking when the parent clears its selection.
   const contractCode = detail?.contract_code ?? '';
+  const { data: evidence = [] } = useAssetEvidence(detail?.target_asset_id);
+  const devicePhotoCount = evidence.reduce((n, s) => n + s.photo_count, 0);
 
   const forceClose = () => { setConfirmClose(false); onClose(); };
 
@@ -170,7 +172,12 @@ export function PartnerCaseApproveModal({ open, detail, onClose, onApproved }: P
                 value: <DateTime value={result.approved_expires_at} showTime />,
                 emphasis: true,
               },
-              { label: t('partnerCase.photosLocked'), value: result.photo_slots_locked },
+              // Approving freezes the device's photos. The result's own number
+              // counts photo groups, not photos — say how many photos, or
+              // nothing when the device has none.
+              ...(devicePhotoCount > 0
+                ? [{ label: t('partnerCase.photosLocked'), value: t('partnerCase.photosLockedValue', { count: devicePhotoCount }) }]
+                : []),
             ]}
             onClose={() => { onApproved?.(); forceClose(); }}
           />

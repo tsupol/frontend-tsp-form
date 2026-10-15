@@ -41,7 +41,7 @@ import { TelLink, ValidMark } from '../../components/TelLink';
 import { PaymentRecordList } from '../../components/PaymentRecord';
 import { usePaymentRecord } from '../../hooks/usePaymentRecord';
 import { ageFrom } from './customerRisk';
-import { usePartnerCaseActions, usePartnerCaseReturnReasons } from './usePartnerCases';
+import { usePartnerCaseActions, usePartnerCaseReturnReasons, useAssetEvidence } from './usePartnerCases';
 import { outcomeBadgeColor, type PartnerCaseDetail } from './partnerCaseTypes';
 import { PartnerCaseApproveModal } from './PartnerCaseApproveModal';
 import { PartnerCaseReturnModal } from './PartnerCaseReturnModal';
@@ -53,19 +53,6 @@ interface PartnerCaseDetailPanelProps {
   onBack?: () => void;
   /** Called after an approve/return so the queue can drop the row. */
   onDecided?: () => void;
-}
-
-/** One slot of the device's photo album, as `v_asset_evidence` returns it. */
-interface EvidenceSlot {
-  asset_id: number;
-  slot: string;
-  label_th: string;
-  photo_count: number;
-  photos: Array<{
-    entity_media_id: number;
-    storage_path: string;
-    variants_json: Record<string, string> | null;
-  }> | null;
 }
 
 /** `v_customer_documents` — the image lives in `file_url`, a storage key. */
@@ -237,12 +224,7 @@ export function PartnerCaseDetailPanel({
   // How they paid before — every other contract of theirs this fund can see.
   const record = usePaymentRecord(customerId, contractId);
 
-  const { data: evidence = [] } = useQuery({
-    queryKey: ['asset-evidence', assetId],
-    queryFn: () => apiClient.get<EvidenceSlot[]>(`/v_asset_evidence?asset_id=eq.${assetId}&order=slot_order`),
-    enabled: assetId != null,
-    staleTime: 30 * 1000,
-  });
+  const { data: evidence = [] } = useAssetEvidence(assetId);
 
   if (!detail) {
     return (

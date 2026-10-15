@@ -316,3 +316,27 @@ export function usePartnerCaseInvalidate() {
     queryClient.invalidateQueries({ queryKey: ['draft-contracts'] });
   }, [queryClient]);
 }
+
+/** One slot of the device's photo album, as `v_asset_evidence` returns it. */
+export interface EvidenceSlot {
+  asset_id: number;
+  slot: string;
+  label_th: string;
+  photo_count: number;
+  photos: Array<{
+    entity_media_id: number;
+    storage_path: string;
+    variants_json: Record<string, string> | null;
+  }> | null;
+}
+
+/** The device's photo album, slot by slot. Shared by the case view and the
+ *  approve result, which says how many of these photos approving froze. */
+export function useAssetEvidence(assetId: number | null | undefined) {
+  return useQuery({
+    queryKey: ['asset-evidence', assetId],
+    queryFn: () => apiClient.get<EvidenceSlot[]>(`/v_asset_evidence?asset_id=eq.${assetId}&order=slot_order`),
+    enabled: assetId != null,
+    staleTime: 30 * 1000,
+  });
+}
