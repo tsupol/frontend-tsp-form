@@ -11,12 +11,15 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Button, TextArea } from 'tsp-form';
-import { Info } from 'lucide-react';
+import { Info, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { usePartnerSettlementInvalidate } from './usePartnerSettlements';
+import { useAuth } from '../../contexts/AuthContext';
+import { useMyPermissions } from '../../hooks/useMyPermissions';
 import type {
   PartnerSettlementDetail,
   PartnerSettlementFinanceCheckResult,
@@ -34,7 +37,13 @@ export function PartnerSettlementCheckModal({
   open, detail, checked, onClose,
 }: PartnerSettlementCheckModalProps) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const invalidate = usePartnerSettlementInvalidate();
+  // Building the shop's payout is the next job once a request is ticked —
+  // offered only to whoever may build one (same gate as the payout menu).
+  const { isFundCompany } = useAuth();
+  const { hasPermission } = useMyPermissions();
+  const canPayPartners = isFundCompany && hasPermission('PARTNER.PAYOUT_APPROVE');
 
   const [view, setView] = useState<'form' | 'done'>('form');
   const [note, setNote] = useState('');
@@ -170,6 +179,12 @@ export function PartnerSettlementCheckModal({
                 <span>{t('partnerSettlement.checkNoChange')}</span>
               </div>
             ) : undefined}
+            secondaryAction={checked && result.checked && canPayPartners && detail ? {
+              label: t('fundBill.buildTitle'),
+              endIcon: <ArrowRight size={16} />,
+              isNextStep: true,
+              onClick: () => { forceClose(); navigate(`/admin/fund-bills/new/${detail.branch_id}`); },
+            } : undefined}
             onClose={forceClose}
           />
         )}

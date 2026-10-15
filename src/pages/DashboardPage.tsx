@@ -152,6 +152,9 @@ export function DashboardPage() {
     || permissions.some(p => MONEY_WORK_PREFIXES.some(code => p.permission_code.startsWith(code)));
   // Same gate as the side menu's shop-case entry, read from the permission.
   const canReviewPartnerCases = isFundCompany && hasPermission('PARTNER.CREDIT_APPROVE');
+  // Fund finance checks the shops' close-outs and pays them — same gate as the
+  // side menu's payout entry, read from the permission.
+  const canCheckCloseouts = isFundCompany && hasPermission('PARTNER.PAYOUT_APPROVE');
   const today = todayISO();
 
   // Today's receiving accounts — both channel slots (STORE_FRONT + INSTALLMENT),
@@ -244,6 +247,20 @@ export function DashboardPage() {
   });
   const partnerCaseCount = partnerCasesQuery.data?.totalCount ?? 0;
 
+  // Shop close-outs nobody has ticked yet — the same filter the close-out
+  // page's "to check" tab opens on, so the number matches it.
+  const closeoutsQuery = useQuery({
+    queryKey: ['dashboard', 'partner-closeouts-to-check'],
+    queryFn: () =>
+      apiClient.getPaginated<{ settlement_id: number }>(
+        '/v_partner_settlement_queue?select=settlement_id&status=eq.CLOSE_SUBMITTED&finance_checked_at=is.null',
+        { page: 1, pageSize: 1 },
+      ),
+    enabled: canCheckCloseouts,
+    refetchInterval: 60_000,
+  });
+  const closeoutCount = closeoutsQuery.data?.totalCount ?? 0;
+
   const unclosedRow = unclosedQuery.data?.[0];
   const approvalsRow = approvalsQuery.data?.[0];
   const submissionsRow = submissionsQuery.data?.[0];
@@ -256,7 +273,8 @@ export function DashboardPage() {
         (reconRow?.mismatch_count ?? 0)
       : 0) +
     (canApprove ? (approvalsRow?.pending_count ?? 0) : 0) +
-    (canReviewPartnerCases ? partnerCaseCount : 0);
+    (canReviewPartnerCases ? partnerCaseCount : 0) +
+    (canCheckCloseouts ? closeoutCount : 0);
 
   // ── Pending tasks: contracts awaiting device bind ────────────────────
   // Plain (non-rollup) view, scoped via standard sq filter. One round-trip
@@ -466,7 +484,7 @@ export function DashboardPage() {
         </div>
 
         {/* ── Action band ──────────────────────────────────────────────── */}
-        {(showMoneyWork || canApprove || canReviewPartnerCases) && (
+        {(showMoneyWork || canApprove || canReviewPartnerCases || canCheckCloseouts) && (
         <section className="mb-6">
           <h2 className="text-sm font-semibold text-subtle mb-3 uppercase tracking-wide">
             {t('dashboard.actionRequired')}
@@ -483,6 +501,19 @@ export function DashboardPage() {
                 error={partnerCasesQuery.error}
                 to="/admin/partner-cases"
                 emptyText={t('dashboard.noPartnerCases')}
+              />
+            )}
+
+            {canCheckCloseouts && (
+              <CountCard
+                icon={<Receipt size={20} />}
+                title={t('dashboard.closeoutsWaiting')}
+                count={closeoutCount}
+                isLoading={closeoutsQuery.isLoading}
+                isError={closeoutsQuery.isError}
+                error={closeoutsQuery.error}
+                to="/admin/partner-settlements"
+                emptyText={t('dashboard.noCloseouts')}
               />
             )}
 

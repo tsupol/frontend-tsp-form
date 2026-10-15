@@ -16,11 +16,13 @@ import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { Badge, Button, Tooltip, LabeledCheckbox } from 'tsp-form';
 import {
-  ArrowLeft, ExternalLink, Images, History, Smartphone,
+  ArrowLeft, ArrowRight, ExternalLink, Images, History, Smartphone,
   Wallet, AlertTriangle, CheckCircle2, Store,
 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { CopyButton } from '../../components/CopyButton';
+import { useAuth } from '../../contexts/AuthContext';
+import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { fmtCurrency } from '../../lib/format';
 import { ContractPhotoGroups } from '../contracts/ContractPhotoGroups';
 import {
@@ -67,6 +69,12 @@ export function PartnerSettlementReviewPanel({
 
   const [returnOpen, setReturnOpen] = useState(false);
   const [checkTarget, setCheckTarget] = useState<boolean | null>(null);
+
+  // Building the shop's payout is the next job once a request is ticked —
+  // offered only to whoever may build one (same gate as the payout menu).
+  const { isFundCompany } = useAuth();
+  const { hasPermission } = useMyPermissions();
+  const canPayPartners = isFundCompany && hasPermission('PARTNER.PAYOUT_APPROVE');
 
   const contractId = detail?.contract_id ?? null;
   const { actions } = usePartnerSettlementActions(contractId);
@@ -140,6 +148,8 @@ export function PartnerSettlementReviewPanel({
   const deviceId = submitSnapshot?.device_id ?? null;
 
   const lines = detail.lines ?? [];
+  const showBuildPayout = isChecked && detail.status === 'CLOSE_SUBMITTED' && canPayPartners;
+  const buildPayoutPath = `/admin/fund-bills/new/${detail.branch_id}`;
 
   return (
     <>
@@ -202,7 +212,7 @@ export function PartnerSettlementReviewPanel({
         />
       </div>
 
-      {(!tickHidden || !returnHidden) && (
+      {(!tickHidden || !returnHidden || showBuildPayout) && (
         <div className="flex-none border-t border-line px-4 py-3 flex items-center gap-3 flex-wrap">
           {!tickHidden && (
             <Tooltip
@@ -253,6 +263,18 @@ export function PartnerSettlementReviewPanel({
                 {t('partnerSettlement.returnTitle')}
               </Button>
             </Tooltip>
+          )}
+
+          {showBuildPayout && (
+            <Button
+              size="sm"
+              color="primary"
+              endIcon={<ArrowRight size={14} />}
+              onClick={(e) => (e.ctrlKey || e.metaKey ? window.open(buildPayoutPath, '_blank') : navigate(buildPayoutPath))}
+              onAuxClick={(e) => { if (e.button === 1) window.open(buildPayoutPath, '_blank'); }}
+            >
+              {t('fundBill.buildTitle')}
+            </Button>
           )}
         </div>
       )}

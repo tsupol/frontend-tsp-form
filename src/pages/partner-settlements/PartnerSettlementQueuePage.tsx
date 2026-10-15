@@ -25,6 +25,7 @@ import {
   usePartnerSettlementDetail,
   usePartnerSettlementStatusRef,
   usePartnerSettlementBranches,
+  usePartnerSettlementActions,
   type SettlementQueueTab,
 } from './usePartnerSettlements';
 import { PartnerSettlementReviewPanel } from './PartnerSettlementReviewPanel';
@@ -57,23 +58,28 @@ export function PartnerSettlementQueuePage() {
   const statusRef = usePartnerSettlementStatusRef();
   const queue = usePartnerSettlementQueue({ tab, branchId, pageIndex, pageSize });
   const { detail, isLoading: detailLoading } = usePartnerSettlementDetail(selectedId);
+  // The detail view has no tick; the actions call (same cache as the review
+  // panel's) does — it says whether the open request is in "checked".
+  const { actions: selectedActions } = usePartnerSettlementActions(detail?.contract_id ?? null);
+  const selectedChecked = selectedActions?.finance_checked_at != null;
 
-  // A deep link (from a payout document, a contract) names one request. Stand on
-  // the tab that holds it, so the rail shows its neighbours rather than the
-  // default "to check" list it is not in. A fully paid request belongs to no
-  // tab — leave the current one; its detail still opens on the right.
+  // Stand on the tab that holds the open request — when a deep link (from a
+  // payout document, a contract) names one, and again when ticking or sending
+  // it back moves it, so the rail shows where it now sits instead of pinning it
+  // into a tab whose header says it holds nothing. A request no tab holds
+  // leaves the current tab; its detail still opens on the right.
   useEffect(() => {
     if (!detail || detail.settlement_id !== selectedId) return;
     const target: SettlementQueueTab | null =
       detail.status === 'PAID' ? 'PAID'
       : detail.status === 'IN_PAYOUT' ? 'IN_PAYOUT'
-      : detail.status === 'CLOSE_SUBMITTED' ? 'TO_CHECK'
+      : detail.status === 'CLOSE_SUBMITTED' ? (selectedChecked ? 'CHECKED' : 'TO_CHECK')
       : detail.waiting_on === 'BRANCH' ? 'WAITING_BRANCH'
       : null;
     if (target) setTab(target);
-    // Only when the link target changes — a later tab change is the user's own.
+    // Only when the request or where it sits changes — a later tab change is the user's own.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, detail?.settlement_id, detail?.status]);
+  }, [selectedId, detail?.settlement_id, detail?.status, selectedChecked]);
 
   // The rail sorts by shop so one shop reads as a block; within a shop the
   // backend's own order (oldest first) is preserved.
