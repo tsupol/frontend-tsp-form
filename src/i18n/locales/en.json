@@ -6102,7 +6102,10 @@
       "slip_uploaded": "Slip uploaded [to review]",
       "bill_paid_staff": "Bill paid",
       "bill_voided_staff": "Bill voided",
-      "buyback_approval_required_staff": "Buyback approval required"
+      "buyback_approval_required_staff": "Buyback approval required",
+      "partner_case_submitted_staff": "Shop credit case waiting for approval",
+      "partner_case_approved_staff": "Credit approved — collect the down payment and sign",
+      "partner_case_returned_staff": "Credit request returned"
     },
     "signingType": {
       "ADDENDUM": "addendum",

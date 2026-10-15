@@ -276,6 +276,7 @@ export const AppSideNav = () => {
     savingContractsCount,
     draftContractsCount,
     pendingPaymentCount,
+    partnerCasesPendingCount,
     depositOverdueCount,
     pausedContractsCount,
     unreadChatCount,
@@ -333,7 +334,7 @@ export const AppSideNav = () => {
 
   // A deal-partner shop's contract menu: its own list, in the order a shop
   // works, under two headings. ContractsLayout builds from the same list.
-  const shopCounts = { draft: draftContractsCount, pendingPayment: pendingPaymentCount };
+  const shopCounts = { draft: draftContractsCount, pendingApproval: partnerCasesPendingCount, pendingPayment: pendingPaymentCount };
   const shopContractChildren: SideMenuItemData[] = [];
   let shopGroup: string | undefined;
   for (const s of SHOP_STAGES) {

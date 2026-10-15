@@ -16,7 +16,7 @@ export function ContractsLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const activePath = contractMenuActivePath(location.pathname, location.search);
-  const { savingContractsCount, draftContractsCount, pendingPairingCount, pendingPaymentCount, depositOverdueCount, pausedContractsCount } = useNavCounts();
+  const { savingContractsCount, draftContractsCount, pendingPairingCount, pendingPaymentCount, depositOverdueCount, pausedContractsCount, partnerCasesPendingCount } = useNavCounts();
 
   type NavRow =
     | { group: string }
@@ -37,9 +37,9 @@ export function ContractsLayout({ children }: { children: ReactNode }) {
   }
   // Deal-partner shops get their own list, in the order a shop works, under
   // two headings (dual-nav rule — AppSideNav builds from the same list). Only
-  // two stages have a backend counter; the rest carry no badge (BE asked us not
-  // to count the shop views on every menu open).
-  const shopCounts = { draft: draftContractsCount, pendingPayment: pendingPaymentCount };
+  // stages with a backend counter carry a badge (BE asked us not to count the
+  // shop views on every menu open).
+  const shopCounts = { draft: draftContractsCount, pendingApproval: partnerCasesPendingCount, pendingPayment: pendingPaymentCount };
   const shopItems: NavRow[] = [];
   let shopGroup: string | undefined;
   for (const s of SHOP_STAGES) {

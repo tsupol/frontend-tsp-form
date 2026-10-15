@@ -168,6 +168,10 @@ export function useNavCounts() {
 
   return {
     pendingApprovals: n('pending_approvals'),
+    // The shop's own requests still waiting on the fund's credit desk (mig 1448)
+    // — not `pending_approvals`, which counts branches with staff approvals waiting.
+    // UI_FEEDBACK/2026-10-15_DELIVERY_partner_case_counter_and_notifications.md §1.
+    partnerCasesPendingCount: n('partner_cases_pending'),
     pendingSlips: n('payment_submissions_slips'),
     pendingSlipBranches,
     unclosedCount,

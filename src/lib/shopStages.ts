@@ -11,7 +11,7 @@ import {
 //
 // Which pages a shop may reach at all is still decided by shopMenu.ts.
 export type ShopStageGroup = 'money';
-export type ShopStageCount = 'draft' | 'pendingPayment';
+export type ShopStageCount = 'draft' | 'pendingApproval' | 'pendingPayment';
 
 export interface ShopStage {
   key: string;
@@ -38,7 +38,7 @@ export const SHOP_STAGES: ShopStage[] = [
 
   { key: 'new-contract', path: '/admin/contracts/new', labelKey: 'nav.shopNewContract', icon: FilePlus, accent: true },
   { key: 'draft-contracts', path: '/admin/contracts/draft', labelKey: 'nav.draftContracts', icon: FileEdit, count: 'draft' },
-  { key: 'pending-approval', path: '/admin/contracts/pending-approval', labelKey: 'nav.pendingApproval', icon: ClipboardCheck },
+  { key: 'pending-approval', path: '/admin/contracts/pending-approval', labelKey: 'nav.pendingApproval', icon: ClipboardCheck, count: 'pendingApproval' },
   { key: 'approval-returned', path: '/admin/contracts/approval-returned', labelKey: 'nav.approvalReturned', icon: Undo2 },
   { key: 'pending-payment', path: '/admin/contracts/pending-payment', labelKey: 'nav.pendingPayment', icon: CreditCard, count: 'pendingPayment' },
   // No bind / hand-over stage: a shop's device is bound when the contract goes

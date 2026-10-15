@@ -44,6 +44,10 @@ type NotificationRow = {
     // SMS couldn't be parsed — the title must still render.
     otp_code?: string;
     login_email?: string;
+    // Shop credit request (mig 1449). reason_text is "reason name — note",
+    // only on a returned request.
+    case_id?: number;
+    reason_text?: string;
   } | null;
   contract_ids: number[] | null;
   created_at: string;
@@ -79,7 +83,7 @@ function resolveCategory(evt: string, fallback: string): NotifCategory | string 
   if (evt.startsWith('chat_')) return 'chat';
   if (evt.startsWith('signing_') || evt.startsWith('bind_') || evt.startsWith('contract_')) return 'contract';
   if (evt.startsWith('bill_') || evt === 'slip_uploaded') return 'payment';
-  if (evt.endsWith('_approval_required_staff') || evt.startsWith('buyback_')) return 'approval';
+  if (evt.endsWith('_approval_required_staff') || evt.startsWith('buyback_') || evt.startsWith('partner_case_')) return 'approval';
   return fallback;
 }
 
@@ -117,6 +121,14 @@ function deeplinkFor(row: NotificationRow): string | null {
   // ABM enrollment OTP — not contract-related; the full SMS lives on the
   // ABM account OTP screen (UI_SUMMARY/137).
   if (evt === 'abm_otp_received') return '/admin/company/abm-otp';
+  // Shop credit request (mig 1449): the credit desk lands on the case itself;
+  // the shop lands on the contract in the stage it has just moved to.
+  if (evt === 'partner_case_submitted_staff' && row.payload?.case_id) {
+    return `/admin/partner-cases/${row.payload.case_id}`;
+  }
+  const pcid = row.payload?.contract_id;
+  if (evt === 'partner_case_approved_staff' && pcid) return `/admin/contracts/pending-payment/${pcid}`;
+  if (evt === 'partner_case_returned_staff' && pcid) return `/admin/contracts/approval-returned/${pcid}`;
   const cid = row.payload?.contract_id ?? row.contract_ids?.[0];
   if (!cid) return null;
   if (evt.startsWith('chat_')) return `/admin/chat?contract=${cid}`;
@@ -449,7 +461,21 @@ export function NotificationMenuItem({ collapsed, isMobile, unreadCount }: Props
                           {relativeTime(t, row.created_at)}
                         </span>
                       </div>
-                      {cat === 'approval' ? (
+                      {row.event_type.startsWith('partner_case_') ? (
+                        // Shop credit request: the contract, then who sent it
+                        // (credit desk) or why it came back (shop).
+                        <div className="text-xs leading-snug mt-0.5 min-w-0">
+                          <div className="inline-flex items-center gap-1.5 min-w-0 max-w-full">
+                            {code && <span className="text-primary-fg font-medium shrink-0">{code}</span>}
+                            {row.event_type === 'partner_case_submitted_staff' && row.payload?.branch_name && (
+                              <><span className="text-subtle">·</span><span className="text-subtle truncate">{row.payload.branch_name}</span></>
+                            )}
+                          </div>
+                          {row.event_type === 'partner_case_returned_staff' && row.payload?.reason_text && (
+                            <div className="text-subtle line-clamp-2">{row.payload.reason_text}</div>
+                          )}
+                        </div>
+                      ) : cat === 'approval' ? (
                         <div className="text-xs leading-snug truncate mt-0.5 inline-flex items-center gap-1.5 min-w-0 flex-wrap">
                           {row.payload?.po_code && <span className="text-primary-fg font-medium truncate">{row.payload.po_code}</span>}
                           {row.payload?.branch_name && (
