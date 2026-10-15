@@ -18,7 +18,7 @@
 // the button writes.
 
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Modal } from 'tsp-form';
@@ -64,6 +64,7 @@ export function ShopCollectDownModal({ open, contractId, contractCode, onClose, 
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
+  const [, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
 
   const [view, setView] = useState<View>('form');
@@ -131,6 +132,10 @@ export function ShopCollectDownModal({ open, contractId, contractCode, onClose, 
   const canConfirm = !!figures && readinessKnown && readiness.ready && !loading;
 
   const forceClose = () => { setConfirmDiscard(false); onClose(); };
+  const goToSigning = () => {
+    setSearchParams(prev => { const next = new URLSearchParams(prev); next.set('tab', 'signing'); return next; });
+    forceClose();
+  };
   const handleClose = () => {
     if (loading) return;
     if (view === 'form' && cartLines.length > 0) { setConfirmDiscard(true); return; }
@@ -273,7 +278,10 @@ export function ShopCollectDownModal({ open, contractId, contractCode, onClose, 
                   {collected > 0 ? t('wizard.bill_confirmed_body_signing') : t('wizard.bill_opened_no_charge_body')}
                 </div>
               }
-              onClose={forceClose}
+              // Signing is the next step, and the contract behind this window
+              // has it on its signing tab — the main button goes there.
+              doneLabel={t('contract.action_go_to_signing')}
+              onClose={goToSigning}
             />
           )}
 

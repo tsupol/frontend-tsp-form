@@ -182,10 +182,16 @@ type SignTarget = {
 export function SigningTab({
   contractId,
   contractCode,
+  contractState,
+  branchId,
   onRenderPdf,
 }: {
   contractId: number;
   contractCode: string | null;
+  branchId?: number | null;
+  /** Before approval the handover photos aren't due yet — the photo box
+   *  stays neutral instead of saying groups are missing. */
+  contractState?: string | null;
   onRenderPdf?: (target: SigningPdfTarget) => void;
 }) {
   const { t } = useTranslation();
@@ -236,21 +242,28 @@ export function SigningTab({
     refetchIntervalInBackground: false,
   });
 
-  // When the customer signs on the bridge and the snapshot seals, the polls above
-  // pick it up and COLLECTING → none. That transition is exactly when the contract
-  // flips (e.g. PENDING_SIGN → ACTIVE), so refresh the contract detail/lists too —
-  // otherwise the state chip + action footer stay stale until a manual reload.
+  // When the parties finish signing on the bridge, the polls above see that
+  // document seal — and that is when the contract flips (e.g. PENDING_SIGN →
+  // ACTIVE), so refresh the contract detail/lists too, or the state chip and
+  // action footer stay stale until a manual reload. Watch for a NEWLY sealed
+  // document, not for "nothing left collecting": a shop's contract opens its
+  // device-receipt document the moment the first one seals, so something is
+  // always collecting right after the flip.
   const qc = useQueryClient();
-  const wasCollecting = useRef(false);
+  const sealedSeen = useRef<{ contractId: number; ids: Set<number> } | null>(null);
   useEffect(() => {
-    const collecting = hasCollecting(historyQuery.data);
-    if (wasCollecting.current && !collecting) {
+    if (!historyQuery.data) return;
+    const sealed = new Set(historyQuery.data.filter(s => s.status === 'SEALED').map(s => s.signing_id));
+    // Only compare within one contract — picking another contract isn't a signing.
+    const prev = sealedSeen.current?.contractId === contractId ? sealedSeen.current.ids : null;
+    sealedSeen.current = { contractId, ids: sealed };
+    if (prev && [...sealed].some(id => !prev.has(id))) {
       qc.invalidateQueries({ queryKey: ['contract-detail', contractId] });
       qc.invalidateQueries({ queryKey: ['contract-actions', contractId] });
       qc.invalidateQueries({ queryKey: ['contract-search'] });
       qc.invalidateQueries({ queryKey: ['contract-installments', contractId] });
+      qc.invalidateQueries({ queryKey: ['nav', 'counters'] });
     }
-    wasCollecting.current = collecting;
   }, [historyQuery.data, qc, contractId]);
 
   const partiesBySigning = useMemo(() => {
@@ -338,14 +351,23 @@ export function SigningTab({
     <div className="p-4 flex flex-col gap-3">
       {/* Contract photo album (delivery/handover evidence) — contract-scoped,
           works before and after signing. */}
-      <ContractAttachments contractId={contractId} contractCode={contractCode} />
+      <ContractAttachments
+        contractId={contractId}
+        contractCode={contractCode}
+        branchId={branchId}
+        stage={contractState === 'DRAFT' || contractState === 'PENDING_APPROVAL' ? 'draft' : 'signing'}
+      />
 
-      <Tooltip content={t('signing.auditToggleHint')}>
-        <label className="self-end flex items-center gap-2 text-xs text-subtle cursor-pointer">
-          <span>{t('signing.auditToggle')}</span>
-          <Switch size="sm" checked={showAudit} onChange={e => setShowAudit(e.target.checked)} />
-        </label>
-      </Tooltip>
+      {/* A shop has no copy of the full history — only the list without the
+          system's own cancellations — so the switch would only fail for it. */}
+      {!isDealPartner && (
+        <Tooltip content={t('signing.auditToggleHint')}>
+          <label className="self-end flex items-center gap-2 text-xs text-subtle cursor-pointer">
+            <span>{t('signing.auditToggle')}</span>
+            <Switch size="sm" checked={showAudit} onChange={e => setShowAudit(e.target.checked)} />
+          </label>
+        </Tooltip>
+      )}
 
       {signings.length === 0 ? (
         <div className="p-8 text-center text-subtler flex flex-col items-center gap-2">

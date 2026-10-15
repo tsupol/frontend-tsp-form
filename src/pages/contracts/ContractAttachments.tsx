@@ -21,6 +21,8 @@ import {
   Plus, XCircle, ImageOff, Image as ImageIcon, Loader2, CheckCircle2, AlertCircle, Info,
 } from 'lucide-react';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
+import { useBranchIsPartner } from '../../hooks/useAllowedPaymentMethods';
+import { useAuth } from '../../contexts/AuthContext';
 import { normalizeKey } from '../../lib/mediaPath';
 import { MediaLightboxKeyGallery } from '../../components/MediaLightbox';
 import { useMobileCaptureSession, type MobileCaptureSession } from './workspace/useMobileCaptureSession';
@@ -46,11 +48,15 @@ function pickFullKey(m: ContractPhoto): string | null {
 export function ContractAttachments({
   contractId,
   contractCode,
+  branchId,
   className,
   stage = 'signing',
 }: {
   contractId: number;
   contractCode: string | null;
+  /** The contract's branch — a partner shop's photos are checked at its
+   *  close-out, an internal branch's are proof only; the note says which. */
+  branchId?: number | null;
   className?: string;
   /** `draft` = the new-contract screen. These are handover photos, taken at
    *  signing and handover, so before that nothing says "required" or
@@ -59,6 +65,14 @@ export function ContractAttachments({
 }) {
   const draft = stage === 'draft';
   const { t, i18n } = useTranslation();
+  // A shop only ever sees its own contracts, and can't read the branch
+  // lookup (its copy has no company type) — so don't ask on its behalf.
+  const { isDealPartner } = useAuth();
+  const { isPartnerBranch: branchIsPartner } = useBranchIsPartner(isDealPartner ? null : branchId);
+  const isPartnerBranch = isDealPartner || branchIsPartner;
+  // Undefined while the branch type loads — no note rather than the wrong one.
+  const draftNote = isPartnerBranch === undefined ? null
+    : t(isPartnerBranch ? 'contractPhotos.draftNotePartner' : 'contractPhotos.draftNote');
   const isThai = i18n.language === 'th';
   const queryClient = useQueryClient();
   const [manageOpen, setManageOpen] = useState(false);
@@ -127,10 +141,10 @@ export function ContractAttachments({
         </Button>
       </div>
 
-      {draft && (
+      {draft && draftNote && (
         <div className="alert alert-info mb-3">
           <Info size={16} />
-          <span>{t('contractPhotos.draftNote')}</span>
+          <span>{draftNote}</span>
         </div>
       )}
 
@@ -186,6 +200,7 @@ export function ContractAttachments({
         contractId={contractId}
         capture={capture}
         draft={draft}
+        draftNote={draftNote}
       />
     </div>
   );
@@ -265,6 +280,7 @@ function ManageModal({
   contractId,
   capture,
   draft,
+  draftNote,
 }: {
   open: boolean;
   onClose: () => void;
@@ -273,6 +289,7 @@ function ManageModal({
   capture: MobileCaptureSession;
   /** Before signing: the note instead of "missing", no required badges. */
   draft?: boolean;
+  draftNote?: string | null;
 }) {
   const { t } = useTranslation();
   const { phase, session, status, error: qrError, uploadCount } = capture;
@@ -323,7 +340,7 @@ function ManageModal({
               </div>
               <div className="min-w-0 flex-1 flex flex-col gap-2">
                 {draft
-                  ? <p className="text-sm text-subtle">{t('contractPhotos.draftNote')}</p>
+                  ? <p className="text-sm text-subtle">{draftNote}</p>
                   : <ChecklistSummary contractId={contractId} />}
                 {pinned}
               </div>

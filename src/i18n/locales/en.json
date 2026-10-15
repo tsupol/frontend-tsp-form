@@ -3827,7 +3827,8 @@
     "summaryOthers": "Other:",
     "lockedSection": "Locked — can't be changed",
     "handoverTitle": "Handover photos",
-    "draftNote": "Not required yet — taken at signing and handover",
+    "draftNote": "Taken at signing and handover, kept as proof of delivery — they don't hold up any step",
+    "draftNotePartner": "Taken at signing and handover · must be complete before the shop submits close-out to get paid — not part of the credit approval",
     "pinnedEmpty": "Photos taken on the phone arrive here — then drag them into a group below.",
     "moveTo": "Move to",
     "checklistComplete": "All required photo groups are complete.",
@@ -4050,6 +4051,8 @@
     "noApprovals": "No pending approvals",
     "partnerCasesWaiting": "Shop credit cases waiting",
     "noPartnerCases": "No cases waiting",
+    "closeoutsWaiting": "Shop payment requests to check",
+    "noCloseouts": "Nothing to check",
     "pendingSlips": "Slips to review",
     "noSlips": "No slips waiting",
     "auditFlags": "Day-close audit flags",
@@ -6083,6 +6086,9 @@
     "silentEmptyHint": "Every device out with a customer or on loan is reporting in normally."
   },
   "notifCenter": {
+    "detail": {
+      "partner_case_approved_staff": "Collect the down payment and sign"
+    },
     "title": "Notifications",
     "markAllRead": "Mark all as read",
     "empty": "No notifications — you're all caught up.",
@@ -6116,7 +6122,7 @@
       "bill_voided_staff": "Bill voided",
       "buyback_approval_required_staff": "Buyback approval required",
       "partner_case_submitted_staff": "Shop credit case waiting for approval",
-      "partner_case_approved_staff": "Credit approved — collect the down payment and sign",
+      "partner_case_approved_staff": "Credit approved",
       "partner_case_returned_staff": "Credit request returned"
     },
     "signingType": {
@@ -6413,7 +6419,9 @@
     "approveNotePlaceholder": "Anything worth recording",
     "approveDone": "Approved",
     "confirmDigits": "Type {{digits}} to confirm",
-    "photosLocked": "Device photos locked",
+    "photosLocked": "Device photos",
+    "photosLockedValue_one": "{{count}} photo · can no longer be deleted or replaced",
+    "photosLockedValue_other": "{{count}} photos · can no longer be deleted or replaced",
     "return": "Send back",
     "returnReason": "Reason",
     "returnReasonPlaceholder": "Pick a reason",
@@ -9556,8 +9564,9 @@
     "contractViewExpiry": "Link expires in about 30 minutes.",
     "signQr": "Sign QR",
     "signQrTitle": "Sign contract QR",
-    "signQrScanHint": "Scan with another device — or, on the iPad, open the signing page here — then hand it to the customer to read and sign.",
+    "signQrScanHint": "Have the customer scan with their own phone, or scan with the shop's iPad — the contract opens for them to read to the end and sign.",
     "signQrOpenHere": "Open signing page on this device",
+    "signQrOpenHereHint": "Use this when you're already on the iPad the customer will sign on.",
     "signQrProgress": "{{count}} signed",
     "signQrExpiry": "Link expires in about 60 minutes.",
     "signQrFinished": "Signing complete ({{count}} signed)",

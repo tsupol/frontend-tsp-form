@@ -104,7 +104,11 @@ export function ContractSignQrModal({
       </div>
 
       <div className="modal-content">
-        {contractCode && <p className="text-sm text-subtle mb-4">{contractCode}</p>}
+        {contractCode && (
+          <div className="px-3 py-2.5 rounded-md bg-surface border border-line mb-4">
+            <div className="font-medium text-sm">{contractCode}</div>
+          </div>
+        )}
 
         {(phase === 'requesting' || phase === 'idle') && (
           <div className="flex flex-col items-center justify-center py-12 text-subtle">
@@ -127,8 +131,10 @@ export function ContractSignQrModal({
                 <div className="rounded-lg border border-line bg-white p-4">
                   <QRCodeSVG value={session.qr_payload} size={224} />
                 </div>
-                <p className="text-sm text-subtle text-center inline-flex items-center gap-1.5">
-                  <PenLine size={14} />
+                {/* Icon inline with the words: beside a wrapped paragraph it
+                    floats at the side, between the lines. */}
+                <p className="text-sm text-subtle text-center">
+                  <PenLine size={14} className="inline-block align-[-2px] mr-1.5" />
                   {t('workspace.signQrScanHint', {
                     defaultValue: 'Scan with the iPad, hand it to the customer to read and sign.',
                   })}
@@ -136,15 +142,18 @@ export function ContractSignQrModal({
 
                 {/* Already on the iPad the customer will sign on — there is no
                     second device to scan with, so open the page right here. */}
-                <a
-                  href={session.qr_payload}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn btn-primary w-full inline-flex items-center justify-center gap-2"
-                >
-                  <ExternalLink size={16} />
-                  {t('workspace.signQrOpenHere')}
-                </a>
+                <div className="w-full flex flex-col items-center gap-1.5">
+                  <a
+                    href={session.qr_payload}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn btn-primary w-full inline-flex items-center justify-center gap-2"
+                  >
+                    <ExternalLink size={16} />
+                    {t('workspace.signQrOpenHere')}
+                  </a>
+                  <p className="text-xs text-subtle text-center">{t('workspace.signQrOpenHereHint')}</p>
+                </div>
 
                 <div className="w-full flex items-center gap-2">
                   <input

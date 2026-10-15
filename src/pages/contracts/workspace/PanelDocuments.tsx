@@ -302,6 +302,7 @@ export function PanelDocuments({ onClose: _onClose }: Props) {
       <ContractAttachments
         contractId={contractId}
         contractCode={contract?.code_display ?? null}
+        branchId={contract?.branch_id}
         stage="draft"
       />
 

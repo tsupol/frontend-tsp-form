@@ -561,6 +561,8 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
           <SigningTab
             contractId={contractId}
             contractCode={contract.code_display ?? contract.code}
+            contractState={contract.state}
+            branchId={contract.branch_id}
             onRenderPdf={(target) => { setPdfTarget(target); setPdfModalOpen(true); }}
           />
         )}
