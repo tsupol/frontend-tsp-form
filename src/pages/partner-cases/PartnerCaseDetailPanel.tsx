@@ -24,7 +24,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Badge, Button, Tooltip } from 'tsp-form';
 import {
   ArrowLeft, Clock, FileText, Smartphone, User, Wallet, MapPin, Phone, Users,
-  History, AlertTriangle, ImageOff, Star, ShieldAlert, ShieldCheck,
+  History, AlertTriangle, ImageOff, Star, ShieldAlert, ShieldCheck, ChevronDown, ChevronRight,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
@@ -291,8 +291,8 @@ export function PartnerCaseDetailPanel({
     staleTime: 30 * 1000,
   });
 
-  // Earlier contracts that actually ran — not this one, and not drafts that
-  // expired or were cancelled before anything was paid.
+  // Earlier contracts that actually started — not this one, and not ones
+  // that never reached their first instalment.
   const ranContracts = customerContracts.filter(c => c.contract_id !== contractId && c.activated_at);
   const unopenedContracts = customerContracts.filter(c => c.contract_id !== contractId && !c.activated_at);
   const ranIds = ranContracts.map(c => c.contract_id);
@@ -768,18 +768,18 @@ export function PartnerCaseDetailPanel({
               })}
             </div>
           )}
-          {/* Drafts that expired or were cancelled never ran, so they say
-              nothing about paying — counted, out of the way, openable. */}
+          {/* Contracts that never started paying (drafts, expired or
+              cancelled ones, and ones still on their way) say nothing about
+              how this customer pays — counted, out of the way, openable. */}
           {unopenedContracts.length > 0 && (
             <div className="mt-2">
               <button
                 type="button"
                 onClick={() => setShowUnopened(v => !v)}
-                className="text-xs text-primary-fg hover:underline bg-transparent border-none cursor-pointer p-0"
+                className="text-xs text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none cursor-pointer p-0"
               >
-                {showUnopened
-                  ? t('partnerCase.hideUnopened')
-                  : t('partnerCase.showUnopened', { count: unopenedContracts.length })}
+                {showUnopened ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                {t('partnerCase.showUnopened', { count: unopenedContracts.length })}
               </button>
               {showUnopened && (
                 <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
