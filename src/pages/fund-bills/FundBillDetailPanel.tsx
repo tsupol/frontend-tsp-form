@@ -740,18 +740,33 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
                   <Smartphone size={14} className="text-subtle" />
                   {t('fundBill.devices')}
                 </div>
-                {transfers.rows.map(d => (
-                  <div key={d.transfer_id} className="px-3 py-2.5 border-t border-line">
+                {transfers.rows.map(d => {
+                  // The transfer row has no product name; the contract's own
+                  // lines on this document carry it (same name as the shop box).
+                  const deviceName = d.contract_id != null
+                    ? lines.rows.find(l => l.contract_id === d.contract_id && l.product_display_name)?.product_display_name ?? null
+                    : null;
+                  return (
+                  <div key={d.transfer_id} className="px-3 py-3 border-t border-line">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm truncate">{d.asset_code ?? `#${d.asset_id}`}</span>
+                      <EntityCodeLink
+                        to={`/admin/inventory/assets/${d.asset_id}`}
+                        code={d.asset_code ?? `#${d.asset_id}`}
+                        className="font-medium text-sm truncate"
+                      />
                       <Badge color={d.source_type === 'FUND_BILL' ? 'success' : 'warning'} size="sm">
                         {t(`fundBill.transfer_${d.source_type}`, { defaultValue: d.source_type })}
                       </Badge>
                       <span className="flex-1" />
                       <span className="text-sm tabular-nums shrink-0">{fmtCurrency(d.cost_basis_after)}</span>
                     </div>
-                    <div className="text-xs text-subtle mt-0.5">
-                      {d.contract_code ? formatEntityCode(d.contract_code) : '—'} ·{' '}
+                    {deviceName && <div className="text-sm mt-1.5 truncate">{deviceName}</div>}
+                    <div className="text-xs text-subtle mt-1.5">
+                      <EntityCodeLink
+                        to={d.contract_id != null ? `/admin/contracts/search/${d.contract_id}` : null}
+                        code={d.contract_code}
+                        iconSize={11}
+                      />{' '}·{' '}
                       {t(`fundBill.owner_${d.from_owner_type}`, { defaultValue: d.from_owner_type ?? '—' })}
                       {' → '}
                       {t(`fundBill.owner_${d.to_owner_type}`, { defaultValue: d.to_owner_type })}
@@ -759,7 +774,8 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
                       <DateTime value={d.created_at} showTime />
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
