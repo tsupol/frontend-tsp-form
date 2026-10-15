@@ -37,11 +37,13 @@ export interface BillDetailLike {
   change_amount: number;
   is_voided: boolean;
   branch_name: string;
-  line_items: { line_id: number; description: string; amount: number; quantity: number }[];
+  /** Null when the bill has none — the detail view sends null, not []. */
+  line_items: { line_id: number; description: string; amount: number; quantity: number; extended_amount?: number | null }[] | null;
+  /** Null on a bill nobody has paid yet (not []): the receipt must still render. */
   payments: {
     id: number; method: string; amount: number;
     bank_name: string | null; account_number: string | null; reference: string | null;
-  }[];
+  }[] | null;
   cancel_info: { cancelled_at: string; credit_note_code: string } | null;
 }
 
@@ -145,19 +147,23 @@ export function buildBillDocFromDetail(
 
   // ── Lines (freeform: a row per item; qty≠1 gets its own sub-line) ──
   const lineRows: DocLine[] = [];
-  for (const li of bill.line_items) {
+  for (const li of bill.line_items ?? []) {
+    // `amount` is the price of one; the line's money is `extended_amount`
+    // (price × quantity, the backend's own figure) — the lines must add up to
+    // the total printed below them.
+    const lineTotal = li.extended_amount ?? li.amount * li.quantity;
     lineRows.push({
       template: 'cols',
       cols: [
         { text: li.description, flex: 1, wrap: true },
-        { text: fmtCurrency(li.amount * sign), align: 'right', mono: true },
+        { text: fmtCurrency(lineTotal * sign), align: 'right', mono: true },
       ],
     });
     if (li.quantity !== 1) {
       lineRows.push({
         template: 'text',
         emphasis: 'muted',
-        text: `${t('wizard.receipt_qty')} ${li.quantity}`,
+        text: `${t('wizard.receipt_qty')} ${li.quantity} × ${fmtCurrency(li.amount * sign)}`,
       });
     }
   }
@@ -173,9 +179,10 @@ export function buildBillDocFromDetail(
 
   // ── Payments (skip for JOURNAL — no money movement; skip for the
   //    unofficial invoice — nothing is paid yet, so no Paid/Change lines) ──
-  if (!isJournal && !unofficial && bill.payments.length > 0) {
+  const payments = bill.payments ?? [];
+  if (!isJournal && !unofficial && payments.length > 0) {
     blocks.push({ type: 'divider' });
-    const payLines: DocLine[] = bill.payments.map(p => {
+    const payLines: DocLine[] = payments.map(p => {
       const bankDetail = p.bank_name ? `${p.bank_name}${p.account_number ? ` ${p.account_number}` : ''}` : '';
       const parts = [bankDetail, p.reference ?? ''].filter(Boolean);
       const methodLabel = t(`wizard.method_${p.method}`, { defaultValue: p.method });

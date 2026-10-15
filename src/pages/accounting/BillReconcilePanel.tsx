@@ -226,8 +226,12 @@ function BillExpand({ billId }: { billId: number }) {
           {lines.map(l => (
             <div key={l.line_id} className="flex items-center gap-2 text-xs py-1">
               <Badge color={LINE_TYPE_COLOR[l.line_type] ?? 'default'} size="sm">{l.line_type}</Badge>
-              <span className="flex-1 min-w-0 truncate">{l.description}</span>
-              <span className="tabular-nums shrink-0">{fmtCurrency(l.amount)}</span>
+              <span className="flex-1 min-w-0 truncate">
+                {l.description}
+                {l.quantity != null && l.quantity !== 1 && <span className="text-subtle"> · {l.quantity} × {fmtCurrency(l.amount)}</span>}
+              </span>
+              {/* The line's money, not the price of one — lines add up to the total. */}
+              <span className="tabular-nums shrink-0">{fmtCurrency(l.extended_amount ?? l.amount * (l.quantity ?? 1))}</span>
               <span className={`text-[10px] shrink-0 font-medium ${l.owner_type === 'HOLDING' ? 'text-primary-fg' : 'text-warning-fg'}`}>
                 {l.owner_type === 'HOLDING' ? '→H' : '→C'}
               </span>

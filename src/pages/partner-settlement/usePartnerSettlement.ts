@@ -277,10 +277,11 @@ export function usePartnerMyFundBillLines(billId: number | null) {
 }
 
 /**
- * The payment requests a document's lines point at — each carries its own
- * `net_amount`, which is the per-contract figure the panel shows. Never add up
- * the lines for it: the shop's line view hides company-owned lines (the
- * contract fee) that still come off what the shop receives.
+ * The payment requests a document's lines point at, each with its own lines
+ * and `net_amount` — the same request the contract page's card shows. The
+ * panel shows THESE lines under each contract, not the document's: the shop's
+ * document-line view hides company-owned lines (the contract fee) that still
+ * come off the net, so its lines never add up to the net beside them.
  *
  * Looked up by the ids on the lines rather than by `fund_bill_id`, because a
  * request taken back off a document loses that link.
@@ -289,8 +290,8 @@ export function usePartnerMyFundBillSettlements(settlementIds: number[]) {
   const ids = [...new Set(settlementIds)].sort((a, b) => a - b);
   const query = useQuery({
     queryKey: ['partner-fund-bills', 'settlements', ids],
-    queryFn: () => apiClient.get<PartnerSettlement[]>(
-      `/v_partner_my_settlements?settlement_id=in.(${ids.join(',')})`,
+    queryFn: () => apiClient.get<PartnerSettlementDetail[]>(
+      `/v_partner_my_settlement_detail?settlement_id=in.(${ids.join(',')})`,
     ),
     enabled: ids.length > 0,
     staleTime: 30 * 1000,

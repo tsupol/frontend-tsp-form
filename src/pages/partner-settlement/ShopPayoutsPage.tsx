@@ -42,6 +42,7 @@ import {
   type PartnerMyFundBill,
   type PartnerMyFundBillLine,
   type PartnerMyFundBillPayment,
+  type SettlementLine,
 } from './partnerSettlementTypes';
 
 export function ShopPayoutsPage() {
@@ -219,14 +220,15 @@ function ShopFundBillPanel({ bill }: { bill: PartnerMyFundBill }) {
   const { t, i18n } = useTranslation();
   const lines = usePartnerMyFundBillLines(bill.bill_id);
   const payments = usePartnerMyFundBillPayments(bill.bill_id);
-  // Each contract's net comes from its payment request, not from the lines:
-  // the shop's line view leaves out company-owned lines (the contract fee)
-  // that still come off what the shop receives.
+  // A contract's lines and its net both come from its payment request — the
+  // same request the contract page's card shows. The document's own lines
+  // can't stand in: the shop's copy leaves out company-owned lines (the
+  // contract fee) that still come off the net, so they never add up to it.
   const settlements = usePartnerMyFundBillSettlements(
     lines.rows.flatMap(l => (l.settlement_id != null ? [l.settlement_id] : [])),
   );
-  const settlementNet = (id: number | null) =>
-    settlements.rows.find(s => s.settlement_id === id)?.net_amount ?? null;
+  const settlementOf = (id: number | null) =>
+    settlements.rows.find(s => s.settlement_id === id) ?? null;
 
   const byContract: ContractGroup[] = [];
   const manual: PartnerMyFundBillLine[] = [];
@@ -289,6 +291,37 @@ function ShopFundBillPanel({ bill }: { bill: PartnerMyFundBill }) {
     </div>
   );
 
+  /** A request line, worded and signed as the contract page's card has it. */
+  const renderRequestLine = (line: SettlementLine) => {
+    const isVoid = line.status === 'VOID' || line.line_type === 'REVERSAL';
+    const isFrom = line.direction === 'FROM_BRANCH';
+    return (
+      <div key={`r${line.line_id}`} className="flex items-center gap-2 px-3 py-1.5 border-t border-line">
+        <span className={`flex-1 min-w-0 ${isVoid ? 'line-through text-subtler' : ''}`}>
+          <span className="block text-sm truncate">
+            {t(`settlement.lineType_${line.line_type}`, { defaultValue: line.line_type })}
+          </span>
+          {isFrom && <span className="block text-xs text-subtle">{t('settlement.heldByShop')}</span>}
+        </span>
+        <span
+          className={`text-sm tabular-nums shrink-0 ${
+            isVoid ? 'line-through text-subtler' : isFrom ? 'text-danger-fg' : ''
+          }`}
+        >
+          {isFrom ? '−' : ''}{fmtCurrency(line.amount)}
+        </span>
+      </div>
+    );
+  };
+
+  /** The group's lines: its request's own when it has one, else the document's. */
+  const groupLines = (group: ContractGroup) => {
+    if (group.settlement_id == null) return group.lines.map(renderLine);
+    const request = settlementOf(group.settlement_id);
+    if (!request) return null;
+    return (request.lines ?? []).filter(l => !l.is_memo).map(renderRequestLine);
+  };
+
   return (
     <>
       <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2">
@@ -339,7 +372,7 @@ function ShopFundBillPanel({ bill }: { bill: PartnerMyFundBill }) {
                    *  have no request, so their lines carry the amounts alone. */}
                   {group.settlement_id != null && (
                     <span className="text-sm tabular-nums font-medium shrink-0">
-                      {fmtCurrency(settlementNet(group.settlement_id))}
+                      {fmtCurrency(settlementOf(group.settlement_id)?.net_amount ?? null)}
                     </span>
                   )}
                 </div>
@@ -348,7 +381,7 @@ function ShopFundBillPanel({ bill }: { bill: PartnerMyFundBill }) {
                     {[group.settlement_code, groupProduct(group)].filter(Boolean).join(' · ')}
                   </div>
                 )}
-                {group.lines.map(renderLine)}
+                {groupLines(group)}
               </div>
             ))}
           </div>

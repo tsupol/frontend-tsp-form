@@ -54,6 +54,8 @@ interface BillLineItem {
   description: string;
   amount: number;
   quantity: number;
+  /** Price × quantity — the line's money. */
+  extended_amount?: number | null;
   owner_type: string;
   variant_id: number | null;
   approval_status: string;
@@ -417,9 +419,15 @@ function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: bool
           lines.map((line) => (
             <div key={line.line_id} className="px-4 py-2.5 border-b border-line flex items-center gap-3">
               <Badge size="sm" color="default">{line.charge_type}</Badge>
-              <span className="flex-1 min-w-0 truncate text-sm">{line.description}</span>
+              <span className="flex-1 min-w-0 truncate text-sm">
+                {line.description}
+                {line.quantity != null && line.quantity !== 1 && (
+                  <span className="text-xs text-subtle"> · {line.quantity} × {fmtCurrency(line.amount)}</span>
+                )}
+              </span>
               <span className="tabular-nums font-medium shrink-0 text-sm">
-                {fmtCurrency(line.amount)}
+                {/* The line's money, not the price of one — lines add up to the total. */}
+                {fmtCurrency(line.extended_amount ?? line.amount * (line.quantity ?? 1))}
               </span>
             </div>
           ))
