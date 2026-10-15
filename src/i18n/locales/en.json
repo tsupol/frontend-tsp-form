@@ -3861,6 +3861,7 @@
   },
   "customer": {
     "title": "Customers",
+    "paymentRecordTitle": "Payment record",
     "tab_contracts": "Contracts",
     "tab_contact": "Contact",
     "tab_app": "App account",

@@ -86,41 +86,50 @@ export function PaymentRecordList({ record, emptyText, showBranch = false, bySta
     );
   };
 
-  /** Code, state, co-lessee, product (and branch) on one line. */
-  const headLine = (c: CustomerContractRow, trailing?: React.ReactNode) => (
-    <div className="flex items-center gap-2 min-w-0">
-      <EntityCodeLink
-        to={`/admin/contracts/search/${c.contract_id}`}
-        code={c.contract_code}
-        className="text-sm font-medium shrink-0"
-      />
-      <Badge size="sm">{t(`contract.state_${c.state}`, { defaultValue: c.state })}</Badge>
-      {c.role && c.role !== 'PRIMARY' && (
-        <Badge size="sm" color="info">{t(`partnerCase.role_${c.role}`, { defaultValue: c.role })}</Badge>
-      )}
-      <span className="flex-1 min-w-0 truncate text-xs text-subtle">
-        {[c.product_display_name, showBranch ? c.branch_name : null].filter(Boolean).join(' · ')}
-      </span>
-      {trailing}
-    </div>
+  /** Code, state and co-lessee on the first line (the paid count at its end);
+   *  product and branch on their own line, so a phone-width screen never
+   *  squeezes them to nothing. */
+  const headLines = (c: CustomerContractRow, paid?: React.ReactNode, earned?: number) => (
+    <>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
+        <EntityCodeLink
+          to={`/admin/contracts/search/${c.contract_id}`}
+          code={c.contract_code}
+          className="text-sm font-medium shrink-0"
+        />
+        <Badge size="sm">{t(`contract.state_${c.state}`, { defaultValue: c.state })}</Badge>
+        {c.role && c.role !== 'PRIMARY' && (
+          <Badge size="sm" color="info">{t(`partnerCase.role_${c.role}`, { defaultValue: c.role })}</Badge>
+        )}
+        {paid && <span className="ml-auto text-xs text-subtle tabular-nums">{paid}</span>}
+      </div>
+      <div className="flex items-center gap-2 mt-0.5 min-w-0">
+        <span className="flex-1 min-w-0 truncate text-xs text-subtle">
+          {[c.product_display_name, showBranch ? c.branch_name : null].filter(Boolean).join(' · ')}
+        </span>
+        {earned ? (
+          <span className="text-xs text-subtle inline-flex items-center gap-1 shrink-0 tabular-nums">
+            <Award size={12} />{t('customer.reward.points', { value: fmtPoints(earned) })}
+          </span>
+        ) : null}
+      </div>
+    </>
   );
 
   const ranRow = (c: CustomerContractRow) => {
     const late = lateBy.get(c.contract_id);
     const overdue = c.overdue_count ?? 0;
     const marks = marksOf(c.contract_id);
-    const earned = points?.byContract.get(c.contract_id);
     return (
       <div key={c.contract_id} className="px-3 py-2 border-b border-line last:border-b-0">
-        {headLine(c, (
-          <span className="text-xs text-subtle tabular-nums shrink-0">
-            {t('partnerCase.paidOf', { paid: c.paid_installment_count ?? 0, total: c.total_installments ?? 0 })}
-          </span>
-        ))}
+        {headLines(
+          c,
+          t('partnerCase.paidOf', { paid: c.paid_installment_count ?? 0, total: c.total_installments ?? 0 }),
+          points?.byContract.get(c.contract_id),
+        )}
         {/* One mark per instalment, in order — how this customer actually
             pays, not just a count. Hover for the dates (and points earned). */}
-        <div className="flex items-start gap-2 mt-1.5">
-        <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1.5">
           {marks.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {marks.map(i => {
@@ -146,12 +155,6 @@ export function PaymentRecordList({ record, emptyText, showBranch = false, bySta
               {t('partnerCase.paidLate', { count: late.lateCount, days: late.worstDays })}
             </Badge>
           )}
-        </div>
-        {earned ? (
-          <span className="text-xs text-subtle inline-flex items-center gap-1 shrink-0 tabular-nums">
-            <Award size={12} />{t('customer.reward.points', { value: fmtPoints(earned) })}
-          </span>
-        ) : null}
         </div>
       </div>
     );
@@ -179,7 +182,7 @@ export function PaymentRecordList({ record, emptyText, showBranch = false, bySta
         <div className="rounded-md border border-line overflow-hidden">
           {onTheirWay.map(c => (
             <div key={c.contract_id} className="px-3 py-2 border-b border-line last:border-b-0">
-              {headLine(c)}
+              {headLines(c)}
             </div>
           ))}
           {shown.map(ranRow)}

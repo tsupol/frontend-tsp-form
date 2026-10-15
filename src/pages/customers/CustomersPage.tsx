@@ -4,7 +4,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, DataTable, Input, Select, Button, Badge, Modal, LabeledCheckbox, FormErrorMessage, Tooltip, useSnackbarContext } from 'tsp-form';
-import { ArrowRightFromLine, ArrowLeft, Users, User, ImageOff, Award, CheckCircle, XCircle, Trash2, Star, Plus, Pencil, UserPlus, ShieldAlert, ShieldOff } from 'lucide-react';
+import { ArrowRightFromLine, ArrowLeft, Users, User, ImageOff, Award, Phone, MapPin, History, CheckCircle, XCircle, Trash2, Star, Plus, Pencil, UserPlus, ShieldAlert, ShieldOff } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { toLocalDateStr, parseLocalDate, formatTel, formatCid } from '../../lib/format';
@@ -16,6 +16,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { CustomerLoginCard, useInvalidateLoginInfo } from '../../components/CustomerLoginCard';
 import { EditIdentityModal } from '../../components/EditIdentityModal';
 import { OverflowTabs } from '../../components/OverflowTabs';
+import { DetailSection } from '../../components/DetailLine';
 import { TelLink, ValidMark } from '../../components/TelLink';
 import { PaymentRecordList } from '../../components/PaymentRecord';
 import { usePaymentRecord } from '../../hooks/usePaymentRecord';
@@ -180,10 +181,6 @@ const PREFIX_OPTIONS = [
   { value: 'Ms.', label: 'Ms.' },
 ];
 
-/** First letter of a name for the list's round badge — past a leading Thai
- *  vowel (เ แ โ ใ ไ), which is written before the consonant it follows. */
-const initialOf = (name: string) => (name.replace(/^[เแโใไ]/, '').charAt(0) || '?').toUpperCase();
-
 const formatAddress = (a: CustomerAddress): string => {
   const parts = [a.address_line1];
   if (a.address_line2) parts.push(a.address_line2);
@@ -336,13 +333,10 @@ export function CustomersPage() {
                     return (
                       <button
                         type="button"
-                        className="w-full text-left px-4 py-2.5 flex items-center gap-3 transition-colors cursor-pointer"
+                        className="w-full text-left px-4 py-2.5 transition-colors cursor-pointer"
                         onClick={() => handleSelect(c)}
                       >
-                        <span className="w-9 h-9 rounded-full bg-surface-soft border border-line flex items-center justify-center shrink-0 text-sm font-medium text-subtle">
-                          {initialOf(c.first_name || c.full_name)}
-                        </span>
-                        <div className="min-w-0 flex-1">
+                        <div className="min-w-0">
                           <div className="flex items-center gap-2 min-w-0">
                             <span className="font-medium text-sm truncate">{c.full_name}</span>
                             {!c.is_active && <Badge size="xs" color="default">{t('customer.inactive')}</Badge>}
@@ -399,15 +393,17 @@ export function CustomersPage() {
 // credit approver only reads. So:
 //   - the header answers who they are and how to call them, and a blacklist
 //     shows there in red — it is the one thing everyone must see;
-//   - the first tab is their contracts, with how each was paid and the points
-//     each instalment earned (points are earned per paid instalment, so they
-//     belong with the contract, not in a list of their own);
-//   - contact details and the app account sit in their own tabs.
+//   - the first tab is the customer's own details (phones, addresses,
+//     reference people) — this is the customer's page, not a contract list;
+//   - the contracts tab shows how each was paid and the points each instalment
+//     earned (points are earned per paid instalment, so they belong with the
+//     contract, not in a list of their own);
+//   - the app account has its own tab.
 // Edit buttons show only to roles that may change a customer (CUSTOMER.UPDATE);
 // the blacklist and app-account buttons follow their own permissions.
 
-type DetailTab = 'contracts' | 'contact' | 'app';
-const DETAIL_TABS: readonly DetailTab[] = ['contracts', 'contact', 'app'];
+type DetailTab = 'contact' | 'contracts' | 'app';
+const DETAIL_TABS: readonly DetailTab[] = ['contact', 'contracts', 'app'];
 
 function CustomerDetail({ customerId, customer }: { customerId: number; customer: Customer | null }) {
   const { t, i18n } = useTranslation();
@@ -420,10 +416,10 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
   // The tab lives in the address, so back/forward and a copied link keep it.
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab') as DetailTab | null;
-  const tab: DetailTab = tabParam && DETAIL_TABS.includes(tabParam) ? tabParam : 'contracts';
+  const tab: DetailTab = tabParam && DETAIL_TABS.includes(tabParam) ? tabParam : 'contact';
   const setTab = (next: DetailTab) => {
     const params = new URLSearchParams(searchParams);
-    if (next === 'contracts') params.delete('tab');
+    if (next === 'contact') params.delete('tab');
     else params.set('tab', next);
     setSearchParams(params);
   };
@@ -543,7 +539,7 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
   return (
     <div className="flex-1 min-h-0 flex flex-col">
       {/* ── Header: who they are and how to call them ── */}
-      <div className="flex-none px-4 md:px-6 pt-4 pb-3 flex flex-col gap-3">
+      <div className="flex-none px-4 md:px-6 pt-4 pb-3 flex flex-col gap-3 border-b border-line">
         <div className="flex items-start gap-3">
           {idPhotoKeys.length > 0 ? (
             <MediaThumbButton
@@ -574,8 +570,8 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
                 <Tooltip content={t('customer.editIdentity.title')} placement="top">
                   <Button
                     variant="ghost"
-                    className="btn-icon-xs"
-                    startIcon={<Pencil size={12} />}
+                    size="sm"
+                    startIcon={<Pencil size={14} />}
                     onClick={() => setEditIdentityOpen(true)}
                     aria-label={t('customer.editIdentity.title')}
                   />
@@ -651,28 +647,27 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
       <div className="flex-1 min-h-0 overflow-auto better-scroll">
         <div className="px-4 md:px-6 py-4 max-w-2xl flex flex-col gap-5">
           {tab === 'contracts' && (
-            <>
-              {/* How they pay, in one line, and the points they hold. */}
-              {(recordSummary || points.balances.length > 0) && (
-                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                  {recordSummary ? <span className={`text-sm font-medium ${recordTone}`}>{recordSummary}</span> : <span />}
-                  {points.balances.length > 0 && (
-                    <span className="text-sm text-subtle inline-flex flex-wrap items-center gap-x-2">
-                      <Award size={14} />
-                      {points.balances.map(b => (
-                        <span key={b.company_id}>
-                          <span className="text-fg font-medium tabular-nums">{t('customer.reward.points', { value: fmtPoints(b.points) })}</span>
-                          {points.balances.length > 1 && <> · {b.company_name}</>}
-                        </span>
-                      ))}
+            <DetailSection
+              icon={<History size={14} />}
+              title={t('customer.paymentRecordTitle')}
+              action={points.balances.length > 0 && (
+                <span className="text-sm text-subtle inline-flex flex-wrap items-center gap-x-2">
+                  <Award size={14} />
+                  {points.balances.map(b => (
+                    <span key={b.company_id}>
+                      <span className="text-fg font-medium tabular-nums">{t('customer.reward.points', { value: fmtPoints(b.points) })}</span>
+                      {points.balances.length > 1 && <> · {b.company_name}</>}
                     </span>
-                  )}
-                </div>
+                  ))}
+                </span>
               )}
+            >
+              {/* How they pay, in one line. */}
+              {recordSummary && <div className={`text-sm font-medium ${recordTone}`}>{recordSummary}</div>}
               {/* A company user sees only their own company's contracts; one
                   that owes elsewhere in the group looks clean here. */}
               {user?.company_name && contractCount > 0 && (
-                <div className="text-xs text-subtle -mt-3">{t('customer.contractsScope', { company: user.company_name })}</div>
+                <div className="text-xs text-subtle">{t('customer.contractsScope', { company: user.company_name })}</div>
               )}
               <PaymentRecordList
                 key={customerId}
@@ -682,12 +677,13 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
                 showBranch
                 emptyText={t('customer.noContracts')}
               />
-            </>
+            </DetailSection>
           )}
 
           {tab === 'contact' && (
             <>
-              <TabSection
+              <DetailSection
+                icon={<Phone size={14} />}
                 title={t('partnerCase.phones')}
                 action={canEdit && <Button variant="ghost" size="sm" startIcon={<Plus size={14} />} onClick={() => setAddContactOpen(true)}>{t('customer.addContact')}</Button>}
               >
@@ -716,17 +712,18 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
                 ) : (
                   <div className="text-sm text-subtler">{t('customer.noContacts')}</div>
                 )}
-              </TabSection>
+              </DetailSection>
 
-              <TabSection title={t('customer.addresses')}>
+              <DetailSection icon={<MapPin size={14} />} title={t('customer.addresses')}>
                 <div className="flex flex-col gap-3">
                   <AddressLine label={t('customer.addressHome')} address={homeAddress} onEdit={canEdit ? () => setEditAddressType('HOME') : undefined} />
                   <AddressLine label={t('customer.addressWork')} address={workAddress} onEdit={canEdit ? () => setEditAddressType('WORK') : undefined} />
                   <AddressLine label={t('customer.addressShipping')} address={shippingAddress} onEdit={canEdit ? () => setEditAddressType('SHIPPING') : undefined} />
                 </div>
-              </TabSection>
+              </DetailSection>
 
-              <TabSection
+              <DetailSection
+                icon={<Users size={14} />}
                 title={`${t('customer.references')} (${references.length})`}
                 action={canEdit && <Button variant="ghost" size="sm" startIcon={<UserPlus size={14} />} onClick={() => setAddReferenceOpen(true)}>{t('customer.addReference')}</Button>}
               >
@@ -744,11 +741,12 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
                     ))}
                   </div>
                 )}
-              </TabSection>
+              </DetailSection>
             </>
           )}
 
           {tab === 'app' && (
+            <section className="rounded-md border border-line px-3 py-3">
             <CustomerLoginCard
               noCard
               customer={{
@@ -765,6 +763,7 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
               }}
               onChanged={() => { invalidateLogin(customer.id); refreshAll(); }}
             />
+            </section>
           )}
         </div>
       </div>
@@ -847,20 +846,6 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
   );
 }
 
-// ── A titled part of a tab (no box — the tab is the container) ─────────────
-
-function TabSection({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <section className="flex flex-col gap-2">
-      <div className="flex items-center justify-between gap-2 min-h-7">
-        <h3 className="text-sm font-medium">{title}</h3>
-        {action}
-      </div>
-      {children}
-    </section>
-  );
-}
-
 // ── Address line (read-only, edit/add on the right) ────────────────────────
 
 function AddressLine({ label, address, onEdit }: {
@@ -888,9 +873,10 @@ function AddressLine({ label, address, onEdit }: {
         <Tooltip content={address ? t('customer.editAddress') : t('common.add')} placement="top">
           <Button
             variant="ghost"
-            className="btn-icon-xs shrink-0"
+            size="sm"
+            className="shrink-0"
             onClick={onEdit}
-            startIcon={address ? <Pencil size={12} /> : <Plus size={12} />}
+            startIcon={address ? <Pencil size={14} /> : <Plus size={14} />}
             aria-label={address ? t('customer.editAddress') : t('common.add')}
           />
         </Tooltip>
@@ -909,13 +895,14 @@ function ContactLine({ label, value, isPhone, primary, children }: {
   children?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-2 px-3 py-2 text-sm min-h-10">
+    <div className="flex items-center gap-3 pl-3 pr-2 py-1.5 text-sm min-h-11">
       <span className="text-subtle flex-1 min-w-0 truncate inline-flex items-center gap-1.5">
         {primary && <Star size={12} className="text-warning-fg fill-warning shrink-0" />}
         {label}
       </span>
       {isPhone ? <TelLink tel={value} /> : <span className="truncate">{value}</span>}
-      <span className="w-6 shrink-0 flex justify-end">{children}</span>
+      {/* As wide as the icon button, so it never spills onto the number. */}
+      <span className="w-7 shrink-0 flex justify-center">{children}</span>
     </div>
   );
 }
@@ -923,7 +910,7 @@ function ContactLine({ label, value, isPhone, primary, children }: {
 function EditIconButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <Tooltip content={label} placement="top">
-      <Button variant="ghost" className="btn-icon-xs" onClick={onClick} startIcon={<Pencil size={12} />} aria-label={label} />
+      <Button variant="ghost" size="sm" onClick={onClick} startIcon={<Pencil size={14} />} aria-label={label} />
     </Tooltip>
   );
 }
@@ -954,9 +941,10 @@ function DeleteContactButton({ contact, onDeleted }: { contact: CustomerContact;
       <Tooltip content={t('common.delete')} placement="top">
         <Button
           variant="ghost"
-          className="btn-icon-xs text-subtle hover:text-danger"
+          size="sm"
+          className="text-subtle hover:text-danger"
           onClick={() => setConfirming(true)}
-          startIcon={<Trash2 size={12} />}
+          startIcon={<Trash2 size={14} />}
           aria-label={t('common.delete')}
         />
       </Tooltip>
@@ -1475,10 +1463,11 @@ function ReferenceRow({ reference, onEdit, onDeleted }: {
       {reference.tel && <TelLink tel={reference.tel} />}
       {onEdit && onDeleted && <div className="flex items-center gap-1 shrink-0">
         <Tooltip content={t('customer.editReference')} placement="top">
-          <Button variant="ghost" className="btn-icon-xs" onClick={onEdit} startIcon={<Pencil size={12} />} aria-label={t('customer.editReference')} />
+          <Button variant="ghost" size="sm" onClick={onEdit} startIcon={<Pencil size={14} />} aria-label={t('customer.editReference')} />
         </Tooltip>
         <Tooltip content={t('common.delete')} placement="top">
-          <Button variant="ghost" className="btn-icon-xs text-subtle hover:text-danger" onClick={() => setConfirming(true)} startIcon={<Trash2 size={12} />} aria-label={t('common.delete')} />
+          <Button variant="ghost" size="sm"
+          className="text-subtle hover:text-danger" onClick={() => setConfirming(true)} startIcon={<Trash2 size={14} />} aria-label={t('common.delete')} />
         </Tooltip>
       </div>}
       <ConfirmDialog

@@ -3857,6 +3857,7 @@
   },
   "customer": {
     "title": "ลูกค้า",
+    "paymentRecordTitle": "ประวัติการผ่อน",
     "tab_contracts": "สัญญา",
     "tab_contact": "ติดต่อ",
     "tab_app": "บัญชี app",
