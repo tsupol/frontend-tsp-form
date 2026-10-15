@@ -387,6 +387,18 @@ export interface FundBillRemoveSettlementResult {
 }
 
 /** Badge color for a document status — paid is the only "good" terminal one. */
+/**
+ * The figure to show for a whole document. `net_amount` is the party's side
+ * (money to the party = plus), so a clawback — money coming FROM the shop —
+ * comes out negative. The fund-bill guide (149 §6b) says never show that for a
+ * clawback: show `total_from_party`, the amount the shop owes, as plus.
+ */
+export function fundBillShownTotal(
+  bill: Pick<FundBill, 'bill_purpose' | 'net_amount' | 'total_from_party'>,
+): number {
+  return bill.bill_purpose === 'CLAWBACK' ? bill.total_from_party : bill.net_amount;
+}
+
 export function fundBillStatusColor(
   status: FundBillStatus,
 ): 'default' | 'info' | 'success' | 'warning' | 'danger' {

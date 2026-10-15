@@ -30,6 +30,7 @@ import {
 import {
   fundBillStatusColor,
   type FundBillStatus,
+  fundBillShownTotal,
 } from './fundBillTypes';
 import type { FundBillCandidateBranch } from './useFundBills';
 import { useMyPermissions } from '../../hooks/useMyPermissions';
@@ -381,7 +382,7 @@ export function FundBillsPage() {
                           )}
                           <span className="flex-1" />
                           <span className="text-sm tabular-nums font-medium shrink-0">
-                            {fmtCurrency(r.returned_net !== 0 ? r.net_after_returns : r.net_amount)}
+                            {fmtCurrency(r.returned_net !== 0 ? r.net_after_returns : fundBillShownTotal(r))}
                           </span>
                         </div>
                         <div className="text-sm mt-0.5 truncate">

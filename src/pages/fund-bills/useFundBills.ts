@@ -111,7 +111,7 @@ export interface FundBillListOptions {
 export const FUND_BILL_LIST_COLUMNS = [
   'bill_id', 'bill_code', 'status', 'bill_purpose', 'purpose_name', 'bill_date',
   'branch_id', 'branch_name', 'company_name', 'contract_count',
-  'net_amount', 'returned_net', 'net_after_returns', 'is_reversed',
+  'net_amount', 'total_from_party', 'returned_net', 'net_after_returns', 'is_reversed',
 ] as const;
 
 /** What the rail gets per row — a slice of `FundBill`, not the whole head. */

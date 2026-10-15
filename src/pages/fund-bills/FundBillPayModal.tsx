@@ -28,6 +28,7 @@ import { DateTime } from '../../components/DateTime';
 import { fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../../lib/format';
 import { useFundBillInvalidate, useFundSourceAccounts } from './useFundBills';
 import type { FundBill, FundBillPayResult } from './fundBillTypes';
+import { fundBillShownTotal } from './fundBillTypes';
 
 function parseTypedDate(raw: string): Date | null {
   if (raw.length !== 8) return null;
@@ -149,7 +150,7 @@ export function FundBillPayModal({ open, bill, onClose }: FundBillPayModalProps)
                 <div className="font-medium text-sm">{bill?.bill_code ?? ''}</div>
                 <div className="text-xs text-subtle mt-0.5">
                   {bill?.branch_name}
-                  {bill && <> · {fmtCurrency(bill.net_amount)}</>}
+                  {bill && <> · {fmtCurrency(fundBillShownTotal(bill))}</>}
                 </div>
               </div>
 

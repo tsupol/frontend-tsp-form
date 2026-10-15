@@ -24,6 +24,7 @@ import { ActionDoneView } from '../contracts/ActionDoneView';
 import { fmtCurrency } from '../../lib/format';
 import { useFundBillInvalidate } from './useFundBills';
 import type { FundBill, FundBillCreditNoteResult } from './fundBillTypes';
+import { fundBillShownTotal } from './fundBillTypes';
 
 interface FundBillCreditNoteModalProps {
   open: boolean;
@@ -117,7 +118,7 @@ export function FundBillCreditNoteModal({ open, bill, onClose }: FundBillCreditN
                 <div className="font-medium text-sm">{bill?.bill_code ?? ''}</div>
                 <div className="text-xs text-subtle mt-0.5">
                   {bill?.branch_name}
-                  {bill && <> · {fmtCurrency(bill.net_amount)}</>}
+                  {bill && <> · {fmtCurrency(fundBillShownTotal(bill))}</>}
                 </div>
               </div>
 

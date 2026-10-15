@@ -25,6 +25,7 @@ import { useFundSourceAccounts } from '../fund-bills/useFundBills';
 import { useFundClawbackInvalidate } from './useFundClawback';
 import type { FundClawbackCollectResult } from './fundClawbackTypes';
 import type { FundBill } from '../fund-bills/fundBillTypes';
+import { fundBillShownTotal } from '../fund-bills/fundBillTypes';
 
 function parseTypedDate(raw: string): Date | null {
   if (raw.length !== 8) return null;
@@ -151,7 +152,7 @@ export function FundClawbackCollectModal({ open, bill, onClose }: FundClawbackCo
                 <div className="font-medium text-sm">{shown?.bill_code ?? ''}</div>
                 <div className="text-xs text-subtle mt-0.5">
                   {shown?.branch_name ?? shown?.company_name}
-                  {shown && <> · {fmtCurrency(shown.net_amount)}</>}
+                  {shown && <> · {fmtCurrency(fundBillShownTotal(shown))}</>}
                 </div>
               </div>
 

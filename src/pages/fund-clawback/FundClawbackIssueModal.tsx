@@ -19,6 +19,8 @@ import { ActionDoneView } from '../contracts/ActionDoneView';
 import { fmtCurrency, formatEntityCode } from '../../lib/format';
 import { useFundClawbackInvalidate } from './useFundClawback';
 import type { FundClawbackCandidate, FundClawbackCreateResult } from './fundClawbackTypes';
+import { useFundBill } from '../fund-bills/useFundBills';
+import { fundBillShownTotal } from '../fund-bills/fundBillTypes';
 
 interface FundClawbackIssueModalProps {
   open: boolean;
@@ -39,6 +41,9 @@ export function FundClawbackIssueModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<FundClawbackCreateResult | null>(null);
+  // The result's own total is the shop's side (a clawback comes out negative);
+  // the guide says show what the shop owes — read it off the issued document.
+  const { bill: issued } = useFundBill(result?.bill_id ?? null);
   const [confirmClose, setConfirmClose] = useState(false);
 
   // The page clears its selection as this closes, so keep the last rows for the
@@ -175,7 +180,7 @@ export function FundClawbackIssueModal({
                 value: t(`fundClawback.party_${result.liable_party_type}`),
               },
               { label: t('fundClawback.lineCount'), value: String(result.line_count) },
-              { label: t('fundClawback.total'), value: fmtCurrency(result.net_amount), emphasis: true },
+              { label: t('fundClawback.total'), value: issued ? fmtCurrency(fundBillShownTotal(issued)) : '…', emphasis: true },
             ]}
             extras={
               <div className="alert alert-info">
