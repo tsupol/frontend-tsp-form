@@ -26,6 +26,7 @@ import {
   submissionStatusColor,
   type SubmissionRow,
 } from '../../components/SubmissionReviewDrawer';
+import { SlipPayoffBadge } from '../../components/SlipPayoff';
 import { buildChatTimeline, type ChatTimelineItem } from './chatTimeline';
 import type { ChatInboxRow, ChatMessage } from './chatTypes';
 import {
@@ -1107,6 +1108,13 @@ export function ChatThreadPanel({
         row={selectedSlip}
         open={!!selectedSlip}
         onClose={() => setSelectedSlip(null)}
+        onChanged={() => {
+          setSelectedSlip(null);
+          queryClient.invalidateQueries({ queryKey: ['chat-thread-submissions', contractId] });
+          queryClient.invalidateQueries({ queryKey: ['payment-submissions'] });
+          queryClient.invalidateQueries({ queryKey: ['payment-submissions-pending-count'] });
+          queryClient.invalidateQueries({ queryKey: ['nav', 'pending-submissions-summary'] });
+        }}
         onSuccess={(action, extra) => {
           setSelectedSlip(null);
           queryClient.invalidateQueries({ queryKey: ['chat-thread-submissions', contractId] });
@@ -1323,6 +1331,7 @@ function SlipEventCard({ submission, lang, onOpen }: {
             <Badge size="xs" color={submissionStatusColor(submission.status)}>
               {t(`paymentSubmissions.status_${submission.status}`)}
             </Badge>
+            <SlipPayoffBadge row={submission} />
             {submission.submitter_role === 'CO_LESSEE' && (
               <Badge size="xs" color="info">{t('paymentSubmissions.submitterRole_CO_LESSEE')}</Badge>
             )}

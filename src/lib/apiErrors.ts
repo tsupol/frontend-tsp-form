@@ -76,6 +76,12 @@ export function prepareErrorParams(
     // backend's; we only add the thousands separator.
     params.balance = fmtCurrency(params.balance);
   }
+  // mig 1452 slip early payoff: the blocked-payoff reasons name the figures the
+  // staff must act on (overpaid by, cap, minimum slip …). Same formatting rule.
+  for (const k of ['excess', 'max_slip', 'implied_discount', 'max_amount', 'over_by', 'min_slip',
+    'expected_slip', 'bill_total', 'discount_amount'] as const) {
+    if (typeof params[k] === 'number') params[k] = fmtCurrency(params[k] as number);
+  }
   // mig 1357 IDENTIFIER_FORMAT_INVALID ships `reason` (IMEI_FORMAT, APPLE_SERIAL_FORMAT, …) —
   // the same codes the forms' own check returns, so one label set serves both.
   if (typeof params.reason === 'string' && /^(IMEI_FORMAT|IMEI_LUHN_FAIL|APPLE_SERIAL_FORMAT|SERIAL_FORMAT)$/.test(params.reason)) {

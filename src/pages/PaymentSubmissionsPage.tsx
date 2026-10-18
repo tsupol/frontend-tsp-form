@@ -15,6 +15,7 @@ import {
   type SubmissionRow,
   type SubmissionStatus,
 } from '../components/SubmissionReviewDrawer';
+import { SlipPayoffBadge } from '../components/SlipPayoff';
 import { SearchInput } from '../components/SearchInput';
 
 const COMPANY_TIER_ROLES = new Set([
@@ -182,6 +183,7 @@ export function PaymentSubmissionsPage() {
             <Badge size="xs" color={statusColor(row.status)}>
               {t(`paymentSubmissions.status_${row.status}`)}
             </Badge>
+            <SlipPayoffBadge row={row} />
             {/* Money reversed even though the slip reads APPROVED — flag it so the
                 list doesn't imply the payment still stands (doc: is_voided). */}
             {row.is_voided && (
@@ -430,6 +432,7 @@ export function PaymentSubmissionsPage() {
         row={selected}
         open={!!selected}
         onClose={() => setSelected(null)}
+        onChanged={() => { setSelected(null); refresh(); }}
         onSuccess={(action, extra) => {
           setSelected(null);
           refresh();

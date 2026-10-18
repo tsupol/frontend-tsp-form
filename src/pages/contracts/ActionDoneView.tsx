@@ -1,9 +1,10 @@
 import { useCallback, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { Badge, Button } from 'tsp-form';
-import { AlertTriangle, ArrowRight, CheckCircle, Info, Printer, Download, Loader2, XOctagon } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckCircle, ExternalLink, Info, Printer, Download, Loader2, XOctagon } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { printWithMarker } from '../../lib/printDoc';
 import { useBillPdfDownload } from '../../hooks/useBillPdfDownload';
@@ -43,6 +44,9 @@ export interface ActionDoneViewProps {
   headline: string;
   /** Subtitle shown under the headline — typically a contract code, PO code, or asset code. */
   contractCode: string;
+  /** Makes the subtitle code a link to that page (ctrl/middle-click opens a new tab).
+   *  `onNavigate` runs on a plain click only — use it to close the host modal. */
+  contractLink?: { to: string; onNavigate?: () => void };
   /** Action tone — drives icon + accent color. Default: success. */
   tone?: ActionDoneTone;
   /** Optional state badge: from → to. */
@@ -90,6 +94,7 @@ const TONE_COLOR_CLASS: Record<ActionDoneTone, string> = {
 export function ActionDoneView({
   headline,
   contractCode,
+  contractLink,
   tone = 'success',
   stateTransition,
   detailRows,
@@ -148,7 +153,18 @@ export function ActionDoneView({
         <div className="flex flex-col items-center gap-2 pt-2 pb-2 text-center">
           <Icon size={48} className={iconClass} />
           <div className="text-lg font-semibold">{headline}</div>
-          <div className="text-sm text-subtle">{contractCode}</div>
+          {contractLink ? (
+            <Link
+              to={contractLink.to}
+              className="text-sm text-primary-fg inline-flex items-center gap-1 no-underline hover:underline"
+              onClick={(e) => { if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey) contractLink.onNavigate?.(); }}
+            >
+              {contractCode}
+              <ExternalLink size={12} />
+            </Link>
+          ) : (
+            <div className="text-sm text-subtle">{contractCode}</div>
+          )}
         </div>
 
         {stateTransition && (

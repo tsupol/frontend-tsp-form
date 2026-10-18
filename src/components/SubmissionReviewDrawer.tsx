@@ -11,12 +11,17 @@ import { wsClient } from '../lib/api/ws';
 import { DateTime } from './DateTime';
 import { fmtCurrency, formatDateTime } from '../lib/format';
 import { useAuth } from '../contexts/AuthContext';
+import { useMyPermissions } from '../hooks/useMyPermissions';
 import { MediaLightbox, MediaThumbButton } from './MediaLightbox';
 import { normalizeKey } from '../lib/mediaPath';
 import { translateApiError } from '../lib/apiErrors';
 import { BillDayBlockedNotice } from './BillDayPreview';
 import { useBillDatePreview, useBillDayConfirm } from '../hooks/useBillDay';
 import { billDayShiftedText, type BillDay } from '../lib/billDay';
+import {
+  SlipPayoffBadge, SlipPayoffStatusBox, SlipPayoffConfirmModal, SlipPayoffWithdrawModal,
+  payoffBlockedText, type PayoffPhase, type PayoffPreview,
+} from './SlipPayoff';
 
 export type SubmissionStatus = 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
 
@@ -104,6 +109,16 @@ export interface SubmissionRow {
   // [1, total_installments]; null until the contract has a schedule. Never derive it
   // from paid_installment_count + 1 — the DB owns the formula.
   current_installment_no: number | null;
+  // mig 1452 — early payoff from this slip (ปิดจบ). All null when the slip is not
+  // being used for a payoff. payoff_phase drives the label; allowed_actions then
+  // carries PAYOFF / PAYOFF_WITHDRAW instead of APPROVE / REJECT.
+  payoff_bill_id?: number | null;
+  payoff_bill_code_display?: string | null;
+  payoff_bill_status?: string | null;
+  payoff_bill_total?: number | null;
+  payoff_discount_amount?: number | null;
+  payoff_discount_status?: string | null;
+  payoff_phase?: PayoffPhase | null;
 }
 
 /**
@@ -168,16 +183,20 @@ export const submitterRoleColor = (r: SubmitterRole): 'info' | 'default' =>
   r === 'CO_LESSEE' ? 'info' : 'default';
 
 export function SubmissionReviewDrawer({
-  row, open, onClose, onSuccess,
+  row, open, onClose, onSuccess, onChanged,
 }: {
   row: SubmissionRow | null;
   open: boolean;
   onClose: () => void;
   /** `billDayNote` — set when approving put the bill on a later day (fund day close §D2). */
   onSuccess: (action: 'approve' | 'reject' | 'reopen', extra?: { billDayNote: string | null }) => void;
+  /** A payoff press or withdrawal finished and its own done view was dismissed —
+   *  refresh and close; no snackbar needed, the done view already said what happened. */
+  onChanged: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
+  const { hasPermission } = useMyPermissions();
   const [reason, setReason] = useState('');
   const [bankAccountId, setBankAccountId] = useState<string>('');
   const [busy, setBusy] = useState<'approve' | 'reject' | 'reopen' | null>(null);
@@ -247,14 +266,56 @@ export function SubmissionReviewDrawer({
   const billDayConfirm = useBillDayConfirm(billDayPreview);
   const billDayBlocked = reviewable && billDayPreview.data?.state === 'BLOCKED';
 
+  // Early payoff (mig 1452): asked once when the slip opens — never per list row.
+  // It decides whether ปิดจบ is pressable and carries every figure of the confirm box.
+  const payoffCapable = open && !!row && row.status === 'PENDING_REVIEW' && !liveCancelled
+    && (row.allowed_actions ?? []).some(a => a === 'PAYOFF' || a === 'PAYOFF_WITHDRAW');
+  const { data: payoffPreview, isFetching: payoffPreviewLoading } = useQuery({
+    queryKey: ['slip-payoff-preview', row?.id],
+    queryFn: () => apiClient.rpc<PayoffPreview>('fn_payment_submission_payoff_preview', { p_submission_id: row!.id }),
+    enabled: payoffCapable,
+    staleTime: 0,
+  });
+  const [payoffOpen, setPayoffOpen] = useState(false);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  useEffect(() => { if (!open) { setPayoffOpen(false); setWithdrawOpen(false); } }, [open]);
+
+  const bankOptions = bankAccounts.map(b => ({
+    value: String(b.id),
+    label: `${b.bank_name} · ${b.account_number}${b.is_default ? ' ★' : ''}`,
+  }));
+
+  // The payoff boxes live outside the drawer body so they survive the parent
+  // clearing `row` while they animate out.
+  const payoffModals = (
+    <>
+      <SlipPayoffConfirmModal
+        open={payoffOpen}
+        row={row}
+        preview={payoffPreview}
+        onClose={() => setPayoffOpen(false)}
+        onFinished={onChanged}
+      />
+      <SlipPayoffWithdrawModal
+        open={withdrawOpen}
+        row={row}
+        onClose={() => setWithdrawOpen(false)}
+        onFinished={onChanged}
+      />
+    </>
+  );
+
   if (!row) {
     return (
-      <Drawer open={open} onClose={onClose} side="right" ariaLabel={t('paymentSubmissions.review')}>
-        <div className="drawer-header">
-          <h2 className="drawer-title">{t('paymentSubmissions.review')}</h2>
-          <button className="drawer-close-btn" onClick={onClose}>&times;</button>
-        </div>
-      </Drawer>
+      <>
+        <Drawer open={open} onClose={onClose} side="right" ariaLabel={t('paymentSubmissions.review')}>
+          <div className="drawer-header">
+            <h2 className="drawer-title">{t('paymentSubmissions.review')}</h2>
+            <button className="drawer-close-btn" onClick={onClose}>&times;</button>
+          </div>
+        </Drawer>
+        {payoffModals}
+      </>
     );
   }
 
@@ -266,6 +327,15 @@ export function SubmissionReviewDrawer({
   const canApprove = allowed.includes('APPROVE');
   const canReject = allowed.includes('REJECT');
   const canReopen = allowed.includes('REOPEN');
+  // allowed_actions says what the slip allows; the person also needs the payment
+  // permissions (DELIVERY §6) — a company admin reviews slips but cannot take money,
+  // and withdraws without them (no PIN). UI visibility only; the backend decides.
+  const canPayoff = allowed.includes('PAYOFF')
+    && hasPermission('PAYMENT.RECORD') && hasPermission('BILL.PAYMENT_CONFIRM');
+  const canWithdrawPayoff = allowed.includes('PAYOFF_WITHDRAW')
+    && (hasPermission('BILL.CANCEL') || user?.role_code === 'COMPANY_ADMIN');
+  const payoffBlocked = payoffPreview?.verdict === 'BLOCKED';
+  const payoffReason = payoffBlocked ? payoffBlockedText(payoffPreview, t) : '';
 
   const selectedBank = bankAccounts.find(b => String(b.id) === bankAccountId) ?? null;
   const receiverMismatch = !!(
@@ -339,7 +409,12 @@ export function SubmissionReviewDrawer({
               {row.ocr_source && (
                 <Badge size="sm" color="info">{row.ocr_source}</Badge>
               )}
+              <SlipPayoffBadge row={row} />
             </div>
+
+            {/* Tied to a payoff bill: say where it stands up front, so nobody reads
+                the slip as an ordinary one whose อนุมัติ has gone missing. */}
+            <SlipPayoffStatusBox row={row} preview={payoffPreview} onNavigate={onClose} />
 
             {liveCancelled && (
               <div className="alert alert-warning">
@@ -509,10 +584,7 @@ export function SubmissionReviewDrawer({
                 <div>
                   <div className="form-label mb-1">{t('paymentSubmissions.bankAccount')}</div>
                   <Select
-                    options={bankAccounts.map(b => ({
-                      value: String(b.id),
-                      label: `${b.bank_name} · ${b.account_number}${b.is_default ? ' ★' : ''}`,
-                    }))}
+                    options={bankOptions}
                     value={bankAccountId || null}
                     onChange={v => setBankAccountId((v as string) || '')}
                     size="sm"
@@ -530,7 +602,7 @@ export function SubmissionReviewDrawer({
                 </div>
               )}
 
-              <TextArea
+              {(canReject || (isRejected && canReopen)) && <TextArea
                 size="md"
                 className="mb-1 w-full"
                 rows={2}
@@ -542,9 +614,9 @@ export function SubmissionReviewDrawer({
                     : t('paymentSubmissions.reopenNotePlaceholder')
                 }
                 disabled={!!busy}
-              />
+              />}
 
-              {isPending && (
+              {isPending && (canApprove || canReject) && (
                 <div className="flex gap-2 w-full">
                   {canApprove && (
                     <Button
@@ -567,6 +639,38 @@ export function SubmissionReviewDrawer({
                 </div>
               )}
 
+              {/* ปิดจบ — a secondary action under อนุมัติ/ปฏิเสธ with its own confirm
+                  box: the two settle the slip very differently. Greyed with the
+                  backend's reason in words, never greyed silently. */}
+              {isPending && canPayoff && (
+                <div className={canApprove || canReject ? 'pt-2 border-t border-line' : ''}>
+                  <Button
+                    variant="outline" size="sm" className="w-full"
+                    disabled={!!busy || payoffPreviewLoading || !payoffPreview || payoffBlocked}
+                    onClick={() => setPayoffOpen(true)}
+                  >
+                    {payoffPreviewLoading && !payoffPreview
+                      ? t('common.loading')
+                      : payoffPreview?.phase === 'READY_TO_FINISH'
+                        ? t('paymentSubmissions.payoffFinishButton')
+                        : t('paymentSubmissions.payoffButton')}
+                  </Button>
+                  {payoffBlocked && payoffReason && (
+                    <div className="text-xs text-subtle mt-1">{payoffReason}</div>
+                  )}
+                </div>
+              )}
+
+              {isPending && canWithdrawPayoff && (
+                <Button
+                  variant="outline" color="danger" size="sm" className="w-full"
+                  disabled={!!busy}
+                  onClick={() => setWithdrawOpen(true)}
+                >
+                  {t('paymentSubmissions.payoffWithdraw')}
+                </Button>
+              )}
+
               {isRejected && canReopen && (
                 <Button
                   color="primary" size="sm" className="w-full"
@@ -580,6 +684,8 @@ export function SubmissionReviewDrawer({
           </div>
         )}
       </Drawer>
+
+      {payoffModals}
 
       {billDayConfirm.dialog}
 
