@@ -6992,6 +6992,7 @@
   "paymentSubmissions": {
     "title": "ตรวจสลิปโอนเงิน",
     "review": "ตรวจสลิป",
+    "selectToView": "เลือกสลิปเพื่อตรวจ",
     "empty": "ไม่พบสลิปตามตัวกรอง",
     "allStatuses": "ทุกสถานะ",
     "allBranches": "ทุกสาขา",

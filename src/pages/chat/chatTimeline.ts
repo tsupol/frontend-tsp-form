@@ -1,7 +1,7 @@
 // Interleaved chat + slip timeline.
 // See UI_FEEDBACK/2026-06-02_RECOMMEND_chat_slip_interleaved_timeline_pattern.md
 import type { ChatMessage } from './chatTypes';
-import type { SubmissionRow } from '../../components/SubmissionReviewDrawer';
+import type { SubmissionRow } from '../../components/SubmissionReviewPanel';
 
 export type ChatTimelineItem =
   | { kind: 'message'; id: string; timestamp: Date; data: ChatMessage }

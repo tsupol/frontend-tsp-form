@@ -7002,6 +7002,7 @@
   "paymentSubmissions": {
     "title": "Slips to Review",
     "review": "Review Slip",
+    "selectToView": "Pick a slip to review",
     "empty": "No slips match the filters",
     "allStatuses": "All statuses",
     "allBranches": "All branches",

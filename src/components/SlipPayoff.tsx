@@ -16,7 +16,7 @@ import { ActionDoneView, type ActionDoneDetailRow } from '../pages/contracts/Act
 import { BranchPinInput } from './BranchPinInput';
 import { BranchPaymentAccountField } from './BranchPaymentAccountField';
 import { ModalErrorBand } from './ModalErrorBand';
-import type { SubmissionRow } from './SubmissionReviewDrawer';
+import type { SubmissionRow } from './SubmissionReviewPanel';
 
 export type PayoffPhase =
   | 'WAITING_DISCOUNT_APPROVAL' | 'READY_TO_FINISH' | 'DISCOUNT_REJECTED' | 'DONE' | 'BILL_GONE';

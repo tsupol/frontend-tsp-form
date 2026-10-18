@@ -21,11 +21,8 @@ import { useMediaUrl } from '../../hooks/useMediaUrl';
 import { normalizeKey, toStoragePath } from '../../lib/mediaPath';
 import { mimeFromKey } from '../../lib/upload';
 import { beMediaUpload } from '../../lib/beMedia';
-import {
-  SubmissionReviewDrawer,
-  submissionStatusColor,
-  type SubmissionRow,
-} from '../../components/SubmissionReviewDrawer';
+import { SubmissionReviewDrawer } from '../../components/SubmissionReviewDrawer';
+import { submissionStatusColor, type SubmissionRow } from '../../components/SubmissionReviewPanel';
 import { SlipPayoffBadge } from '../../components/SlipPayoff';
 import { buildChatTimeline, type ChatTimelineItem } from './chatTimeline';
 import type { ChatInboxRow, ChatMessage } from './chatTypes';

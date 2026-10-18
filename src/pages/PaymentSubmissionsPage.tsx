@@ -1,27 +1,37 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { MobileHeader, Badge, Select, Button, PopOver, useSnackbarContext } from 'tsp-form';
-import { ArrowRightFromLine, CheckCircle, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react';
+import {
+  PageNav, PageNavPanel, DataTable, MobileHeader, Badge, Select, Button, useSnackbarContext,
+} from 'tsp-form';
+import { ArrowLeft, ArrowRightFromLine, CheckCircle, ChevronLeft, ChevronRight, Inbox } from 'lucide-react';
 import { apiClient } from '../lib/api';
 import { fmtCurrency, formatRelativeAgo } from '../lib/format';
 import { isSearchable } from '../lib/searchKeyword';
 import { useAuth } from '../contexts/AuthContext';
 import { wsClient } from '../lib/api/ws';
 import {
-  SubmissionReviewDrawer,
+  SubmissionReviewPanel,
   SubmissionContractInfoLine,
   submissionStatusColor as statusColor,
   type SubmissionRow,
   type SubmissionStatus,
-} from '../components/SubmissionReviewDrawer';
+} from '../components/SubmissionReviewPanel';
 import { SlipPayoffBadge } from '../components/SlipPayoff';
 import { SearchInput } from '../components/SearchInput';
+import { FilterBar } from '../components/FilterBar';
+import { OverflowTabs } from '../components/OverflowTabs';
 
 const COMPANY_TIER_ROLES = new Set([
   'COMPANY_ADMIN', 'COMPANY_ACCOUNTANT', 'COMPANY_COLLECTOR',
   'COMPANY_INVENTORY', 'COMPANY_REPO',
 ]);
+
+// Pending first (most actionable), then Approved, Rejected, Cancelled.
+const STATUS_TABS = ['PENDING_REVIEW', 'APPROVED', 'REJECTED', 'CANCELLED'] as const satisfies readonly SubmissionStatus[];
+const DEFAULT_STATUS: SubmissionStatus = 'PENDING_REVIEW';
+const BASE_PATH = '/admin/payment-submissions';
 
 // fn_payment_submission_search (mig 1045). Rows carry the same columns as
 // v_payment_submissions, so SubmissionRow is reused as-is.
@@ -35,12 +45,18 @@ type SearchResponse = {
 };
 
 // ── Page ───────────────────────────────────────────────────────────────────
+// PageNav two-panel: status tabs + slip rail on the left, the selected slip's
+// review panel on the right. Tab and slip live in the address
+// (/admin/payment-submissions/<id>?status=X); each tab remembers its own slip.
 
 export function PaymentSubmissionsPage() {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const { submissionId: idParam } = useParams<{ submissionId?: string }>();
+  const [searchParams] = useSearchParams();
 
   // Branch users see only their own branch — no picker, filter is hardcoded.
   // Higher roles get a picker scoped to their company (CA) or holding (HA/SYSTEM_DEV).
@@ -57,18 +73,38 @@ export function PaymentSubmissionsPage() {
   const isCompanyTier = user?.role_code != null && COMPANY_TIER_ROLES.has(user.role_code);
   const lockedCompanyId = isCompanyTier ? user?.company_id ?? null : null;
 
-  const [statusFilter, setStatusFilter] = useState<SubmissionStatus | null>('PENDING_REVIEW');
+  const statusParam = searchParams.get('status');
+  const statusFilter: SubmissionStatus = (STATUS_TABS as readonly string[]).includes(statusParam ?? '')
+    ? statusParam as SubmissionStatus
+    : DEFAULT_STATUS;
+  const selectedId = idParam && /^\d+$/.test(idParam) ? Number(idParam) : null;
+
   const [branchFilter, setBranchFilter] = useState<number | null>(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
-  const [selected, setSelected] = useState<SubmissionRow | null>(null);
-  const [filterOpen, setFilterOpen] = useState(false);
+  // The slip last open on each tab — coming back to a tab reopens it.
+  const rememberedRef = useRef<Partial<Record<SubmissionStatus, number>>>({});
 
   useEffect(() => { setPageIndex(0); }, [statusFilter, branchFilter, debouncedSearch]);
 
-  // Debounce + floor both live in SearchInput below.
+  const goTo = (id: number | null, status: SubmissionStatus, replace: boolean) => {
+    const qs = status === DEFAULT_STATUS ? '' : `?status=${status}`;
+    navigate(`${BASE_PATH}${id != null ? `/${id}` : ''}${qs}`, { replace });
+  };
+  // Picking a row replaces the history entry; switching tab adds one.
+  const selectRow = (row: SubmissionRow) => goTo(row.id, statusFilter, true);
+  const changeTab = (status: SubmissionStatus) => {
+    if (status === statusFilter) return;
+    if (selectedId != null) rememberedRef.current[statusFilter] = selectedId;
+    goTo(rememberedRef.current[status] ?? null, status, false);
+  };
+  // The slip moved on (approved, rejected, paid off) — this tab has nothing open now.
+  const clearSelection = () => {
+    delete rememberedRef.current[statusFilter];
+    goTo(null, statusFilter, true);
+  };
 
   // Branch list for the picker — only fetched when the picker is visible.
   // Scope by the user's natural workspace; RLS enforces holding boundary.
@@ -91,15 +127,15 @@ export function PaymentSubmissionsPage() {
   // The list runs through fn_payment_submission_search (mig 1045), not the view.
   // The view evaluates RLS per row (~80% of its cost) and gets slower as APPROVED
   // slips accumulate; the RPC resolves branch scope once and stays flat. Single-slip
-  // reads (drawer, contract money tab) still use the view.
-  const searchParams = useMemo(() => {
+  // reads (contract money tab) still use the view.
+  const searchQueryParams = useMemo(() => {
     // Branch scope is server-enforced: a branch user is restricted to their own
     // branch + collection pool regardless of what we send, so only pass the
     // picker's value. p_company_id keeps company-tier users off other companies.
     const branch = lockedBranchId ?? branchFilter;
     return {
       p_keyword: isSearchable(debouncedSearch) ? debouncedSearch : null,
-      p_statuses: statusFilter ? [statusFilter] : null,
+      p_statuses: [statusFilter],
       p_date_from: null,
       p_date_to: null,
       p_page: pageIndex + 1,
@@ -110,14 +146,17 @@ export function PaymentSubmissionsPage() {
   }, [statusFilter, branchFilter, lockedBranchId, lockedCompanyId, debouncedSearch, pageIndex, pageSize]);
 
   const { data, isFetching } = useQuery({
-    queryKey: ['payment-submissions', searchParams],
-    queryFn: () => apiClient.rpc<SearchResponse>('fn_payment_submission_search', searchParams),
+    queryKey: ['payment-submissions', searchQueryParams],
+    queryFn: () => apiClient.rpc<SearchResponse>('fn_payment_submission_search', searchQueryParams),
     placeholderData: keepPreviousData,
   });
   const rows = data?.submissions ?? [];
   const hasMore = data?.has_more ?? false;
   // The RPC returns no total count by design — pagination is next/previous only.
   const pendingCount = data?.pending_count ?? 0;
+  // The panel only shows a slip the rail holds: switching tab, page or search so
+  // it drops out clears the panel, and live updates flow into it with the list.
+  const selected = selectedId != null ? rows.find(r => r.id === selectedId) ?? null : null;
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['payment-submissions'] });
@@ -146,73 +185,63 @@ export function PaymentSubmissionsPage() {
     return unsub;
   }, [user, isBranchUser, queryClient]);
 
-  // Shared 2-line row renderer for both desktop list and mobile cards.
-  // Line 1: contract + slip code (left) · amount + status (right)
-  // Line 2: customer · branch · sender (left) · relative time (right)
-  const renderRow = (row: SubmissionRow, layout: 'desktop' | 'mobile') => {
+  // Rail row — stacked, since a narrow rail can't fit columns.
+  // Line 1: contract + slip code (left) · amount (right)
+  // Line 2: status + advisory + sender badges (wrap)
+  // Line 3: customer · branch · sender account (left) · relative time (right)
+  // Line 4: funder ref · activation date · installment n/total
+  const renderRowContent = (row: SubmissionRow) => {
     const ago = formatRelativeAgo(row.submitted_at, i18n.language);
     const byLabel = row.is_staff_submitted
       ? `${t('paymentSubmissions.by')} ${row.submitter_username ?? '—'}`
       : t('paymentSubmissions.byCustomer');
     const senderLine = [row.sender_bank, row.sender_account_no].filter(Boolean).join(' ');
     return (
-      <div
-        key={row.id}
-        className={`cursor-pointer ${
-          layout === 'desktop'
-            ? 'px-3 py-3 border-b border-line hover:bg-surface-hover'
-            : 'px-1 py-3 active:bg-surface-hover'
-        }`}
-        onClick={() => setSelected(row)}
-      >
-        {/* Line 1 */}
+      <>
         <div className="flex items-baseline justify-between gap-3">
-          <div className="min-w-0 flex items-center gap-1.5">
+          <div className="min-w-0 flex items-baseline gap-1.5">
             <span className="text-sm font-medium truncate">{row.contract_code_display}</span>
             {row.code_display && (
-              <span className="text-[11px] font-normal text-subtle tabular-nums shrink-0">
+              <span className="text-[11px] font-normal text-subtle tabular-nums truncate">
                 {row.code_display}
               </span>
             )}
-            {row.submitter_role === 'CO_LESSEE' && (
-              <Badge size="xs" color="info">{t('paymentSubmissions.submitterRole_CO_LESSEE')}</Badge>
-            )}
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-sm font-semibold tabular-nums">{fmtCurrency(row.amount)}</span>
-            <Badge size="xs" color={statusColor(row.status)}>
-              {t(`paymentSubmissions.status_${row.status}`)}
-            </Badge>
-            <SlipPayoffBadge row={row} />
-            {/* Money reversed even though the slip reads APPROVED — flag it so the
-                list doesn't imply the payment still stands (doc: is_voided). */}
-            {row.is_voided && (
-              <Badge size="xs" color="danger">{t('paymentSubmissions.voidedShort')}</Badge>
-            )}
-            {/* Strongest advisory signals surfaced in the list so reviewers catch
-                them without opening each drawer (full detail lives in the drawer). */}
-            {row.ocr_status === 'NON_SLIP' && (
-              <Badge size="xs" color="danger">{t('paymentSubmissions.ocrNonSlipShort')}</Badge>
-            )}
-            {row.is_duplicate_slip && (
-              <Badge size="xs" color={row.dup_cross_customer === true ? 'danger' : 'warning'}>
-                {t('paymentSubmissions.dupShort')}
-              </Badge>
-            )}
-          </div>
+          <span className="text-sm font-semibold tabular-nums shrink-0">{fmtCurrency(row.amount)}</span>
         </div>
-        {/* Line 2 */}
-        <div className="flex items-center justify-between gap-3 mt-1">
-          <div className="min-w-0 flex items-center gap-1.5 text-xs text-subtle">
-            <span className="truncate">
-              {row.customer_name ?? '—'} · {row.branch_name ?? '—'}
-              {senderLine ? ` · ${senderLine}` : ''}
-            </span>
-            {row.submit_channel && (
-              <Badge size="xs" variant="outline" color="default">{row.submit_channel}</Badge>
-            )}
-            <Badge size="xs" color={row.is_staff_submitted ? 'info' : 'default'}>{byLabel}</Badge>
-          </div>
+        <div className="flex items-center flex-wrap gap-1.5 mt-1">
+          <Badge size="xs" color={statusColor(row.status)}>
+            {t(`paymentSubmissions.status_${row.status}`)}
+          </Badge>
+          <SlipPayoffBadge row={row} />
+          {/* Money reversed even though the slip reads APPROVED — flag it so the
+              list doesn't imply the payment still stands (doc: is_voided). */}
+          {row.is_voided && (
+            <Badge size="xs" color="danger">{t('paymentSubmissions.voidedShort')}</Badge>
+          )}
+          {/* Strongest advisory signals surfaced in the list so reviewers catch
+              them without opening each slip (full detail lives in the panel). */}
+          {row.ocr_status === 'NON_SLIP' && (
+            <Badge size="xs" color="danger">{t('paymentSubmissions.ocrNonSlipShort')}</Badge>
+          )}
+          {row.is_duplicate_slip && (
+            <Badge size="xs" color={row.dup_cross_customer === true ? 'danger' : 'warning'}>
+              {t('paymentSubmissions.dupShort')}
+            </Badge>
+          )}
+          {row.submitter_role === 'CO_LESSEE' && (
+            <Badge size="xs" color="info">{t('paymentSubmissions.submitterRole_CO_LESSEE')}</Badge>
+          )}
+          {row.submit_channel && (
+            <Badge size="xs" variant="outline" color="default">{row.submit_channel}</Badge>
+          )}
+          <Badge size="xs" color={row.is_staff_submitted ? 'info' : 'default'}>{byLabel}</Badge>
+        </div>
+        <div className="flex items-baseline justify-between gap-3 mt-1">
+          <span className="min-w-0 truncate text-xs text-subtle">
+            {row.customer_name ?? '—'} · {row.branch_name ?? '—'}
+            {senderLine ? ` · ${senderLine}` : ''}
+          </span>
           <div className="shrink-0 flex items-baseline gap-1.5">
             <span className="text-xs font-medium">{ago.rel}</span>
             {ago.abs && ago.abs !== ago.rel && (
@@ -220,17 +249,17 @@ export function PaymentSubmissionsPage() {
             )}
           </div>
         </div>
-        {/* Line 3 — funder ref · activation date · installment n/total (mig 1186).
-            Renders nothing when the contract isn't active yet. */}
+        {/* Renders nothing when the contract isn't active yet (mig 1186). */}
         <SubmissionContractInfoLine row={row} className="mt-1 text-xs text-subtle truncate" />
-      </div>
+      </>
     );
   };
 
-  // The search RPC returns has_more instead of a total, so the footer is a
+  // The search RPC returns has_more instead of a total, so the rail footer is a
   // next/previous pair — there's no last page to jump to and no "of N" to show.
+  // (DataTable's built-in footer needs a total row count, which this list lacks.)
   const renderPager = () => (
-    <div className="flex-none flex items-center justify-between gap-2 border-t border-line px-2 py-2">
+    <div className="flex-none flex items-center justify-between gap-2 border-t border-line p-2">
       <div className="text-xs text-subtle">
         {t('common.pageN', { n: pageIndex + 1 })}
       </div>
@@ -247,7 +276,7 @@ export function PaymentSubmissionsPage() {
         <Button
           variant="outline"
           size="sm"
-          startIcon={<ChevronLeft size={16} />}
+          startIcon={<ChevronLeft size={14} />}
           disabled={pageIndex === 0 || isFetching}
           onClick={() => setPageIndex(p => Math.max(0, p - 1))}
         >
@@ -256,7 +285,7 @@ export function PaymentSubmissionsPage() {
         <Button
           variant="outline"
           size="sm"
-          endIcon={<ChevronRight size={16} />}
+          endIcon={<ChevronRight size={14} />}
           disabled={!hasMore || isFetching}
           onClick={() => setPageIndex(p => p + 1)}
         >
@@ -266,196 +295,159 @@ export function PaymentSubmissionsPage() {
     </div>
   );
 
-  // Status pills replace the status Select — quick shortcut + pending count visibility.
-  // Pending first (most actionable), then Approved, then Rejected.
-  const statusPills: { value: SubmissionStatus; label: string; showCount?: boolean }[] = [
-    { value: 'PENDING_REVIEW', label: t('paymentSubmissions.status_PENDING_REVIEW'), showCount: true },
-    { value: 'APPROVED', label: t('paymentSubmissions.status_APPROVED') },
-    { value: 'REJECTED', label: t('paymentSubmissions.status_REJECTED') },
-    { value: 'CANCELLED', label: t('paymentSubmissions.status_CANCELLED') },
-  ];
+  const branchSelect = (
+    <Select
+      options={branchOptions.map(b => ({ value: String(b.id), label: b.name }))}
+      value={branchFilter != null ? String(branchFilter) : null}
+      onChange={val => setBranchFilter(val ? Number(val) : null)}
+      placeholder={t('paymentSubmissions.allBranches')}
+      size="sm"
+      showChevron
+      clearable
+    />
+  );
 
   return (
-    <>
-      <MobileHeader className="mobile-header-bordered md:hidden">
-        <div className="mobile-header-start">
-          <button
-            className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
-            aria-label="Open menu"
-            onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}
-          >
-            <ArrowRightFromLine size={18} />
-          </button>
-        </div>
-        <div className="mobile-header-title">{t('paymentSubmissions.title')}</div>
-        <div className="mobile-header-end w-nav" />
-      </MobileHeader>
+    <PageNav
+      panels={['list', 'detail']}
+      defaultPanel={selectedId != null ? 'detail' : undefined}
+      className="h-dvh overflow-hidden"
+    >
+      {({ isMobile, isRoot, goTo: goToPanel, goBack }) => {
+        const pick = (row: SubmissionRow) => { selectRow(row); if (isMobile) goToPanel('detail'); };
+        const afterDone = () => { clearSelection(); if (isMobile) goBack(); refresh(); };
 
-      <div className="page-content responsive-dvh-mobile-header">
-        <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
-          <h1 className="heading-2">{t('paymentSubmissions.title')}</h1>
-        </div>
-
-        {(() => {
-          const renderPills = (variant: 'row' | 'stack') => (
-            <div className={variant === 'stack' ? 'flex flex-col gap-1.5' : 'flex items-center gap-1.5 flex-wrap'}>
-              {statusPills.map(pill => {
-                const active = statusFilter === pill.value;
-                return (
-                  <button
-                    key={pill.value}
-                    type="button"
-                    onClick={() => { setStatusFilter(pill.value); if (variant === 'stack') setFilterOpen(false); }}
-                    className={`inline-flex items-center ${variant === 'stack' ? 'justify-between' : 'gap-1.5'} px-2.5 py-1 rounded-md text-xs font-medium border transition-colors cursor-pointer ${
-                      active
-                        ? 'bg-primary-soft text-primary-fg border-primary'
-                        : 'border-line hover:bg-surface-hover bg-transparent'
-                    }`}
-                  >
-                    <span>{pill.label}</span>
-                    {pill.showCount && pendingCount > 0 && (
-                      <Badge size="xs" color={active ? 'primary' : 'warning'}>
-                        {pendingCount}
-                      </Badge>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          );
-          const renderBranchSelect = () => (
-            <Select
-              options={branchOptions.map(b => ({ value: String(b.id), label: b.name }))}
-              value={branchFilter != null ? String(branchFilter) : null}
-              onChange={val => setBranchFilter(val ? Number(val) : null)}
-              placeholder={t('paymentSubmissions.allBranches')}
-              size="sm"
-              showChevron
-              clearable
-            />
-          );
-          // Collapsed-filter count badge: branch (if picked) + status (if not default Pending).
-          const collapsedActive =
-            (!isBranchUser && branchFilter != null ? 1 : 0) +
-            (statusFilter !== 'PENDING_REVIEW' ? 1 : 0);
-          return (
-            <div className="flex items-center gap-2 pb-4 flex-none flex-wrap">
-              <div className="w-64 max-w-full">
-                <SearchInput
-                  value={search}
-                  onChange={setSearch}
-                  onDebouncedChange={setDebouncedSearch}
-                  placeholder={t('paymentSubmissions.searchPlaceholder')}
-                  size="sm"
-                  className="w-full"
-                />
-              </div>
-              {/* Status pills — inline ≥md */}
-              <div className="hidden md:block">
-                {renderPills('row')}
-              </div>
-              {!isBranchUser && (
-                <div className="hidden lg:block w-56 ml-auto">
-                  {renderBranchSelect()}
+        return (
+          <>
+            {isMobile && (
+              <MobileHeader className="mobile-header-bordered">
+                <div className="mobile-header-start">
+                  {isRoot ? (
+                    <button
+                      className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
+                      aria-label="Open menu"
+                      onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}
+                    >
+                      <ArrowRightFromLine size={18} />
+                    </button>
+                  ) : (
+                    <button
+                      className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
+                      aria-label={t('common.back')}
+                      onClick={goBack}
+                    >
+                      <ArrowLeft size={20} />
+                    </button>
+                  )}
                 </div>
-              )}
-              {/* Filter popover — visible <lg (branch collapse) or <md (status also collapses).
-                  For branch users on ≥md (status inline, no branch picker), no popover needed. */}
-              <div className={`shrink-0 ml-auto ${isBranchUser ? 'md:hidden' : 'lg:hidden'}`}>
-                <PopOver
-                  isOpen={filterOpen}
-                  onClose={() => setFilterOpen(false)}
-                  placement="bottom"
-                  align="end"
-                  maxWidth="280px"
-                  trigger={
-                    <div className="relative inline-flex">
-                      <Button
-                        variant="outline"
+                <div className="mobile-header-title mobile-header-title-truncate">
+                  {isRoot ? t('paymentSubmissions.title') : t('paymentSubmissions.review')}
+                </div>
+                <div className="mobile-header-end w-nav" />
+              </MobileHeader>
+            )}
+
+            {!isMobile && (
+              <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
+                <h1 className="heading-2 shrink-0">{t('paymentSubmissions.title')}</h1>
+              </div>
+            )}
+
+            <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
+              {/* ── List rail ── */}
+              <PageNavPanel id="list" mobileClassName="flex flex-col" className={isMobile ? '' : 'w-1/2 xl:w-5/12 min-w-0 border-r border-line flex flex-col'}>
+                  <OverflowTabs
+                    tabs={STATUS_TABS}
+                    activeTab={statusFilter}
+                    onTabChange={changeTab}
+                    renderLabel={s => (
+                      <span className="inline-flex items-center gap-1.5">
+                        {t(`paymentSubmissions.status_${s}`)}
+                        {s === 'PENDING_REVIEW' && pendingCount > 0 && (
+                          <Badge size="xs" color={statusFilter === s ? 'primary' : 'warning'}>{pendingCount}</Badge>
+                        )}
+                      </span>
+                    )}
+                  />
+
+                  <FilterBar
+                    className="flex-none p-2 border-b border-line"
+                    leading={
+                      <SearchInput
+                        value={search}
+                        onChange={setSearch}
+                        onDebouncedChange={setDebouncedSearch}
+                        placeholder={t('paymentSubmissions.searchPlaceholder')}
                         size="sm"
-                        startIcon={<SlidersHorizontal size={16} />}
-                        onClick={() => setFilterOpen(!filterOpen)}
+                        className="w-full"
                       />
-                      {collapsedActive > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-primary text-white text-[10px] rounded-full w-3.5 h-3.5 flex items-center justify-center leading-none pointer-events-none">
-                          {collapsedActive}
-                        </span>
-                      )}
+                    }
+                    leadingMinWidth={180}
+                    items={isBranchUser ? [] : [{ key: 'branch', width: 192, node: branchSelect, priority: 10 }]}
+                    activeCount={!isBranchUser && branchFilter != null ? 1 : 0}
+                  />
+
+                  <DataTable<SubmissionRow>
+                    data={rows}
+                    getRowProps={row => ({
+                      'data-state': row.original.id === selectedId ? 'selected' : undefined,
+                    })}
+                    enableKeyboardNav={!isMobile}
+                    onRowActivate={row => selectRow(row.original)}
+                    renderRow={row => (
+                      <button
+                        type="button"
+                        className="w-full text-left px-4 py-3 transition-colors cursor-pointer"
+                        onClick={() => pick(row.original)}
+                      >
+                        {renderRowContent(row.original)}
+                      </button>
+                    )}
+                    className={`flex-1 min-h-0 panel-datatable ${isFetching ? 'opacity-60' : ''} transition-opacity`}
+                    noResults={<div className="p-8 text-center text-subtler">{t('paymentSubmissions.empty')}</div>}
+                  />
+                  {(rows.length > 0 || pageIndex > 0) && renderPager()}
+              </PageNavPanel>
+
+              {/* ── Detail panel ── */}
+              <PageNavPanel id="detail" mobileClassName="flex flex-col" className={isMobile ? '' : 'flex-1 min-w-0 flex flex-col'}>
+                <SubmissionReviewPanel
+                  row={selected}
+                  emptyState={
+                    <div className="flex-1 h-full flex items-center justify-center text-subtler">
+                      <div className="text-center">
+                        <Inbox size={32} className="mx-auto mb-2" />
+                        {t('paymentSubmissions.selectToView')}
+                      </div>
                     </div>
                   }
-                >
-                  <div className="flex flex-col gap-3 p-3">
-                    <div className="text-xs font-medium text-subtle uppercase tracking-wide">{t('common.filters')}</div>
-                    {/* Status — only shown in popover <md */}
-                    <div className="md:hidden">
-                      {renderPills('stack')}
-                    </div>
-                    {/* Branch — only shown in popover when not a branch user */}
-                    {!isBranchUser && renderBranchSelect()}
-                  </div>
-                </PopOver>
-              </div>
+                  onChanged={afterDone}
+                  onSuccess={(action, extra) => {
+                    afterDone();
+                    const key =
+                      action === 'approve' ? 'paymentSubmissions.approveSuccess'
+                        : action === 'reject' ? 'paymentSubmissions.rejectSuccess'
+                          : 'paymentSubmissions.reopenSuccess';
+                    addSnackbar({
+                      type: 'success',
+                      message: (
+                        <div className="alert alert-success">
+                          <CheckCircle size={16} />
+                          <span className="flex flex-col">
+                            <span>{t(key)}</span>
+                            {/* Fund day close §D2: the bill went on a later day. */}
+                            {extra?.billDayNote && <span className="text-xs">{extra.billDayNote}</span>}
+                          </span>
+                        </div>
+                      ),
+                    });
+                  }}
+                />
+              </PageNavPanel>
             </div>
-          );
-        })()}
-
-        {/* Desktop list — custom 2-line rows (replaces the column DataTable) */}
-        <div className={`flex-1 min-h-0 hidden md:flex flex-col ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
-          <div className="flex-1 overflow-auto better-scroll">
-            {rows.length === 0 ? (
-              <div className="p-8 text-center text-subtle">{t('paymentSubmissions.empty')}</div>
-            ) : (
-              <div className="flex flex-col border-t border-line">
-                {rows.map(row => renderRow(row, 'desktop'))}
-              </div>
-            )}
-          </div>
-          {(rows.length > 0 || pageIndex > 0) && renderPager()}
-        </div>
-
-        {/* Mobile cards */}
-        <div className={`flex-1 min-h-0 flex flex-col md:hidden ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
-          <div className="flex-1 overflow-auto better-scroll pb-8">
-            {rows.length === 0 ? (
-              <div className="p-8 text-center text-subtle">{t('paymentSubmissions.empty')}</div>
-            ) : (
-              <div className="flex flex-col divide-y divide-line">
-                {rows.map(row => renderRow(row, 'mobile'))}
-              </div>
-            )}
-          </div>
-          {(rows.length > 0 || pageIndex > 0) && renderPager()}
-        </div>
-      </div>
-
-      <SubmissionReviewDrawer
-        row={selected}
-        open={!!selected}
-        onClose={() => setSelected(null)}
-        onChanged={() => { setSelected(null); refresh(); }}
-        onSuccess={(action, extra) => {
-          setSelected(null);
-          refresh();
-          const key =
-            action === 'approve' ? 'paymentSubmissions.approveSuccess'
-              : action === 'reject' ? 'paymentSubmissions.rejectSuccess'
-                : 'paymentSubmissions.reopenSuccess';
-          addSnackbar({
-            type: 'success',
-            message: (
-              <div className="alert alert-success">
-                <CheckCircle size={16} />
-                <span className="flex flex-col">
-                  <span>{t(key)}</span>
-                  {/* Fund day close §D2: the bill went on a later day. */}
-                  {extra?.billDayNote && <span className="text-xs">{extra.billDayNote}</span>}
-                </span>
-              </div>
-            ),
-          });
-        }}
-      />
-    </>
+          </>
+        );
+      }}
+    </PageNav>
   );
 }
-

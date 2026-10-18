@@ -1194,7 +1194,7 @@ function App() {
         }
       />
       <Route
-        path="/admin/payment-submissions"
+        path="/admin/payment-submissions/:submissionId?"
         element={
           <ProtectedRoute>
             <AdminLayout>
