@@ -372,6 +372,19 @@ export class ApiClient {
     return { data: parseResponseData<T[]>(data, endpoint), totalCount };
   }
 
+  /** Row count only: `limit=0` + `count=exact` → `[]` body, total from `Content-Range: *\/N`.
+   *  Skips the row-fetch pass that a 1-row page would still run (NOTICE 2026-10-18). */
+  async count(endpoint: string, includeAuth: boolean = true): Promise<number> {
+    const sep = endpoint.includes('?') ? '&' : '?';
+    const { response } = await this._fetch(
+      `${endpoint}${sep}limit=0`,
+      { method: 'GET', headers: { 'Prefer': 'count=exact' } },
+      includeAuth,
+    );
+    const match = (response.headers.get('Content-Range') ?? '').match(/\/(\d+)/);
+    return match ? parseInt(match[1], 10) : 0;
+  }
+
   async post<T>(endpoint: string, body?: unknown, includeAuth: boolean = true): Promise<T> {
     return this.request<T>(
       endpoint,

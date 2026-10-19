@@ -71,13 +71,8 @@ export function useNavCounts() {
   // Only OPS.ASSIGN.OVERSEE holders can see rows, so everyone else just gets 0.
   const { data: unassignedCount } = useQuery({
     queryKey: ['nav', 'unassigned-no-collector', sk],
-    queryFn: async () => {
-      const { totalCount } = await apiClient.getPaginated<{ contract_id: number }>(
-        '/v_unassigned_contracts?pool_reason=eq.NO_COLLECTOR&select=contract_id',
-        { page: 1, pageSize: 1 },
-      );
-      return totalCount;
-    },
+    // Count only (limit=0): a 1-row page made the DB run the view twice (NOTICE 2026-10-18).
+    queryFn: () => apiClient.count('/v_unassigned_contracts?pool_reason=eq.NO_COLLECTOR&select=contract_id'),
     // Deal-partner shops have no collections menu and the view is outside the
     // nnf_partner whitelist (permanent 403) — don't poll a dead view.
     enabled: user?.branch_type !== 'DEAL_PARTNER',
