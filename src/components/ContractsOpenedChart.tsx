@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from 'recharts';
 import { fmtCurrency } from '../lib/format';
+import { DateTime } from './DateTime';
 
 /* ───────────────────────────────────────────────────────────────────────────
  * Shared monthly "contracts opened" bar chart — one vertical bar per day.
@@ -88,6 +89,24 @@ export function useDayPoints(rows: MonthlyRow[]): DayPoint[] {
   }, [rows]);
 }
 
+/** Per-day branch rows that opened something, most contracts first then
+ *  branch code — the hover breakdown on the bars and the calendar. Days with
+ *  no opened contracts are absent from the map. */
+export function useBranchRowsByDay(rows: MonthlyRow[]): Map<string, MonthlyRow[]> {
+  return useMemo(() => {
+    const byDay = new Map<string, MonthlyRow[]>();
+    for (const r of rows) {
+      if (r.opened_contracts <= 0 && !(Number(r.agreed_total) > 0)) continue;
+      const list = byDay.get(r.day);
+      if (list) list.push(r); else byDay.set(r.day, [r]);
+    }
+    for (const list of byDay.values()) {
+      list.sort((a, b) => b.opened_contracts - a.opened_contracts || a.branch_code.localeCompare(b.branch_code));
+    }
+    return byDay;
+  }, [rows]);
+}
+
 /** Month totals across every day point. */
 export function useMonthTotals(points: DayPoint[]) {
   return useMemo(() => points.reduce(
@@ -101,10 +120,30 @@ export function useMonthTotals(points: DayPoint[]) {
   ), [points]);
 }
 
-/** The bars themselves. Caller owns the height — wrap in a sized container. */
-export function ContractsOpenedChart({ points }: { points: DayPoint[] }) {
-  const { t, i18n } = useTranslation();
+/** The bars themselves. Caller owns the height — wrap in a sized container.
+ *  `branchRowsByDay` (all-branches view only) turns the hover into the
+ *  per-branch table; without it the hover keeps the single-day summary. */
+export function ContractsOpenedChart({ points, branchRowsByDay }: {
+  points: DayPoint[];
+  branchRowsByDay?: Map<string, MonthlyRow[]>;
+}) {
+  // Touch screens: the card opens on a tap (click trigger) instead of hover —
+  // the browser's made-up mouse events after a tap are not reliable — and a
+  // touch anywhere outside the chart hides it.
+  const isTouch = useMemo(() => window.matchMedia('(hover: none)').matches, []);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [touchHidden, setTouchHidden] = useState(false);
+  useEffect(() => {
+    const onDown = (e: PointerEvent) => {
+      if (e.pointerType === 'mouse') return;
+      setTouchHidden(!wrapRef.current?.contains(e.target as Node));
+    };
+    document.addEventListener('pointerdown', onDown);
+    return () => document.removeEventListener('pointerdown', onDown);
+  }, []);
+
   return (
+    <div ref={wrapRef} className="w-full h-full">
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={points} margin={{ top: 8, right: 8, bottom: 4, left: 8 }} barCategoryGap="12%">
         <CartesianGrid vertical={false} stroke="var(--color-line)" strokeDasharray="3 3" />
@@ -125,12 +164,15 @@ export function ContractsOpenedChart({ points }: { points: DayPoint[] }) {
         />
         <Tooltip
           cursor={{ fill: 'var(--color-surface-hover)' }}
-          content={<ChartTooltip labels={{
-            contracts: t('contractsOpened.tipContracts'),
-            agreed: t('contractsOpened.sumAgreed'),
-            down: t('contractsOpened.legendDown'),
-            financed: t('contractsOpened.legendFinanced'),
-          }} lang={i18n.language} />}
+          // A branch table can be taller than the plot: start it at the top
+          // of the chart and let it run down past the axis, so a long list
+          // (a holding's ~20 branches) stays on screen wherever the cursor is.
+          allowEscapeViewBox={{ x: false, y: !!branchRowsByDay }}
+          position={branchRowsByDay ? { y: 0 } : undefined}
+          trigger={isTouch ? 'click' : 'hover'}
+          active={touchHidden ? false : undefined}
+          wrapperStyle={{ zIndex: 20 }}
+          content={<ChartTooltip branchRowsByDay={branchRowsByDay} />}
         />
         {/* Stacked: down (bottom) + financed (top). Two distinct hues from the
             chart palette — the old pair was one primary blue and a color-mix of
@@ -144,6 +186,7 @@ export function ContractsOpenedChart({ points }: { points: DayPoint[] }) {
         </Bar>
       </BarChart>
     </ResponsiveContainer>
+    </div>
   );
 }
 
@@ -163,25 +206,91 @@ export function ChartLegend({ downLabel, financedLabel }: { downLabel: string; f
 }
 
 interface TooltipPayloadItem { payload: DayPoint }
-function ChartTooltip({ active, payload, labels, lang }: {
+function ChartTooltip({ active, payload, branchRowsByDay }: {
   active?: boolean;
   payload?: TooltipPayloadItem[];
-  labels: { contracts: string; agreed: string; down: string; financed: string };
-  lang: string;
+  branchRowsByDay?: Map<string, MonthlyRow[]>;
 }) {
   if (!active || !payload || payload.length === 0) return null;
   const p = payload[0].payload;
-  const dateLabel = new Date(p.day + 'T00:00:00').toLocaleDateString(
-    lang === 'th' ? 'th-TH' : 'en-GB',
-    { day: 'numeric', month: 'short' },
-  );
   return (
     <div className="rounded-md border border-line bg-surface shadow-md px-3 py-2 text-xs">
-      <div className="font-semibold mb-1">{dateLabel}</div>
-      <TipLine label={labels.contracts} value={String(p.contracts)} />
-      <TipLine label={labels.agreed} value={`฿${fmtCurrency(p.agreed)}`} strong />
-      <TipLine label={labels.down} value={`฿${fmtCurrency(p.down)}`} dot={COLOR_DOWN} />
-      <TipLine label={labels.financed} value={`฿${fmtCurrency(p.financed)}`} dot={COLOR_FINANCED} />
+      <DayBreakdown point={p} branchRows={branchRowsByDay ? (branchRowsByDay.get(p.day) ?? []) : undefined} />
+    </div>
+  );
+}
+
+export interface DayHoliday { company_name: string; description: string }
+
+/** One day's figures — shared by the bar hover and the calendar cell.
+ *  `branchRows` given (all-branches view) → day totals + per-branch table;
+ *  omitted (one branch picked, or a branch user) → the single-day summary.
+ *  Day totals are the sum of the RPC's rows, so they equal the bar height. */
+export function DayBreakdown({ point, branchRows, holidays, showCompany }: {
+  point: DayPoint;
+  branchRows?: MonthlyRow[];
+  holidays?: DayHoliday[];
+  showCompany?: boolean;
+}) {
+  const { t } = useTranslation();
+  const holidayLines = holidays && holidays.length > 0 && (
+    <div className="mb-1.5 flex flex-col gap-0.5 text-warning-fg">
+      {holidays.map((h, i) => (
+        <div key={i}>{showCompany ? `${h.company_name}: ${h.description}` : h.description}</div>
+      ))}
+    </div>
+  );
+
+  if (!branchRows) {
+    return (
+      <div className="min-w-44">
+        <div className="font-semibold mb-1"><DateTime value={point.day} showTime={false} /></div>
+        {holidayLines}
+        <TipLine label={t('contractsOpened.tipContracts')} value={String(point.contracts)} />
+        <TipLine label={t('contractsOpened.sumAgreed')} value={`฿${fmtCurrency(point.agreed)}`} strong />
+        <TipLine label={t('contractsOpened.legendDown')} value={`฿${fmtCurrency(point.down)}`} dot={COLOR_DOWN} />
+        <TipLine label={t('contractsOpened.legendFinanced')} value={`฿${fmtCurrency(point.financed)}`} dot={COLOR_FINANCED} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-w-64">
+      <div className="font-semibold"><DateTime value={point.day} showTime={false} /></div>
+      {point.contracts > 0 && (
+        <div className="text-subtle mb-1.5 tabular-nums">
+          {t('contractsOpened.dayHeadline', {
+            count: point.contracts,
+            agreed: fmtCurrency(point.agreed),
+            down: fmtCurrency(point.down),
+          })}
+        </div>
+      )}
+      {holidayLines}
+      {branchRows.length === 0 ? (
+        <div className="text-subtle mt-1">{t('contractsOpened.dayNone')}</div>
+      ) : (
+        <table className="w-full tabular-nums">
+          <thead>
+            <tr className="text-subtle border-b border-line">
+              <th className="text-left font-normal pt-0.5 pb-1.5 pr-3">{t('contractsOpened.colBranch')}</th>
+              <th className="text-right font-normal pt-0.5 pb-1.5 pl-2">{t('contractsOpened.colContracts')}</th>
+              <th className="text-right font-normal pt-0.5 pb-1.5 pl-3">{t('contractsOpened.sumAgreed')}</th>
+              <th className="text-right font-normal pt-0.5 pb-1.5 pl-3">{t('contractsOpened.colDown')}</th>
+            </tr>
+          </thead>
+          <tbody className="[&>tr:first-child>td]:pt-1.5">
+            {branchRows.map(r => (
+              <tr key={r.branch_id}>
+                <td className="text-left py-0.5 pr-3 whitespace-nowrap">{r.branch_name}</td>
+                <td className="text-right py-0.5 pl-2 font-semibold">{r.opened_contracts}</td>
+                <td className="text-right py-0.5 pl-3">{fmtCurrency(Number(r.agreed_total) || 0)}</td>
+                <td className="text-right py-0.5 pl-3">{fmtCurrency(Number(r.down_total) || 0)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }

@@ -3854,7 +3854,16 @@
     "legendDown": "เงินดาวน์",
     "legendFinanced": "ยอดผ่อน",
     "tipContracts": "จำนวนสัญญา",
-    "noData": "ไม่มีสัญญาที่เปิดในเดือนนี้"
+    "noData": "ไม่มีสัญญาที่เปิดในเดือนนี้",
+    "viewBars": "กราฟแท่ง",
+    "viewCalendar": "ปฏิทิน",
+    "dayHeadline": "{{count}} สัญญา · ยอดจัด {{agreed}} · ดาวน์ {{down}}",
+    "dayNone": "ไม่มีสัญญาเปิดวันนี้",
+    "colBranch": "สาขา",
+    "colContracts": "สัญญา",
+    "colDown": "ดาวน์",
+    "holidayCompanies": "หยุด {{count}} บริษัท",
+    "daysWithOpenings": "มีการเปิดสัญญา {{count}} จาก {{days}} วัน"
   },
   "customer": {
     "title": "ลูกค้า",

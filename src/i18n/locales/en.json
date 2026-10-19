@@ -3858,7 +3858,16 @@
     "legendDown": "Down payment",
     "legendFinanced": "Installment (financed)",
     "tipContracts": "Contracts",
-    "noData": "No contracts opened this month"
+    "noData": "No contracts opened this month",
+    "viewBars": "Bar chart",
+    "viewCalendar": "Calendar",
+    "dayHeadline": "{{count}} contracts · financed {{agreed}} · down {{down}}",
+    "dayNone": "No contracts opened this day",
+    "colBranch": "Branch",
+    "colContracts": "Contracts",
+    "colDown": "Down",
+    "holidayCompanies": "{{count}} companies off",
+    "daysWithOpenings": "Contracts opened on {{count}} of {{days}} days"
   },
   "customer": {
     "title": "Customers",

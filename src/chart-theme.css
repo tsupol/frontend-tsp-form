@@ -45,6 +45,16 @@
   /* Semantic aliases — reference these in chart code, not the slot numbers. */
   --chart-sold: var(--chart-1); /* retail sold  */
   --chart-gift: var(--chart-4); /* gift / promo */
+
+  /* Heat steps — one hue (slot 1), four depths, for a cell BACKGROUND under
+     text (the calendar view of รายงานเปิดสัญญา: quiet day → busy day). A
+     background wash is the one place a blend toward the page bg is right —
+     same derivation as the theme's -soft tokens. Steps 1-3 carry fg text,
+     step 4 carries -contrast text. */
+  --chart-heat-1: color-mix(in oklab, var(--chart-1) 12%, var(--color-bg));
+  --chart-heat-2: color-mix(in oklab, var(--chart-1) 32%, var(--color-bg));
+  --chart-heat-3: color-mix(in oklab, var(--chart-1) 58%, var(--color-bg));
+  --chart-heat-4: color-mix(in oklab, var(--chart-1) 85%, var(--color-bg));
 }
 
 /* Dark values — the original per-theme steps for slots 2-6. */
