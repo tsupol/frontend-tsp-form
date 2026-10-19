@@ -52,6 +52,8 @@ export const SHOP_ALLOWED_PATHS = new Set<string>([
   '/admin/price-check/fin1',
   '/admin/price-check/fin2',
   '/admin/price-check/finance-rates',
+  // ตารางราคาไฟแนนซ์ (mig 1457) — the owner built it for the shop first.
+  '/admin/price-check/fin1-price-table',
   // Company: branch PIN, branch signers, ABM OTP (shown during MDM enroll)
   '/admin/company/pin',
   '/admin/company/signers',

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Calculator, Table2 } from 'lucide-react';
+import { Calculator, Table2, Tags } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useMyCommercialModels } from '../../hooks/useMyCommercialModels';
 
@@ -9,11 +9,13 @@ import { useMyCommercialModels } from '../../hooks/useMyCommercialModels';
 //   คำนวณค่างวด (FIN2) → the original quote-table page
 //   คำนวณค่างวด (FIN1) → the negotiation calculator
 //   เรทไฟแนนซ์ (FIN1)  → brand/family rate sheet (+ price edit for the permitted)
+//   ตารางราคาไฟแนนซ์  → one row per model: prices, add-on range, used range (mig 1457)
 // Child visibility mirrors AppSideNav — keep both in sync (dual-nav rule).
 const navItems = [
   { path: '/admin/price-check/fin2', labelKey: 'nav.priceCheckFin2', icon: Calculator, requires: 'FIN2' as const },
   { path: '/admin/price-check/fin1', labelKey: 'nav.priceCheckFin1', icon: Calculator, requires: 'FIN1' as const },
   { path: '/admin/price-check/finance-rates', labelKey: 'nav.financeRates', icon: Table2, requires: 'FIN1' as const },
+  { path: '/admin/price-check/fin1-price-table', labelKey: 'nav.fin1PriceTable', icon: Tags, requires: 'FIN1' as const },
 ];
 
 export function PriceCheckLayout({ children }: { children: ReactNode }) {
@@ -31,7 +33,8 @@ export function PriceCheckLayout({ children }: { children: ReactNode }) {
           {t('nav.priceCheck')}
         </span>
         {visible.map(({ path, labelKey, icon: Icon }) => {
-          const isActive = pathname.startsWith(path);
+          // Whole segments only: /fin1-price-table must not light up /fin1 too.
+          const isActive = pathname === path || pathname.startsWith(`${path}/`);
           return (
             <a
               key={path}

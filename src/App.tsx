@@ -48,6 +48,7 @@ import { PriceCheckLayout, PriceCheckIndexRedirect } from './pages/price-check/P
 import { PriceCheckPage } from './pages/price-check/PriceCheckPage';
 import { Fin1CalculatorPage } from './pages/price-check/Fin1CalculatorPage';
 import { FinanceRatesPage } from './pages/price-check/FinanceRatesPage';
+import { Fin1PriceTablePage } from './pages/price-check/Fin1PriceTablePage';
 import { DunningTargetsPage } from './pages/legal/DunningTargetsPage';
 import { StaffCommissionPage } from './pages/commission/StaffCommissionPage';
 import { ApprovalsPage } from './pages/approvals/ApprovalsPage';
@@ -689,6 +690,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <PriceCheckLayout><FinanceRatesPage /></PriceCheckLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/price-check/fin1-price-table"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <PriceCheckLayout><Fin1PriceTablePage /></PriceCheckLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

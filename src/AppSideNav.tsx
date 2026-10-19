@@ -29,7 +29,7 @@ import {
   // Fanout child icons — Pricing
   TrendingUp, Percent, Handshake,
   // Fanout child icons — Price check
-  Table2,
+  Table2, Tags,
   // Fanout child icons — Inventory
   BarChart3, Boxes, ClipboardList, PackagePlus, ArrowLeftRight, Wrench, RotateCcw, HandCoins, ShoppingCart, Barcode, UserCog,
   // Retail
@@ -752,6 +752,7 @@ export const AppSideNav = () => {
         ...(showFin1 ? [
           { key: 'pc-fin1', icon: <Calculator size="1rem" />, label: t('nav.priceCheckFin1'), path: '/admin/price-check/fin1' },
           { key: 'pc-finance-rates', icon: <Table2 size="1rem" />, label: t('nav.financeRates'), path: '/admin/price-check/finance-rates' },
+          { key: 'pc-fin1-price-table', icon: <Tags size="1rem" />, label: t('nav.fin1PriceTable'), path: '/admin/price-check/fin1-price-table' },
         ] : []),
       ],
     }] : []),

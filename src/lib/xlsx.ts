@@ -18,6 +18,8 @@ export interface XlsxColumn {
   label: string;
   type?: XlsxCellType; // default 'text'
   width?: number;      // in characters
+  /** Excel display format, e.g. '#,##0' for baht — the cell stays a number. */
+  format?: string;
 }
 
 // A cell is either a typed value object or `null` for an empty cell (the lib
@@ -51,15 +53,29 @@ function toCell(raw: unknown, kind: XlsxCellType): Cell {
 /**
  * Build a typed .xlsx from rows + column defs and trigger a browser download.
  * Columns are written in the given order (already the intended sheet layout).
+ * `titleRows` go above the column headings, one line per row in the first
+ * cell, with an empty row after them (report title, "as of", filters used).
  */
 export async function downloadXlsx(
   rows: Record<string, unknown>[],
   columns: XlsxColumn[],
   filename: string,
+  options?: { titleRows?: string[] },
 ): Promise<void> {
   const headerRow = columns.map(c => ({ type: String, value: c.label, fontWeight: 'bold' as const }));
-  const dataRows = rows.map(row => columns.map(c => toCell(row[c.key], c.type ?? 'text')));
-  const sheetData = [headerRow, ...dataRows];
+  const dataRows = rows.map(row => columns.map(c => {
+    const cell = toCell(row[c.key], c.type ?? 'text');
+    return cell && c.format ? { ...cell, format: c.format } : cell;
+  }));
+  const titles = options?.titleRows ?? [];
+  const titleBlock = titles.length === 0 ? [] : [
+    ...titles.map((line, i) => [
+      { type: String, value: line, ...(i === 0 ? { fontWeight: 'bold' as const } : {}) },
+      ...columns.slice(1).map(() => null),
+    ]),
+    columns.map(() => null),
+  ];
+  const sheetData = [...titleBlock, headerRow, ...dataRows];
 
   const colWidths = columns.map(c => (c.width != null ? { width: c.width } : {}));
 

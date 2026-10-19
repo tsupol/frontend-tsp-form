@@ -67,6 +67,8 @@ const PARTNER_VIEW_MAP: Record<string, string> = {
   v_ref_product_family_list: 'v_partner_ref_product_family_list',
   v_product_model_list: 'v_partner_product_model_list',
   v_fin1_sheet_families: 'v_partner_fin1_sheet_families',
+  // ตารางราคาไฟแนนซ์ (mig 1457) — same columns minus can_edit.
+  v_fin1_price_list: 'v_partner_fin1_price_list',
   v_ref_blacklist_reasons: 'v_partner_ref_blacklist_reasons',
   v_postal_lookup: 'v_partner_postal_lookup',
   v_ref_payment_methods: 'v_partner_ref_payment_methods',

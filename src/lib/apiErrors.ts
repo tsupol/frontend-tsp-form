@@ -7,7 +7,7 @@ import { getBucketLabel } from '../pages/inventory/inventoryUtils';
 // Backend error/blocking params that carry a plain `YYYY-MM-DD` date. They go
 // straight into a user-facing sentence, so render them the way every other date
 // in the app is rendered instead of leaking the ISO form.
-const DATE_PARAM_KEYS = ['bill_date', 'unclosed_date', 'today', 'close_date'] as const;
+const DATE_PARAM_KEYS = ['bill_date', 'unclosed_date', 'today', 'close_date', 'min_date', 'max_date'] as const;
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // Try every reasonable translation key for an API error before falling back

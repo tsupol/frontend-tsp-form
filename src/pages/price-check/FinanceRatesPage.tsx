@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
@@ -64,6 +64,8 @@ interface SheetRow {
 interface SheetModel {
   model_id: number;
   model_name: string;
+  /** Catalogue name, brand + family + model (mig 1453) — what people read. */
+  product_display_name?: string;
   retail_price: number;
   price_varies?: boolean;
   rows: SheetRow[];
@@ -215,7 +217,7 @@ function ModelRateCard({ model, familyLabel, terms, ratesVisible, canEdit, onEdi
       <div className="flex items-center gap-2 flex-wrap px-3 py-2.5 bg-surface border-b border-line">
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2 flex-wrap">
-            <span className="text-sm font-semibold">{model.model_name}</span>
+            <span className="text-sm font-semibold">{model.product_display_name || model.model_name}</span>
             <span className="text-sm tabular-nums">
               {shown.uplift_amount != null && shown.uplift_amount > 0 && shown.base_price != null ? (
                 <>
@@ -372,7 +374,7 @@ function RetailPriceModal({ open, model, onClose, onSaved }: {
             <div className="modal-content">
               <div className="form-grid">
                 <div className="px-3 py-2.5 rounded-md bg-surface border border-line">
-                  <div className="font-medium text-sm">{m?.model_name}</div>
+                  <div className="font-medium text-sm">{m?.product_display_name || m?.model_name}</div>
                   <div className="text-xs text-subtle tabular-nums">
                     {t('financeRates.currentPrice')} {fmtCurrency(m?.retail_price)}
                   </div>
@@ -404,7 +406,7 @@ function RetailPriceModal({ open, model, onClose, onSaved }: {
         {view === 'done' && m && (
           <ActionDoneView
             headline={t('financeRates.priceSaved')}
-            contractCode={m.model_name}
+            contractCode={m.product_display_name || m.model_name}
             detailRows={[
               { label: t('financeRates.currentPrice'), value: fmtCurrency(m.retail_price) },
               { label: t('financeRates.newPrice'), value: fmtCurrency(savedPrice), emphasis: true },
@@ -435,7 +437,12 @@ export function FinanceRatesPage() {
 
   // One combobox picks either a whole brand ("b:5") or a family ("f:178") —
   // typing "appl" surfaces the Apple brand row plus every Apple family.
-  const [pick, setPick] = useState<string>('');
+  // ?pick=f:178 opens on a family (the price table's "ดูค่างวด" link).
+  const [searchParams] = useSearchParams();
+  const [pick, setPick] = useState<string>(() => {
+    const p = searchParams.get('pick') ?? '';
+    return /^[bf]:\d+$/.test(p) ? p : '';
+  });
   const [search, setSearch] = useState('');
   const [editModel, setEditModel] = useState<SheetModel | null>(null);
 
