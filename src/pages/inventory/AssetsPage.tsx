@@ -1702,7 +1702,7 @@ function CorrectVariantModal({
             <div className="modal-content">
               {/* Target box */}
               <div className="px-3 py-2.5 rounded-md bg-surface border border-line mb-4">
-                <div className="font-medium text-sm">{asset.asset_code}</div>
+                <div className="font-medium text-sm">{codeDisplay(asset.asset_code_display, asset.asset_code)}</div>
                 <div className="text-xs text-subtle">{asset.product_display_name ?? asset.variant_name}</div>
               </div>
 
@@ -1785,7 +1785,7 @@ function CorrectVariantModal({
         {view === 'done' && (
           <ActionDoneView
             headline={t('asset.correctVariant.doneTitle', { defaultValue: 'Colour corrected' })}
-            contractCode={asset.asset_code}
+            contractCode={codeDisplay(asset.asset_code_display, asset.asset_code)}
             detailRows={[
               { label: t('asset.color'), value: savedName },
             ]}
@@ -2011,7 +2011,7 @@ function CorrectModelModal({
             <div className="modal-content">
               {/* Target box — asset code + current model. */}
               <div className="px-3 py-2.5 rounded-md bg-surface border border-line mb-4">
-                <div className="font-medium text-sm">{asset.asset_code}</div>
+                <div className="font-medium text-sm">{codeDisplay(asset.asset_code_display, asset.asset_code)}</div>
                 <div className="text-xs text-subtle">
                   {t('asset.correctModel.current', { defaultValue: 'Current model' })}: {preflight?.current.product_display_name ?? asset.product_display_name ?? asset.variant_name}
                 </div>
@@ -2142,7 +2142,7 @@ function CorrectModelModal({
         {view === 'done' && (
           <ActionDoneView
             headline={t('asset.correctModel.doneTitle', { defaultValue: 'Model corrected' })}
-            contractCode={asset.asset_code}
+            contractCode={codeDisplay(asset.asset_code_display, asset.asset_code)}
             detailRows={[
               { label: t('asset.correctModel.model', { defaultValue: 'Model' }), value: savedName },
               ...(selectedVariantRow

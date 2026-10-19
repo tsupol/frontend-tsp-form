@@ -363,7 +363,7 @@ export function SellOutRequestModal({
                   ) : (
                     <SellOutConditionPhotos
                       requestId={result?.request_id ?? null}
-                      code={result?.code ?? asset?.asset_code ?? ''}
+                      code={result?.code ?? (asset ? codeDisplay(asset.asset_code_display, asset.asset_code) : '')}
                       editable
                       onRequestDraft={() => {
                         // Guard: never fire a second create if one is in flight

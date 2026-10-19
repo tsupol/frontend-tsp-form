@@ -119,7 +119,7 @@ export function ActivationLockRevealModal({ target, onClose }: Props) {
             {result?.serial_number ?? target?.serial_number ?? '—'}
             {result?.model && <span className="text-subtle font-normal"> · {result.model}</span>}
           </div>
-          <div className="text-xs text-subtle">{result?.asset_code ?? target?.asset_code_display ?? ''}</div>
+          <div className="text-xs text-subtle">{target?.asset_code_display ?? ''}</div>
         </div>
 
         {!result ? (

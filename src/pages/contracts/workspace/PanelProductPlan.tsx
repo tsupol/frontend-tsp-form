@@ -87,6 +87,8 @@ interface PricingRow {
 interface StockAsset {
   asset_id: number;
   asset_code: string;
+  /** Dashed form for display — AT-2610-000613-4. */
+  asset_code_display: string;
   model_id: number;
   variant_id: number;
   model_name: string;
@@ -1007,7 +1009,7 @@ export function PanelProductPlan(_props: Props) {
           <div className="flex items-center px-4 py-3 gap-3">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="font-medium">{selectedAsset?.asset_code ?? `#${localTargetAssetId}`}</span>
+                <span className="font-medium">{selectedAsset?.asset_code_display ?? `#${localTargetAssetId}`}</span>
                 {(selectedAsset?.condition_grade ?? contract?.target_asset_condition_grade) && (
                   <span className={`text-xs font-medium ${getConditionTextColor(selectedAsset?.condition_grade ?? contract?.target_asset_condition_grade ?? '')}`}>
                     {getConditionLabel(selectedAsset?.condition_grade ?? contract?.target_asset_condition_grade ?? '', t)}
@@ -1104,7 +1106,7 @@ export function PanelProductPlan(_props: Props) {
                         onClick={() => handleSelectAsset(asset)}
                       >
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm">{asset.asset_code}</span>
+                          <span className="font-medium text-sm">{asset.asset_code_display}</span>
                           <span className={`text-xs font-medium ${getConditionTextColor(asset.condition_grade)}`}>
                             {getConditionLabel(asset.condition_grade, t)}
                           </span>

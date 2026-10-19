@@ -203,7 +203,7 @@ function ViewLoanerModal({ open, onClose, assetId }: { open: boolean; onClose: (
             <div className="flex flex-col gap-3">
               <div className="flex items-center gap-2">
                 <Package size={16} className="text-subtle shrink-0" />
-                <span className="font-medium text-sm">{asset.product_display_name ?? asset.asset_code}</span>
+                <span className="font-medium text-sm">{asset.product_display_name ?? codeDisplay(asset.asset_code_display, asset.asset_code)}</span>
                 <Badge size="xs" color="info">{asset.current_bucket}</Badge>
               </div>
               <div className="rounded-md border border-line divide-y divide-line">
