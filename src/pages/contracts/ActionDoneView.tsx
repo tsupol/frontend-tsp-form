@@ -33,6 +33,8 @@ export interface ActionDoneSecondaryAction {
   label: string;
   /** Called BEFORE onClose so the parent can navigate/select. The done view itself does not call onClose after — the secondary's onClick should call onClose if it wants to dismiss. */
   onClick: () => void;
+  /** The page this button leads to, if it leads to one: ctrl/middle-click then opens it in a new tab (and leaves the window open) instead of calling onClick. */
+  to?: string;
   startIcon?: ReactNode;
   endIcon?: ReactNode;
   /** When the action only produced something that still needs work (a draft), the secondary IS the next step: it takes the primary colour and Done drops to outline. */
@@ -210,7 +212,12 @@ export function ActionDoneView({
           <Button
             variant={secondaryAction.isNextStep ? 'solid' : 'outline'}
             color={secondaryAction.isNextStep ? 'primary' : undefined}
-            onClick={secondaryAction.onClick}
+            onClick={(e) => {
+              const to = secondaryAction.to;
+              if (to && (e.ctrlKey || e.metaKey)) { window.open(to, '_blank'); return; }
+              secondaryAction.onClick();
+            }}
+            onAuxClick={(e) => { if (e.button === 1 && secondaryAction.to) window.open(secondaryAction.to, '_blank'); }}
             startIcon={secondaryAction.startIcon}
             endIcon={secondaryAction.endIcon}
           >

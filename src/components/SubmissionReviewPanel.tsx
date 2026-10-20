@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Badge, Select, Button, TextArea,
+  Badge, Select, Button,
 } from 'tsp-form';
 import { XCircle, AlertTriangle, ImageOff, ExternalLink, CheckCircle, Loader2, Copy } from 'lucide-react';
 import { apiClient, ApiError } from '../lib/api';
@@ -23,6 +23,8 @@ import {
   SlipPayoffBadge, SlipPayoffStatusBox, SlipPayoffConfirmModal, SlipPayoffWithdrawModal,
   payoffBlockedText, type PayoffPhase, type PayoffPreview,
 } from './SlipPayoff';
+import { SlipReopenModal } from './SlipReopenModal';
+import { SlipRejectModal } from './SlipRejectModal';
 
 export type SubmissionStatus = 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
 
@@ -222,7 +224,6 @@ export function useSubmissionReview({
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const { hasPermission } = useMyPermissions();
-  const [reason, setReason] = useState('');
   const [bankAccountId, setBankAccountId] = useState<string>('');
   const [busy, setBusy] = useState<ReviewAction | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
@@ -234,7 +235,6 @@ export function useSubmissionReview({
 
   useEffect(() => {
     if (active) {
-      setReason('');
       setBankAccountId('');
       setErrorMessage('');
       setLiveCancelled(false);
@@ -302,7 +302,9 @@ export function useSubmissionReview({
   });
   const [payoffOpen, setPayoffOpen] = useState(false);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
-  useEffect(() => { if (!active) { setPayoffOpen(false); setWithdrawOpen(false); } }, [active]);
+  const [reopenOpen, setReopenOpen] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  useEffect(() => { if (!active) { setPayoffOpen(false); setWithdrawOpen(false); setReopenOpen(false); setRejectOpen(false); } }, [active]);
 
   const bankOptions = bankAccounts.map(b => ({
     value: String(b.id),
@@ -322,6 +324,18 @@ export function useSubmissionReview({
         open={withdrawOpen}
         row={row}
         onClose={() => setWithdrawOpen(false)}
+        onFinished={onChanged}
+      />
+      <SlipRejectModal
+        open={rejectOpen}
+        row={row}
+        onClose={() => setRejectOpen(false)}
+        onFinished={onChanged}
+      />
+      <SlipReopenModal
+        open={reopenOpen}
+        row={row}
+        onClose={() => setReopenOpen(false)}
         onFinished={onChanged}
       />
       {billDayConfirm.dialog}
@@ -362,34 +376,24 @@ export function useSubmissionReview({
     selectedBank.account_number !== row.receiver_account_no
   );
 
-  const handleAction = async (action: ReviewAction) => {
-    if (action === 'reject' && !reason.trim()) return;
-    if (action === 'approve' && !bankAccountId) return;
-    setBusy(action);
+  // Approve stays in the panel (bank account above, bill-day guard). Reject and
+  // reopen each carry their own text, so they open their own windows.
+  const handleApprove = async () => {
+    if (!bankAccountId) return;
+    setBusy('approve');
     setErrorMessage('');
     const start = Date.now();
     try {
-      if (action === 'reopen') {
-        await apiClient.rpc('fn_payment_submission_reopen', {
-          p_submission_id: row.id,
-          p_note: reason.trim() || null,
-        });
-      } else {
-        const res = await apiClient.rpc<{ bill_day?: BillDay | null } | null>('fn_payment_submission_review', {
-          p_submission_id: row.id,
-          p_action: action === 'approve' ? 'APPROVE' : 'REJECT',
-          p_channel: action === 'approve' ? 'TRANSFER' : null,
-          p_branch_id: row.branch_id,
-          p_bank_account_id: action === 'approve' ? Number(bankAccountId) : null,
-          p_reject_reason: action === 'reject' ? (reason.trim() || null) : null,
-          p_reviewed_by: user?.user_id ?? null,
-        });
-        if (action === 'approve') {
-          onSuccess(action, { billDayNote: billDayShiftedText(res?.bill_day, t, i18n.language) });
-          return;
-        }
-      }
-      onSuccess(action);
+      const res = await apiClient.rpc<{ bill_day?: BillDay | null } | null>('fn_payment_submission_review', {
+        p_submission_id: row.id,
+        p_action: 'APPROVE',
+        p_channel: 'TRANSFER',
+        p_branch_id: row.branch_id,
+        p_bank_account_id: Number(bankAccountId),
+        p_reject_reason: null,
+        p_reviewed_by: user?.user_id ?? null,
+      });
+      onSuccess('approve', { billDayNote: billDayShiftedText(res?.bill_day, t, i18n.language) });
     } catch (err) {
       if (err instanceof ApiError) {
         const translated = translateApiError(err, t);
@@ -455,8 +459,10 @@ export function useSubmissionReview({
 
           {/* Advisory signals — duplicate slip + OCR read-back. Both are hints for
               the reviewer, never blockers (approve/reject stay driven by allowed_actions). */}
-          <DuplicateAdvisory row={row} />
-          <OcrAdvisory row={row} />
+          <div className="space-y-1.5">
+            <DuplicateAdvisory row={row} />
+            <OcrAdvisory row={row} />
+          </div>
 
           {/* Money reversed — an APPROVED slip can still have its payment voided
               (whole bill cancelled, or just this payment reversed to a CN). The
@@ -598,7 +604,7 @@ export function useSubmissionReview({
         </div>
       </div>
 
-      {(isPending || isRejected) && (
+      {(isPending || (isRejected && canReopen)) && (
         <div className="flex-none border-t border-line px-4 py-3 bg-bg">
           <div className="space-y-2 w-full">
             {errorMessage && (
@@ -610,105 +616,80 @@ export function useSubmissionReview({
 
             {billDayBlocked && <BillDayBlockedNotice preview={billDayPreview.data} />}
 
-            {isPending && canApprove && (
-              <div>
-                <div className="form-label mb-1">{t('paymentSubmissions.bankAccount')}</div>
-                <Select
-                  options={bankOptions}
-                  value={bankAccountId || null}
-                  onChange={v => setBankAccountId((v as string) || '')}
-                  size="sm"
-                  placeholder={t('paymentSubmissions.selectBankAccount')}
-                  searchable={false}
-                />
-                {receiverMismatch && (
-                  <div className="alert alert-warning mt-2">
-                    <AlertTriangle size={14} />
-                    <div className="alert-description text-xs">
-                      {t('paymentSubmissions.receiverMismatch')}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {(canReject || (isRejected && canReopen)) && <TextArea
-              size="md"
-              className="mb-1 w-full"
-              rows={2}
-              value={reason}
-              onChange={e => setReason(e.target.value)}
-              placeholder={
-                isPending
-                  ? t('paymentSubmissions.rejectReasonPlaceholder')
-                  : t('paymentSubmissions.reopenNotePlaceholder')
-              }
-              disabled={!!busy}
-            />}
-
-            {isPending && (canApprove || canReject) && (
-              <div className="flex gap-2 w-full">
-                {canApprove && (
+            {/* One row: the bank account takes the free width on the left, the
+                buttons sit on the right, sized to their text — the same footer
+                shape as the other detail panels. A narrow panel wraps the buttons
+                under the account. */}
+            <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+              {isPending && canApprove ? (
+                <div className="flex-1 min-w-[16rem]">
+                  <div className="form-label mb-1">{t('paymentSubmissions.bankAccount')}</div>
+                  <Select
+                    options={bankOptions}
+                    value={bankAccountId || null}
+                    onChange={v => setBankAccountId((v as string) || '')}
+                    size="sm"
+                    placeholder={t('paymentSubmissions.selectBankAccount')}
+                    searchable={false}
+                  />
+                </div>
+              ) : <span className="flex-1" />}
+              <div className="flex items-center gap-2 ml-auto">
+                {/* ปิดจบ — settles the slip very differently from อนุมัติ, so it opens
+                    its own confirm box. Greyed with the backend's reason in words. */}
+                {isPending && canPayoff && (
                   <Button
-                    color="success" size="sm" className="flex-1"
+                    variant="outline" size="sm"
+                    disabled={!!busy || payoffPreviewLoading || !payoffPreview || payoffBlocked}
+                    onClick={() => setPayoffOpen(true)}
+                  >
+                    {payoffPreviewLoading && !payoffPreview
+                      ? t('common.loading')
+                      : payoffPreview?.phase === 'READY_TO_FINISH'
+                        ? t('paymentSubmissions.payoffFinishButton')
+                        : t('paymentSubmissions.payoffButton')}
+                  </Button>
+                )}
+                {isPending && canWithdrawPayoff && (
+                  <Button
+                    variant="outline" color="danger" size="sm"
+                    disabled={!!busy}
+                    onClick={() => setWithdrawOpen(true)}
+                  >
+                    {t('paymentSubmissions.payoffWithdraw')}
+                  </Button>
+                )}
+                {isPending && canReject && (
+                  <Button color="danger" size="sm" disabled={!!busy} onClick={() => setRejectOpen(true)}>
+                    {t('paymentSubmissions.reject')}
+                  </Button>
+                )}
+                {isPending && canApprove && (
+                  <Button
+                    color="success" size="sm"
                     disabled={!!busy || !bankAccountId || billDayBlocked}
-                    onClick={() => billDayConfirm.guard(() => { void handleAction('approve'); })}
+                    onClick={() => billDayConfirm.guard(() => { void handleApprove(); })}
                   >
                     {busy === 'approve' ? t('common.loading') : t('paymentSubmissions.approve')}
                   </Button>
                 )}
-                {canReject && (
-                  <Button
-                    color="danger" size="sm" className="flex-1"
-                    disabled={!!busy || !reason.trim()}
-                    onClick={() => handleAction('reject')}
-                  >
-                    {busy === 'reject' ? t('common.loading') : t('paymentSubmissions.reject')}
+                {isRejected && canReopen && (
+                  <Button color="primary" size="sm" onClick={() => setReopenOpen(true)}>
+                    {t('paymentSubmissions.reopen')}
                   </Button>
                 )}
               </div>
-            )}
-
-            {/* ปิดจบ — a secondary action under อนุมัติ/ปฏิเสธ with its own confirm
-                box: the two settle the slip very differently. Greyed with the
-                backend's reason in words, never greyed silently. */}
-            {isPending && canPayoff && (
-              <div className={canApprove || canReject ? 'pt-2 border-t border-line' : ''}>
-                <Button
-                  variant="outline" size="sm" className="w-full"
-                  disabled={!!busy || payoffPreviewLoading || !payoffPreview || payoffBlocked}
-                  onClick={() => setPayoffOpen(true)}
-                >
-                  {payoffPreviewLoading && !payoffPreview
-                    ? t('common.loading')
-                    : payoffPreview?.phase === 'READY_TO_FINISH'
-                      ? t('paymentSubmissions.payoffFinishButton')
-                      : t('paymentSubmissions.payoffButton')}
-                </Button>
-                {payoffBlocked && payoffReason && (
-                  <div className="text-xs text-subtle mt-1">{payoffReason}</div>
-                )}
+            </div>
+            {isPending && canApprove && receiverMismatch && (
+              <div className="alert alert-warning">
+                <AlertTriangle size={14} />
+                <div className="alert-description text-xs">
+                  {t('paymentSubmissions.receiverMismatch')}
+                </div>
               </div>
             )}
-
-            {isPending && canWithdrawPayoff && (
-              <Button
-                variant="outline" color="danger" size="sm" className="w-full"
-                disabled={!!busy}
-                onClick={() => setWithdrawOpen(true)}
-              >
-                {t('paymentSubmissions.payoffWithdraw')}
-              </Button>
-            )}
-
-            {isRejected && canReopen && (
-              <Button
-                color="primary" size="sm" className="w-full"
-                disabled={!!busy}
-                onClick={() => handleAction('reopen')}
-              >
-                {busy === 'reopen' ? t('common.loading') : t('paymentSubmissions.reopen')}
-              </Button>
+            {isPending && canPayoff && payoffBlocked && payoffReason && (
+              <div className="text-xs text-subtle">{payoffReason}</div>
             )}
           </div>
         </div>

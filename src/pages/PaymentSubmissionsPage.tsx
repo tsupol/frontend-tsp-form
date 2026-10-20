@@ -187,8 +187,8 @@ export function PaymentSubmissionsPage() {
 
   // Rail row — stacked, since a narrow rail can't fit columns.
   // Line 1: contract + slip code (left) · amount (right)
-  // Line 2: status + advisory + sender badges (wrap)
-  // Line 3: customer · branch · sender account (left) · relative time (right)
+  // Line 2: status + advisory + sender badges (wrap) · how long ago (right)
+  // Line 3: customer · branch · sender account · exact date (right, under how long ago)
   // Line 4: funder ref · activation date · installment n/total
   const renderRowContent = (row: SubmissionRow) => {
     const ago = formatRelativeAgo(row.submitted_at, i18n.language);
@@ -209,7 +209,8 @@ export function PaymentSubmissionsPage() {
           </div>
           <span className="text-sm font-semibold tabular-nums shrink-0">{fmtCurrency(row.amount)}</span>
         </div>
-        <div className="flex items-center flex-wrap gap-1.5 mt-1">
+        <div className="flex items-start justify-between gap-3 mt-1">
+        <div className="min-w-0 flex items-center flex-wrap gap-1.5">
           <Badge size="xs" color={statusColor(row.status)}>
             {t(`paymentSubmissions.status_${row.status}`)}
           </Badge>
@@ -237,17 +238,16 @@ export function PaymentSubmissionsPage() {
           )}
           <Badge size="xs" color={row.is_staff_submitted ? 'info' : 'default'}>{byLabel}</Badge>
         </div>
+          <span className="shrink-0 text-xs text-subtle leading-5">{ago.rel}</span>
+        </div>
         <div className="flex items-baseline justify-between gap-3 mt-1">
           <span className="min-w-0 truncate text-xs text-subtle">
             {row.customer_name ?? '—'} · {row.branch_name ?? '—'}
             {senderLine ? ` · ${senderLine}` : ''}
           </span>
-          <div className="shrink-0 flex items-baseline gap-1.5">
-            <span className="text-xs font-medium">{ago.rel}</span>
-            {ago.abs && ago.abs !== ago.rel && (
-              <span className="text-[11px] text-subtler tabular-nums">{ago.abs}</span>
-            )}
-          </div>
+          {ago.abs && ago.abs !== ago.rel && (
+            <span className="shrink-0 text-[11px] text-subtler tabular-nums">{ago.abs}</span>
+          )}
         </div>
         {/* Renders nothing when the contract isn't active yet (mig 1186). */}
         <SubmissionContractInfoLine row={row} className="mt-1 text-xs text-subtle truncate" />
