@@ -6,7 +6,7 @@ import { Button, Badge, Tooltip, PopOver, useSnackbarContext } from 'tsp-form';
 import {
   User, Phone, Smartphone, Loader2, ClipboardList, Scale,
   Star, StarOff, CheckCircle, AlertTriangle, Repeat, ExternalLink,
-  Printer, FileText, ChevronDown, PenLine, Eye,
+  Printer, FileText, ChevronDown, PenLine, Eye, Store,
 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { apiClient } from '../../lib/api';
@@ -283,6 +283,9 @@ export function RepoDetailPanel({ contractId, onChanged }: {
           <ExternalLink size={12} className="shrink-0" />
         </Link>
         <Badge color={statusColor} size="sm">{t(`repo.status.${detail.dunning_status}`, { defaultValue: detail.dunning_status })}</Badge>
+        {detail.branch_name && (
+          <span className="text-sm text-subtle whitespace-nowrap inline-flex items-center gap-1"><Store size={13} />{t('repo.pool.branch', { name: detail.branch_name })}</span>
+        )}
         <div className="ml-auto flex items-center gap-2">
           {focusAction && (
             <Tooltip

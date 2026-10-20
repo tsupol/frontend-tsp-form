@@ -7989,6 +7989,7 @@
       "neverBadge": "New",
       "unclaimedBadge": "Unclaimed",
       "daysWaiting": "{{days}}d waiting",
+      "branch": "Branch {{name}}",
       "attempts": "{{count}} attempt(s)",
       "approxArea": "approx area",
       "noGeo": "no location",

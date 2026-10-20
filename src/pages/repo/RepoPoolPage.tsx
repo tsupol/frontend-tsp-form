@@ -8,7 +8,7 @@ import {
 } from 'tsp-form';
 import {
   ArrowRightFromLine, ArrowLeft, Search, X, MapPin, Star, AlertTriangle, Clock,
-  ExternalLink, CheckCircle, Loader2, StarOff,
+  ExternalLink, CheckCircle, Loader2, StarOff, Store,
 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { SearchInput } from '../../components/SearchInput';
@@ -407,6 +407,12 @@ export function RepoPoolPage() {
                         <span className="ml-auto text-sm font-medium tabular-nums shrink-0">{fmtCurrency(r.outstanding)}</span>
                       </div>
                       <div className="flex items-center gap-1.5 text-xs text-subtle min-w-0">
+                        {/* The branch the contract came from — the repo team works
+                            for several companies and asked to see it (IMPLEMENT
+                            2026-10-19). Never shrinks; the customer line gives way. */}
+                        {r.branch_name && (
+                          <span className="shrink-0 whitespace-nowrap inline-flex items-center gap-1"><Store size={11} />{t('repo.pool.branch', { name: r.branch_name })} ·</span>
+                        )}
                         <span className="truncate">
                           {r.customer_name ?? '—'}
                           {r.address_display && <> · <span className="text-subtler">{r.address_display}</span></>}

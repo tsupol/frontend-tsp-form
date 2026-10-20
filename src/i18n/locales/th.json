@@ -7979,6 +7979,7 @@
       "neverBadge": "ใหม่",
       "unclaimedBadge": "ยังไม่มีคนดูแล",
       "daysWaiting": "รอ {{days}} วัน",
+      "branch": "สาขา {{name}}",
       "attempts": "ไปแล้ว {{count}} รอบ",
       "approxArea": "พื้นที่โดยประมาณ",
       "noGeo": "ไม่มีพิกัด",

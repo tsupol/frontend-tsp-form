@@ -23,6 +23,9 @@ export interface RepoPoolRow {
   customer_tel: string | null;
   company_id: number;
   branch_id: number | null;
+  // mig 1468: the contract's branch name, readable even for a company the repo
+  // user only holds a grant for (v_branches only shows their own company).
+  branch_name: string | null;
   dunning_status: DunningStatus;
   status_reason: string | null;
   status_at: string;
@@ -106,6 +109,7 @@ export interface ContractRepoDetail {
   focus_pickers: Array<{ user_id: number; picked_at: string }>;
   company_id: number;
   branch_id: number | null;
+  branch_name: string | null;
   // The device's iCloud account (mig 1369–1370). The password is in no view —
   // only ops_repo_reveal_icloud_password returns it.
   has_icloud: boolean;
