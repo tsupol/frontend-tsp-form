@@ -6184,7 +6184,8 @@
   },
   "notifCenter": {
     "detail": {
-      "partner_case_approved_staff": "Collect the down payment and sign"
+      "partner_case_approved_staff": "Collect the down payment and sign",
+      "partner_settlement_submitted_staff": "Shop receives {{amount}} net"
     },
     "title": "Notifications",
     "markAllRead": "Mark all as read",
@@ -6220,7 +6221,9 @@
       "buyback_approval_required_staff": "Buyback approval required",
       "partner_case_submitted_staff": "Shop credit case waiting for approval",
       "partner_case_approved_staff": "Credit approved",
-      "partner_case_returned_staff": "Credit request returned"
+      "partner_case_returned_staff": "Credit request returned",
+      "partner_settlement_submitted_staff": "Shop close-out waiting for review",
+      "partner_settlement_returned_staff": "Close-out returned for fixes"
     },
     "signingType": {
       "ADDENDUM": "addendum",

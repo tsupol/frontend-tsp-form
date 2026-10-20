@@ -6177,7 +6177,8 @@
   },
   "notifCenter": {
     "detail": {
-      "partner_case_approved_staff": "เก็บเงินดาวน์และเซ็นสัญญาได้"
+      "partner_case_approved_staff": "เก็บเงินดาวน์และเซ็นสัญญาได้",
+      "partner_settlement_submitted_staff": "ร้านได้สุทธิ {{amount}} บาท"
     },
     "title": "การแจ้งเตือน",
     "markAllRead": "ทำเครื่องหมายว่าอ่านแล้วทั้งหมด",
@@ -6213,7 +6214,9 @@
       "buyback_approval_required_staff": "ซื้อคืนรออนุมัติ",
       "partner_case_submitted_staff": "เคสร้านรออนุมัติสินเชื่อ",
       "partner_case_approved_staff": "อนุมัติสินเชื่อแล้ว",
-      "partner_case_returned_staff": "ใบขออนุมัติถูกส่งกลับ"
+      "partner_case_returned_staff": "ใบขออนุมัติถูกส่งกลับ",
+      "partner_settlement_submitted_staff": "ร้านยื่นปิดงาน รอตรวจ",
+      "partner_settlement_returned_staff": "ใบปิดงานถูกส่งกลับให้แก้"
     },
     "signingType": {
       "ADDENDUM": "เพิ่มเติม",

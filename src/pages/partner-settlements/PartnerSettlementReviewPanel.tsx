@@ -225,6 +225,10 @@ export function PartnerSettlementReviewPanel({
             >
               <span className="inline-flex">
                 <LabeledCheckbox
+                  // TEMPORARY until the next tsp-form release: its Checkbox hides the
+                  // tick on click even when `checked` stays true (fixed in the library
+                  // source). Remounting when the confirm box opens/closes redraws it.
+                  key={checkTarget === null ? 'idle' : 'asking'}
                   label={
                     <span className="flex flex-col">
                       <span className="text-sm">{t('partnerSettlement.checkedFlag')}</span>

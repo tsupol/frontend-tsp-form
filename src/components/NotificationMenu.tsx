@@ -48,6 +48,13 @@ type NotificationRow = {
     // only on a returned request.
     case_id?: number;
     reason_text?: string;
+    // Shop close-out request (mig 1471). net_amount_text only on a submit;
+    // the return reason + note only on a return.
+    settlement_id?: number;
+    settlement_code?: string;
+    net_amount_text?: string;
+    return_reason_name?: string;
+    return_note?: string;
   } | null;
   contract_ids: number[] | null;
   created_at: string;
@@ -83,7 +90,7 @@ function resolveCategory(evt: string, fallback: string): NotifCategory | string 
   if (evt.startsWith('chat_')) return 'chat';
   if (evt.startsWith('signing_') || evt.startsWith('bind_') || evt.startsWith('contract_')) return 'contract';
   if (evt.startsWith('bill_') || evt === 'slip_uploaded') return 'payment';
-  if (evt.endsWith('_approval_required_staff') || evt.startsWith('buyback_') || evt.startsWith('partner_case_')) return 'approval';
+  if (evt.endsWith('_approval_required_staff') || evt.startsWith('buyback_') || evt.startsWith('partner_case_') || evt.startsWith('partner_settlement_')) return 'approval';
   return fallback;
 }
 
@@ -129,6 +136,12 @@ function deeplinkFor(row: NotificationRow): string | null {
   const pcid = row.payload?.contract_id;
   if (evt === 'partner_case_approved_staff' && pcid) return `/admin/contracts/pending-payment/${pcid}`;
   if (evt === 'partner_case_returned_staff' && pcid) return `/admin/contracts/approval-returned/${pcid}`;
+  // Shop close-out (mig 1471): fund finance lands on the request to review it;
+  // the shop lands on the contract in its close-out menu, where it fixes and resubmits.
+  if (evt === 'partner_settlement_submitted_staff' && row.payload?.settlement_id) {
+    return `/admin/partner-settlements/${row.payload.settlement_id}`;
+  }
+  if (evt === 'partner_settlement_returned_staff' && pcid) return `/admin/contracts/settlement-close/${pcid}`;
   const cid = row.payload?.contract_id ?? row.contract_ids?.[0];
   if (!cid) return null;
   if (evt.startsWith('chat_')) return `/admin/chat?contract=${cid}`;
@@ -236,6 +249,13 @@ function detailFor(row: NotificationRow, t: ReturnType<typeof useTranslation>['t
     case 'partner_case_approved_staff': return t('notifCenter.detail.partner_case_approved_staff');
     case 'partner_case_returned_staff': return row.payload?.reason_text?.trim() || null;
     case 'partner_case_submitted_staff': return row.payload?.branch_name?.trim() || null;
+    case 'partner_settlement_submitted_staff': {
+      const net = row.payload?.net_amount_text?.trim();
+      return net ? t('notifCenter.detail.partner_settlement_submitted_staff', { amount: net }) : null;
+    }
+    case 'partner_settlement_returned_staff':
+      return [row.payload?.return_reason_name?.trim(), row.payload?.return_note?.trim()]
+        .filter(Boolean).join(' — ') || null;
     default: return null;
   }
 }
@@ -489,6 +509,10 @@ export function NotificationMenuItem({ collapsed, isMobile, unreadCount }: Props
                       ) : cat === 'approval' ? (
                         <div className="text-xs leading-snug truncate mt-0.5 inline-flex items-center gap-1.5 min-w-0 flex-wrap">
                           {row.payload?.po_code && <span className="text-primary-fg truncate">{row.payload.po_code}</span>}
+                          {row.payload?.settlement_code && (
+                            <><span className="text-primary-fg shrink-0">{row.payload.settlement_code}</span>
+                              {code && <><span className="text-subtle">·</span><span className="text-subtle truncate">{code}</span></>}</>
+                          )}
                           {row.payload?.branch_name && (
                             <><span className="text-subtle">·</span><span className="text-subtle truncate">{row.payload.branch_name}</span></>
                           )}

@@ -303,7 +303,9 @@ function QueueRow({ row, tab, statusLabel, onPick, onOpenPayout, onOpenAccountSe
                 : t('partnerSettlement.checkedBadge')}
               placement="top"
             >
-              <span className="inline-flex text-success">
+              {/* Block-level flex: an inline box inside the tooltip's block
+                  wrapper sits on the text baseline, a few px above centre. */}
+              <span className="flex text-success">
                 <CheckCircle2 size={14} />
               </span>
             </Tooltip>
