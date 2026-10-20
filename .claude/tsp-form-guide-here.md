@@ -156,6 +156,9 @@ checklist in `.claude/CLAUDE.md`; the pattern itself is "Form modals: success st
 + nav guard" in the global guide). Renders both the `modal-content` body and the
 `modal-footer` — the host drops it inside its modal and stops there. Do NOT
 hand-roll a success screen; use this so all modals look and behave the same.
+The global guide's "Design the success step for what the user does next" applies:
+the next step goes in `secondaryAction`, and the contract code is linked with
+`contractLink` (ctrl/middle-click opens a new tab).
 
 **When:** any modal that creates/edits data, after the mutation resolves. Set
 `view='done'`, stash the result, render `<ActionDoneView .../>` instead of the
