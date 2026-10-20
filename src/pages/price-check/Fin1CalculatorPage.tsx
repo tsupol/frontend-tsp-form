@@ -36,6 +36,7 @@ interface ModelSearchRow {
   model_name: string;
   brand_name: string | null;
   family_name: string | null;
+  product_display_name: string | null;
   is_active: boolean;
 }
 
@@ -145,11 +146,12 @@ function snapUplift(v: number, min: number, max: number): number {
   return clamped >= min / 2 ? min : 0;
 }
 
-// Same two-line shape as the FIN2 price-check rail: family + model, brand below.
+// The backend's full name (DELIVERY 2026-10-20, mig 1469) already carries the
+// brand, so the brand line only shows for a row that lacks it.
 const modelLabel = (m: ModelSearchRow) =>
-  [m.family_name, m.model_name].filter(Boolean).join(' ');
+  m.product_display_name || [m.family_name, m.model_name].filter(Boolean).join(' ');
 
-const modelSubLabel = (m: ModelSearchRow) => m.brand_name ?? '';
+const modelSubLabel = (m: ModelSearchRow) => (m.product_display_name ? '' : m.brand_name ?? '');
 
 export function Fin1CalculatorPage() {
   const { t } = useTranslation();

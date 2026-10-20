@@ -38,6 +38,7 @@ interface SearchModel {
   model_name_suffix: string | null;
   brand_name: string;
   family_name: string;
+  product_display_name?: string | null;
   variants: SearchVariant[];
 }
 
@@ -993,8 +994,15 @@ export function PanelProductPlan(_props: Props) {
         <div className="border border-success-border bg-success-soft rounded-lg transition-colors">
           <div className="flex items-center px-4 py-3">
             <div className="flex-1 min-w-0">
-              <div className="font-medium">{localFamilyName} {localModelName}</div>
-              <div className="text-xs text-subtle">{localBrandName}</div>
+              {/* Full name from the search (DELIVERY 2026-10-20, mig 1469) already carries the brand. */}
+              {selectedModel?.product_display_name ? (
+                <div className="font-medium">{selectedModel.product_display_name}</div>
+              ) : (
+                <>
+                  <div className="font-medium">{localFamilyName} {localModelName}</div>
+                  <div className="text-xs text-subtle">{localBrandName}</div>
+                </>
+              )}
               {retailPrice != null && <div className="text-sm text-subtle mt-1">{t('priceCheck.retailPrice')} {fmtCurrency(retailPrice)}</div>}
             </div>
             <button className="p-1.5 rounded hover:bg-surface-hover cursor-pointer text-subtle hover:text-fg transition-colors bg-transparent border-none" onClick={handleResetSelection} title={t('common.remove')}>
@@ -1173,8 +1181,14 @@ export function PanelProductPlan(_props: Props) {
                   <div className="flex flex-col">
                     {models.map(model => (
                       <button key={model.model_id} className={`w-full text-left px-4 py-2.5 border-b border-line cursor-pointer transition-colors hover:bg-surface-hover`} onClick={() => handleSelectModel(model)}>
-                        <div className="font-medium text-sm truncate">{model.family_name} {model.model_name}</div>
-                        <div className="text-xs text-subtle">{model.brand_name}</div>
+                        {model.product_display_name ? (
+                          <div className="font-medium text-sm truncate">{model.product_display_name}</div>
+                        ) : (
+                          <>
+                            <div className="font-medium text-sm truncate">{model.family_name} {model.model_name}</div>
+                            <div className="text-xs text-subtle">{model.brand_name}</div>
+                          </>
+                        )}
                       </button>
                     ))}
                   </div>
