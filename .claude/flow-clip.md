@@ -32,6 +32,10 @@ A book's figure is signed from the book's side, a document's lines from the docu
 (BE 2026-10-12, mig 1421). Clawback / top-up totals: show `total_from_party`, never `net_amount`
 (`UI_SUMMARY/149` §6b).
 
+Side path scenes 20–26 (credit changes the figures when approving, migs 1472-1475) use
+CT-2610-000599-5 (98085) — case 178, approved with changes and acknowledged. To reshoot, send the
+latest case back as credit, resubmit as the shop, approve with changes again.
+
 ## Open
-Scene 37 ⚠ — BE sends no message to fund finance when a shop submits close-out.
-Re-shot 10-15/16: 11–16, 18, 23, 30, 31, 37, 39, 40, 50. The rest show older screens.
+Scene 44 ⚠ — BE sends no message to fund finance when a shop submits close-out.
+Re-shot 10-15/16: 11–16, 18, 30, 37, 38, 44, 46, 47, 57 (numbers after the 10-21 side path). The rest show older screens.
