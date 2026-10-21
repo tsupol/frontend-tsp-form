@@ -111,7 +111,20 @@ export interface PartnerCase {
   hours_approve_to_active: number | null;
   created_at: string;
   updated_at: string;
+
+  // ── Approved with adjustments (migs 1472-1475) ──
+  /** Credit changed the plan when approving (a phone call with the shop). */
+  has_adjustments: boolean;
+  /** Approved with adjustments and the shop has not acknowledged yet — billing and signing wait on it. */
+  awaiting_ack: boolean;
+  acknowledged_at: string | null;
 }
+
+/** The four inputs credit may change when approving (`p_adjustments` keys). */
+export type PartnerCaseAdjustKey = 'price' | 'uplift' | 'down_amount' | 'term_months';
+
+/** `{field: {requested, approved}}` — only the fields credit changed. */
+export type PartnerCaseAdjustments = Partial<Record<PartnerCaseAdjustKey, { requested: number | null; approved: number | null }>>;
 
 /** The submitted payload — same shape the signing anchor hashes. */
 export interface PartnerCaseSnapshot {
@@ -181,6 +194,18 @@ export interface PartnerCaseSnapshot {
 /** `v_partner_case_detail` / `v_partner_my_case_detail` — one row plus the payload. */
 export interface PartnerCaseDetail extends PartnerCase {
   snapshot_payload: PartnerCaseSnapshot | null;
+  adjustments: PartnerCaseAdjustments | null;
+  /** Staff view only — the shop's view carries no names. */
+  acknowledged_by_name?: string | null;
+  /** What the shop asked to collect at signing (down + doc fee). */
+  requested_due_at_signing: number | null;
+  // The approved plan, frozen at approval. All null on a case without adjustments.
+  approved_installment_amount: number | null;
+  approved_last_installment_amount: number | null;
+  approved_down_payment: number | null;
+  approved_due_at_signing: number | null;
+  approved_term_months: number | null;
+  approved_uplift_amount: number | null;
 }
 
 /** `v_partner_case_queue` — waiting requests for the reviewer's own company. */
@@ -244,7 +269,7 @@ export interface PartnerCaseReturnReasonRef {
 
 /** One button from `fn_partner_case_available_actions`. */
 export interface PartnerCaseAction {
-  action_code: 'APPROVE' | 'RETURN' | 'WITHDRAW';
+  action_code: 'APPROVE' | 'RETURN' | 'WITHDRAW' | 'ACKNOWLEDGE';
   rpc_name: string;
   is_available: boolean;
   blocking_reason: 'status_not_allowed' | 'permission_denied' | 'not_in_pool' | 'snapshot_stale' | null;
@@ -297,6 +322,10 @@ export interface PartnerCaseApproveResult {
   approved_expires_at: string;
   contract_state: string;
   photo_slots_locked: number;
+  /** Null when nothing was changed (or every value was sent unchanged). */
+  adjustments: PartnerCaseAdjustments | null;
+  /** True = approved with adjustments; the shop must acknowledge before billing/signing. */
+  requires_acknowledge: boolean;
 }
 
 /** `fn_partner_case_return` result. */

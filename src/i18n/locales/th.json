@@ -6178,7 +6178,8 @@
   "notifCenter": {
     "detail": {
       "partner_case_approved_staff": "เก็บเงินดาวน์และเซ็นสัญญาได้",
-      "partner_settlement_submitted_staff": "ร้านได้สุทธิ {{amount}} บาท"
+      "partner_settlement_submitted_staff": "ร้านได้สุทธิ {{amount}} บาท",
+      "partner_case_approved_adjusted_staff": "กดรับทราบการแก้ไขก่อนเก็บเงินดาวน์/เซ็นสัญญา"
     },
     "title": "การแจ้งเตือน",
     "markAllRead": "ทำเครื่องหมายว่าอ่านแล้วทั้งหมด",
@@ -6216,7 +6217,8 @@
       "partner_case_approved_staff": "อนุมัติสินเชื่อแล้ว",
       "partner_case_returned_staff": "ใบขออนุมัติถูกส่งกลับ",
       "partner_settlement_submitted_staff": "ร้านยื่นปิดงาน รอตรวจ",
-      "partner_settlement_returned_staff": "ใบปิดงานถูกส่งกลับให้แก้"
+      "partner_settlement_returned_staff": "ใบปิดงานถูกส่งกลับให้แก้",
+      "partner_case_approved_adjusted_staff": "อนุมัติแล้ว — มีแก้ไขจากฝ่ายสินเชื่อ"
     },
     "signingType": {
       "ADDENDUM": "เพิ่มเติม",
@@ -6625,7 +6627,35 @@
     "legend_onTime": "จ่ายตรง",
     "legend_late": "จ่ายช้า",
     "legend_overdue": "ค้าง",
-    "legend_future": "ยังไม่ถึง"
+    "legend_future": "ยังไม่ถึง",
+    "adjustToggle": "แก้ตัวเลขตามที่ตกลงกับร้าน",
+    "adjustToggleHint": "หลังโทรคุยกับร้านแล้ว ระบบคำนวณค่างวดให้เอง ร้านต้องกดรับทราบก่อนเก็บเงิน/เซ็นสัญญา",
+    "adjust_price": "ราคาเครื่อง",
+    "adjust_uplift": "ราคาเพิ่ม (OVER)",
+    "adjust_down_amount": "เงินดาวน์",
+    "adjust_term_months": "จำนวนงวด",
+    "termValue": "{{count}} งวด",
+    "priceFromPricebook": "ตามตารางราคา",
+    "requestedValue": "ร้านขอ {{value}}",
+    "compareRequested": "เดิม (ที่ร้านขอ)",
+    "compareApproved": "ใหม่ (ที่อนุมัติ)",
+    "rowInstallment": "ค่างวด/เดือน",
+    "rowDueAtSigning": "เงินที่เก็บวันเซ็น",
+    "lastInstallmentShort": "งวดสุดท้าย {{amount}}",
+    "adjustNoteLabel": "บันทึกถึงร้าน (บังคับเมื่อแก้ตัวเลข)",
+    "adjustNotePlaceholder": "เช่น โทรคุยร้านแล้ว เพิ่มเงินดาวน์",
+    "approveWithAdjust": "อนุมัติพร้อมแก้ไข",
+    "approveAdjustDone": "อนุมัติพร้อมแก้ไขแล้ว",
+    "approveAdjustDoneHint": "ร้านต้องกดรับทราบการแก้ไขก่อน จึงจะเก็บเงินดาวน์/เซ็นสัญญาได้",
+    "awaitingAck": "รอรับทราบการแก้ไข",
+    "adjustedHeadline": "ฝ่ายสินเชื่ออนุมัติพร้อมแก้ไข — แจ้งลูกค้าแล้วกดรับทราบ",
+    "creditNoteLabel": "ฝ่ายสินเชื่อ",
+    "acknowledge": "รับทราบ — แจ้งลูกค้าแล้ว",
+    "acknowledgeDone": "รับทราบแล้ว — เก็บเงินดาวน์และเซ็นสัญญาต่อได้",
+    "acknowledgedAt": "รับทราบการแก้ไขแล้ว",
+    "adjustedTitle": "อนุมัติพร้อมแก้ไข",
+    "ackWaiting": "รอร้านกดรับทราบ",
+    "ackDone": "ร้านรับทราบแล้ว"
   },
   "partnerPools": {
     "title": "ผู้ตรวจร้าน deal partner",

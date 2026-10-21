@@ -44,6 +44,7 @@ import { ageFrom } from './customerRisk';
 import { usePartnerCaseActions, usePartnerCaseReturnReasons, useAssetEvidence } from './usePartnerCases';
 import { outcomeBadgeColor, type PartnerCaseDetail } from './partnerCaseTypes';
 import { PartnerCaseApproveModal } from './PartnerCaseApproveModal';
+import { adjustLabel, adjustValue, adjustmentRows } from './adjustFormat';
 import { PartnerCaseReturnModal } from './PartnerCaseReturnModal';
 
 interface PartnerCaseDetailPanelProps {
@@ -498,6 +499,40 @@ export function PartnerCaseDetailPanel({
           {detail.status === 'APPROVED' && detail.approved_expires_at && (
             <div className="mt-3 -mx-3 rounded-md border border-success-border bg-success-soft px-3 py-2 text-sm text-success-fg">
               {t('partnerCase.usableUntil')} <DateTime value={detail.approved_expires_at} showTime />
+            </div>
+          )}
+          {/* Approved with adjustments: what credit changed, why, and whether
+              the shop has acknowledged it yet (billing and signing wait on it). */}
+          {detail.has_adjustments && (
+            <div className="mt-3 -mx-3 rounded-md border border-line px-3 py-2 flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium flex-1">{t('partnerCase.adjustedTitle')}</span>
+                {detail.awaiting_ack ? (
+                  <Badge color="warning" size="sm">{t('partnerCase.ackWaiting')}</Badge>
+                ) : (
+                  <Badge color="success" size="sm">{t('partnerCase.ackDone')}</Badge>
+                )}
+              </div>
+              <div className="flex flex-col gap-1 text-sm">
+                {adjustmentRows(detail.adjustments).map(r => (
+                  <div key={r.key} className="flex items-center gap-2">
+                    <span className="text-subtle flex-1 min-w-0">{adjustLabel(r.key, t)}</span>
+                    <span className="tabular-nums text-subtle">{adjustValue(r.key, r.requested, t)}</span>
+                    <span className="text-subtler">→</span>
+                    <span className="tabular-nums font-medium">{adjustValue(r.key, r.approved, t)}</span>
+                  </div>
+                ))}
+              </div>
+              {detail.approve_note && (
+                <div className="text-sm">{detail.approve_note}</div>
+              )}
+              {detail.acknowledged_at && (
+                <div className="text-xs text-subtle">
+                  {t('partnerCase.acknowledgedAt')}{' '}
+                  <DateTime value={detail.acknowledged_at} showTime />
+                  {detail.acknowledged_by_name && <> · {detail.acknowledged_by_name}</>}
+                </div>
+              )}
             </div>
           )}
         </section>

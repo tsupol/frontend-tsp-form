@@ -135,6 +135,8 @@ function deeplinkFor(row: NotificationRow): string | null {
   }
   const pcid = row.payload?.contract_id;
   if (evt === 'partner_case_approved_staff' && pcid) return `/admin/contracts/pending-payment/${pcid}`;
+  // Approved with adjustments (mig 1474): same stage — the acknowledge button is on that contract's card.
+  if (evt === 'partner_case_approved_adjusted_staff' && pcid) return `/admin/contracts/pending-payment/${pcid}`;
   if (evt === 'partner_case_returned_staff' && pcid) return `/admin/contracts/approval-returned/${pcid}`;
   // Shop close-out (mig 1471): fund finance lands on the request to review it;
   // the shop lands on the contract in its close-out menu, where it fixes and resubmits.
@@ -247,6 +249,7 @@ function RowShell({ to, onOpen, children }: {
 function detailFor(row: NotificationRow, t: ReturnType<typeof useTranslation>['t']): string | null {
   switch (row.event_type) {
     case 'partner_case_approved_staff': return t('notifCenter.detail.partner_case_approved_staff');
+    case 'partner_case_approved_adjusted_staff': return t('notifCenter.detail.partner_case_approved_adjusted_staff');
     case 'partner_case_returned_staff': return row.payload?.reason_text?.trim() || null;
     case 'partner_case_submitted_staff': return row.payload?.branch_name?.trim() || null;
     case 'partner_settlement_submitted_staff': {

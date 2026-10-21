@@ -1331,5 +1331,17 @@
   "SALE.STATE.PAYOFF_SLIP_AMOUNT_DRIFT_basic": "ยอดบิลปิดยอดไม่ตรงกับกระเป๋า + สลิปแล้ว — ถอนปิดจบแล้วเริ่มใหม่",
   "SALE.STATE.PAYOFF_BILL_GONE": "บิลปิดยอด {{payoff_bill_code_display}} ถูกยกเลิกไปแล้ว — กดถอนปิดจบเพื่อปลดสลิป",
   "SALE.STATE.PAYOFF_BILL_GONE_basic": "บิลปิดยอดที่ผูกไว้ถูกยกเลิกไปแล้ว — กดถอนปิดจบเพื่อปลดสลิป",
-  "BILL.CONFLICT.EARLY_PAYOFF_EXISTS_basic": "สัญญานี้มีบิลปิดยอดค้างอยู่แล้ว"
+  "BILL.CONFLICT.EARLY_PAYOFF_EXISTS_basic": "สัญญานี้มีบิลปิดยอดค้างอยู่แล้ว",
+  "partner.validation.adjust_key": "แก้ตอนอนุมัติได้เฉพาะ ราคาเครื่อง ราคาเพิ่ม เงินดาวน์ และจำนวนงวด",
+  "partner.validation.adjust_note_required": "แก้ตัวเลขแล้วต้องเขียนบันทึกถึงร้าน",
+  "partner.validation.adjust_price_new": "ราคาเครื่องมือหนึ่งมาจากตารางราคา แก้รายเคสไม่ได้",
+  "partner.state.no_adjustment": "ใบอนุมัตินี้ไม่มีการแก้ไขให้รับทราบ",
+  "partner.state.already_acknowledged": "รับทราบการแก้ไขไปแล้ว",
+  "contract.state.partner_adjust_not_acknowledged": "ฝ่ายสินเชื่ออนุมัติพร้อมแก้ไข — กดรับทราบที่การ์ด “ขออนุมัติสินเชื่อ” ของสัญญาก่อน",
+  "PARTNER.VALIDATION.ADJUST_KEY": "แก้ตอนอนุมัติได้เฉพาะ ราคาเครื่อง ราคาเพิ่ม เงินดาวน์ และจำนวนงวด",
+  "PARTNER.VALIDATION.ADJUST_NOTE_REQUIRED": "แก้ตัวเลขแล้วต้องเขียนบันทึกถึงร้าน",
+  "PARTNER.VALIDATION.ADJUST_PRICE_NEW": "ราคาเครื่องมือหนึ่งมาจากตารางราคา แก้รายเคสไม่ได้",
+  "PARTNER.STATE.NO_ADJUSTMENT": "ใบอนุมัตินี้ไม่มีการแก้ไขให้รับทราบ",
+  "PARTNER.STATE.ALREADY_ACKNOWLEDGED": "รับทราบการแก้ไขไปแล้ว",
+  "CONTRACT.STATE.PARTNER_ADJUST_NOT_ACKNOWLEDGED": "ฝ่ายสินเชื่ออนุมัติพร้อมแก้ไข — กดรับทราบที่การ์ด “ขออนุมัติสินเชื่อ” ของสัญญาก่อน"
 }

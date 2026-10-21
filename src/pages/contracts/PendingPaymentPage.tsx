@@ -39,7 +39,22 @@ export function PendingPaymentPage() {
     enabled: isDealPartner,
     staleTime: 30 * 1000,
   });
-  const hideIds = useMemo(() => (expiredApprovals ?? []).map(r => r.contract_id), [expiredApprovals]);
+  // Approved with changes the shop has not acknowledged (migs 1472-1475):
+  // nothing else on the contract can move until it does, so these go first.
+  const { data: awaitingAckRows } = useQuery({
+    queryKey: ['partner-cases', 'mine', 'awaiting-ack-contract-ids'],
+    queryFn: () => apiClient.get<{ contract_id: number }[]>(
+      '/v_partner_my_cases?is_latest=eq.true&awaiting_ack=eq.true&select=contract_id',
+    ),
+    enabled: isDealPartner,
+    staleTime: 30 * 1000,
+  });
+  const awaitingAckIds = useMemo(() => (awaitingAckRows ?? []).map(r => r.contract_id), [awaitingAckRows]);
+  const expiredIds = useMemo(() => (expiredApprovals ?? []).map(r => r.contract_id), [expiredApprovals]);
+  // The list puts its extras first only when they are not already among the
+  // state-filtered rows, so the awaiting ones leave those rows and come back
+  // as extras — that is what lifts them to the top.
+  const hideIds = useMemo(() => [...expiredIds, ...awaitingAckIds], [expiredIds, awaitingAckIds]);
 
   // A contract that is already active can still have a paper to sign: binding
   // a phone creates the device-receipt paper, and later changes (a co-lessee,
@@ -54,8 +69,8 @@ export function PendingPaymentPage() {
     staleTime: 30 * 1000,
   });
   const extraIds = useMemo(
-    () => [...new Set((papersToSign ?? []).map(r => r.contract_id))].filter(id => !hideIds.includes(id)),
-    [papersToSign, hideIds],
+    () => [...new Set([...awaitingAckIds, ...(papersToSign ?? []).map(r => r.contract_id)])].filter(id => !expiredIds.includes(id)),
+    [papersToSign, expiredIds, awaitingAckIds],
   );
   // Contracts whose only waiting paper is the device receipt — named on the row.
   const receiptOnly = useMemo(() => {
@@ -73,6 +88,9 @@ export function PendingPaymentPage() {
 
   const renderRowRight = (c: ContractSearchResult) => {
     const due = totalByContract.get(c.id);
+    if (awaitingAckIds.includes(c.id)) {
+      return <div className="text-xs text-warning-fg font-medium">{t('partnerCase.awaitingAck')}</div>;
+    }
     if (due == null && c.state === 'ACTIVE') {
       return (
         <div className="text-xs text-warning-fg">

@@ -1331,5 +1331,17 @@
   "SALE.STATE.PAYOFF_SLIP_AMOUNT_DRIFT_basic": "The payoff bill no longer equals wallets + slip. Withdraw the payoff and start again.",
   "SALE.STATE.PAYOFF_BILL_GONE": "Payoff bill {{payoff_bill_code_display}} has been cancelled. Withdraw the payoff to free the slip.",
   "SALE.STATE.PAYOFF_BILL_GONE_basic": "The payoff bill this slip was tied to has been cancelled. Withdraw the payoff to free the slip.",
-  "BILL.CONFLICT.EARLY_PAYOFF_EXISTS_basic": "This contract already has a payoff bill open."
+  "BILL.CONFLICT.EARLY_PAYOFF_EXISTS_basic": "This contract already has a payoff bill open.",
+  "partner.validation.adjust_key": "This figure can’t be changed when approving — only device price, uplift, down payment and instalments",
+  "partner.validation.adjust_note_required": "Write a note for the shop when changing the figures",
+  "partner.validation.adjust_price_new": "A new device’s price comes from the price table — it can’t be changed per case",
+  "partner.state.no_adjustment": "This approval has no changes to acknowledge",
+  "partner.state.already_acknowledged": "The changes were already acknowledged",
+  "contract.state.partner_adjust_not_acknowledged": "Credit approved with changes — acknowledge them on the contract’s “Credit approval” card first",
+  "PARTNER.VALIDATION.ADJUST_KEY": "This figure can’t be changed when approving — only device price, uplift, down payment and instalments",
+  "PARTNER.VALIDATION.ADJUST_NOTE_REQUIRED": "Write a note for the shop when changing the figures",
+  "PARTNER.VALIDATION.ADJUST_PRICE_NEW": "A new device’s price comes from the price table — it can’t be changed per case",
+  "PARTNER.STATE.NO_ADJUSTMENT": "This approval has no changes to acknowledge",
+  "PARTNER.STATE.ALREADY_ACKNOWLEDGED": "The changes were already acknowledged",
+  "CONTRACT.STATE.PARTNER_ADJUST_NOT_ACKNOWLEDGED": "Credit approved with changes — acknowledge them on the contract’s “Credit approval” card first"
 }

@@ -6185,7 +6185,8 @@
   "notifCenter": {
     "detail": {
       "partner_case_approved_staff": "Collect the down payment and sign",
-      "partner_settlement_submitted_staff": "Shop receives {{amount}} net"
+      "partner_settlement_submitted_staff": "Shop receives {{amount}} net",
+      "partner_case_approved_adjusted_staff": "Acknowledge the changes before collecting the down payment or signing"
     },
     "title": "Notifications",
     "markAllRead": "Mark all as read",
@@ -6223,7 +6224,8 @@
       "partner_case_approved_staff": "Credit approved",
       "partner_case_returned_staff": "Credit request returned",
       "partner_settlement_submitted_staff": "Shop close-out waiting for review",
-      "partner_settlement_returned_staff": "Close-out returned for fixes"
+      "partner_settlement_returned_staff": "Close-out returned for fixes",
+      "partner_case_approved_adjusted_staff": "Approved — with changes from credit"
     },
     "signingType": {
       "ADDENDUM": "addendum",
@@ -6635,7 +6637,35 @@
     "legend_onTime": "On time",
     "legend_late": "Late",
     "legend_overdue": "Overdue",
-    "legend_future": "Not due"
+    "legend_future": "Not due",
+    "adjustToggle": "Change the figures agreed with the shop",
+    "adjustToggleHint": "After talking it through with the shop by phone. The system works out the monthly payment; the shop must acknowledge before collecting money or signing.",
+    "adjust_price": "Device price",
+    "adjust_uplift": "Price uplift (OVER)",
+    "adjust_down_amount": "Down payment",
+    "adjust_term_months": "Instalments",
+    "termValue": "{{count}} instalments",
+    "priceFromPricebook": "From the price table",
+    "requestedValue": "Shop asked for {{value}}",
+    "compareRequested": "Before (shop asked)",
+    "compareApproved": "New (approved)",
+    "rowInstallment": "Monthly payment",
+    "rowDueAtSigning": "Collected at signing",
+    "lastInstallmentShort": "last {{amount}}",
+    "adjustNoteLabel": "Note for the shop (required when figures change)",
+    "adjustNotePlaceholder": "e.g. talked to the shop, raised the down payment",
+    "approveWithAdjust": "Approve with changes",
+    "approveAdjustDone": "Approved with changes",
+    "approveAdjustDoneHint": "The shop has to acknowledge the changes before it can collect the down payment or sign.",
+    "awaitingAck": "Waiting to acknowledge changes",
+    "adjustedHeadline": "Credit approved with changes — tell the customer, then acknowledge",
+    "creditNoteLabel": "Credit department",
+    "acknowledge": "Acknowledge — customer informed",
+    "acknowledgeDone": "Acknowledged — you can collect the down payment and sign",
+    "acknowledgedAt": "Changes acknowledged",
+    "adjustedTitle": "Approved with changes",
+    "ackWaiting": "Shop yet to acknowledge",
+    "ackDone": "Shop acknowledged"
   },
   "partnerPools": {
     "title": "Partner Shop Reviewers",

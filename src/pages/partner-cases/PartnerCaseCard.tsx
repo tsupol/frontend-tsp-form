@@ -12,16 +12,21 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Badge, Button } from 'tsp-form';
-import { ChevronDown, ChevronRight, ClipboardCheck, Clock, CheckCircle, Undo2, AlertTriangle } from 'lucide-react';
+import { Badge, Button, useSnackbarContext } from 'tsp-form';
+import { ChevronDown, ChevronRight, ClipboardCheck, Clock, CheckCircle, Undo2, AlertTriangle, XCircle } from 'lucide-react';
 import { apiClient } from '../../lib/api';
+import { translateApiError } from '../../lib/apiErrors';
 import { DateTime } from '../../components/DateTime';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   useContractPartnerCases,
+  usePartnerCaseDetail,
+  usePartnerCaseInvalidate,
   usePartnerCaseReturnReasons,
 } from './usePartnerCases';
 import { outcomeBadgeColor, type PartnerCase } from './partnerCaseTypes';
+import { adjustmentRows } from './adjustFormat';
+import { PlanCompareTable } from './PlanCompareTable';
 import { PartnerCaseSubmitModal, type ReasonFix } from './PartnerCaseSubmitModal';
 import { PartnerCaseWithdrawModal } from './PartnerCaseWithdrawModal';
 
@@ -74,6 +79,37 @@ export function PartnerCaseCard({
 
   const { latest, history, isLoading } = useContractPartnerCases(contractId, applies);
   const returnReasons = usePartnerCaseReturnReasons();
+  const invalidate = usePartnerCaseInvalidate();
+  const { addSnackbar } = useSnackbarContext();
+
+  // Approved with adjustments (migs 1472-1475): the list row only flags it;
+  // the before → after figures are on the request's detail row.
+  const isAdjusted = applies && latest?.status === 'APPROVED' && latest.has_adjustments;
+  const { detail: adjusted } = usePartnerCaseDetail(isAdjusted ? latest!.case_id : null);
+  const [acking, setAcking] = useState(false);
+  const [ackError, setAckError] = useState<string | null>(null);
+
+  const handleAcknowledge = async () => {
+    if (!latest) return;
+    setAcking(true);
+    setAckError(null);
+    try {
+      await apiClient.rpc('fn_partner_case_acknowledge', { p_case_id: latest.case_id });
+      invalidate(contractId);
+      addSnackbar({
+        message: (
+          <div className="alert alert-success">
+            <CheckCircle size={16} />
+            <span>{t('partnerCase.acknowledgeDone')}</span>
+          </div>
+        ),
+      });
+    } catch (err) {
+      setAckError(translateApiError(err, t));
+    } finally {
+      setAcking(false);
+    }
+  };
 
   // Buttons come from the backend. While a request is waiting the contract is
   // not in a draft state, so the wizard's own edit actions are already gone;
@@ -122,7 +158,10 @@ export function PartnerCaseCard({
   // noise next to a live contract's own sections.
   if (isUsed && contractState === 'ACTIVE') return null;
 
-  const headIcon = isWaiting ? <Clock size={16} className="text-warning-fg shrink-0" />
+  const awaitingAck = isAdjusted && !!latest?.awaiting_ack;
+
+  const headIcon = awaitingAck ? <AlertTriangle size={16} className="text-warning-fg shrink-0" />
+    : isWaiting ? <Clock size={16} className="text-warning-fg shrink-0" />
     : isApproved ? <CheckCircle size={16} className="text-success shrink-0" />
     : isReturned ? <Undo2 size={16} className="text-danger-fg shrink-0" />
     : isExpired ? <AlertTriangle size={16} className="text-danger-fg shrink-0" />
@@ -132,12 +171,16 @@ export function PartnerCaseCard({
   // repeats it verbatim (approved / approved) is noise, so only states whose
   // headline SAYS something the badge doesn't get one.
   const headline = !latest ? t('partnerCase.stateNever')
+    : awaitingAck ? t('partnerCase.adjustedHeadline')
     : isWaiting ? t('partnerCase.stateWaiting')
     : isExpired ? t('partnerCase.stateExpired')
     : isReturned ? t('partnerCase.stateReturned')
     : null;
 
-  const actionButtons = (canSubmit || canWithdraw) ? (
+  // Acknowledge only shows once the comparison it confirms is on screen.
+  const canAcknowledge = awaitingAck && !!adjusted;
+
+  const actionButtons = (canSubmit || canWithdraw || canAcknowledge) ? (
     <>
       {canWithdraw && (
         <Button size="sm" variant="outline" onClick={() => setWithdrawOpen(true)}>
@@ -147,6 +190,11 @@ export function PartnerCaseCard({
       {canSubmit && (
         <Button size="sm" color="primary" onClick={() => setSubmitOpen(true)}>
           {latest ? t('partnerCase.resubmit') : t('partnerCase.submit')}
+        </Button>
+      )}
+      {canAcknowledge && (
+        <Button size="sm" color="primary" onClick={handleAcknowledge} disabled={acking}>
+          {t('partnerCase.acknowledge')}
         </Button>
       )}
     </>
@@ -162,11 +210,13 @@ export function PartnerCaseCard({
         <div className="flex items-center gap-2">
           {headIcon}
           <span className="font-medium text-sm flex-1 min-w-0">{t('partnerCase.cardTitle')}</span>
-          {latest && (
+          {latest && (awaitingAck ? (
+            <Badge color="warning" size="sm">{t('partnerCase.awaitingAck')}</Badge>
+          ) : (
             <Badge color={outcomeBadgeColor(latest.outcome)} size="sm">
               {t(`partnerCase.outcome_${latest.outcome}`)}
             </Badge>
-          )}
+          ))}
         </div>
 
         <div className="mt-2 text-sm flex flex-col gap-1.5">
@@ -190,6 +240,51 @@ export function PartnerCaseCard({
                 <div className="text-subtle">
                   {t('partnerCase.usableUntil')}{' '}
                   <DateTime value={latest.approved_expires_at} showTime />
+                </div>
+              )}
+
+              {/* Approved with adjustments — before → after, credit's note, and
+                  the acknowledge button, all on this one card. Billing and
+                  signing are refused until the shop presses it. */}
+              {isAdjusted && adjusted && (
+                <div className="mt-1 flex flex-col gap-2">
+                  <PlanCompareTable
+                    requested={{
+                      installment: adjusted.installment_amount,
+                      lastInstallment: adjusted.last_installment_amount,
+                      dueAtSigning: adjusted.requested_due_at_signing,
+                    }}
+                    approved={{
+                      installment: adjusted.approved_installment_amount,
+                      lastInstallment: adjusted.approved_last_installment_amount,
+                      dueAtSigning: adjusted.approved_due_at_signing,
+                    }}
+                    changes={adjustmentRows(adjusted.adjustments)}
+                  />
+                  {/* Flush with the table and the card's other lines — no
+                      inset box, which only pushed the text off their edge. */}
+                  {adjusted.approve_note && (
+                    <div>
+                      <div className="text-xs text-subtle">{t('partnerCase.creditNoteLabel')}</div>
+                      <div className="text-sm mt-0.5">{adjusted.approve_note}</div>
+                    </div>
+                  )}
+                  {/* The acknowledge button itself sits with the card's other
+                      buttons (or the wizard's pinned bar) — see actionButtons. */}
+                  {awaitingAck ? (
+                    ackError && (
+                      <div className="alert alert-danger">
+                        <XCircle size={16} className="shrink-0" />
+                        <span>{ackError}</span>
+                      </div>
+                    )
+                  ) : adjusted.acknowledged_at && (
+                    <div className="text-xs text-success-fg inline-flex items-center gap-1">
+                      <CheckCircle size={12} />
+                      {t('partnerCase.acknowledgedAt')}{' '}
+                      <DateTime value={adjusted.acknowledged_at} showTime />
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -226,7 +321,7 @@ export function PartnerCaseCard({
           )}
         </div>
 
-        {((!actionsTarget && (canSubmit || canWithdraw)) || history.length > 0) && (
+        {((!actionsTarget && actionButtons) || history.length > 0) && (
           <div className="mt-3 flex items-center gap-2 flex-wrap">
             {history.length > 0 && (
               <button
