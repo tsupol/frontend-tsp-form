@@ -1119,21 +1119,20 @@ function PoLineRow({
 
   return (
     <div className="px-4 py-2.5 border-b border-line flex items-center gap-3">
-      <div className="flex-1 min-w-0">
+      {/* One grid so each figure shares a row (and baseline) with its left-hand line */}
+      <div className="flex-1 min-w-0 grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 items-baseline">
         <div className="text-sm font-medium truncate">
           {[line.brand_name, line.family_name].filter(Boolean).join(' ')}
         </div>
+        <div className="text-sm font-medium tabular-nums text-right">{fmtNum(line.qty)} pcs</div>
         <div className="text-xs text-subtle font-semibold truncate mt-1">
           {line.variant_name}
         </div>
+        <div className="text-xs text-subtle tabular-nums text-right mt-1">@ {fmtCurrency(line.unit_cost)}</div>
         <div className="text-[11px] text-subtler font-mono truncate">
           {line.sku_code}
         </div>
-      </div>
-      <div className="text-right shrink-0">
-        <div className="text-sm font-medium tabular-nums">{fmtNum(line.qty)} pcs</div>
-        <div className="text-xs text-subtle tabular-nums">@ {fmtCurrency(line.unit_cost)}</div>
-        <div className="text-xs font-medium tabular-nums">{fmtCurrency(line.line_total)}</div>
+        <div className="text-xs font-medium tabular-nums text-right">{fmtCurrency(line.line_total)}</div>
       </div>
       {canEdit && (
         <Button
