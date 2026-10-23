@@ -26,7 +26,7 @@ import { useTranslation } from 'react-i18next';
 import { Badge, PopOver, Tooltip } from 'tsp-form';
 import {
   ShieldOff, PauseCircle, Loader2, ShieldAlert, WifiOff, CheckCircle2,
-  Image as ImageIcon, Lock, AlertTriangle, Eye, ArrowRight, Clock,
+  Image as ImageIcon, Lock, AlertTriangle, Clock, LogIn,
 } from 'lucide-react';
 import type { AssetMdmStory, MdmStoryStatusCode } from './mdmApi';
 
@@ -42,6 +42,9 @@ const STATUS: Record<MdmStoryStatusCode, { icon: typeof ShieldAlert; tone: Tone;
   CHANGING:   { icon: Loader2,      tone: 'info', spin: true },
   PAUSED:     { icon: PauseCircle,  tone: 'warning' },
   SILENT:     { icon: WifiOff,      tone: 'neutral' },
+  // A new device waiting for its first NNF-app login (mig 370). The customer
+  // did nothing wrong — informational blue, never the dunning red/orange.
+  WAITING_LOGIN: { icon: LogIn,     tone: 'info' },
   NOT_IN_MDM: { icon: ShieldOff,    tone: 'neutral' },
 };
 
@@ -76,18 +79,17 @@ export function isStoryChanging(story: AssetMdmStory | null | undefined): boolea
   return story?.status_code === 'CHANGING';
 }
 
-/** One "label: sentence" row; renders nothing when the DB sent no sentence. */
-function StoryLine({ icon, label, text, children }: {
-  icon: React.ReactNode; label: string; text: string; children?: React.ReactNode;
+/** One "label: sentence" row; renders nothing when the DB sent no sentence.
+ *  No leading icon: the label already names the line, and an icon column
+ *  pushed the sentences out of line with the headline above them. */
+function StoryLine({ label, text, children }: {
+  label: string; text: string; children?: React.ReactNode;
 }) {
   if (!text) return null;
   return (
-    <div className="flex items-start gap-1.5">
-      <span className="shrink-0 mt-0.5 opacity-70">{icon}</span>
-      <div className="min-w-0">
-        <span className="text-subtle">{label}: </span>
-        {children ?? text}
-      </div>
+    <div className="min-w-0">
+      <span className="text-subtle">{label}: </span>
+      <span className="text-fg">{children ?? text}</span>
     </div>
   );
 }
@@ -101,7 +103,7 @@ function CustomerSeesLine({ story }: { story: AssetMdmStory }) {
   const apps = story.apps_allowed ?? [];
   const tappable = story.apps_allowed_count != null && apps.length > 0;
   return (
-    <StoryLine icon={<Eye size={13} />} label={t('asset.mdm.story.customerSees')} text={story.customer_sees_th}>
+    <StoryLine label={t('asset.mdm.story.customerSees')} text={story.customer_sees_th}>
       {tappable ? (
         <PopOver
           isOpen={open}
@@ -146,36 +148,31 @@ export function MdmStoryBox({ story, onGoToEnroll }: {
     <div className={ALERT_CLASS[s.tone]}>
       <Icon size={20} className={`shrink-0 ${s.spin ? 'animate-spin' : ''}`} />
       <div className="min-w-0 flex-1">
-        {/* Headline + how fresh it is. Both straight from the DB. */}
-        <div className="alert-title flex items-baseline justify-between gap-3 flex-wrap">
-          <span>{story.status_th}</span>
-          {story.as_of_th && (
-            <span className="text-xs font-normal text-subtle inline-flex items-center gap-1">
-              <Clock size={11} />{story.as_of_th}
-            </span>
-          )}
-        </div>
+        {/* Headline, then how fresh it is right under it. Both straight from the DB. */}
+        <div className="alert-title">{story.status_th}</div>
+        {story.as_of_th && (
+          <div className="text-xs text-subtler">{story.as_of_th}</div>
+        )}
 
-        <div className="alert-description flex flex-col gap-1 mt-1">
+        <div className="alert-description flex flex-col gap-1 mt-1.5">
           <CustomerSeesLine story={story} />
-          <StoryLine
-            icon={<AlertTriangle size={13} />}
-            label={t('asset.mdm.story.reason')}
-            text={story.reason_th}
-          />
-          <StoryLine
-            icon={<ArrowRight size={13} />}
-            label={t('asset.mdm.story.next')}
-            text={story.next_th}
-          />
+          <StoryLine label={t('asset.mdm.story.reason')} text={story.reason_th} />
+          <StoryLine label={t('asset.mdm.story.next')} text={story.next_th} />
         </div>
 
         {/* Something a human must go and do — its own bar, not a detail line.
             WAIT_DEVICE is the exception: nothing to do but wait for the device
-            to come online, so it is a quiet grey note and offers no resend. */}
+            to come online, so it is a quiet grey note and offers no resend.
+            HELP_CUSTOMER_LOGIN is a real job at the counter but not a problem
+            with the customer, so it stays in the box's blue, not warning. */}
         {story.action_th && (story.action_code === 'WAIT_DEVICE' ? (
           <div className="mt-2 rounded-md border border-line bg-surface text-subtle px-2.5 py-1.5 text-sm inline-flex items-center gap-1.5">
             <Clock size={14} className="shrink-0" />
+            <span>{story.action_th}</span>
+          </div>
+        ) : story.action_code === 'HELP_CUSTOMER_LOGIN' ? (
+          <div className="mt-2 rounded-md border border-info-border bg-info-soft text-info-fg px-2.5 py-1.5 text-sm inline-flex items-center gap-1.5">
+            <LogIn size={14} className="shrink-0" />
             <span>{story.action_th}</span>
           </div>
         ) : (
@@ -207,12 +204,10 @@ export function MdmStoryLines({ story }: { story: AssetMdmStory }) {
   return (
     <div className="rounded-md border border-line bg-surface px-3 py-2 text-sm flex flex-col gap-1">
       <StoryLine
-        icon={<AlertTriangle size={13} />}
         label={t('asset.mdm.story.reason')}
         text={story.reason_th}
       />
       <StoryLine
-        icon={<ArrowRight size={13} />}
         label={t('asset.mdm.story.next')}
         text={story.next_th}
       />

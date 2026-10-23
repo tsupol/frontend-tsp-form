@@ -264,7 +264,7 @@ export function fetchMdmStatus(assetId: number): Promise<AssetMdmStatus | null> 
 
 export type MdmStoryStatusCode =
   | 'NOT_IN_MDM' | 'PAUSED' | 'CHANGING' | 'SILENT'
-  | 'HARD' | 'MEDIUM' | 'WALLPAPER' | 'NORMAL';
+  | 'WAITING_LOGIN' | 'HARD' | 'MEDIUM' | 'WALLPAPER' | 'NORMAL';
 
 export interface AssetMdmStory {
   asset_id: number;
@@ -281,11 +281,11 @@ export interface AssetMdmStory {
   customer_sees_level: number;
   customer_sees_th: string;
 
-  reason_code: 'OVERDUE' | 'SLIP_UNDER_REVIEW' | 'STAFF_HOLD' | 'PROMISE_ACTIVE' | 'NONE';
+  reason_code: 'OVERDUE' | 'SLIP_UNDER_REVIEW' | 'STAFF_HOLD' | 'PROMISE_ACTIVE' | 'NO_LOGIN_YET' | 'NONE';
   /** Empty string = no reason to show; hide the line rather than print blank. */
   reason_th: string;
 
-  next_code: 'WILL_ESCALATE' | 'RELEASE_ON_PAYMENT' | 'HOLD_UNTIL' | 'NONE';
+  next_code: 'WILL_ESCALATE' | 'RELEASE_ON_PAYMENT' | 'HOLD_UNTIL' | 'RELEASE_ON_LOGIN' | 'NONE';
   next_date: string | null;
   next_th: string;
 
@@ -295,8 +295,11 @@ export interface AssetMdmStory {
 
   /** WAIT_DEVICE (mig 355): the device hasn't checked in since the last
    *  command, which is queued and lands when it comes online — informational,
-   *  never a prompt to resend (resending a silent device stacks commands). */
-  action_code: 'CALL_CUSTOMER' | 'RESEND' | 'WAIT_DEVICE' | 'NONE';
+   *  never a prompt to resend (resending a silent device stacks commands).
+   *  HELP_CUSTOMER_LOGIN (nnf-mdm mig 370): a new device holds a "setup not
+   *  finished" wallpaper until anyone on the contract logs in to the NNF app;
+   *  the system then releases it itself — there is nothing to press. */
+  action_code: 'CALL_CUSTOMER' | 'RESEND' | 'WAIT_DEVICE' | 'HELP_CUSTOMER_LOGIN' | 'NONE';
   action_th: string;
 
   /** mig 355: the apps the customer can still open while apps are limited.
