@@ -653,6 +653,8 @@
   "po_not_draft": "PO is not in DRAFT state.",
   "INV.STATE.PO_NOT_PENDING": "PO is not pending approval.",
   "po_not_pending": "PO is not pending approval.",
+  "INV.STATE.PO_NOT_EDITABLE": "This PO was cancelled or rejected, so its header can't be edited.",
+  "INV.VALIDATION.NOT_PURCHASE_PO": "This is not a regular purchase PO.",
   "INV.STATE.RECEIPT_CANNOT_CANCEL": "Only draft receipts can be cancelled.",
   "receipt_cannot_cancel": "Only draft receipts can be cancelled.",
   "INV.STATE.RECEIPT_NOT_DRAFT": "Receipt is not in DRAFT state.",

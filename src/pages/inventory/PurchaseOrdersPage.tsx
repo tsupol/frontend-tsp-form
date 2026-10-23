@@ -4,11 +4,12 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import {
   PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, Modal, TextArea, Input,
-  DataTable, useSnackbarContext,
+  DataTable, useSnackbarContext, FormErrorMessage,
 } from 'tsp-form';
 import {
-  ArrowLeft, ArrowRightFromLine, ClipboardList, CheckCircle, XCircle, Plus, Trash2, Search, ScanBarcode, PackagePlus, ExternalLink, ChevronsRight,
+  ArrowLeft, ArrowRightFromLine, ClipboardList, CheckCircle, XCircle, Plus, Trash2, Search, ScanBarcode, PackagePlus, ExternalLink, ChevronsRight, Pencil,
 } from 'lucide-react';
+import { useFormSnapshot } from '../../hooks/useFormSnapshot';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
@@ -18,6 +19,7 @@ import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
 import { fmtNum, codeDisplay } from './inventoryUtils';
 import { ActionDoneView } from '../contracts/ActionDoneView';
+import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { useBarcodeScanner } from '../../components/BarcodeScanner';
 import { lookupBarcode } from '../../lib/barcodeLookup';
 import { OwnerBadge } from '../../components/OwnerBadge';
@@ -586,6 +588,7 @@ function PoDetailPanel({
   const [actionModal, setActionModal] = useState<ActionKind | null>(null);
   const [addLineOpen, setAddLineOpen] = useState(false);
   const [createReceiptOpen, setCreateReceiptOpen] = useState(false);
+  const [editHeaderOpen, setEditHeaderOpen] = useState(false);
 
   // Project policy (per owner 2026-05-02):
   // - BM can create/edit/submit/cancel PO — auto-routed to PENDING_APPROVAL on submit
@@ -624,6 +627,24 @@ function PoDetailPanel({
   const canRevertFromRejected = isRejected && canWrite;
   const canClose = isApproved && isCompanyPlus;
   const canCreateReceipt = isApproved && canReceive;
+
+  // Header edit (mig 1478) is backend-driven: allowed_actions has 'update_header'
+  // AND the caller holds po_create. Hidden until the RPC answers. BUYBACK POs are
+  // refused by this RPC (they use their own header edit), so don't ask.
+  const { data: poActions } = useQuery({
+    queryKey: ['po-actions', detail.po_id, detail.status],
+    queryFn: () => apiClient.rpc<PoAvailableActions>('fn_po_available_actions', { p_po_id: detail.po_id }),
+    enabled: detail.po_type !== 'BUYBACK',
+    retry: false,
+    staleTime: 30 * 1000,
+  });
+  // TEMP: the po_type check covers a backend gap — fn_po_available_actions offers
+  // update_header on DEAL_PARTNER POs (seen on DEV 2026-10-23, PO 1166) although
+  // NOTICE 1478 says they get no button and the save refuses them. Remove once
+  // the backend stops offering it there.
+  const canEditHeader = detail.po_type === 'PURCHASE'
+    && !!poActions?.allowed_actions.includes('update_header')
+    && !!poActions?.has_permission.po_create;
 
   const handleSuccess = (key: string) => {
     setActionModal(null);
@@ -784,7 +805,7 @@ function PoDetailPanel({
       </div>
 
       {/* Actions: destructive on left (outline), primary on right */}
-      {(canSubmit || canApprove || canReject || canRevertFromPending || canRevertFromRejected || canClose || canCancel || canCreateReceipt) && (
+      {(canSubmit || canApprove || canReject || canRevertFromPending || canRevertFromRejected || canClose || canCancel || canCreateReceipt || canEditHeader) && (
         <div className="flex-none px-4 py-3 border-t border-line flex flex-wrap gap-2 items-center">
           {canCancel && (
             <Button size="sm" variant="outline" color="danger" onClick={() => setActionModal('cancel')}>
@@ -792,6 +813,17 @@ function PoDetailPanel({
             </Button>
           )}
           <div className="ml-auto flex flex-wrap gap-2">
+            {canEditHeader && (
+              <Button
+                size="sm"
+                variant="outline"
+                startIcon={<Pencil size={14} />}
+                onClick={() => setEditHeaderOpen(true)}
+                data-action="update_header"
+              >
+                {t('po.editHeader')}
+              </Button>
+            )}
             {(canRevertFromPending || canRevertFromRejected) && (
               <Button size="sm" variant="outline" onClick={() => setActionModal('revert')}>
                 {t('po.revertDraft')}
@@ -855,7 +887,213 @@ function PoDetailPanel({
         onClose={() => setCreateReceiptOpen(false)}
         po={detail}
       />
+
+      <PoHeaderEditModal
+        open={editHeaderOpen}
+        po={detail}
+        onClose={() => setEditHeaderOpen(false)}
+        onSaved={onRefresh}
+      />
     </div>
+  );
+}
+
+// ============================================================================
+// Header edit — fn_po_update_header (mig 1478): supplier / reference / note.
+// Only changed fields are sent; an empty field keeps the stored value (the
+// backend cannot clear one). Past DRAFT the backend appends an audit line to
+// the PO's note.
+// ============================================================================
+
+interface PoAvailableActions {
+  po_id: number;
+  status: string;
+  po_type: string;
+  allowed_actions: string[];
+  has_permission: { po_create: boolean; po_approve: boolean; po_close: boolean; po_receive: boolean };
+}
+
+interface PoHeaderUpdateResult {
+  po_id: number;
+  status: string;
+  supplier_name: string | null;
+  supplier_ref: string | null;
+  changed: boolean;
+  audit_appended: boolean;
+}
+
+function PoHeaderEditModal({
+  open,
+  po,
+  onClose,
+  onSaved,
+}: {
+  open: boolean;
+  po: PoDetail;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+
+  const [view, setView] = useState<'form' | 'done'>('form');
+  const [confirmClose, setConfirmClose] = useState(false);
+  const [supplierName, setSupplierName] = useState('');
+  const [supplierRef, setSupplierRef] = useState('');
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+  const [result, setResult] = useState<PoHeaderUpdateResult | null>(null);
+
+  const snapshot = useFormSnapshot({ supplierName, supplierRef, note });
+
+  // Reset on open (not on po change) so the done view survives the refresh
+  useEffect(() => {
+    if (!open) return;
+    setView('form');
+    setConfirmClose(false);
+    setError('');
+    setResult(null);
+    setSupplierName(po.supplier_name ?? '');
+    setSupplierRef(po.supplier_ref ?? '');
+    setNote(po.notes ?? '');
+    snapshot.resetNext();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const changed = {
+    supplierName: supplierName.trim() !== '' && supplierName.trim() !== (po.supplier_name ?? ''),
+    supplierRef: supplierRef.trim() !== '' && supplierRef.trim() !== (po.supplier_ref ?? ''),
+    note: note.trim() !== '' && note.trim() !== (po.notes ?? '').trim(),
+  };
+  const anyChange = changed.supplierName || changed.supplierRef || changed.note;
+
+  const mutation = useMutation({
+    mutationFn: () => apiClient.rpc<PoHeaderUpdateResult>('fn_po_update_header', {
+      p_po_id: po.po_id,
+      p_supplier_name: changed.supplierName ? supplierName.trim() : null,
+      p_supplier_ref: changed.supplierRef ? supplierRef.trim() : null,
+      p_note: changed.note ? note.trim() : null,
+    }),
+    onSuccess: (data) => {
+      setResult(data);
+      setView('done');
+      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['po-actions', po.po_id] });
+      onSaved();
+    },
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const translated = translateApiError(err, t);
+        setError(translated || (err.code ? t(err.code, { ns: 'apiErrors', defaultValue: '' }) : '') || err.message);
+      } else {
+        setError(String(err));
+      }
+    },
+  });
+
+  const handleClose = () => {
+    if (view === 'done') { onClose(); return; }
+    if (snapshot.isDirty) { setConfirmClose(true); return; }
+    onClose();
+  };
+
+  const forceClose = () => {
+    setConfirmClose(false);
+    onClose();
+  };
+
+  const poCode = codeDisplay(po.code_display, po.po_no);
+
+  return (
+    <>
+      <Modal open={open} onClose={handleClose} maxWidth="32rem" width="100%">
+        <div className="flex flex-col overflow-hidden">
+          <div className="modal-header">
+            <h2 className="modal-title">
+              {view === 'done' ? t('po.editHeaderDoneTitle') : t('po.editHeader')}
+            </h2>
+            <button type="button" className="modal-close-btn" onClick={handleClose} aria-label="Close">&times;</button>
+          </div>
+
+          {view === 'done' && result && (
+            <ActionDoneView
+              headline={t('po.editHeaderDoneTitle')}
+              contractCode={poCode}
+              detailRows={[
+                { label: t('po.supplier'), value: result.supplier_name ?? '—', emphasis: true },
+                { label: t('po.supplierRef'), value: result.supplier_ref ?? '—' },
+              ]}
+              extras={result.audit_appended
+                ? <div className="text-xs text-subtle">{t('po.editHeaderAuditDone')}</div>
+                : undefined}
+              onClose={onClose}
+            />
+          )}
+
+          {view === 'form' && <>
+            <div className="modal-content">
+              <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
+                <div className="font-medium text-sm">{poCode}</div>
+              </div>
+              {/* pb-0: the last field (note) has no inline check, so nothing needs the reserved error room */}
+              <div className="form-grid pb-0">
+                <div className="flex flex-col">
+                  <label className="form-label">{t('po.supplier')}</label>
+                  <Input
+                    value={supplierName}
+                    onChange={(e) => setSupplierName(e.target.value)}
+                    placeholder={t('po.supplierPlaceholder')}
+                    className="w-full"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <label className="form-label">{t('po.supplierRef')}</label>
+                  <Input
+                    value={supplierRef}
+                    onChange={(e) => setSupplierRef(e.target.value)}
+                    placeholder={t('po.supplierRefPlaceholder')}
+                    className="w-full"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <label className="form-label">{t('po.note')}</label>
+                  <TextArea
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder={t('po.notePlaceholder')}
+                    rows={3}
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col gap-1 mt-2 text-xs text-subtle">
+                <span>{t('po.editHeaderEmptyKeeps')}</span>
+                {po.status !== 'DRAFT' && <span>{t('po.editHeaderAuditHint')}</span>}
+              </div>
+            </div>
+            <ModalErrorBand message={error} onDismiss={() => setError('')} />
+            <div className="modal-footer">
+              <Button variant="outline" onClick={handleClose}>{t('common.cancel')}</Button>
+              <Button
+                color="primary"
+                onClick={() => mutation.mutate()}
+                disabled={!anyChange || mutation.isPending}
+              >
+                {mutation.isPending ? t('common.loading') : t('common.save')}
+              </Button>
+            </div>
+          </>}
+        </div>
+      </Modal>
+
+      <Modal open={confirmClose} onClose={() => setConfirmClose(false)} maxWidth="24rem" width="100%">
+        <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
+        <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
+        <div className="modal-footer">
+          <Button variant="ghost" onClick={() => setConfirmClose(false)}>{t('common.cancel')}</Button>
+          <Button color="danger" onClick={forceClose}>{t('common.discard')}</Button>
+        </div>
+      </Modal>
+    </>
   );
 }
 
@@ -1109,6 +1347,9 @@ function CreatePoModal({
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
   const [result, setResult] = useState<CreatePoResult | null>(null);
+  // Field marks show only after the first สร้าง press, not on an untouched form
+  const [triedSubmit, setTriedSubmit] = useState(false);
+  const supplierMissing = triedSubmit && !supplierName.trim();
 
   const { data: companies } = useQuery({
     queryKey: ['companies'],
@@ -1138,6 +1379,7 @@ function CreatePoModal({
     if (!open) return;
     setView('form');
     setSupplierName(''); setSupplierRef(''); setNote(''); setError('');
+    setTriedSubmit(false);
     setOwnership(null);
     setResult(null);
     if (user?.company_id) {
@@ -1151,7 +1393,6 @@ function CreatePoModal({
     mutationFn: async () => {
       if (!companyId) throw new ApiError({ code: 'CLIENT.COMPANY_REQUIRED', message: t('po.companyRequired'), isAuthError: false });
       if (!ownership) throw new ApiError({ code: 'INV.PO.OWNERSHIP_REQUIRED', message: t('po.ownershipRequired'), isAuthError: false });
-      if (!supplierName.trim()) throw new ApiError({ code: 'CLIENT.SUPPLIER_REQUIRED', message: t('po.supplierRequired'), isAuthError: false });
       const res = await apiClient.rpc<CreatePoResult>('fn_po_create', {
         p_company_id: companyId,
         p_ownership: ownership,
@@ -1208,13 +1449,7 @@ function CreatePoModal({
         )}
         {view === 'form' && <>
         <div className="modal-content">
-          {error && (
-            <div className="alert alert-danger mb-4 animate-pop-in">
-              <XCircle size={16} />
-              <span>{error}</span>
-            </div>
-          )}
-          <div className="form-grid gap-4">
+          <div className="form-grid">
             <div className="flex flex-col">
               <label className="form-label">{t('po.company')} *</label>
               <Select
@@ -1241,7 +1476,9 @@ function CreatePoModal({
                 onChange={(e) => setSupplierName(e.target.value)}
                 placeholder={t('po.supplierPlaceholder')}
                 className="w-full"
+                error={supplierMissing}
               />
+              {supplierMissing && <FormErrorMessage error={{ message: t('po.supplierRequired') }} />}
             </div>
             <div className="flex flex-col">
               <label className="form-label">{t('po.supplierRef')}</label>
@@ -1263,11 +1500,16 @@ function CreatePoModal({
             </div>
           </div>
         </div>
+        <ModalErrorBand message={error} onDismiss={() => setError('')} />
         <div className="modal-footer">
           <Button variant="outline" onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             color="primary"
-            onClick={() => mutation.mutate()}
+            onClick={() => {
+              setTriedSubmit(true);
+              if (!supplierName.trim()) return;
+              mutation.mutate();
+            }}
             disabled={mutation.isPending}
           >
             {mutation.isPending ? t('common.loading') : t('po.create')}

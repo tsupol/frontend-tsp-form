@@ -653,6 +653,8 @@
   "po_not_draft": "PO ไม่อยู่ในสถานะแบบร่าง",
   "INV.STATE.PO_NOT_PENDING": "PO ไม่ได้รออนุมัติ",
   "po_not_pending": "PO ไม่ได้รออนุมัติ",
+  "INV.STATE.PO_NOT_EDITABLE": "ใบถูกยกเลิก/ตีกลับแล้ว แก้หัวใบไม่ได้",
+  "INV.VALIDATION.NOT_PURCHASE_PO": "ใบนี้ไม่ใช่ PO ซื้อปกติ",
   "INV.STATE.RECEIPT_CANNOT_CANCEL": "ยกเลิกได้เฉพาะใบรับของแบบร่าง",
   "receipt_cannot_cancel": "ยกเลิกได้เฉพาะใบรับของแบบร่าง",
   "INV.STATE.RECEIPT_NOT_DRAFT": "ใบรับของไม่อยู่ในสถานะแบบร่าง",
