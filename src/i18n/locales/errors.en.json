@@ -121,6 +121,8 @@
   "refresh_failed": "Your session could not be refreshed. Please log in again.",
   "logout_failed": "Logout failed. Please try again.",
   "auth.unauthorized": "Please log in to continue",
+  "AUTH_SESSION_REVOKED": "You were signed out of this account, possibly because it was signed in on another device, or left idle too long.",
+  "AUTH_SESSION_EXPIRED": "You were signed out after being away too long.",
   "auth.session_expired": "Session expired, please log in again",
   "auth.forbidden": "You do not have permission to perform this action",
   "auth.permission.not_grantable": "This permission cannot be granted to an individual.",

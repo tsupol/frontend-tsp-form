@@ -245,17 +245,30 @@ export class ApiClient {
     // RAISE'd business errors (RPCs) come back as raw PostgREST bodies
     // {code:"P0001", message:"AUTH.AUTH.FORBIDDEN"} — not a v2 envelope. Surface
     // the raw message so callers can branch on it (e.g. FORBIDDEN scope checks).
-    const pgMessage = typeof data === 'object' && data !== null && 'message' in data
+    let pgMessage = typeof data === 'object' && data !== null && 'message' in data
       ? (data as { message: string }).message : '';
+    // The session gate (below) packs its own {code, message} into that message
+    // as JSON text. Unpack it, or the raw JSON reaches the login page as both
+    // the code and the sentence the user reads.
+    let pgInnerCode = '';
+    if (pgMessage.startsWith('{')) {
+      try {
+        const inner = JSON.parse(pgMessage) as { code?: unknown; message?: unknown };
+        if (typeof inner.code === 'string') {
+          pgInnerCode = inner.code;
+          pgMessage = typeof inner.message === 'string' ? inner.message : inner.code;
+        }
+      } catch { /* not JSON — keep the message as it came */ }
+    }
 
     // A revoked or expired session is raised by the request gate before any
     // view or RPC runs, and arrives as HTTP 400 {code:"P0001", hint:"status=401",
     // message:'{"code":"AUTH_SESSION_REVOKED",…}'} — not a 401. Treat it as the
     // auth error it is, or the user stays on a page where every read silently
     // fails (seen 2026-10-02: a section spinning forever after sign-in elsewhere).
-    const auth = !isPermissionDenied && (status === 401 || isAuthError('', pgMessage));
+    const auth = !isPermissionDenied && (status === 401 || isAuthError(pgInnerCode, pgInnerCode || pgMessage));
 
-    const errorCode = isPermissionDenied ? 'PERMISSION_DENIED' : (pgMessage || `HTTP_${status}`);
+    const errorCode = isPermissionDenied ? 'PERMISSION_DENIED' : (pgInnerCode || pgMessage || `HTTP_${status}`);
     const errorMessage = isPermissionDenied
       ? `Permission denied: ${endpoint}`
       : (pgMessage || `Request failed: ${endpoint} (HTTP ${status})`);
