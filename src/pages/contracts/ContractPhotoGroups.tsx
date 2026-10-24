@@ -112,7 +112,7 @@ export interface PhotoGroupsLayoutParts {
   body: ReactNode;
 }
 
-export function ContractPhotoGroups({ contractId, className, hideBanner, hideRequired, pinnedSlot, scrollRef, renderLayout, onDraggingChange }: {
+export function ContractPhotoGroups({ contractId, className, hideBanner, hideRequired, pinnedSlot, ungroupedSlot, scrollRef, renderLayout, onDraggingChange }: {
   contractId: number;
   className?: string;
   /** The host pins its own checklist (ChecklistSummary) outside the scroll. */
@@ -122,6 +122,9 @@ export function ContractPhotoGroups({ contractId, className, hideBanner, hideReq
   hideRequired?: boolean;
   /** Group drawn as a one-row strip in `parts.pinned` instead of in the list. */
   pinnedSlot?: string;
+  /** A contract that doesn't sort photos into groups: only this group, plus
+   *  any other that already holds photos so they stay reachable. */
+  ungroupedSlot?: string;
   /** The list's scroll container — scrolled while a photo is held near its edge. */
   scrollRef?: RefObject<HTMLElement | null>;
   renderLayout?: (parts: PhotoGroupsLayoutParts) => ReactNode;
@@ -388,7 +391,7 @@ export function ContractPhotoGroups({ contractId, className, hideBanner, hideReq
 
   // Group rows to render: the checklist is authoritative (it carries counts and
   // ok flags), falling back to the ref view before the checklist lands.
-  const groups: PhotoStatusSlot[] = status?.slots ?? slotRefs.map(s => ({
+  const allGroups: PhotoStatusSlot[] = status?.slots ?? slotRefs.map(s => ({
     slot: s.usage_type,
     label_th: s.label_th,
     label_en: s.label_en,
@@ -399,6 +402,9 @@ export function ContractPhotoGroups({ contractId, className, hideBanner, hideReq
     ok: !s.is_required,
     locks_with_settlement: s.locks_with_settlement,
   }));
+  const groups = ungroupedSlot
+    ? allGroups.filter(g => g.slot === ungroupedSlot || photosIn(g.slot).length > 0)
+    : allGroups;
 
   // Whole-tile drag: mouse after a few pixels, touch after a short hold so a
   // swipe still scrolls. Keyboard keeps the tile reachable without a pointer.

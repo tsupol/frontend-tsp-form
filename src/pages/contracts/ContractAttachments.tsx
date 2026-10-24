@@ -11,6 +11,10 @@
 // The page box answers "are the required photos in?" — one row per required
 // group with its thumbnails, optional groups only once they hold photos. The
 // checklist (fn_contract_photo_status) decides done-ness; never counted here.
+//
+// Only a financier's shops sort photos into groups — their close-out checks
+// them. Every other contract keeps one flat album: a strip on the page, the
+// general group in the window, nothing "required" or "missing".
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -34,6 +38,7 @@ import {
 
 const USAGE_TYPE = 'ATTACHMENT';
 const ROW_THUMBS = 3; // thumbnails per group row before "+N"
+const STRIP_LIMIT = 6; // thumbnails in the ungrouped strip before "+N"
 
 function pickThumbKey(m: ContractPhoto): string | null {
   const v = m.variants_json ?? {};
@@ -54,8 +59,8 @@ export function ContractAttachments({
 }: {
   contractId: number;
   contractCode: string | null;
-  /** The contract's branch — a partner shop's photos are checked at its
-   *  close-out, an internal branch's are proof only; the note says which. */
+  /** The contract's branch — a financier's shop sorts its photos into groups
+   *  checked at its close-out; any other branch keeps one flat album. */
   branchId?: number | null;
   className?: string;
   /** `draft` = the new-contract screen. These are handover photos, taken at
@@ -66,13 +71,13 @@ export function ContractAttachments({
   const draft = stage === 'draft';
   const { t, i18n } = useTranslation();
   // A shop only ever sees its own contracts, and can't read the branch
-  // lookup (its copy has no company type) — so don't ask on its behalf.
-  const { isDealPartner } = useAuth();
-  const { isPartnerBranch: branchIsPartner } = useBranchIsPartner(isDealPartner ? null : branchId);
-  const isPartnerBranch = isDealPartner || branchIsPartner;
-  // Undefined while the branch type loads — no note rather than the wrong one.
-  const draftNote = isPartnerBranch === undefined ? null
-    : t(isPartnerBranch ? 'contractPhotos.draftNotePartner' : 'contractPhotos.draftNote');
+  // lookup (its copy has no company type) — so its own session answers.
+  // A branch the user can't read counts as not a financier's: flat album.
+  const { isDealPartner, isFundBranch: sessionIsFund } = useAuth();
+  const { isFundBranch: branchIsFund } = useBranchIsPartner(isDealPartner ? null : branchId);
+  // Undefined while the branch loads — the box waits rather than flip views.
+  const grouped = isDealPartner ? sessionIsFund : branchIsFund;
+  const draftNote = grouped ? t('contractPhotos.draftNotePartner') : null;
   const isThai = i18n.language === 'th';
   const queryClient = useQueryClient();
   const [manageOpen, setManageOpen] = useState(false);
@@ -108,11 +113,13 @@ export function ContractAttachments({
 
   const photosIn = (slot: string) => photos.filter(p => p.usage_type === slot);
   const label = (s: PhotoStatusSlot) => (isThai ? s.label_th : s.label_en);
-  const requiredRows = slots.filter(s => s.required);
-  const otherRows = slots.filter(s => !s.required && photosIn(s.slot).length > 0);
+  const requiredRows = grouped ? slots.filter(s => s.required) : [];
+  const otherRows = grouped ? slots.filter(s => !s.required && photosIn(s.slot).length > 0) : [];
   // Required rows first, then the optional groups that hold photos — the
-  // viewer pages through exactly what the box shows, in that order.
-  const shown = [...requiredRows, ...otherRows].flatMap(s => photosIn(s.slot));
+  // viewer pages through exactly what the box shows, in that order. Ungrouped,
+  // the whole album in one strip.
+  const shown = grouped ? [...requiredRows, ...otherRows].flatMap(s => photosIn(s.slot)) : photos;
+  const strip = shown.slice(0, STRIP_LIMIT);
   const shownKeys = shown.map(m => { const k = pickFullKey(m); return k ? normalizeKey(k) : ''; });
   const indexOf = (p: ContractPhoto) => shown.findIndex(x => x.entity_media_id === p.entity_media_id);
   const missingCount = requiredRows.filter(s => !s.ok).length;
@@ -122,7 +129,11 @@ export function ContractAttachments({
       <div className="flex items-center justify-between gap-2 mb-2">
         <h3 className="min-w-0 text-xs font-semibold text-subtle uppercase tracking-wider flex items-center gap-1.5 flex-wrap">
           <ImageIcon size={13} />
-          {draft ? t('contractPhotos.handoverTitle') : t('contract.attachments', { defaultValue: 'Photos' })}          {!draft && status && requiredRows.length > 0 && (
+          {draft && grouped ? t('contractPhotos.handoverTitle') : t('contract.attachments', { defaultValue: 'Photos' })}
+          {grouped === false && photos.length > 0 && (
+            <span className="normal-case font-normal text-subtler">{photos.length}</span>
+          )}
+          {!draft && status && requiredRows.length > 0 && (
             missingCount > 0 ? (
               <span className="normal-case font-medium text-warning-fg">{t('contractPhotos.summaryMissing', { count: missingCount })}</span>
             ) : (
@@ -148,8 +159,33 @@ export function ContractAttachments({
         </div>
       )}
 
-      {!status ? (
+      {!status || grouped === undefined ? (
         <div className="py-3 flex justify-center"><Loader2 size={16} className="animate-spin text-subtler" /></div>
+      ) : !grouped ? (
+        photos.length === 0 ? (
+          <button
+            type="button"
+            onClick={() => setManageOpen(true)}
+            className="w-full text-xs text-subtler italic py-3 text-center border border-dashed border-line rounded-md hover:bg-surface-hover transition-colors cursor-pointer bg-transparent"
+          >
+            {t('contract.attachmentsEmpty', { defaultValue: 'No photos yet. Add one.' })}
+          </button>
+        ) : (
+          <div className="flex items-center gap-2 flex-wrap">
+            {strip.map((p, i) => (
+              <StripThumb key={p.entity_media_id} media={p} size="lg" onPreview={() => setLightboxIndex(i)} />
+            ))}
+            {shown.length > strip.length && (
+              <button
+                type="button"
+                onClick={() => setManageOpen(true)}
+                className="w-14 h-14 shrink-0 rounded-md border border-line bg-surface text-subtle text-xs font-medium flex items-center justify-center hover:bg-surface-hover hover:text-fg transition-colors cursor-pointer"
+              >
+                +{shown.length - strip.length}
+              </button>
+            )}
+          </div>
+        )
       ) : (
         <div className="flex flex-col">
           {requiredRows.map(s => (
@@ -201,6 +237,7 @@ export function ContractAttachments({
         capture={capture}
         draft={draft}
         draftNote={draftNote}
+        grouped={grouped !== false}
       />
     </div>
   );
@@ -245,9 +282,12 @@ function GroupRow({ label, ok, neutral, photos, onOpen, onPreview }: {
 
 function StripThumb({
   media,
+  size = 'sm',
   onPreview,
 }: {
   media: ContractPhoto;
+  /** `lg` for the ungrouped strip, where the photos are the whole box. */
+  size?: 'sm' | 'lg';
   onPreview: () => void;
 }) {
   const thumbKey = pickThumbKey(media);
@@ -256,7 +296,7 @@ function StripThumb({
     <button
       type="button"
       onClick={(e) => { e.stopPropagation(); onPreview(); }}
-      className="w-10 h-10 shrink-0 rounded-md border border-line overflow-hidden bg-surface flex items-center justify-center cursor-zoom-in p-0"
+      className={`${size === 'lg' ? 'w-14 h-14' : 'w-10 h-10'} shrink-0 rounded-md border border-line overflow-hidden bg-surface flex items-center justify-center cursor-zoom-in p-0`}
       aria-label="Preview photo"
     >
       {url ? (
@@ -281,6 +321,7 @@ function ManageModal({
   capture,
   draft,
   draftNote,
+  grouped,
 }: {
   open: boolean;
   onClose: () => void;
@@ -290,6 +331,8 @@ function ManageModal({
   /** Before signing: the note instead of "missing", no required badges. */
   draft?: boolean;
   draftNote?: string | null;
+  /** False = one flat album: the general group, no checklist, nothing to drag into. */
+  grouped: boolean;
 }) {
   const { t } = useTranslation();
   const { phase, session, status, error: qrError, uploadCount } = capture;
@@ -315,8 +358,9 @@ function ManageModal({
       <ContractPhotoGroups
         contractId={contractId}
         hideBanner
-        hideRequired={draft}
-        pinnedSlot={USAGE_TYPE}
+        hideRequired={draft || !grouped}
+        pinnedSlot={grouped ? USAGE_TYPE : undefined}
+        ungroupedSlot={grouped ? undefined : USAGE_TYPE}
         scrollRef={scrollRef}
         onDraggingChange={handleDragging}
         renderLayout={({ pinned, body }) => (
@@ -339,9 +383,11 @@ function ManageModal({
                 </span>
               </div>
               <div className="min-w-0 flex-1 flex flex-col gap-2">
-                {draft
-                  ? <p className="text-sm text-subtle">{draftNote}</p>
-                  : <ChecklistSummary contractId={contractId} />}
+                {!grouped
+                  ? <p className="text-sm text-subtle">{t('contract.attachmentsQrHint')}</p>
+                  : draft
+                    ? <p className="text-sm text-subtle">{draftNote}</p>
+                    : <ChecklistSummary contractId={contractId} />}
                 {pinned}
               </div>
             </div>
@@ -353,7 +399,7 @@ function ManageModal({
       {/* Photos save as they're added, so this finishes rather than discards —
           and becomes the main button once the required groups are filled. */}
       <div className="modal-footer">
-        <Button color={photoStatus?.complete || draft ? 'primary' : undefined} onClick={onClose}>
+        <Button color={photoStatus?.complete || draft || !grouped ? 'primary' : undefined} onClick={onClose}>
           {t('common.done')}
         </Button>
       </div>
