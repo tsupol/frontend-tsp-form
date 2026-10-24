@@ -684,7 +684,7 @@ function CustomerDetail({ customerId, customer }: { customerId: number; customer
             <>
               <DetailSection
                 icon={<Phone size={14} />}
-                title={t('partnerCase.phones')}
+                title={t('customer.contacts')}
                 action={canEdit && <Button variant="ghost" size="sm" startIcon={<Plus size={14} />} onClick={() => setAddContactOpen(true)}>{t('customer.addContact')}</Button>}
               >
                 {hasAnyContact ? (
