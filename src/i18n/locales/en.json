@@ -4646,7 +4646,6 @@
     "footerOutOfDate": "Unsaved changes",
     "termTitle": "Instalments",
     "unitMonths": "instalments",
-    "usedPriceFirst": "Set the device price to see the down payment and the instalments.",
     "downAmountHint": "Between {{min}} and {{max}}, in steps of {{unit}}",
     "months_one": "{{count}} month",
     "months_other": "{{count}} months",

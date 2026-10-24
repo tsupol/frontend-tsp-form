@@ -4642,7 +4642,6 @@
     "footerOutOfDate": "ยังไม่ได้บันทึก",
     "termTitle": "จำนวนงวด",
     "unitMonths": "งวด",
-    "usedPriceFirst": "ตั้งราคาเครื่องก่อน จึงจะเห็นเงินดาวน์และค่างวด",
     "downAmountHint": "ระหว่าง {{min}} ถึง {{max}} และลงหลัก {{unit}}",
     "months_one": "{{count}} งวด",
     "months_other": "{{count}} งวด",

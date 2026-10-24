@@ -305,6 +305,13 @@ export function Fin1PlanEditor({
           });
           setTermMonths(probeTerm);
           setPreviewError('');
+          // Start the price where the slider's thumb is drawn — the bottom of
+          // the range. Left empty, the thumb looked set while nothing was, and a
+          // model whose range is one price (min = max) gave a slider that can't
+          // be dragged, so the step never got a price at all.
+          if (initialPrice == null && p.used_retail_min != null) {
+            setPriceStr(String(p.used_retail_min));
+          }
           // The down controls still need a starting percentage, and the branch's
           // range is only quoted once a price is on the table. Ask again with
           // the price the contract already holds, if it has one, and take the
@@ -565,11 +572,13 @@ export function Fin1PlanEditor({
         )}
       </div>
 
-      {/* On a used contract the down range in baht is a share of the price, so
-          the server can't state it — and this editor can't draw it — until a
-          price is named. Say so instead of showing an empty gap. */}
-      {isUsedRange && !policy && (
-        <div className="text-sm text-subtle">{t('fin1Plan.usedPriceFirst')}</div>
+      {/* On a used contract the down range arrives only after the first priced
+          preview — show it loading rather than an empty gap. */}
+      {isUsedRange && !policy && !previewError && (
+        <div className="flex items-center gap-2 text-sm text-subtle">
+          <Loader2 size={14} className="animate-spin" />
+          <span>{t('common.loading')}</span>
+        </div>
       )}
 
       {/* ── Down payment: % slider or baht box, one of them ────────── */}
