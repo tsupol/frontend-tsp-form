@@ -38,6 +38,7 @@ import { useContractAlbumPhotos } from '../contracts/contractPhotoStatus';
 import { passesThaiCidChecksum } from '../../lib/ocr/extractIdCard';
 import { thaiPhoneReason } from '../../lib/validators';
 import { TelLink, ValidMark } from '../../components/TelLink';
+import { ContactValue } from '../../components/ContactValue';
 import { PaymentRecordList } from '../../components/PaymentRecord';
 import { usePaymentRecord } from '../../hooks/usePaymentRecord';
 import { ageFrom } from './customerRisk';
@@ -648,7 +649,7 @@ export function PartnerCaseDetailPanel({
                   {channels.map(c => (
                     <div key={c.key} className="flex items-center gap-2 px-3 py-2 text-sm">
                       <span className="text-subtle flex-1 min-w-0 truncate">{c.label}</span>
-                      <span className="truncate">{c.value}</span>
+                      <ContactValue value={c.value} />
                     </div>
                   ))}
                 </div>
@@ -695,9 +696,37 @@ export function PartnerCaseDetailPanel({
            *  negotiated with the fund for it to represent: the shop prices the
            *  phone through the plan below, and the fund pays device cost plus
            *  commission regardless. Showing it (and the discount derived from
-           *  it) implied a negotiation that does not happen. */}
+           *  it) implied a negotiation that does not happen.
+           *
+           *  What the owner does want (NOTICE 2026-10-24 price display): the
+           *  device's selling price, the uplift on top, and the net price they
+           *  make. The net is the one sum done here — BE's own rule (device +
+           *  uplift; net − down = financed on every case). */}
+          {(() => {
+            const retail = snapshot?.rated?.retail_price ?? null;
+            const uplift = agreed?.uplift_amount ?? detail.uplift_amount ?? 0;
+            const net = retail != null ? retail + uplift : null;
+            return (
+              <div className="rounded-md border border-line divide-y divide-line text-sm mb-3">
+                <div className="flex items-center gap-3 px-3 py-1.5">
+                  <span className="flex-1 text-subtle">{t('partnerCase.retailPrice')}</span>
+                  <span className="tabular-nums">{fmtCurrency(retail)}</span>
+                </div>
+                <div className="flex items-center gap-3 px-3 py-1.5">
+                  <span className="flex-1 text-subtle">+ {t('partnerCase.uplift')}</span>
+                  <span className="tabular-nums">{fmtCurrency(uplift)}</span>
+                </div>
+                <div className="flex items-center gap-3 px-3 py-1.5">
+                  <span className="flex-1 font-medium">= {t('partnerCase.netPrice')}</span>
+                  <span className="tabular-nums font-semibold">{fmtCurrency(net)}</span>
+                </div>
+              </div>
+            );
+          })()}
           <div className="grid grid-cols-2 gap-3">
-            <Field label={t('partnerCase.uplift')} value={fmtCurrency(agreed?.uplift_amount ?? detail.uplift_amount)} />
+            {detail.guarantee_days != null && (
+              <Field label={t('partnerCase.guarantee')} value={t('partnerCase.guaranteeDays', { n: detail.guarantee_days })} />
+            )}
             <Field label={t('partnerCase.downPayment')} value={fmtCurrency(agreed?.down_payment ?? detail.down_payment)} />
             <Field
               label={t('partnerCase.financedAmount')}

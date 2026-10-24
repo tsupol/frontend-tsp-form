@@ -68,6 +68,10 @@ export interface PartnerCase {
   uplift_amount: number | null;
   /** Financed base for FIN1 — NOT price minus down payment. */
   financed_amount: number | null;
+  /** Days the shop's return guarantee lasts (30, or 60 with an uplift) — the
+   *  live contract value, right before and after an adjusted approval. Absent
+   *  until mig 1488 is on the server. */
+  guarantee_days?: number | null;
   term_months: number | null;
   installment_amount: number | null;
   last_installment_amount: number | null;
@@ -129,6 +133,11 @@ export type PartnerCaseAdjustments = Partial<Record<PartnerCaseAdjustKey, { requ
 /** The submitted payload — same shape the signing anchor hashes. */
 export interface PartnerCaseSnapshot {
   schema_version?: number;
+  /** Price-sheet figures at submit. `retail_price` = the device's selling price
+   *  (new: the finance sheet's price; used: the price the shop picked). */
+  rated?: {
+    retail_price?: number;
+  };
   agreed?: {
     agreed_price?: number;
     down_payment?: number;
@@ -186,7 +195,6 @@ export interface PartnerCaseSnapshot {
       relation: string | null;
     }>;
   }>;
-  rated?: Record<string, unknown>;
   /** The hashed slice. Show `agreed`/`asset`/`parties` instead — this is plumbing. */
   _anchor?: Record<string, unknown>;
 }
