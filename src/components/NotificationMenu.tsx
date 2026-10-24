@@ -15,7 +15,7 @@ import { fmtCurrency } from '../lib/format';
 
 type NotifCategory = 'contract' | 'chat' | 'payment' | 'approval' | 'system';
 
-type NotificationRow = {
+export type NotificationRow = {
   notification_id: number;
   event_type: string;
   // Top-level variant discriminator (mig 27). NULL until Phase A2 wires
@@ -61,7 +61,7 @@ type NotificationRow = {
   is_read: boolean;
 };
 
-type ListResponse = {
+export type ListResponse = {
   items: NotificationRow[];
   total: number;
   limit: number;
@@ -86,7 +86,7 @@ function relativeTime(t: ReturnType<typeof useTranslation>['t'], iso: string): s
 
 // Map event_type to category for tab filtering + icon. The BE `category` field
 // is unreliable (chat_status_attention currently ships as `system`).
-function resolveCategory(evt: string, fallback: string): NotifCategory | string {
+export function resolveCategory(evt: string, fallback: string): NotifCategory | string {
   if (evt.startsWith('chat_')) return 'chat';
   if (evt.startsWith('signing_') || evt.startsWith('bind_') || evt.startsWith('contract_')) return 'contract';
   if (evt.startsWith('bill_') || evt === 'slip_uploaded') return 'payment';
@@ -109,16 +109,16 @@ function iconForCategory(category: string) {
 
 // BE canonical fields (mig 27): contract_code is always formatted via
 // sale.format_business_code; customer_full_name is the canonical name.
-function contractCodeOf(row: NotificationRow): string | null {
+export function contractCodeOf(row: NotificationRow): string | null {
   return row.payload?.contract_code ?? null;
 }
 
-function customerNameOf(row: NotificationRow): string | null {
+export function customerNameOf(row: NotificationRow): string | null {
   return row.payload?.customer_full_name ?? null;
 }
 
 // FE owns deeplinks. event_type + payload → route.
-function deeplinkFor(row: NotificationRow): string | null {
+export function deeplinkFor(row: NotificationRow): string | null {
   const evt = row.event_type;
   // Buyback approval (PART_022 mig 100) — no contract_id; the approval lives on
   // the Approvals page (BUYBACK type). Routed before the contract_id guard below.
@@ -177,7 +177,7 @@ function usesContractSubtitle(row: NotificationRow, t: ReturnType<typeof useTran
 // recipient's language for EVERY event — only if that is missing too do we
 // show the raw event_type. Without this, any event the FE doesn't know about
 // (e.g. abm_otp_received) renders its internal name to the user.
-function titleFor(row: NotificationRow, t: ReturnType<typeof useTranslation>['t']): string {
+export function titleFor(row: NotificationRow, t: ReturnType<typeof useTranslation>['t']): string {
   const evt = row.event_type;
   // ABM OTP: the code is only meaningful next to the account it belongs to —
   // several people can be enrolling at once (UI_SUMMARY/137 §4). A missing
@@ -246,7 +246,7 @@ function RowShell({ to, onOpen, children }: {
 
 // The line under the contract: what to do next, or why it came back. One
 // line per event, so the title stays a short name for what happened.
-function detailFor(row: NotificationRow, t: ReturnType<typeof useTranslation>['t']): string | null {
+export function detailFor(row: NotificationRow, t: ReturnType<typeof useTranslation>['t']): string | null {
   switch (row.event_type) {
     case 'partner_case_approved_staff': return t('notifCenter.detail.partner_case_approved_staff');
     case 'partner_case_approved_adjusted_staff': return t('notifCenter.detail.partner_case_approved_adjusted_staff');

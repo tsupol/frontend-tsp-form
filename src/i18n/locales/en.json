@@ -10129,5 +10129,10 @@
     "confirmGo": "Continue",
     "datedLabel": "Bill date",
     "datedValue": "{{date}} — {{reason}} on {{closedDate}}"
+  },
+  "approvalNotice": {
+    "region": "Approval notices",
+    "open": "Open",
+    "more": "+{{count}} more in notifications"
   }
 }

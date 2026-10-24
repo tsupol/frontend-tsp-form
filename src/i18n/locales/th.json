@@ -10113,5 +10113,10 @@
     "confirmGo": "ยืนยัน",
     "datedLabel": "บิลลงวันที่",
     "datedValue": "{{date}} — เพราะ{{reason}}วันที่ {{closedDate}}"
+  },
+  "approvalNotice": {
+    "region": "แจ้งเตือนการอนุมัติ",
+    "open": "เปิดดู",
+    "more": "และอีก {{count}} รายการในกระดิ่งแจ้งเตือน"
   }
 }

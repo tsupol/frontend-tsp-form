@@ -13,7 +13,7 @@ import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-quer
 import { useCallback, useEffect, useRef } from 'react';
 import { apiClient } from '../../lib/api';
 import { wsClient } from '../../lib/api/ws';
-import { defaultScopeFor, scopeCountersChannel } from '../../lib/scope';
+import { ownCountersChannel } from '../../lib/scope';
 import { useAuth } from '../../contexts/AuthContext';
 import type {
   PartnerCase,
@@ -326,15 +326,16 @@ const LIVE_REFETCH_DEBOUNCE_MS = 3_000;
  * shop sees "approved" and the down-payment button without pressing F5.
  *
  * The backend raises a counters event for the branch whenever a request or a
- * contract changes state (PARTNER_CASE / CONTRACT_STATE). It carries no
- * contract id, so any such change in scope refetches this contract and the
- * request lists; a burst coalesces into one refetch. A reconnect refetches
+ * contract changes state. It carries no contract id, and its `reason` is only
+ * the first write of the change (never filter on it), so any event in scope
+ * refetches this contract and the request lists; a burst coalesces into one
+ * refetch. A reconnect refetches
  * too, since events sent while the socket was down are not replayed.
  */
 export function usePartnerCaseLive(contractId: number | null) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const channel = user ? scopeCountersChannel(defaultScopeFor(user)) : null;
+  const channel = ownCountersChannel(user);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -348,9 +349,7 @@ export function usePartnerCaseLive(contractId: number | null) {
       queryClient.invalidateQueries({ queryKey: ['contract-search'] });
     };
 
-    const onEvent = (payload: unknown) => {
-      const reason = (payload as { reason?: string } | undefined)?.reason;
-      if (reason && reason !== 'PARTNER_CASE' && reason !== 'CONTRACT_STATE') return;
+    const onEvent = () => {
       if (timerRef.current) return;
       timerRef.current = setTimeout(() => {
         timerRef.current = null;

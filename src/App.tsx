@@ -15,6 +15,7 @@ import { EnrollRedirectPage } from './pages/EnrollRedirectPage';
 import { HoldingSelectModal } from './components/HoldingSelectModal';
 import { ChatDockProvider } from './contexts/ChatDockContext';
 import { ChatDock } from './components/ChatDock';
+import { ApprovalNotices } from './components/ApprovalNotices';
 import { UsersPage } from './pages/UsersPage';
 import { PermissionGrantsPage } from './pages/users/PermissionGrantsPage';
 import { UsersLayout } from './pages/users/UsersLayout';
@@ -185,6 +186,9 @@ function AdminLayout({ children }: { children: ReactNode }) {
       {/* Floating chat — fixed-position, so it sits outside the scroll pane and
           renders on every admin route without affecting page layout. */}
       <ChatDock />
+      {/* Approval notices stay on screen until opened or closed — same
+          fixed-position, every-admin-route reasoning as the dock. */}
+      <ApprovalNotices />
     </div>
   );
 }

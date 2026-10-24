@@ -95,6 +95,21 @@ export function scopeCountersChannel(scope: Scope): string | null {
   }
 }
 
+/**
+ * The counters channel of the tier the user's login is at — branch if it has a
+ * branch, else company, else holding (DELIVERY 2026-08-11 §1). Not the same as
+ * the default *view* scope: a company-tier role other than COMPANY_ADMIN views
+ * at holding scope but may only listen at company tier, and asking for the
+ * holding channel is refused (acl_denied).
+ */
+export function ownCountersChannel(user: UserInfo | null): string | null {
+  if (!user || user.role_code === 'SYSTEM_DEV') return null;
+  if (user.branch_id != null) return `counters:branch:${user.branch_id}`;
+  if (user.company_id != null) return `counters:company:${user.company_id}`;
+  if (user.holding_id != null) return `counters:holding:${user.holding_id}`;
+  return null;
+}
+
 /** Stable cache-key fragment for React Query. */
 export function scopeKey(scope: Scope): string {
   switch (scope.kind) {
