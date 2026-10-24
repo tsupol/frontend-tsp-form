@@ -9,7 +9,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, Select, TextArea, useSnackbarContext } from 'tsp-form';
 import {
   Phone, Pencil, CheckCircle, XCircle,
-  Users, ExternalLink, Save, Clock, Flag, CalendarClock,
+  Users, Save, Clock, Flag, CalendarClock,
   MessageSquare, Cloud, Truck, Undo2,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
@@ -31,6 +31,8 @@ import { OverflowTabs } from '../../components/OverflowTabs';
 import { SendToRepoModal, type SendToRepoDirection } from './SendToRepoModal';
 import { DeviceSignalsPanel, deviceSignalsKey, useDeviceSignals } from '../../components/DeviceSignalsPanel';
 import { DetailLine } from '../../components/DetailLine';
+import { ContactValue } from '../../components/ContactValue';
+import { contactHref } from '../../lib/contactLink';
 
 type DetailTab = 'overview' | 'installments' | 'contacts' | 'history';
 const TABS: DetailTab[] = ['overview', 'installments', 'contacts', 'history'];
@@ -529,10 +531,8 @@ function ContactsTab({ contractId }: { contractId: number }) {
             <span className="text-xs text-subtle w-20 shrink-0">
               {t(`callCenter.contactType.${c.contact_type}`, { defaultValue: c.contact_type })}
             </span>
-            {c.value.startsWith('http') ? (
-              <a href={c.value} target="_blank" rel="noreferrer" className="text-primary-fg hover:underline inline-flex items-center gap-1 truncate">
-                {c.label || c.value}<ExternalLink size={12} />
-              </a>
+            {contactHref(c.value) ? (
+              <ContactValue value={c.value} text={c.label || c.value} />
             ) : (
               <span className="truncate">{c.label ? `${c.label}: ${c.value}` : c.value}</span>
             )}

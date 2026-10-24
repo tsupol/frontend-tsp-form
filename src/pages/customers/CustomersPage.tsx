@@ -18,6 +18,7 @@ import { EditIdentityModal } from '../../components/EditIdentityModal';
 import { OverflowTabs } from '../../components/OverflowTabs';
 import { DetailSection } from '../../components/DetailLine';
 import { TelLink, ValidMark } from '../../components/TelLink';
+import { ContactValue } from '../../components/ContactValue';
 import { PaymentRecordList } from '../../components/PaymentRecord';
 import { usePaymentRecord } from '../../hooks/usePaymentRecord';
 import { useCustomerPoints } from '../../hooks/useCustomerPoints';
@@ -900,7 +901,7 @@ function ContactLine({ label, value, isPhone, primary, children }: {
         {primary && <Star size={12} className="text-warning-fg fill-warning shrink-0" />}
         {label}
       </span>
-      {isPhone ? <TelLink tel={value} /> : <span className="truncate">{value}</span>}
+      {isPhone ? <TelLink tel={value} /> : <ContactValue value={value} />}
       {/* As wide as the icon button, so it never spills onto the number. */}
       <span className="w-7 shrink-0 flex justify-center">{children}</span>
     </div>

@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Input, MaskedInput, Select, Switch, Badge, useSnackbarContext } from 'tsp-form';
 import { translateApiError } from '../../../lib/apiErrors';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
+import { ContactValue } from '../../../components/ContactValue';
 import { Plus, Pencil, Trash2, Star, XCircle, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { useWorkspace } from './WorkspaceContext';
@@ -111,7 +112,7 @@ function ContactRow({ contact, onDeleted }: { contact: CustomerContact; onDelete
   return (
     <div className="flex items-center gap-2 px-3 py-2 border border-success-border bg-success-soft rounded-lg text-sm">
       <Badge size="xs" color="info">{contact.contact_type}</Badge>
-      <span className="tabular-nums flex-1">{contact.value}</span>
+      <span className="flex-1 min-w-0 flex"><ContactValue value={contact.value} className="tabular-nums" /></span>
       {contact.is_primary && <Star size={12} className="text-warning-fg fill-warning shrink-0" />}
       {contact.label && <span className="text-subtle text-xs shrink-0">({contact.label})</span>}
       <button className="p-1 rounded hover:bg-surface-hover cursor-pointer text-subtle hover:text-danger shrink-0 bg-transparent border-none" onClick={handleDelete} disabled={deleting}><Trash2 size={13} /></button>

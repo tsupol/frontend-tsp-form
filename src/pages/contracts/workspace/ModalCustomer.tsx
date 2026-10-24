@@ -9,6 +9,7 @@ import { toLocalDateStr, parseLocalDate } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
 import { AddressFormPostal } from './AddressFormPostal';
 import type { CustomerRegisterResult, CustomerAddress, CustomerContact, CustomerReference } from './WorkspaceTypes';
+import { ContactValue } from '../../../components/ContactValue';
 
 // ── Constants ────────────────────────────────────────────────────────────
 
@@ -471,7 +472,7 @@ function ContactRow({ contact, onDeleted }: { contact: CustomerContact; onDelete
       <div className="flex items-center gap-2">
         {contact.is_primary && <Star size={12} className="text-warning-fg fill-warning" />}
         <Badge size="xs" color="info">{contact.contact_type}</Badge>
-        <span className="tabular-nums">{contact.value}</span>
+        <ContactValue value={contact.value} className="tabular-nums" />
         {contact.label && <span className="text-subtle text-xs">({contact.label})</span>}
       </div>
       <button className="p-1 rounded hover:bg-surface-hover cursor-pointer text-subtle hover:text-danger" onClick={handleDelete} disabled={deleting}>
