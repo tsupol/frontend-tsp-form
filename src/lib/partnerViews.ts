@@ -72,6 +72,9 @@ const PARTNER_VIEW_MAP: Record<string, string> = {
   v_ref_blacklist_reasons: 'v_partner_ref_blacklist_reasons',
   v_postal_lookup: 'v_partner_postal_lookup',
   v_ref_payment_methods: 'v_partner_ref_payment_methods',
+  // Revalue reasons (mig 1489) — only the 4 ADJUST reasons the owner picked
+  // for shops; other txn groups come back empty.
+  v_ref_reason_codes: 'v_partner_ref_reason_codes',
 };
 
 // localStorage is read directly (not via authService) to avoid a circular
