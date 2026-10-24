@@ -15,11 +15,13 @@ adds what is specific to this app.
   Two things, both drawn into the page before capturing:
   1. **Orange outline rectangles** (`2px solid #f59e0b`, ~6px radius) around
      every element the change touched — all instances on screen, not just one.
-  2. **A doc-reference caption bottom-left**, naming the `UI_FEEDBACK/` or
-     `UI_SUMMARY/` doc the change implements, on a **light-gray opaque
-     background** (`#d4d4d8`, dark text, regular weight — not bold). Opaque,
-     never semi-transparent — the page shows through and the text stops being
-     readable.
+  2. **No caption by default.** Ton finds the bottom-left caption annoying
+     (2026-10-24) — the outline plus one line in chat is enough, especially on
+     the live window he is looking at. Add a caption only when it carries
+     something the outline and the chat line can't (e.g. a saved shot going to
+     BE that must name its doc). When one is needed: bottom-left, light-gray
+     opaque background (`#d4d4d8`, dark text, regular weight), never
+     semi-transparent.
 
   Inject with `page.addScriptTag` + `page.evaluate`, `position: fixed` and a
   max z-index so the overlay sits above modals and drawers. Measure the text
