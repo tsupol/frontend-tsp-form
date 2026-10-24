@@ -1,8 +1,8 @@
 // The expandable MDM check: closed it is the handover-ready box, open it is the
 // device's MDM tab in place. Used where someone needs MDM without leaving the
-// job they are on — finance's close-out review, and the shop's own contract
-// (Ohm #11, 2026-10-24: the shop enrols its phones, and a separate device page
-// was a place it had to know to go). The host draws its own heading and puts
+// job they are on — finance's close-out review, and the contract's device tab
+// (Ohm #11, 2026-10-24: a separate device page was a place the branch had to
+// know to go). The host draws its own heading and puts
 // MdmCheckToggle in it, so the toggle belongs to the section it opens.
 
 import { useState } from 'react';
@@ -34,7 +34,7 @@ export function MdmCheckToggle({ open, onToggle }: { open: boolean; onToggle: ()
 export function MdmCheckBody({ assetId, open, allowAddSerial = false }: {
   assetId: number;
   open: boolean;
-  /** The shop enrols its own phones and may add the serial; a reviewer may not. */
+  /** The branch doing the enrolment may add the serial; a reviewer may not. */
   allowAddSerial?: boolean;
 }) {
   const { t } = useTranslation();

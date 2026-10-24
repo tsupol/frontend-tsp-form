@@ -104,16 +104,17 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
   // Identifier (IMEI / SN) correction target for the primary device.
   const [fixIdentifier, setFixIdentifier] = useState<{ type: IdentifierType; oldValue: string } | null>(null);
 
-  // A shop enrols its own phones in MDM, so its contract carries the MDM card
-  // (Ohm #11, 2026-10-24) — for the bound phone, or before binding, the phone
-  // picked on the credit request. Enrolment wipes the phone partway through,
-  // so it has to happen before handover; showing it from approval on is the
-  // reminder the shop otherwise only got when finance sent the close-out back.
+  // The contract carries the phone's MDM card (Ohm #11, 2026-10-24) so MDM is
+  // done here rather than on a device page the branch has to know to visit;
+  // what the open card offers is the backend's per-user MDM rights, as on the
+  // device page. Every branch gets it for the bound phone. A shop also gets it
+  // before binding, for the phone picked on the credit request: the shop
+  // enrols its own phones, enrolment wipes the phone partway through so it
+  // has to happen before handover, and the phone is only bound on activation.
   const { isDealPartner } = useAuth();
   const partnerCase = useContractPartnerCases(contract.id, isDealPartner && contract.device_id == null);
-  const mdmAssetId = isDealPartner
-    ? (contract.device_id ?? partnerCase.latest?.target_asset_id ?? null)
-    : null;
+  const mdmAssetId = contract.device_id
+    ?? (isDealPartner ? partnerCase.latest?.target_asset_id ?? null : null);
   const mdmIsTarget = mdmAssetId != null && contract.device_id == null;
   const [mdmOpen, setMdmOpen] = useState(false);
 
