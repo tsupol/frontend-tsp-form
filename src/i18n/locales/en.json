@@ -10133,8 +10133,6 @@
   "approvalNotice": {
     "region": "Approval notices",
     "open": "Open",
-    "expand": "Open approval notices",
-    "collapse": "Minimize",
-    "dismissAll": "Close all"
+    "more": "+{{count}} more in notifications"
   }
 }
