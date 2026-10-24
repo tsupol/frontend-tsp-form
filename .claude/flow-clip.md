@@ -33,8 +33,8 @@ A book's figure is signed from the book's side, a document's lines from the docu
 (`UI_SUMMARY/149` §6b).
 
 Side path scenes 20–26 (credit changes the figures when approving, migs 1472-1475) use
-CT-2610-000599-5 (98085) — case 178, approved with changes and acknowledged. To reshoot, send the
-latest case back as credit, resubmit as the shop, approve with changes again.
+CT-2610-000599-5 (98085) — now case 185, approved plainly (2026-10-24 live-refresh test). To
+reshoot, send the latest case back as credit, resubmit as the shop, approve with changes again.
 
 ## Open
 Scene 44 ⚠ — BE sends no message to fund finance when a shop submits close-out.

@@ -25,7 +25,7 @@ import { fmtCurrency, formatDateTime } from '../../lib/format';
 import { getStateColor, getStateLabel, productName, formatInstallment } from './contractUtils';
 import { ContractActionButtons } from './ContractActions';
 import { PartnerCaseCard } from '../partner-cases/PartnerCaseCard';
-import { useContractPartnerCases } from '../partner-cases/usePartnerCases';
+import { useContractPartnerCases, usePartnerCaseLive } from '../partner-cases/usePartnerCases';
 import { ContractCapitalStrip } from './ContractCapitalStrip';
 import { SettlementCard } from '../partner-settlement/SettlementCard';
 import { ContractMoneyPanel } from '../fund-bills/ContractMoneyPanel';
@@ -388,6 +388,7 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
   const { isDealPartner } = useAuth();
   const approvalCase = useContractPartnerCases(contractId, isDealPartner && contract?.state === 'APPROVED');
   const approvalExpired = isDealPartner && contract?.state === 'APPROVED' && approvalCase.latest?.outcome === 'EXPIRED';
+  usePartnerCaseLive(contractId);
 
   // An opening bill paid in full but never confirmed leaves the contract
   // waiting for payment. Confirm it as soon as the contract is shown

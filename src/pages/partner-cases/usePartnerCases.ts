@@ -10,8 +10,10 @@
 // for shops), so callers pass which side they are.
 
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { apiClient } from '../../lib/api';
+import { wsClient } from '../../lib/api/ws';
+import { defaultScopeFor, scopeCountersChannel } from '../../lib/scope';
 import { useAuth } from '../../contexts/AuthContext';
 import type {
   PartnerCase,
@@ -315,6 +317,55 @@ export function usePartnerCaseInvalidate() {
     queryClient.invalidateQueries({ queryKey: ['contracts'] });
     queryClient.invalidateQueries({ queryKey: ['draft-contracts'] });
   }, [queryClient]);
+}
+
+const LIVE_REFETCH_DEBOUNCE_MS = 3_000;
+
+/**
+ * Keep an open contract current while someone else decides its request — the
+ * shop sees "approved" and the down-payment button without pressing F5.
+ *
+ * The backend raises a counters event for the branch whenever a request or a
+ * contract changes state (PARTNER_CASE / CONTRACT_STATE). It carries no
+ * contract id, so any such change in scope refetches this contract and the
+ * request lists; a burst coalesces into one refetch. A reconnect refetches
+ * too, since events sent while the socket was down are not replayed.
+ */
+export function usePartnerCaseLive(contractId: number | null) {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const channel = user ? scopeCountersChannel(defaultScopeFor(user)) : null;
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!channel || contractId == null) return;
+
+    const refetch = () => {
+      queryClient.invalidateQueries({ queryKey: ['partner-cases'] });
+      queryClient.invalidateQueries({ queryKey: ['partner-case-actions'] });
+      queryClient.invalidateQueries({ queryKey: ['contract-detail', contractId] });
+      queryClient.invalidateQueries({ queryKey: ['contract-actions', contractId] });
+      queryClient.invalidateQueries({ queryKey: ['contract-search'] });
+    };
+
+    const onEvent = (payload: unknown) => {
+      const reason = (payload as { reason?: string } | undefined)?.reason;
+      if (reason && reason !== 'PARTNER_CASE' && reason !== 'CONTRACT_STATE') return;
+      if (timerRef.current) return;
+      timerRef.current = setTimeout(() => {
+        timerRef.current = null;
+        refetch();
+      }, LIVE_REFETCH_DEBOUNCE_MS);
+    };
+
+    const unsubHello = wsClient.onHello(refetch);
+    const unsubEvent = wsClient.subscribe(channel, onEvent);
+    return () => {
+      unsubHello();
+      unsubEvent();
+      if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+    };
+  }, [channel, contractId, queryClient]);
 }
 
 /** One slot of the device's photo album, as `v_asset_evidence` returns it. */
