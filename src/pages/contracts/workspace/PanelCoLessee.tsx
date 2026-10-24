@@ -18,6 +18,7 @@ import { passesThaiCidChecksum } from '../../../lib/ocr/extractIdCard';
 import type { CustomerRegisterResult, CustomerAddress } from './WorkspaceTypes';
 import { useCustomerMatch, type MatchedCustomer } from './useCustomerMatch';
 import { CustomerMatchResults } from './CustomerMatchResults';
+import { coLesseesQueryKey } from './useContractCoLessees';
 
 const KNOWN_TH_PREFIXES = new Set(['นาย', 'นาง', 'นางสาว']);
 
@@ -504,7 +505,7 @@ interface CoLesseeCustomer {
   date_of_birth: string | null; tel: string | null;
 }
 
-function CoLesseeRow({ coLessee, expanded, onToggle, onRemove, removing }: {
+function CoLesseeRow({ coLessee, contractId, expanded, onToggle, onRemove, removing }: {
   coLessee: { customerId: number; fullName: string; idNumber: string };
   contractId: number | null;
   expanded: boolean;
@@ -588,14 +589,18 @@ function CoLesseeRow({ coLessee, expanded, onToggle, onRemove, removing }: {
     if (!custInfo) return;
     setInfoSaving(true);
     try {
-      await apiClient.rpc('fn_customer_register_or_update', {
-        p_id_type: custInfo.id_type, p_id_number: custInfo.id_number,
+      // Keyed by customer id, never the ID number: v_customers masks it, so
+      // re-registering sent the masked value back and failed (NOTICE 1485).
+      await apiClient.rpc('fn_customer_update_contact', {
+        p_customer_id: custInfo.id,
         p_prefix: editPrefix || null,
         p_first_name: editFirstName.trim(), p_last_name: editLastName.trim(),
-        p_date_of_birth: editDob || null, p_tel: editTel.trim(),
+        p_date_of_birth: editDob || null, p_tel: editTel.trim() || null,
       });
       refetchCustInfo();
       queryClient.invalidateQueries({ queryKey: ['co-lessee-status'] }); queryClient.invalidateQueries({ queryKey: ['co-lessee-all-complete'] });
+      // The row title and the step card read the name from the contract's co-lessee list.
+      queryClient.invalidateQueries({ queryKey: coLesseesQueryKey(contractId) });
       setInfoSaved(true);
       setTimeout(() => setInfoSaved(false), 2000);
       addSnackbar({ message: <div className="alert alert-success"><CheckCircle size={18} /><div><div className="alert-title">{t('common.saved')}</div></div></div> });
