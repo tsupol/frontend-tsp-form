@@ -308,9 +308,32 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
     } finally { setSubmitting(false); }
   };
 
+  // Editing a customer already on file. Keyed by customer id, never the id
+  // number: reopening the step pre-fills from v_customers, which masks the CID,
+  // so re-registering would send the masked value (owner/BE 2026-10-24). The ID
+  // fields are locked for an existing customer, so nothing here changes the CID.
   const doUpdateAndAttach = async () => {
     setConfirmData(null);
-    await doRegister(); // fn_customer_register_or_update handles both create and update by id_number
+    if (!selectedCustomer) return;
+    setSubmitting(true);
+    setApiError('');
+    try {
+      await apiClient.rpc('fn_customer_update_contact', {
+        p_customer_id: selectedCustomer.id,
+        p_prefix: prefix || null,
+        p_first_name: firstName.trim(),
+        p_last_name: lastName.trim(),
+        p_tel: tel.trim() || null,
+        p_tel2: tel2.trim() || null,
+        p_date_of_birth: dateOfBirth || null,
+      });
+      await doAttach(selectedCustomer.id, `${firstName.trim()} ${lastName.trim()}`);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const translated = translateApiError(err, t);
+        setApiError(translated || err.code || err.message);
+      } else setApiError(String(err));
+    } finally { setSubmitting(false); }
   };
 
   // Persist the OCR-scanned ID card image as the customer's ID_CARD_FRONT
