@@ -4588,7 +4588,7 @@
     "conditionNew": "New",
     "conditionUsed": "Used",
     "usedPriceLabel": "Used device price",
-    "usedPriceHint": "Between {{min}} and {{max}}",
+    "usedPriceHint": "Up to {{max}}",
     "downByPercent": "%",
     "downByAmount": "Baht",
     "downBelowMin": "Minimum down payment for this price is {{min}} ({{pct}}%).",

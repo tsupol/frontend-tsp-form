@@ -221,10 +221,11 @@ export function Fin1CalculatorPage() {
   const upliftMin = usedMode ? (bounds?.used_uplift_min ?? 0) : (bounds?.uplift_min ?? 0);
   const upliftMax = usedMode ? (bounds?.used_uplift_max ?? 0) : (bounds?.uplift_max ?? 0);
 
-  // Clamp the typed used price into the model's range; seeded with the max.
+  // The used price is capped at the model's max and may go as low as the staff
+  // negotiates (owner 2026-10-24: "max only"); seeded with the max.
   const usedPriceRaw = usedPriceDebounced === '' ? null : parseFloat(usedPriceDebounced);
   const usedPrice = usedMode && usedPriceRaw != null && usedPriceRaw > 0
-    ? Math.min(bounds!.used_retail_max!, Math.max(bounds!.used_retail_min!, usedPriceRaw))
+    ? Math.min(bounds!.used_retail_max!, usedPriceRaw)
     : null;
 
   /** Price the table/quotes are actually computed from, in either condition. */
@@ -436,7 +437,7 @@ export function Fin1CalculatorPage() {
     }
   };
 
-  // A used price outside the model's band is clamped for the query; tell the
+  // A used price above the model's max is clamped for the query; tell the
   // staff which number is actually being used rather than silently disagreeing.
   const usedPriceClamped = usedMode && usedPriceRaw != null && usedPrice != null
     && usedPriceRaw !== usedPrice;
@@ -625,7 +626,6 @@ export function Fin1CalculatorPage() {
                             </div>
                             <span className={`text-xs mt-1 tabular-nums ${usedPriceClamped ? 'text-warning-fg' : 'text-subtle'}`}>
                               {t('fin1Calc.usedPriceHint', {
-                                min: fmtCurrency(bounds.used_retail_min),
                                 max: fmtCurrency(bounds.used_retail_max),
                               })}
                             </span>

@@ -4584,7 +4584,7 @@
     "conditionNew": "มือ 1",
     "conditionUsed": "มือสอง",
     "usedPriceLabel": "ราคาเครื่องมือสอง",
-    "usedPriceHint": "ระหว่าง {{min}} ถึง {{max}}",
+    "usedPriceHint": "ไม่เกิน {{max}}",
     "downByPercent": "%",
     "downByAmount": "บาท",
     "downBelowMin": "เงินดาวน์ขั้นต่ำของราคานี้คือ {{min}} ({{pct}}%)",
