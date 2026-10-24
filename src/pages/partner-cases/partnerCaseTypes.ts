@@ -54,6 +54,8 @@ export interface PartnerCase {
   customer_name: string | null;
   target_asset_id: number | null;
   asset_code: string | null;
+  /** The phone's code as staff read it (AT-2610-000613-4). */
+  asset_code_display?: string | null;
   model_id: number | null;
   model_name: string | null;
   variant_id: number | null;

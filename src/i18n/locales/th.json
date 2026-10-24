@@ -1000,6 +1000,11 @@
         "device": "ที่ตัวเครื่อง",
         "auto": "เกิดเอง"
       },
+      "check": {
+        "showDetails": "ดูรายละเอียด MDM",
+        "hideDetails": "ซ่อนรายละเอียด MDM",
+        "noStatus": "ยังไม่มีข้อมูล MDM ของเครื่องนี้"
+      },
       "readiness": {
         "ready": "พร้อมส่งมอบลูกค้า",
         "notReady": "ยังไม่พร้อมส่งมอบ",
@@ -3364,6 +3369,8 @@
     "device_noLoaner": "ยังไม่มีเครื่องสำรอง",
     "device_noPrimary": "ยังไม่มีเครื่องผูก",
     "device_primary": "เครื่องหลัก",
+    "device_mdm": "MDM ของเครื่อง",
+    "device_mdmTargetNote": "เครื่องตามคำขออนุมัติ {{code}} — ยังไม่ได้ผูกกับสัญญา เข้าระบบ MDM ได้เลยก่อนส่งมอบ",
     "device_recentRepairs": "ประวัติการซ่อมล่าสุด",
     "discount": "ส่วนลด",
     "documents": "เอกสาร",
@@ -7033,9 +7040,6 @@
     "photosTitle": "รูปส่งมอบ",
     "deviceTitle": "เครื่อง",
     "openMdmTab": "เปิดแท็บ MDM ของเครื่อง",
-    "mdmShowDetails": "ดูรายละเอียด MDM",
-    "mdmHideDetails": "ซ่อนรายละเอียด MDM",
-    "mdmNoStatus": "ยังไม่มีข้อมูล MDM ของเครื่องนี้",
     "historyTitle": "ประวัติ",
     "logAction": {
       "CLOSE_SUBMIT": "ร้านยื่นปิดงาน",

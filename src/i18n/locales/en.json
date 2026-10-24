@@ -1000,6 +1000,11 @@
         "device": "on the device",
         "auto": "happens on its own"
       },
+      "check": {
+        "showDetails": "Show MDM details",
+        "hideDetails": "Hide MDM details",
+        "noStatus": "No MDM information for this device yet"
+      },
       "readiness": {
         "ready": "Ready to hand over to the customer",
         "notReady": "Not ready to hand over yet",
@@ -3367,6 +3372,8 @@
     "device_noLoaner": "No loaner bound",
     "device_noPrimary": "No device bound",
     "device_primary": "Primary device",
+    "device_mdm": "Device MDM",
+    "device_mdmTargetNote": "The phone on the credit request, {{code}} — not bound to the contract yet; enrol it before handover",
     "device_recentRepairs": "Recent repairs",
     "discount": "Discount",
     "documents": "Documents",
@@ -7043,9 +7050,6 @@
     "photosTitle": "Handover photos",
     "deviceTitle": "Device",
     "openMdmTab": "Open the device MDM tab",
-    "mdmShowDetails": "Show MDM details",
-    "mdmHideDetails": "Hide MDM details",
-    "mdmNoStatus": "No MDM information for this device yet",
     "historyTitle": "History",
     "logAction": {
       "CLOSE_SUBMIT": "Shop submitted",

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, Modal, Input, FormErrorMessage, useSnackbarContext } from 'tsp-form';
-import { Smartphone, ExternalLink, Wrench, ArrowDownToLine, ArrowUpFromLine, Link2, Link2Off, Cloud, CloudOff, CheckCircle, Pencil, XCircle, Loader2, Archive, Undo2 } from 'lucide-react';
+import { Smartphone, ShieldCheck, ExternalLink, Wrench, ArrowDownToLine, ArrowUpFromLine, Link2, Link2Off, Cloud, CloudOff, CheckCircle, Pencil, XCircle, Loader2, Archive, Undo2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { DateTime } from '../../components/DateTime';
@@ -18,6 +18,9 @@ import { ImeiInput } from '../../components/ImeiInput';
 import { identifierFormatReason, isAppleBrand } from '../../lib/validators';
 import { SerialInput } from '../../components/SerialInput';
 import { translateApiError } from '../../lib/apiErrors';
+import { useAuth } from '../../contexts/AuthContext';
+import { useContractPartnerCases } from '../partner-cases/usePartnerCases';
+import { MdmCheckBody, MdmCheckToggle } from '../inventory/MdmCheck';
 
 type IdentifierType = 'IMEI' | 'SERIAL_NO';
 
@@ -100,6 +103,19 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
   const [icloudReleaseOpen, setIcloudReleaseOpen] = useState(false);
   // Identifier (IMEI / SN) correction target for the primary device.
   const [fixIdentifier, setFixIdentifier] = useState<{ type: IdentifierType; oldValue: string } | null>(null);
+
+  // A shop enrols its own phones in MDM, so its contract carries the MDM card
+  // (Ohm #11, 2026-10-24) — for the bound phone, or before binding, the phone
+  // picked on the credit request. Enrolment wipes the phone partway through,
+  // so it has to happen before handover; showing it from approval on is the
+  // reminder the shop otherwise only got when finance sent the close-out back.
+  const { isDealPartner } = useAuth();
+  const partnerCase = useContractPartnerCases(contract.id, isDealPartner && contract.device_id == null);
+  const mdmAssetId = isDealPartner
+    ? (contract.device_id ?? partnerCase.latest?.target_asset_id ?? null)
+    : null;
+  const mdmIsTarget = mdmAssetId != null && contract.device_id == null;
+  const [mdmOpen, setMdmOpen] = useState(false);
 
   // Loaner asset lookup (only when bound)
   const { data: loanerAsset } = useQuery({
@@ -454,6 +470,26 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
           )}
         </div>
       </section>
+
+      {mdmAssetId != null && (
+        <section className="border border-line rounded-md">
+          <header className="flex items-center justify-between gap-2 px-4 py-1.5 border-b border-line">
+            <div className="flex items-center gap-2">
+              <ShieldCheck size={16} className="text-subtle" />
+              <h3 className="text-sm font-semibold">{t('contract.device_mdm')}</h3>
+            </div>
+            <MdmCheckToggle open={mdmOpen} onToggle={() => setMdmOpen(o => !o)} />
+          </header>
+          <div className="px-4 py-3 flex flex-col gap-2">
+            {mdmIsTarget && (
+              <div className="text-xs text-subtle">
+                {t('contract.device_mdmTargetNote', { code: partnerCase.latest?.asset_code_display ?? '' })}
+              </div>
+            )}
+            <MdmCheckBody assetId={mdmAssetId} open={mdmOpen} allowAddSerial />
+          </div>
+        </section>
+      )}
 
       {/* Loaner device card */}
       <section className="border border-line rounded-md">

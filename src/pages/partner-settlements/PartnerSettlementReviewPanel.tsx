@@ -17,7 +17,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Badge, Button, Tooltip, LabeledCheckbox } from 'tsp-form';
 import {
   ArrowLeft, ArrowRight, ExternalLink, Images, History, Smartphone,
-  Wallet, AlertTriangle, CheckCircle2, Store, ChevronDown, ChevronUp,
+  Wallet, AlertTriangle, CheckCircle2, Store,
 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { CopyButton } from '../../components/CopyButton';
@@ -25,9 +25,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { fmtCurrency } from '../../lib/format';
 import { ContractPhotoGroups } from '../contracts/ContractPhotoGroups';
-import { AssetMdmTab } from '../inventory/AssetMdmTab';
-import { MdmReadinessBox } from '../inventory/mdm/MdmReadinessBox';
-import { useMdmStatus } from '../inventory/mdm/useMdmStatus';
+import { MdmCheckBody, MdmCheckToggle } from '../inventory/MdmCheck';
 import {
   usePartnerSettlementActions,
   usePartnerSettlementCloseLog,
@@ -304,7 +302,6 @@ export function PartnerSettlementReviewPanel({
 function DeviceMdmCheck({ deviceId }: { deviceId: number }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  const { data: status, isLoading } = useMdmStatus(deviceId);
 
   // The toggle sits on the section's own title row — it opens and closes the
   // whole section, so it belongs to the heading, not floating under the box.
@@ -316,35 +313,21 @@ function DeviceMdmCheck({ deviceId }: { deviceId: number }) {
           {t('partnerSettlement.deviceTitle')}
         </div>
         <span className="flex-1" />
-        <Button
-          variant="ghost"
-          size="sm"
-          endIcon={open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          onClick={() => setOpen(o => !o)}
-          aria-expanded={open}
-        >
-          {open ? t('partnerSettlement.mdmHideDetails') : t('partnerSettlement.mdmShowDetails')}
-        </Button>
+        <MdmCheckToggle open={open} onToggle={() => setOpen(o => !o)} />
       </div>
-      {open ? (
-        <div className="flex flex-col gap-2">
-          <div className="rounded-md border border-line overflow-hidden flex flex-col">
-            <AssetMdmTab assetId={deviceId} onRefresh={() => {}} />
-          </div>
-          {/* BE's close-out delivery (2026-09-17) specified this link to tab-1;
-              it now lives with the details it leads to. */}
+      <MdmCheckBody assetId={deviceId} open={open} />
+      {open && (
+        // BE's close-out delivery (2026-09-17) specified this link to tab-1;
+        // it lives with the details it leads to.
+        <div className="flex justify-end mt-2">
           <Link
             to={`/admin/inventory/assets/${deviceId}?tab=mdm`}
-            className="self-end text-xs font-medium text-primary-fg hover:underline inline-flex items-center gap-1"
+            className="text-xs font-medium text-primary-fg hover:underline inline-flex items-center gap-1"
           >
             {t('partnerSettlement.openMdmTab')}
             <ExternalLink size={12} />
           </Link>
         </div>
-      ) : status ? (
-        <MdmReadinessBox status={status} />
-      ) : (
-        <div className="text-sm text-subtler">{isLoading ? t('common.loading') : t('partnerSettlement.mdmNoStatus')}</div>
       )}
     </section>
   );
