@@ -328,6 +328,16 @@ export function PanelCustomer({ onClose: _onClose }: Props) {
         p_date_of_birth: dateOfBirth || null,
       });
       await doAttach(selectedCustomer.id, `${firstName.trim()} ${lastName.trim()}`);
+      // doAttach forgets the picked customer, which would leave the masked ID
+      // in a form that now offers "register" — keep it the saved customer.
+      const saved: CustomerSearchResult = {
+        ...selectedCustomer,
+        prefix: prefix || null, first_name: firstName.trim(), last_name: lastName.trim(),
+        full_name: `${firstName.trim()} ${lastName.trim()}`,
+        tel: tel.trim() || null, tel2: tel2.trim() || null, date_of_birth: dateOfBirth || null,
+      };
+      setSelectedCustomer(saved);
+      originalRef.current = makeSnapshot(saved);
     } catch (err) {
       if (err instanceof ApiError) {
         const translated = translateApiError(err, t);
