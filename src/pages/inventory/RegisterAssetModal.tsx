@@ -8,6 +8,7 @@ import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { makeDatePickerFormat, toLocalDateStr, fmtCurrency } from '../../lib/format';
 import { ImeiInput } from '../../components/ImeiInput';
+import { ColorSwatch } from '../../components/ColorAutocomplete';
 import { SerialInput } from '../../components/SerialInput';
 import { identifierFormatReason, isAppleBrand } from '../../lib/validators';
 import { getConditionLabel, getBucketLabel, CONDITION_VALUES } from './inventoryUtils';
@@ -55,6 +56,7 @@ interface ProductSearchModel {
   variants: ProductSearchVariant[];
 }
 interface ProductSearchResponse { rows: ProductSearchModel[] }
+interface VariantColorRow { variant_id: number; manufacturer_color: string | null; master_color_hex: string | null }
 
 interface RegisterResult {
   asset_id: number;
@@ -167,6 +169,19 @@ export function RegisterAssetModal({
   const models = searchData?.rows ?? [];
   const selectedModel = useMemo(() => models.find(m => m.model_id === modelId) ?? null, [models, modelId]);
   const activeVariants = useMemo(() => selectedModel?.variants.filter(v => v.is_active) ?? [], [selectedModel]);
+
+  // The search result carries no colour, so the swatch + colour name come from
+  // the variant list. Until it answers, buttons show the variant name and a
+  // neutral swatch.
+  const { data: variantColors = [] } = useQuery({
+    queryKey: ['register-variant-colors', modelId],
+    queryFn: () => apiClient.get<VariantColorRow[]>(
+      `/v_product_variant_list?model_id=eq.${modelId}&select=variant_id,manufacturer_color,master_color_hex`,
+    ),
+    enabled: open && modelId != null,
+    staleTime: 5 * 60 * 1000,
+  });
+  const colorById = useMemo(() => new Map(variantColors.map(c => [c.variant_id, c])), [variantColors]);
 
   useEffect(() => {
     if (activeVariants.length === 0) { setVariantId(null); return; }
@@ -445,13 +460,26 @@ export function RegisterAssetModal({
                   {selectedModel && (
                     <div className="flex flex-col">
                       <label className="form-label">{t('asset.registerVariant', { defaultValue: 'Variant' })} *</label>
-                      <Select
-                        options={activeVariants.map(v => ({ value: String(v.variant_id), label: v.name }))}
-                        value={variantId != null ? String(variantId) : null}
-                        onChange={(v) => setVariantId(v ? Number(v) : null)}
-                        size="sm"
-                        showChevron
-                      />
+                      {/* Same pick-by-swatch rows as the asset's correct-colour window. */}
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {activeVariants.map(v => {
+                          const c = colorById.get(v.variant_id);
+                          const active = v.variant_id === variantId;
+                          return (
+                            <button
+                              key={v.variant_id}
+                              type="button"
+                              onClick={() => setVariantId(v.variant_id)}
+                              className={`flex items-center gap-2.5 px-3 py-2 rounded-md border text-left transition-colors cursor-pointer min-w-0 ${
+                                active ? 'border-primary-fg bg-primary-soft' : 'border-line hover:bg-surface-hover'
+                              }`}
+                            >
+                              <ColorSwatch hex={c?.master_color_hex ?? null} />
+                              <span className="text-sm truncate">{c?.manufacturer_color ?? v.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
 
