@@ -17,7 +17,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Badge, Button, Tooltip, LabeledCheckbox } from 'tsp-form';
 import {
   ArrowLeft, ArrowRight, ExternalLink, Images, History, Smartphone,
-  Wallet, AlertTriangle, CheckCircle2, Store,
+  Wallet, AlertTriangle, CheckCircle2, Store, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { CopyButton } from '../../components/CopyButton';
@@ -26,6 +26,8 @@ import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { fmtCurrency } from '../../lib/format';
 import { ContractPhotoGroups } from '../contracts/ContractPhotoGroups';
 import { AssetMdmTab } from '../inventory/AssetMdmTab';
+import { MdmReadinessBox } from '../inventory/mdm/MdmReadinessBox';
+import { useMdmStatus } from '../inventory/mdm/useMdmStatus';
 import {
   usePartnerSettlementActions,
   usePartnerSettlementCloseLog,
@@ -192,26 +194,7 @@ export function PartnerSettlementReviewPanel({
         </section>
 
         {deviceId != null && (
-          <section>
-            <div className="flex items-center gap-2">
-              <SectionTitle icon={<Smartphone size={14} />} text={t('partnerSettlement.deviceTitle')} />
-              <span className="flex-1" />
-              <Link
-                to={`/admin/inventory/assets/${deviceId}?tab=mdm`}
-                className="text-xs font-medium text-primary-fg hover:underline inline-flex items-center gap-1 mb-2"
-              >
-                {t('partnerSettlement.openMdmTab')}
-                <ExternalLink size={12} />
-              </Link>
-            </div>
-            {/* The device's own MDM tab, in place (Ohm #11): enrolment and the
-                lock are part of what finance checks before ticking, so they
-                read it here instead of leaving the request. Its sub-tabs follow
-                the device's may_* flags, so finance sees only what it may. */}
-            <div className="rounded-md border border-line overflow-hidden flex flex-col">
-              <AssetMdmTab assetId={deviceId} onRefresh={() => {}} />
-            </div>
-          </section>
+          <DeviceMdmCheck deviceId={deviceId} />
         )}
 
         <HistoryBlock
@@ -306,6 +289,64 @@ export function PartnerSettlementReviewPanel({
         onClose={() => setCheckTarget(null)}
       />
     </>
+  );
+}
+
+/**
+ * The device check finance does before ticking (Ohm #11). Closed, it is the
+ * handover-ready box — enrolled, baseline lock, both keys — which answers most
+ * requests on its own. Opened, it is the device's whole MDM tab in place, for
+ * the detail behind a "not ready"; its sub-tabs follow the device's may_*
+ * flags, so finance sees only what it may. Nothing here blocks the tick: the
+ * backend's close checks don't include MDM, finance judges it and sends back
+ * with "MDM not ready" when needed.
+ */
+function DeviceMdmCheck({ deviceId }: { deviceId: number }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const { data: status, isLoading } = useMdmStatus(deviceId);
+
+  // The toggle sits on the section's own title row — it opens and closes the
+  // whole section, so it belongs to the heading, not floating under the box.
+  return (
+    <section>
+      <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center gap-1.5 text-sm font-medium">
+          <span className="text-subtle"><Smartphone size={14} /></span>
+          {t('partnerSettlement.deviceTitle')}
+        </div>
+        <span className="flex-1" />
+        <Button
+          variant="ghost"
+          size="sm"
+          endIcon={open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          onClick={() => setOpen(o => !o)}
+          aria-expanded={open}
+        >
+          {open ? t('partnerSettlement.mdmHideDetails') : t('partnerSettlement.mdmShowDetails')}
+        </Button>
+      </div>
+      {open ? (
+        <div className="flex flex-col gap-2">
+          <div className="rounded-md border border-line overflow-hidden flex flex-col">
+            <AssetMdmTab assetId={deviceId} onRefresh={() => {}} />
+          </div>
+          {/* BE's close-out delivery (2026-09-17) specified this link to tab-1;
+              it now lives with the details it leads to. */}
+          <Link
+            to={`/admin/inventory/assets/${deviceId}?tab=mdm`}
+            className="self-end text-xs font-medium text-primary-fg hover:underline inline-flex items-center gap-1"
+          >
+            {t('partnerSettlement.openMdmTab')}
+            <ExternalLink size={12} />
+          </Link>
+        </div>
+      ) : status ? (
+        <MdmReadinessBox status={status} />
+      ) : (
+        <div className="text-sm text-subtler">{isLoading ? t('common.loading') : t('partnerSettlement.mdmNoStatus')}</div>
+      )}
+    </section>
   );
 }
 

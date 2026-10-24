@@ -7043,6 +7043,9 @@
     "photosTitle": "Handover photos",
     "deviceTitle": "Device",
     "openMdmTab": "Open the device MDM tab",
+    "mdmShowDetails": "Show MDM details",
+    "mdmHideDetails": "Hide MDM details",
+    "mdmNoStatus": "No MDM information for this device yet",
     "historyTitle": "History",
     "logAction": {
       "CLOSE_SUBMIT": "Shop submitted",

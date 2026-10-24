@@ -7033,6 +7033,9 @@
     "photosTitle": "รูปส่งมอบ",
     "deviceTitle": "เครื่อง",
     "openMdmTab": "เปิดแท็บ MDM ของเครื่อง",
+    "mdmShowDetails": "ดูรายละเอียด MDM",
+    "mdmHideDetails": "ซ่อนรายละเอียด MDM",
+    "mdmNoStatus": "ยังไม่มีข้อมูล MDM ของเครื่องนี้",
     "historyTitle": "ประวัติ",
     "logAction": {
       "CLOSE_SUBMIT": "ร้านยื่นปิดงาน",

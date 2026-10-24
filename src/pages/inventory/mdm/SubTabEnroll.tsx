@@ -35,7 +35,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from 'tsp-form';
-import { ShieldCheck, RefreshCw, PackageCheck, PackageOpen, Search } from 'lucide-react';
+import { ShieldCheck, RefreshCw, Search } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { ApiError } from '../../../lib/api';
 import { DateTime } from '../../../components/DateTime';
@@ -44,9 +44,10 @@ import { useEnrollAccounts, defaultAccountId } from './enrollAccounts';
 import { EnrollAccountPicker } from './shared/EnrollAccountPicker';
 import { translateApiError } from '../../../lib/apiErrors';
 import { EnrollChecklist } from './shared/EnrollChecklist';
-import { EnrollReadinessSteps, isLockedBadge } from './shared/EnrollReadinessSteps';
+import { EnrollReadinessSteps } from './shared/EnrollReadinessSteps';
 import { SerialZoomModal } from './shared/SerialDisplay';
-import { fromAssetStatus, enrollDoneCount } from './shared/enrollView';
+import { MdmReadinessBox } from './MdmReadinessBox';
+import { fromAssetStatus } from './shared/enrollView';
 import { EnrollDelegationPanel } from './EnrollDelegationPanel';
 
 interface PrepareResponse {
@@ -119,17 +120,9 @@ export function SubTabEnroll({
     },
   });
 
-  // Step readiness.
-  const enrollComplete = enrollDoneCount(status) >= 5;   // steps 1–5
-  // "Locked?" comes from the badge, not enforcement_level (wallpaper fakes level 1).
-  const step7Done = isLockedBadge(status.enforcement_badge);
-  // Handover needs BOTH keys, and the DB owns that rule (lock_ready) — never
-  // recompute it from has_pull_key/has_push_key. A device with the Apple key but
-  // no org key reads "safe" on every other field while a customer wipe would
-  // lose it outright; that is exactly what shipped a device on 2026-08-11.
+  // Readiness (steps 1–5 + baseline lock + both keys) is MdmReadinessBox's.
   // ⛔ lock_ready gates HANDOVER only. It must never reach the step-7 lock
   //    button — see the comment in EnrollReadinessSteps.
-  const readyToHandOver = enrollComplete && step7Done && status.lock_ready;
 
   return (
     <div className="flex flex-col gap-4">
@@ -148,22 +141,8 @@ export function SubTabEnroll({
 
       {/* ⭐ Readiness summary — the one-glance answer (§6.5). Staff-side only:
           it is the branch's handover decision, phrased for someone with the
-          asset record in front of them. */}
-      <div className={readyToHandOver ? 'alert alert-success' : 'alert alert-warning'}>
-        {readyToHandOver ? <PackageCheck size={20} className="shrink-0" /> : <PackageOpen size={20} className="shrink-0" />}
-        <div className="min-w-0">
-          <div className="alert-title">
-            {readyToHandOver ? t('asset.mdm.readiness.ready') : t('asset.mdm.readiness.notReady')}
-          </div>
-          {!readyToHandOver && (
-            <div className="alert-description">
-              {t('asset.mdm.readiness.remaining', {
-                steps: remainingStepLabels(t, { enrollComplete, step7Done, lockReady: status.lock_ready }),
-              })}
-            </div>
-          )}
-        </div>
-      </div>
+          asset record in front of them. Shared with finance's close-out review. */}
+      <MdmReadinessBox status={status} />
 
       {/* All 7 steps from shared/ — the same components the token page renders. */}
       <EnrollChecklist
@@ -254,21 +233,4 @@ function DeviceInfo({ status }: { status: EnrollStatus }) {
       ))}
     </div>
   );
-}
-
-/** Comma-joined labels of the still-incomplete groups, for the summary line.
- *  The org key is listed too: it blocks handover but is not something staff can
- *  DO anything about (the system installs it), so it must be named or the banner
- *  says "not ready" with no visible reason. */
-function remainingStepLabels(
-  t: (k: string) => string,
-  { enrollComplete, step7Done, lockReady }: {
-    enrollComplete: boolean; step7Done: boolean; lockReady: boolean;
-  },
-): string {
-  const parts: string[] = [];
-  if (!enrollComplete) parts.push(t('asset.mdm.readiness.stepEnroll'));
-  if (!step7Done) parts.push(t('asset.mdm.readiness.step7'));
-  if (!lockReady) parts.push(t('asset.mdm.readiness.stepKeys'));
-  return parts.join(', ');
 }
