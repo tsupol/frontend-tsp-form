@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { XCircle, ExternalLink } from 'lucide-react';
 import { ApiError } from '../lib/api';
 import { translateApiError } from '../lib/apiErrors';
+import { ModalErrorBand } from './ModalErrorBand';
 
 /**
  * Standard `alert alert-danger` block for a failed API call.
@@ -26,37 +27,57 @@ export function ApiErrorAlert({
   className?: string;
 }) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
 
   if (!error) return null;
 
   const message = typeof error === 'string' ? error : translateApiError(error, t);
   if (!message) return null;
 
-  const params = error instanceof ApiError ? error.messageParams : undefined;
-  const conflictAssetId = params?.existing_asset_id;
-  const conflictAssetCode = params?.existing_asset_code;
-  const canLink =
-    (typeof conflictAssetId === 'number' || typeof conflictAssetId === 'string') && !!conflictAssetId;
-
   return (
     <div className={className}>
       <XCircle size={16} />
       <div className="flex flex-col gap-1 min-w-0">
         <span>{message}</span>
-        {canLink && (
-          <button
-            type="button"
-            onClick={() => navigate(`/admin/inventory/assets/${conflictAssetId}`)}
-            className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer self-start"
-          >
-            {t('inventory.viewConflictingAsset', {
-              code: typeof conflictAssetCode === 'string' ? conflictAssetCode : '',
-            })}
-            <ExternalLink size={12} />
-          </button>
-        )}
+        <ConflictAssetLink error={error} />
       </div>
     </div>
+  );
+}
+
+/**
+ * The same error as a write-modal's submit error: placed between
+ * `.modal-content` and `.modal-footer` (see ModalErrorBand), so it shows above
+ * the button that caused it however far the form is scrolled. Keeps the
+ * conflict link.
+ */
+export function ApiErrorBand({ error, onDismiss }: { error: unknown; onDismiss?: () => void }) {
+  const { t } = useTranslation();
+  if (!error) return null;
+  const message = typeof error === 'string' ? error : translateApiError(error, t);
+  return <ModalErrorBand message={message} onDismiss={onDismiss} action={<ConflictAssetLink error={error} />} />;
+}
+
+function ConflictAssetLink({ error }: { error: unknown }) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+
+  const params = error instanceof ApiError ? error.messageParams : undefined;
+  const conflictAssetId = params?.existing_asset_id;
+  const conflictAssetCode = params?.existing_asset_code;
+  const canLink =
+    (typeof conflictAssetId === 'number' || typeof conflictAssetId === 'string') && !!conflictAssetId;
+  if (!canLink) return null;
+
+  return (
+    <button
+      type="button"
+      onClick={() => navigate(`/admin/inventory/assets/${conflictAssetId}`)}
+      className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer self-start"
+    >
+      {t('inventory.viewConflictingAsset', {
+        code: typeof conflictAssetCode === 'string' ? conflictAssetCode : '',
+      })}
+      <ExternalLink size={12} />
+    </button>
   );
 }

@@ -31,7 +31,7 @@ import { OverflowTabs } from '../../components/OverflowTabs';
 import { SellExternalModal } from './SellExternalModal';
 import { SellOutRequestModal } from './SellOutRequestModal';
 import { OwnerBadge } from '../../components/OwnerBadge';
-import { ApiErrorAlert } from '../../components/ApiErrorAlert';
+import { ApiErrorBand } from '../../components/ApiErrorAlert';
 import type { OwnerType } from '../../lib/ownerTypes';
 import { translateApiError, blockingReasonText } from '../../lib/apiErrors';
 import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
@@ -2985,7 +2985,7 @@ function AssetActionModal({
   const [reason, setReason] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [extra, setExtra] = useState<Record<string, string>>({});
-  // Holds the caught error itself, so ApiErrorAlert can offer a link to the
+  // Holds the caught error itself, so ApiErrorBand can offer a link to the
   // conflicting asset when the backend names one.
   const [error, setError] = useState<unknown>(null);
   // Per-field date-picker typing-mode toggle, keyed by field name.
@@ -3143,7 +3143,7 @@ function AssetActionModal({
       return apiClient.rpc<Partial<StandardBillResponse>>(config.rpc, params);
     },
     onSuccess: (data) => onSuccess(config!.successKey, data),
-    // Keep the error object, not just its message: ApiErrorAlert reads
+    // Keep the error object, not just its message: ApiErrorBand reads
     // `existing_asset_id` off an identifier conflict to link to that asset.
     onError: (err) => setError(err),
   });
@@ -3168,7 +3168,6 @@ function AssetActionModal({
           <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
         </div>
         <div className="modal-content">
-          <ApiErrorAlert error={error} />
           <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
             <div className="font-medium text-sm">{codeDisplay(asset.asset_code_display, asset.asset_code)}</div>
             <div className="text-xs text-subtle">
@@ -3369,6 +3368,7 @@ function AssetActionModal({
             </div>
           </div>
         </div>
+        <ApiErrorBand error={error} onDismiss={() => setError(null)} />
         <div className="modal-footer">
           <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button

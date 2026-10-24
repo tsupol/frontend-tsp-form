@@ -231,8 +231,12 @@ produced it.
 Translate the message before passing it — `translateApiError(err, t)` for
 `ApiError`, per the API error handling rules in `.claude/CLAUDE.md`.
 
-**Migration:** most modals still render `alert alert-danger` inline. Migrate a modal
-to the band when you touch it for another reason; no bulk sweep.
+**Migration:** most modals still render `alert alert-danger` inline. Any modal you
+edit, test or show Ton gets moved to the band in that same piece of work, without
+being asked (Ton 2026-10-24). No bulk sweep of modals nobody is working on.
+For a caught `ApiError` whose alert offers a way out (the conflicting-asset link),
+use `ApiErrorBand` from `src/components/ApiErrorAlert.tsx`: the same band with that
+link kept. Reference: the device action window in `AssetsPage`.
 
 ## Anything that opens a document or another page honours ctrl/middle click
 
