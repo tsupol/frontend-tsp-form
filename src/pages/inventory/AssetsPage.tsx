@@ -163,6 +163,8 @@ interface BackendAssetAction {
   rpc_name: string;
   is_available: boolean;
   blocking_reason: string | null;
+  /** Facts the reason names (shop name, contract code) — mig 1484. */
+  blocking_params?: Record<string, unknown> | null;
   require_pin: boolean;
   sort_order: number;
   target_bucket: string | null;
