@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { PageNav, PageNavPanel, MobileHeader, Badge, Select, Button, DataTable, PopOver } from 'tsp-form';
 import { useAuth } from '../../contexts/AuthContext';
-import { ArrowLeft, ArrowRightFromLine, SlidersHorizontal, Plus, Archive } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, SlidersHorizontal, Plus, Archive, SearchCheck } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
@@ -62,7 +62,21 @@ export interface ContractSearchResult {
   is_my_branch: boolean;
   is_device_deposited?: boolean;
   created_at: string;
+  /** Why this row matched the keyword (mig 1481). Null when browsing without a
+   *  keyword, absent on rows read by id. */
+  match?: ContractSearchMatch | null;
 }
+
+type MatchReason = 'CONTRACT' | 'DEVICE' | 'FORMER_DEVICE' | 'TARGET_DEVICE' | 'CUSTOMER' | 'CO_LESSEE';
+
+interface ContractSearchMatch {
+  reason: MatchReason;
+  prio: number;
+  mode: string;
+  asset_code_display?: string | null;
+}
+
+const DEVICE_REASONS: MatchReason[] = ['DEVICE', 'FORMER_DEVICE', 'TARGET_DEVICE'];
 
 interface SearchResponse {
   page: number;
@@ -291,7 +305,7 @@ export function ContractListPane({
   const rowRight = renderRowRight ?? defaultRowRight;
 
   return (
-    <PageNav panels={['list', 'detail']} defaultPanel={selectedId ? 'detail' : 'list'} className="h-dvh">
+    <PageNav panels={['list', 'detail']} defaultPanel={selectedId ? 'detail' : 'list'} className="h-dvh overflow-hidden">
       {({ isMobile, isRoot, goTo, goBack }) => (
         <>
           {isMobile && (
@@ -434,6 +448,17 @@ export function ContractListPane({
                             return product ? ` · ${product}` : '';
                           })()}
                         </div>
+                        {contract.match && (
+                          <div className="flex items-center gap-1 mt-1 text-xs text-info-fg min-w-0">
+                            <SearchCheck size={12} className="shrink-0" />
+                            <span className="truncate">
+                              {t('contract.matchReason.label')}: {t(`contract.matchReason.${contract.match.reason}`, { defaultValue: contract.match.reason })}
+                              {DEVICE_REASONS.includes(contract.match.reason) && contract.match.asset_code_display
+                                ? ` ${contract.match.asset_code_display}`
+                                : ''}
+                            </span>
+                          </div>
+                        )}
                         <div className="flex items-center gap-3 mt-1 text-xs text-subtle">
                           <span>{contract.branch_name}</span>
                           <OwnerBadge size="xs" ownerType={contract.owner_type as OwnerType | null} ownerName={contract.owner_name} />

@@ -3717,6 +3717,15 @@
       "USE_WALLET_CASHOUT_SAVING": "ใช้ปุ่ม “ถอนเงินออม”",
       "USE_WALLET_CASHOUT_INSURANCE": "ใช้ปุ่ม “ถอนเงินประกัน”",
       "USE_WALLET_CASHOUT_CREDIT": "ใช้ปุ่ม “ถอนเงินเครดิต”"
+    },
+    "matchReason": {
+      "label": "ตรงที่",
+      "CONTRACT": "เลขสัญญา",
+      "DEVICE": "เครื่องที่ผูกอยู่",
+      "FORMER_DEVICE": "เครื่องเดิมของสัญญา",
+      "TARGET_DEVICE": "เครื่องที่จองไว้",
+      "CUSTOMER": "ลูกค้า",
+      "CO_LESSEE": "ผู้เช่าร่วม"
     }
   },
   "contractAddon": {

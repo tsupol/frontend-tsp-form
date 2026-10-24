@@ -3721,6 +3721,15 @@
       "USE_WALLET_CASHOUT_SAVING": "Use “Cash out savings”",
       "USE_WALLET_CASHOUT_INSURANCE": "Use “Cash out insurance”",
       "USE_WALLET_CASHOUT_CREDIT": "Use “Cash out credit”"
+    },
+    "matchReason": {
+      "label": "Matched",
+      "CONTRACT": "Contract no.",
+      "DEVICE": "Current device",
+      "FORMER_DEVICE": "Former device",
+      "TARGET_DEVICE": "Reserved device",
+      "CUSTOMER": "Customer",
+      "CO_LESSEE": "Co-lessee"
     }
   },
   "contractAddon": {
