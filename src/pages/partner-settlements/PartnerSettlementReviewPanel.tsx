@@ -25,6 +25,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { fmtCurrency } from '../../lib/format';
 import { ContractPhotoGroups } from '../contracts/ContractPhotoGroups';
+import { AssetMdmTab } from '../inventory/AssetMdmTab';
 import {
   usePartnerSettlementActions,
   usePartnerSettlementCloseLog,
@@ -192,15 +193,24 @@ export function PartnerSettlementReviewPanel({
 
         {deviceId != null && (
           <section>
-            <SectionTitle icon={<Smartphone size={14} />} text={t('partnerSettlement.deviceTitle')} />
-            <button
-              type="button"
-              onClick={() => navigate(`/admin/inventory/assets/${deviceId}?tab=mdm`)}
-              className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
-            >
-              {t('partnerSettlement.openMdmTab')}
-              <ExternalLink size={12} />
-            </button>
+            <div className="flex items-center gap-2">
+              <SectionTitle icon={<Smartphone size={14} />} text={t('partnerSettlement.deviceTitle')} />
+              <span className="flex-1" />
+              <Link
+                to={`/admin/inventory/assets/${deviceId}?tab=mdm`}
+                className="text-xs font-medium text-primary-fg hover:underline inline-flex items-center gap-1 mb-2"
+              >
+                {t('partnerSettlement.openMdmTab')}
+                <ExternalLink size={12} />
+              </Link>
+            </div>
+            {/* The device's own MDM tab, in place (Ohm #11): enrolment and the
+                lock are part of what finance checks before ticking, so they
+                read it here instead of leaving the request. Its sub-tabs follow
+                the device's may_* flags, so finance sees only what it may. */}
+            <div className="rounded-md border border-line overflow-hidden flex flex-col">
+              <AssetMdmTab assetId={deviceId} onRefresh={() => {}} />
+            </div>
           </section>
         )}
 
