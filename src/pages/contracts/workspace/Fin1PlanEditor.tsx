@@ -282,7 +282,7 @@ export function Fin1PlanEditor({
       } catch (err) {
         // The out-of-range probe is expected to fail — the error carries the
         // branch's down range, which is all we needed to build the controls.
-        if (err instanceof ApiError && err.code === 'PRICING.VALIDATION.FIN1_DOWN_PERCENT') {
+        if (err instanceof ApiError && err.code === 'PRICING.VALIDATION.FIN1_DOWN_BELOW_MIN') {
           const p = (err.messageParams ?? {}) as Record<string, number>;
           if (p.min_down_percent != null) {
             setTermMonths(probeTerm);
@@ -328,7 +328,7 @@ export function Fin1PlanEditor({
                 p_price: initialPrice,
               });
             } catch (err2) {
-              if (err2 instanceof ApiError && err2.code === 'PRICING.VALIDATION.FIN1_DOWN_PERCENT') {
+              if (err2 instanceof ApiError && err2.code === 'PRICING.VALIDATION.FIN1_DOWN_BELOW_MIN') {
                 const p2 = (err2.messageParams ?? {}) as Record<string, number>;
                 if (p2.min_down_percent != null) setDownPercent(p2.min_down_percent);
               }
@@ -375,7 +375,7 @@ export function Fin1PlanEditor({
         });
       } catch (err) {
         if (cancelled) return;
-        if (err instanceof ApiError && err.code === 'PRICING.VALIDATION.FIN1_DOWN_PERCENT') {
+        if (err instanceof ApiError && err.code === 'PRICING.VALIDATION.FIN1_DOWN_BELOW_MIN') {
           const p = (err.messageParams ?? {}) as Record<string, number>;
           if (p.min_down_percent != null) setDownPercent(p.min_down_percent);
           return;

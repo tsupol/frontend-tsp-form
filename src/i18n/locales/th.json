@@ -4593,8 +4593,7 @@
     "usedPriceHint": "ไม่เกิน {{max}}",
     "downByPercent": "%",
     "downByAmount": "บาท",
-    "downBelowMin": "เงินดาวน์ขั้นต่ำของราคานี้คือ {{min}} ({{pct}}%)",
-    "monthlyDisabledHint": "ใช้ไม่ได้เมื่อกรอกเงินดาวน์เป็นบาท — สลับกลับเป็น % เพื่อค้นหาจากค่างวด"
+    "downRange": "ดาวน์ได้ {{min}}–{{max}} บาท"
   },
   "fin1Config": {
     "title": "เรทผ่อน FIN1",

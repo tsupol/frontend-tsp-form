@@ -89,7 +89,8 @@ interface PriceTable {
   rows: PriceTableRow[];
 }
 
-/** One row of fn_fin1_quote_all — a quote, or the below-minimum-down error. */
+/** One row of fn_fin1_quote_all. A wrong down fails the whole call (mig 1492c);
+ *  a row only carries `error_code` for a problem with that one term. */
 interface QuoteRow {
   term_months?: number;
   installment_amount?: number;
@@ -98,9 +99,25 @@ interface QuoteRow {
   down_payment?: number;
   down_percent?: number;
   error_code?: string;
-  min_down_percent?: number;
-  min_down_amount?: number;
 }
+
+/** The logged-in branch's down range — `data.down` on success, and the same
+ *  keys in `error.params` when the down is rejected (mig 1492c). */
+interface DownBounds {
+  min_down_amount?: number;
+  max_down_amount?: number;
+  min_down_percent?: number;
+  max_down_percent?: number;
+  rounded_down?: number;
+  rounded_up?: number;
+}
+
+/** The three down-payment rejections, one cause each (mig 1492c). */
+const DOWN_ERROR_CODES = [
+  'PRICING.VALIDATION.FIN1_DOWN_NOT_ROUNDED',
+  'PRICING.VALIDATION.FIN1_DOWN_BELOW_MIN',
+  'PRICING.VALIDATION.FIN1_DOWN_ABOVE_MAX',
+];
 
 interface PlanByMonthly {
   price: number;
@@ -273,9 +290,9 @@ export function Fin1CalculatorPage() {
   const [downAmountDebounced, setDownAmountDebounced] = useState('');
   const [downNotice, setDownNotice] = useState(false);
   const amountMode = downMode === 'amount';
-  // The backend's monthly search only accepts a % down, so exact-baht down and
-  // "customer says X per month" are mutually exclusive.
-  const monthlyMode = !amountMode && monthlyStr !== '' && parseFloat(monthlyStr) > 0;
+  // The monthly search takes a down in % or in baht (mig 1492c), so it works
+  // in both down modes.
+  const monthlyMode = monthlyStr !== '' && parseFloat(monthlyStr) > 0;
 
   useEffect(() => {
     const tm = setTimeout(() => setDownAmountDebounced(downAmountStr), 300);
@@ -300,10 +317,10 @@ export function Fin1CalculatorPage() {
   // amount has no cell to point at. fn_fin1_quote_all answers the same
   // question the other way round: one row per active term at this exact down.
   const downAmountNum = downAmountDebounced === '' ? null : parseFloat(downAmountDebounced);
-  const { data: quoteAll, isFetching: quotesLoading } = useQuery({
+  const { data: quoteAll, error: quotesError, isFetching: quotesLoading } = useQuery({
     queryKey: ['fin1-quote-all', effectivePrice, downAmountNum],
     queryFn: () =>
-      apiClient.rpc<{ quotes: QuoteRow[] }>('fn_fin1_quote_all', {
+      apiClient.rpc<{ quotes: QuoteRow[]; down?: DownBounds }>('fn_fin1_quote_all', {
         p_price: effectivePrice!,
         p_down: downAmountNum!,
       }),
@@ -313,18 +330,21 @@ export function Fin1CalculatorPage() {
     retry: false,
   });
 
-  // A row is a quote or a "below the minimum down for this price" error; the
-  // minimum is the same for every term, so the first error row carries it.
+  // A rejected down fails the whole call with one code per cause; the screen
+  // reads the code, never compares the numbers itself.
+  const downError = amountMode && quotesError instanceof ApiError
+    && DOWN_ERROR_CODES.includes(quotesError.code)
+    ? quotesError : null;
+  const quotesErrorMsg = amountMode && quotesError ? translateApiError(quotesError, t) : '';
   const quotes = useMemo(
-    () => (quoteAll?.quotes ?? []).filter((q): q is QuoteRow & { term_months: number } =>
+    () => (quotesError ? [] : (quoteAll?.quotes ?? [])).filter((q): q is QuoteRow & { term_months: number } =>
       q.error_code == null && q.term_months != null),
-    [quoteAll],
+    [quoteAll, quotesError],
   );
-  const downBelowMin = useMemo(() => {
-    if (!amountMode || !quoteAll) return null;
-    const bad = quoteAll.quotes.find(q => q.error_code === 'PRICING.VALIDATION.FIN1_DOWN_BELOW_MIN');
-    return bad && quotes.length === 0 ? bad : null;
-  }, [amountMode, quoteAll, quotes]);
+  // The branch's down range in baht — from the answer, or from the rejection.
+  const downBounds: DownBounds | null = downError
+    ? (downError.messageParams as DownBounds | undefined) ?? null
+    : quoteAll?.down ?? null;
 
   const quoteTerms = useMemo(() => quotes.map(q => q.term_months), [quotes]);
   const terms = amountMode && quoteTerms.length > 0 ? quoteTerms : tableTerms;
@@ -362,23 +382,26 @@ export function Fin1CalculatorPage() {
   // "4", "45", "450" on the way to "4,500" are all below the floor, and the
   // debounce is shorter than a normal pause between digits — without this the
   // customer watches a red "lowest possible is X" flash after every keystroke.
-  const monthlyFloor = useMemo(
-    () => (row ? Math.min(...row.cells.map(c => c.installment_amount)) : null),
-    [row],
-  );
+  const monthlyFloor = useMemo(() => {
+    if (amountMode) return quotes.length > 0 ? Math.min(...quotes.map(q => q.installment_amount ?? Infinity)) : null;
+    return row ? Math.min(...row.cells.map(c => c.installment_amount)) : null;
+  }, [amountMode, quotes, row]);
   const belowFloor = monthlyMode && monthlyFloor != null && parseFloat(monthlyStr) < monthlyFloor;
   const [floorNotice, setFloorNotice] = useState(false);
 
   useEffect(() => {
-    if (!monthlyMode || !model || downPct == null) { setPlan(null); setPlanError(''); return; }
-    if (belowFloor) { setPlan(null); setPlanError(''); setPlanLoading(false); return; }
+    const downReady = amountMode ? downAmountNum != null && downAmountNum > 0 : downPct != null;
+    if (!monthlyMode || !model || !downReady) { setPlan(null); setPlanError(''); return; }
+    // A rejected baht down already says why under the down box; the plan
+    // would only repeat the same rejection.
+    if (belowFloor || downError) { setPlan(null); setPlanError(''); setPlanLoading(false); return; }
     const seq = ++planSeq.current;
     setPlanLoading(true);
     const tm = setTimeout(async () => {
       try {
         const res = await apiClient.rpc<PlanByMonthly>('fn_fin1_plan_by_monthly', {
           p_monthly: parseFloat(monthlyStr),
-          p_down_percent: downPct,
+          ...(amountMode ? { p_down_amount: downAmountNum } : { p_down_percent: downPct }),
           // Used mode has no catalog price to start from — send the manual
           // price directly (p_uplift is ignored when p_price is set, so the
           // uplift is already folded into effectivePrice).
@@ -406,7 +429,8 @@ export function Fin1CalculatorPage() {
     }, 300);
     return () => clearTimeout(tm);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [monthlyMode, monthlyStr, downPct, uplift, model?.model_id, belowFloor, usedMode, effectivePrice]);
+  }, [monthlyMode, monthlyStr, downPct, uplift, model?.model_id, belowFloor, usedMode, effectivePrice,
+    amountMode, downAmountNum, !!downError]);
 
   const pickModel = (m: ModelSearchRow) => {
     if (m.model_id !== model?.model_id) {
@@ -452,7 +476,17 @@ export function Fin1CalculatorPage() {
   // While the typed amount is still below the floor we hold the slider-derived
   // plan on screen rather than blanking the panel — the customer is mid-number,
   // not looking at an empty result.
-  const summary = amountMode
+  const summary = monthlyMode && !belowFloor && !downError
+    ? (plan && {
+        down: plan.down_payment,
+        months: plan.term_months,
+        monthly: plan.installment_amount,
+        last: plan.last_installment_amount,
+        total: plan.total_effective,
+        docFee: plan.doc_fee_amount,
+        exact: plan.exact,
+      })
+    : amountMode
     ? (quote && table && {
         down: quote.down_payment ?? downAmountNum ?? 0,
         months: quote.term_months,
@@ -463,16 +497,6 @@ export function Fin1CalculatorPage() {
         // figure, identical to the one the price table already returned.
         docFee: table.policy.doc_fee_amount,
         exact: true,
-      })
-    : monthlyMode && !belowFloor
-    ? (plan && {
-        down: plan.down_payment,
-        months: plan.term_months,
-        monthly: plan.installment_amount,
-        last: plan.last_installment_amount,
-        total: plan.total_effective,
-        docFee: plan.doc_fee_amount,
-        exact: plan.exact,
       })
     : (row && cell && table && {
         down: row.down_amount,
@@ -720,13 +744,15 @@ export function Fin1CalculatorPage() {
                                     variant={amountMode ? 'primary' : 'outline'}
                                     onClick={() => {
                                       setDownMode('amount');
-                                      setMonthlyStr('');
-                                      setPlan(null);
                                       // Seed the box from whatever the % slider
-                                      // was resting on, so the numbers don't jump.
+                                      // was resting on, so the numbers don't jump —
+                                      // rounded up to the baht step the server
+                                      // requires (a % of the price rarely lands on it).
                                       if (downAmountStr === '' && row) {
-                                        setDownAmountStr(String(row.down_amount));
-                                        setDownAmountDebounced(String(row.down_amount));
+                                        const unit = table.policy.rounding_unit ?? 10;
+                                        const seeded = String(Math.ceil(row.down_amount / unit) * unit);
+                                        setDownAmountStr(seeded);
+                                        setDownAmountDebounced(seeded);
                                       }
                                     }}
                                   >
@@ -761,13 +787,44 @@ export function Fin1CalculatorPage() {
                                 />
                               ) : null}
 
-                              {amountMode && downNotice && downBelowMin && (
-                                <span className="text-xs text-warning-fg tabular-nums">
-                                  {t('fin1Calc.downBelowMin', {
-                                    min: fmtCurrency(downBelowMin.min_down_amount ?? 0),
-                                    pct: downBelowMin.min_down_percent ?? 0,
+                              {amountMode && downBounds?.min_down_amount != null && downBounds.max_down_amount != null && (
+                                <span className="text-xs text-subtle tabular-nums">
+                                  {t('fin1Calc.downRange', {
+                                    min: fmtCurrency(downBounds.min_down_amount),
+                                    max: fmtCurrency(downBounds.max_down_amount),
                                   })}
                                 </span>
+                              )}
+
+                              {/* A down rejection waits for blur — a half-typed
+                                  amount is always below the minimum. Anything
+                                  else shows at once. */}
+                              {quotesErrorMsg && (!downError || downNotice) && (
+                                <div className="alert alert-warning">
+                                  <XCircle size={16} />
+                                  <span className="flex flex-col gap-2">
+                                    <span>{quotesErrorMsg}</span>
+                                    {downError?.code === 'PRICING.VALIDATION.FIN1_DOWN_NOT_ROUNDED'
+                                      && downBounds?.rounded_down != null && downBounds.rounded_up != null && (
+                                      <span className="flex gap-2">
+                                        {[downBounds.rounded_down, downBounds.rounded_up].map(v => (
+                                          <Button
+                                            key={v}
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => {
+                                              setDownAmountStr(String(v));
+                                              setDownAmountDebounced(String(v));
+                                              setDownNotice(false);
+                                            }}
+                                          >
+                                            {fmtCurrency(v)}
+                                          </Button>
+                                        ))}
+                                      </span>
+                                    )}
+                                  </span>
+                                </div>
                               )}
                             </div>
 
@@ -803,16 +860,13 @@ export function Fin1CalculatorPage() {
                             )}
 
                             {/* ── Customer's target monthly ──────────────── */}
-                            {/* Off in baht-down mode: fn_fin1_plan_by_monthly's
-                                search only takes a down PERCENT. */}
-                            <div className={`flex flex-col ${amountMode ? 'opacity-50' : ''}`}>
+                            <div className="flex flex-col">
                               <label className="form-label">{t('fin1Calc.monthlyTarget')}</label>
                               <div className="w-56">
                                 <MaskedInput
                                   mask="number"
                                   decimalScale={0}
                                   size="lg"
-                                  disabled={amountMode}
                                   className="w-full fin1-amount-input"
                                   value={monthlyStr}
                                   onChange={(raw) => { setMonthlyStr(raw); setFloorNotice(false); }}
@@ -821,7 +875,9 @@ export function Fin1CalculatorPage() {
                                   // on it, so the "lowest possible" guidance is
                                   // finally worth showing.
                                   onBlur={() => setFloorNotice(belowFloor)}
-                                  placeholder={cell ? fmtCurrency(cell.installment_amount) : ''}
+                                  placeholder={amountMode
+                                    ? (quote?.installment_amount != null ? fmtCurrency(quote.installment_amount) : '')
+                                    : (cell ? fmtCurrency(cell.installment_amount) : '')}
                                   // The icon slot is pointer-events:none until
                                   // onEndIconClick marks it clickable, so the
                                   // handler has to go here — a <button> nested
@@ -834,7 +890,7 @@ export function Fin1CalculatorPage() {
                                 />
                               </div>
                               <span className="text-xs text-subtle mt-1">
-                                {amountMode ? t('fin1Calc.monthlyDisabledHint') : t('fin1Calc.monthlyTargetHint')}
+                                {t('fin1Calc.monthlyTargetHint')}
                               </span>
                             </div>
 

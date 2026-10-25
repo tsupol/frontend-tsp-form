@@ -4597,8 +4597,7 @@
     "usedPriceHint": "Up to {{max}}",
     "downByPercent": "%",
     "downByAmount": "Baht",
-    "downBelowMin": "Minimum down payment for this price is {{min}} ({{pct}}%).",
-    "monthlyDisabledHint": "Not available with an exact-baht down payment — switch back to % to search by installment."
+    "downRange": "Down payment allowed: {{min}}–{{max}} baht"
   },
   "fin1Config": {
     "title": "FIN1 Installment Rates",
