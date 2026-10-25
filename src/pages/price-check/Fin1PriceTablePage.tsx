@@ -92,7 +92,9 @@ export function Fin1PriceTablePage() {
 
   const { data: allRows, isFetching, error } = useQuery({
     queryKey: ['fin1-price-list'],
-    queryFn: () => apiClient.get<Fin1PriceRow[]>('/v_fin1_price_list?order=brand_name,family_name,model_name'),
+    // sort_rank is the backend's line → newest family → tier → capacity order
+    // (NOTICE 2026-10-25, mig 1492) — never re-sort these rows on screen.
+    queryFn: () => apiClient.get<Fin1PriceRow[]>('/v_fin1_price_list?order=sort_rank'),
     staleTime: 60_000,
   });
 

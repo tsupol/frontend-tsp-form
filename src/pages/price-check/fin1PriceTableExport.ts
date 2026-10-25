@@ -139,7 +139,8 @@ export async function downloadFin1PricePdf(
     ];
   };
 
-  // Rows arrive sorted brand → family → model; keep that order.
+  // Rows arrive in the backend's sort_rank order (line → family → tier →
+  // capacity); keep it — families stay contiguous, so runs group cleanly.
   const content: unknown[] = [
     { text: title, fontSize: 15, bold: true },
     { text: asOf, fontSize: 9, color: GREY, margin: [0, 2, 0, 0] },
