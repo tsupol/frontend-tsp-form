@@ -36,6 +36,13 @@ Side path scenes 20–26 (credit changes the figures when approving, migs 1472-1
 CT-2610-000599-5 (98085) — now case 185, approved plainly (2026-10-24 live-refresh test). To
 reshoot, send the latest case back as credit, resubmit as the shop, approve with changes again.
 
+Adjustable-commission scenes (3, 4, 15 credit's commission card, side path 28–29 fund rate page,
+role `fund`) are shot on the training fund — shop 484 "อบรม-ร้าน 1" is on an adjustable plan,
+branch 7 is not. CT-2610-000926-0 (98414) · case 220, submitted 10-26 at 13.95%, not yet approved.
+Users (password `Test@1234`, pass `p=`): shop `demo_shop01`…`04` · credit `demo_fund_credit` ·
+fund admin `demo_fund_admin`. Never press save in the lever window — it changes every shop's next
+plan in the DEV holding.
+
 ## Open
 Scene 44 ⚠ — BE sends no message to fund finance when a shop submits close-out.
 Re-shot 10-15/16: 11–16, 18, 30, 37, 38, 44, 46, 47, 57 (numbers after the 10-21 side path). The rest show older screens.
