@@ -59,6 +59,9 @@ export type NotificationRow = {
   contract_ids: number[] | null;
   created_at: string;
   is_read: boolean;
+  /** false = must stay on screen until the user presses it (mig 1502,
+   *  UI_SUMMARY/153). Read it directly — never derive it from severity. */
+  dismissible?: boolean;
 };
 
 export type ListResponse = {

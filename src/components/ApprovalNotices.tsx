@@ -12,24 +12,28 @@ import {
   type ListResponse, type NotificationRow,
 } from './NotificationMenu';
 
-// Approval notices people missed in the bell (Ohm 2026-10-24): a request that
-// needs approving, was approved or was sent back stays on screen until someone
-// opens it or closes it. It never blocks the page — a cashier mid-payment
-// keeps working and deals with it after.
+// Notices someone is waiting on stay on screen until that person presses them
+// (owner 2026-10-25, UI_SUMMARY/153): a shop waiting for approval walks away,
+// comes back, and the answer is still there — the same for the fund's desk
+// when a shop submits or withdraws. It never blocks the page — a cashier
+// mid-payment keeps working and deals with it after.
 //
-// The trigger is the counters push the backend already sends on every request
-// change. It carries no notice, so a push means "look at the unread list";
-// anything new and approval-shaped there becomes a card. Never filter on the
-// push's `reason`: the backend sends one push per change per branch, labelled
-// with whichever write came first (a resubmit arrives as CONTRACT_STATE).
+// What shows is decided by the unread list alone, every unread notice the
+// backend marks `dismissible: false` — including ones from before this page
+// opened, and on every reload, until it is acknowledged. The counters push and
+// a slow poll only say "look again": push is best-effort (web-push needs a
+// per-browser opt-in), so it can never be what puts a card up. Never filter on
+// the push's `reason`: the backend sends one push per change per branch,
+// labelled with whichever write came first.
 
 const CHECK_DEBOUNCE_MS = 1_500;
+const POLL_MS = 60_000;
 const MAX_VISIBLE = 3;
-// Notices from just before the tab opened still count as new — a push can land
-// while the page is loading.
-const OPEN_GRACE_MS = 60_000;
 
-function isApprovalNotice(row: NotificationRow): boolean {
+/** Stays until pressed. Rows from before mig 1502 carried no flag; for those,
+ *  the approval category was the old rule. */
+function mustStay(row: NotificationRow): boolean {
+  if (row.dismissible != null) return row.dismissible === false;
   return resolveCategory(row.event_type, row.category) === 'approval';
 }
 
@@ -42,13 +46,14 @@ export function ApprovalNotices() {
   const { user, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   const location = useLocation();
-  const [notices, setNotices] = useState<NotificationRow[]>([]);
+  // Every unread must-stay notice, newest first, as the backend last said.
+  const [pending, setPending] = useState<NotificationRow[]>([]);
+  // Pressed here but the acknowledgement may not have landed yet — hidden so a
+  // check racing the request doesn't bring the card back.
+  const [acked, setAcked] = useState<Set<number>>(() => new Set());
 
-  const openedAt = useRef(Date.now() - OPEN_GRACE_MS);
-  const seen = useRef(new Set<number>());
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pathRef = useRef(location.pathname);
-  pathRef.current = location.pathname;
+  const countRef = useRef(0);
 
   const channel = ownCountersChannel(user);
 
@@ -58,45 +63,26 @@ export function ApprovalNotices() {
       res = await apiClient.rpc<ListResponse>('fn_staff_list_notifications', {
         p_category: null,
         p_unread_only: true,
-        p_limit: 20,
+        p_limit: 50,
         p_offset: 0,
       });
     } catch {
       return;
     }
-    const fresh = (res.items ?? []).filter(r =>
-      !r.is_read
-      && !seen.current.has(r.notification_id)
-      && isApprovalNotice(r)
-      && new Date(r.created_at).getTime() >= openedAt.current,
-    );
-    if (!fresh.length) return;
-    fresh.forEach(r => seen.current.add(r.notification_id));
-    queryClient.invalidateQueries({ queryKey: ['notif', 'panel-list'] });
-    queryClient.invalidateQueries({ queryKey: ['nav', 'notif-unread-summary'] });
-
-    // Someone already looking at that contract sees it change in place.
-    const onScreen = (r: NotificationRow) => {
-      const cid = contractIdOf(r);
-      return cid != null && new RegExp(`/${cid}(/|$)`).test(pathRef.current);
-    };
-    const show = fresh.filter(r => !onScreen(r));
-    // Only the latest word on a contract stays up: "sent back" replaces an
-    // earlier "approved" for the same contract instead of contradicting it.
-    const latestPerContract = show.filter((r, i) => {
-      const cid = contractIdOf(r);
-      return cid == null || show.findIndex(o => contractIdOf(o) === cid) === i;
-    });
-    if (!latestPerContract.length) return;
-    const replaced = new Set(latestPerContract.map(contractIdOf).filter((c): c is number => c != null));
-    setNotices(prev => [
-      ...latestPerContract,
-      ...prev.filter(p => { const cid = contractIdOf(p); return cid == null || !replaced.has(cid); }),
-    ]);
+    const rows = (res.items ?? []).filter(r => !r.is_read && mustStay(r));
+    if (rows.length !== countRef.current) {
+      countRef.current = rows.length;
+      queryClient.invalidateQueries({ queryKey: ['notif', 'panel-list'] });
+      queryClient.invalidateQueries({ queryKey: ['nav', 'notif-unread-summary'] });
+    }
+    setPending(rows);
   }, [queryClient]);
 
   useEffect(() => {
-    if (!isAuthenticated || !channel) return;
+    if (!isAuthenticated) return;
+    void check();
+    const poll = setInterval(() => { void check(); }, POLL_MS);
+    if (!channel) return () => clearInterval(poll);
 
     const onEvent = () => {
       if (timerRef.current) return;
@@ -109,6 +95,7 @@ export function ApprovalNotices() {
     const unsubHello = wsClient.onHello(() => { void check(); });
     const unsubEvent = wsClient.subscribe(channel, onEvent);
     return () => {
+      clearInterval(poll);
       unsubHello();
       unsubEvent();
       if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
@@ -121,7 +108,7 @@ export function ApprovalNotices() {
     if (!import.meta.env.DEV) return;
     const onPreview = (e: Event) => {
       const rows = (e as CustomEvent<NotificationRow[]>).detail ?? [];
-      setNotices(prev => [...rows, ...prev]);
+      setPending(prev => [...rows, ...prev]);
     };
     window.addEventListener('dev:approval-notices', onPreview);
     return () => window.removeEventListener('dev:approval-notices', onPreview);
@@ -129,19 +116,41 @@ export function ApprovalNotices() {
 
   // Logging out (or another user logging in) starts clean.
   useEffect(() => {
-    if (!isAuthenticated) setNotices([]);
+    if (!isAuthenticated) { setPending([]); setAcked(new Set()); countRef.current = 0; }
   }, [isAuthenticated]);
 
-  const remove = (id: number) => setNotices(prev => prev.filter(n => n.notification_id !== id));
+  // Someone already looking at that contract sees it change in place; the
+  // card waits (still unread) and shows once they leave the page.
+  const onScreen = (r: NotificationRow) => {
+    const cid = contractIdOf(r);
+    return cid != null && new RegExp(`/${cid}(/|$)`).test(location.pathname);
+  };
+  const live = pending.filter(r => !acked.has(r.notification_id));
+  const shown = live.filter(r => !onScreen(r));
+  // Only the latest word on a contract shows: "sent back" replaces an earlier
+  // "approved" for the same contract instead of contradicting it.
+  const notices = shown.filter((r, i) => {
+    const cid = contractIdOf(r);
+    return cid == null || shown.findIndex(o => contractIdOf(o) === cid) === i;
+  });
 
-  const open = (row: NotificationRow) => {
-    remove(row.notification_id);
-    apiClient.rpc('fn_staff_mark_notification_read', { p_notification_id: row.notification_id })
+  // Pressing a card (open or ×) is the acknowledgement. It also covers the
+  // older notices it replaced for the same contract — the user has seen the
+  // latest word, and the earlier one would otherwise come back on reload.
+  const acknowledge = (row: NotificationRow) => {
+    const cid = contractIdOf(row);
+    const ids = cid == null
+      ? [row.notification_id]
+      : live.filter(r => r.notification_id === row.notification_id || contractIdOf(r) === cid).map(r => r.notification_id);
+    setAcked(prev => new Set([...prev, ...ids]));
+    Promise.all(ids.map(id => apiClient.rpc('fn_staff_ack_notification', { p_notification_id: id })))
       .then(() => {
         queryClient.invalidateQueries({ queryKey: ['notif', 'panel-list'] });
         queryClient.invalidateQueries({ queryKey: ['nav', 'notif-unread-summary'] });
+        void check();
       })
-      .catch(() => {});
+      // Not recorded — let the card come back rather than lose the notice.
+      .catch(() => setAcked(prev => { const next = new Set(prev); ids.forEach(id => next.delete(id)); return next; }));
   };
 
   if (!notices.length) return null;
@@ -194,8 +203,8 @@ export function ApprovalNotices() {
               <Link
                 to={to}
                 className={`${cardCls} rounded-lg hover:bg-item-hover-bg`}
-                onClick={() => open(row)}
-                onAuxClick={(e) => { if (e.button === 1) open(row); }}
+                onClick={() => acknowledge(row)}
+                onAuxClick={(e) => { if (e.button === 1) acknowledge(row); }}
               >
                 {body}
               </Link>
@@ -206,7 +215,7 @@ export function ApprovalNotices() {
               type="button"
               className="absolute top-2 right-2 w-6 h-6 rounded-md flex items-center justify-center text-subtle hover:bg-item-hover-bg hover:text-fg cursor-pointer"
               aria-label={t('common.dismiss')}
-              onClick={() => remove(row.notification_id)}
+              onClick={() => acknowledge(row)}
             >
               <X size={14} />
             </button>
