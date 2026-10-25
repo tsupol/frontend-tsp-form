@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { DollarSign, SlidersHorizontal, TrendingUp, Percent, Handshake } from 'lucide-react';
+import { DollarSign, SlidersHorizontal, TrendingUp, Percent, Handshake, BadgePercent } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -9,6 +9,8 @@ const navItems = [
   { path: '/admin/pricing/pricebook', labelKey: 'nav.pricebook', icon: DollarSign },
   // NOTICE 2026-09-05: holding/company-side only — hidden from branch roles.
   { path: '/admin/pricing/fin1-rate-config', labelKey: 'nav.fin1RateConfig', icon: SlidersHorizontal, holdingCompanyOnly: true },
+  // Adjustable shop commission — fund side only, same as the global menu.
+  { path: '/admin/pricing/fin1-commission-rates', labelKey: 'nav.fin1CommissionRates', icon: BadgePercent, holdingCompanyOnly: true, fundOnly: true },
   { path: '/admin/pricing/fin2-rates', labelKey: 'nav.fin2Rates', icon: TrendingUp },
   { path: '/admin/pricing/discount-policies', labelKey: 'nav.discountPolicies', icon: Percent },
   { path: '/admin/pricing/deal-partner-rates', labelKey: 'nav.dealPartnerRates', icon: Handshake },
@@ -18,7 +20,7 @@ export function PricingLayout({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
   const navGuard = useNavGuard();
-  const { user } = useAuth();
+  const { user, isFundCompany } = useAuth();
   const role = user?.role_code ?? '';
   const isHoldingCompany = role.startsWith('HOLDING_') || role.startsWith('COMPANY_') || role === 'SYSTEM_DEV';
 
@@ -28,7 +30,7 @@ export function PricingLayout({ children }: { children: ReactNode }) {
         <span className="subnav-group-label mb-1">
           {t('nav.pricing')}
         </span>
-        {navItems.filter(item => !item.holdingCompanyOnly || isHoldingCompany).map(({ path, labelKey, icon: Icon }) => {
+        {navItems.filter(item => (!item.holdingCompanyOnly || isHoldingCompany) && (!('fundOnly' in item) || isFundCompany)).map(({ path, labelKey, icon: Icon }) => {
           const isActive = pathname.startsWith(path);
           return (
             <a

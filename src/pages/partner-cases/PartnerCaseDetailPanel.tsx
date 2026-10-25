@@ -26,7 +26,7 @@ import { Badge, Button, Tooltip } from 'tsp-form';
 import {
   ArrowLeft, Clock, FileText, Smartphone, User, Wallet, MapPin, Phone, Users,
   History, AlertTriangle, ImageOff, Star, ChevronRight,
-  CheckCircle2, XCircle, Info, MessageCircle,
+  CheckCircle2, XCircle, Info, MessageCircle, Percent,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
@@ -47,6 +47,7 @@ import { outcomeBadgeColor, type PartnerCaseDetail } from './partnerCaseTypes';
 import { PartnerCaseApproveModal } from './PartnerCaseApproveModal';
 import { adjustLabel, adjustValue, adjustmentRows } from './adjustFormat';
 import { PartnerCaseReturnModal } from './PartnerCaseReturnModal';
+import { PartnerCaseCommissionSection } from './PartnerCaseCommissionSection';
 
 interface PartnerCaseDetailPanelProps {
   detail: PartnerCaseDetail | null;
@@ -747,6 +748,16 @@ export function PartnerCaseDetailPanel({
             )}
           </div>
         </Section>
+
+        {/* The shop's commission and what lowering it took off the interest.
+            Hidden on cases from before the commission was frozen on the case. */}
+        <PartnerCaseCommissionSection
+          caseId={detail.case_id}
+          status={detail.status}
+          wrap={body => (
+            <Section icon={<Percent size={14} />} title={t('partnerCase.commissionTitle')}>{body}</Section>
+          )}
+        />
 
         {/* The device, plus its own photo album when it has one */}
         <Section icon={<Smartphone size={14} />} title={t('partnerCase.deviceTitle')}>

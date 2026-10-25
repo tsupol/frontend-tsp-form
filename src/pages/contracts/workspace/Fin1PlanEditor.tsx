@@ -31,6 +31,15 @@ import { fmtCurrency } from '../../../lib/format';
 // The last installment is routinely LIGHTER than the rest (flat interest,
 // remainder settles on the final one) — `is_uniform: false`. Every screen that
 // shows installments must say "X × (n−1) + final Y", never "X × n".
+//
+// A shop on an adjustable commission plan (IMPLEMENT 2026-10-26, shown only
+// when `policy.commission.adjustable`) also picks its own commission: a slider
+// from `min_pct` to `ceiling_pct`, or a round installment typed in, from which
+// the backend finds the commission (`p_installment`). Only one of the two is
+// ever sent; the chosen percent then rides along with every later preview and
+// the save, so changing price/down/term keeps the commission and moves the
+// installment. The shop sees its commission in % and baht and what the
+// customer saves per installment — never the multiplier or the fund's part.
 // ============================================================================
 
 // ── Response types (fn_contract_set_fin1_plan) ────────────────────────────
@@ -62,6 +71,33 @@ export interface Fin1Policy {
   used_uplift_min: number | null;
   used_uplift_max: number | null;
   used_price_rounding_unit: number | null;
+  /** The shop's commission plan (IMPLEMENT 2026-10-26 adjustable commission).
+   *  `adjustable` alone decides whether the commission control is drawn — never
+   *  the plan code. Null for an internal branch. */
+  commission?: Fin1CommissionPolicy | null;
+}
+
+export interface Fin1CommissionPolicy {
+  plan_code: string;
+  adjustable: boolean;
+  ceiling_pct: number;
+  /** Left end of the slider — read every time, never hardcoded (0 today; the
+   *  negative levels open later without a screen change). */
+  min_pct: number;
+  step_pct: number;
+}
+
+/** `data.commission` on a priced dry run / write. Every baht here is the
+ *  backend's; the screen only displays it. */
+export interface Fin1Commission extends Fin1CommissionPolicy {
+  chosen_pct: number;
+  commission_amount: number;
+  commission_amount_at_ceiling: number;
+  installment_at_ceiling: number;
+  saving_per_installment: number;
+  /** The typed-installment range at this price/down/term — changes with them. */
+  installment_min: number;
+  installment_max: number;
 }
 
 export interface Fin1Check {
@@ -115,6 +151,21 @@ export interface Fin1PlanResponse {
     agreed_price: number;
   };
   check: Fin1Check | null;
+  /** Null for an internal branch; `adjustable: false` for a fixed plan. */
+  commission?: Fin1Commission | null;
+}
+
+/** A commission percent as the shop reads it: whole when whole, else up to two
+ *  decimals (a typed installment resolves to e.g. 13.95). */
+export function fmtCommissionPct(pct: number): string {
+  return String(Number(pct.toFixed(2)));
+}
+
+/** Order-free identity of a set of RPC params. */
+function previewKey(params: Record<string, unknown>): string {
+  return JSON.stringify(
+    Object.keys(params).filter((k) => params[k] !== undefined).sort().map((k) => [k, params[k]]),
+  );
 }
 
 /** Which box the user typed the down payment into — only one is sent. */
@@ -185,11 +236,27 @@ export function Fin1PlanEditor({
     initialPrice != null ? String(initialPrice) : '',
   );
 
+  // ── Shop commission (adjustable plans only) ──────────────────────────
+  // Null until the backend names it: the first priced preview goes without a
+  // commission and gets back the one saved on the contract (or the ceiling).
+  const [commissionPct, setCommissionPct] = useState<number | null>(null);
+  const [installmentStr, setInstallmentStr] = useState('');
+  const [installmentError, setInstallmentError] = useState('');
+  const [installmentBusy, setInstallmentBusy] = useState(false);
+  /** The commission on the contract when the editor opened. */
+  const savedCommissionRef = useRef<number | null>(null);
+  /** Enter then blur would ask twice for the same typed installment. */
+  const installmentTriedRef = useRef('');
+
   // ── Preview (dry run) ────────────────────────────────────────────────
   const [preview, setPreview] = useState<Fin1PlanResponse | null>(null);
   const [previewError, setPreviewError] = useState('');
   const [previewing, setPreviewing] = useState(false);
   const previewSeq = useRef(0);
+  /** The inputs the preview on screen answers. Learning a value back from the
+   *  server (the other down box, the commission) must not buy a second,
+   *  identical call. Cleared on error so the same inputs can be retried. */
+  const lastPreviewKeyRef = useRef('');
 
   // ── Confirmed write ──────────────────────────────────────────────────
   const [saving, setSaving] = useState(false);
@@ -215,6 +282,8 @@ export function Fin1PlanEditor({
   const usedMin = policy?.used_retail_min ?? null;
   const usedMax = policy?.used_retail_max ?? null;
   const usedStep = policy?.used_price_rounding_unit ?? 100;
+  const commissionPolicy = policy?.commission?.adjustable ? policy.commission : null;
+  const adjustable = commissionPolicy != null;
 
   const buildParams = (dryRun: boolean) => {
     const params: Record<string, unknown> = {
@@ -228,7 +297,33 @@ export function Fin1PlanEditor({
     // Only a used contract may carry a price; sending one otherwise is its own
     // error (PRICING.VALIDATION.FIN1_PRICE_NOT_ALLOWED_NEW).
     if (isUsedRange && priceNum != null) params.p_price = priceNum;
+    // Only a shop on an adjustable plan sends it — anyone else gets 400/403.
+    if (adjustable && commissionPct != null) params.p_commission_pct = commissionPct;
     return params;
+  };
+
+  /** Take in a preview that landed: show it, and learn back what the server
+   *  resolved so the controls match it. `sent` is what was asked. */
+  const applyPreview = (res: Fin1PlanResponse, sent: Record<string, unknown>) => {
+    setPreview(res);
+    setPolicy(res.policy);
+    setPreviewError('');
+    // Keep the *other* down box in sync with what the server resolved, so
+    // switching % ↔ baht never shows a stale number. Never overwrite the
+    // box the user is typing in.
+    if (downMode === 'percent') setDownAmountStr(String(res.down_amount));
+    else setDownPercent(Math.round(res.down_percent));
+    const learned: Record<string, unknown> = { ...sent };
+    delete learned.p_installment;
+    const c = res.commission;
+    if (c?.adjustable) {
+      if (savedCommissionRef.current == null && sent.p_commission_pct === undefined && sent.p_installment === undefined) {
+        savedCommissionRef.current = c.chosen_pct;
+      }
+      setCommissionPct(c.chosen_pct);
+      learned.p_commission_pct = c.chosen_pct;
+    }
+    lastPreviewKeyRef.current = previewKey(learned);
   };
 
   // ── Bootstrap — learn `policy` before the user touches anything ───────
@@ -282,16 +377,18 @@ export function Fin1PlanEditor({
         // branch's range, fall through to the minimum like a fresh plan.
         if (initialDownAmount != null && term != null) {
           try {
-            const saved = await apiClient.rpc<Fin1PlanResponse>('fn_contract_set_fin1_plan', {
+            // No commission sent: the backend answers with the one saved on
+            // the contract, which seeds the commission control.
+            const sent = {
               p_contract_id: contractId,
               p_term_months: term,
               p_uplift: initialUplift ?? 0,
               p_dry_run: true,
               p_down_amount: initialDownAmount,
               ...(price != null ? { p_price: price } : {}),
-            });
-            setPolicy(saved.policy);
-            setPreview(saved);
+            };
+            const saved = await apiClient.rpc<Fin1PlanResponse>('fn_contract_set_fin1_plan', sent);
+            applyPreview(saved, sent);
             // Integer: the % slider steps by 1 and its label shows the chosen
             // whole percent — never seed it with the resolved decimal (25.02).
             setDownPercent(Math.round(saved.down_percent));
@@ -327,22 +424,18 @@ export function Fin1PlanEditor({
     // Once the plan is written, the panel shows the receipt — a stray preview
     // behind it would just churn requests.
     if (saved) return;
+    const sent = buildParams(true);
+    if (previewKey(sent) === lastPreviewKeyRef.current) return;
     const seq = ++previewSeq.current;
     setPreviewing(true);
     const timer = setTimeout(async () => {
       try {
-        const res = await apiClient.rpc<Fin1PlanResponse>('fn_contract_set_fin1_plan', buildParams(true));
+        const res = await apiClient.rpc<Fin1PlanResponse>('fn_contract_set_fin1_plan', sent);
         if (seq !== previewSeq.current) return;
-        setPreview(res);
-        setPolicy(res.policy);
-        setPreviewError('');
-        // Keep the *other* down box in sync with what the server resolved, so
-        // switching % ↔ baht never shows a stale number. Never overwrite the
-        // box the user is typing in.
-        if (downMode === 'percent') setDownAmountStr(String(res.down_amount));
-        else setDownPercent(Math.round(res.down_percent));
+        applyPreview(res, sent);
       } catch (err) {
         if (seq !== previewSeq.current) return;
+        lastPreviewKeyRef.current = '';
         setPreview(null);
         setPreviewError(translateApiError(err, t));
       } finally {
@@ -351,7 +444,52 @@ export function Fin1PlanEditor({
     }, 300);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [termMonths, uplift, downMode, downPercent, downAmountStr, priceStr, inputsReady, saved]);
+  }, [termMonths, uplift, downMode, downPercent, downAmountStr, priceStr, commissionPct, inputsReady, saved]);
+
+  // A typed installment only finds the commission, once. Moving price, down or
+  // term afterwards keeps that commission and changes the installment, so the
+  // typed figure no longer describes anything — clear it.
+  const downKey = downMode === 'percent' ? downPercent : downAmountStr;
+  useEffect(() => {
+    setInstallmentStr('');
+    setInstallmentError('');
+    installmentTriedRef.current = '';
+  }, [termMonths, uplift, downKey, priceStr]);
+
+  // ── Typed installment → the backend finds the commission ─────────────
+  const submitInstallment = async () => {
+    const target = installmentStr === '' ? null : Number(installmentStr);
+    if (target == null || !inputsReady || saved) return;
+    if (installmentTriedRef.current === installmentStr) return;
+    installmentTriedRef.current = installmentStr;
+    const sent = buildParams(true);
+    delete sent.p_commission_pct; // one or the other, never both
+    sent.p_installment = target;
+    const seq = ++previewSeq.current;
+    setInstallmentBusy(true);
+    setPreviewing(true);
+    setInstallmentError('');
+    try {
+      const res = await apiClient.rpc<Fin1PlanResponse>('fn_contract_set_fin1_plan', sent);
+      if (seq !== previewSeq.current) return;
+      applyPreview(res, sent);
+    } catch (err) {
+      if (seq !== previewSeq.current) return;
+      // The commission and the preview on screen stay as they were.
+      setInstallmentError(translateApiError(err, t));
+    } finally {
+      if (seq === previewSeq.current) setPreviewing(false);
+      setInstallmentBusy(false);
+    }
+  };
+
+  const changeCommission = (pct: number) => {
+    // The slider wins over a typed installment.
+    setInstallmentStr('');
+    setInstallmentError('');
+    installmentTriedRef.current = '';
+    setCommissionPct(pct);
+  };
 
   // ── Confirm — the same RPC, this time writing ────────────────────────
   const handleConfirm = async () => {
@@ -387,6 +525,8 @@ export function Fin1PlanEditor({
     || preview.down_amount !== initialDownAmount
     || preview.uplift_amount !== (initialUplift ?? 0)
     || (isUsedRange && initialPrice != null && preview.price !== initialPrice)
+    || (adjustable && savedCommissionRef.current != null
+      && preview.commission?.chosen_pct !== savedCommissionRef.current)
   );
   useEffect(() => {
     onDirtyChange?.(previewDiffers);
@@ -614,6 +754,24 @@ export function Fin1PlanEditor({
         </div>
       )}
 
+      {/* ── Shop commission (adjustable plans only) ────────────────── */}
+      {commissionPolicy && commissionPct != null && (
+        <CommissionChooser
+          policy={commissionPolicy}
+          pct={commissionPct}
+          onPct={changeCommission}
+          commission={preview?.commission?.adjustable ? preview.commission : null}
+          financed={preview?.financed_amount ?? null}
+          dim={previewing}
+          installmentStr={installmentStr}
+          onInstallmentStr={(v) => { setInstallmentStr(v); setInstallmentError(''); installmentTriedRef.current = ''; }}
+          onInstallmentSubmit={submitInstallment}
+          installmentError={installmentError}
+          installmentBusy={installmentBusy}
+          t={t}
+        />
+      )}
+
       {previewError && (
         <div className="alert alert-warning">
           <AlertTriangle size={16} />
@@ -641,9 +799,121 @@ export function Fin1PlanEditor({
   );
 }
 
-// ── Summary block — every figure straight from the RPC response ──────────
+// ── Shop commission: slider · typed installment · what the shop earns ────
 
 type TFn = (key: string, opts?: Record<string, unknown>) => string;
+
+/** Slider granularity for convenience; the backend takes 0.01, which a typed
+ *  installment can land on (13.95). */
+const COMMISSION_SLIDER_STEP = 0.5;
+
+function CommissionChooser({
+  policy, pct, onPct, commission, financed, dim,
+  installmentStr, onInstallmentStr, onInstallmentSubmit, installmentError, installmentBusy, t,
+}: {
+  policy: Fin1CommissionPolicy;
+  pct: number;
+  onPct: (pct: number) => void;
+  /** From the preview on screen; null until a priced preview lands. */
+  commission: Fin1Commission | null;
+  financed: number | null;
+  dim: boolean;
+  installmentStr: string;
+  onInstallmentStr: (v: string) => void;
+  onInstallmentSubmit: () => void;
+  installmentError: string;
+  installmentBusy: boolean;
+  t: TFn;
+}) {
+  const min = policy.min_pct;
+  const max = policy.ceiling_pct;
+  const amount = commission?.commission_amount ?? null;
+  // Display only: both figures are the backend's (doc §3.3 allows this one).
+  const cut = commission ? commission.commission_amount_at_ceiling - commission.commission_amount : 0;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-baseline gap-x-2">
+        <label className="form-label mb-0">{t('fin1Plan.commissionTitle')}</label>
+        <span className={BIG_NUM}>{fmtCommissionPct(pct)}%</span>
+      </div>
+      <Slider
+        value={pct}
+        onChange={(v) => onPct(Math.min(max, Math.max(min, Math.round(v / COMMISSION_SLIDER_STEP) * COMMISSION_SLIDER_STEP)))}
+        min={min}
+        max={max}
+        step={COMMISSION_SLIDER_STEP}
+      />
+      <div className="flex justify-between text-[11px] text-subtler tabular-nums">
+        <span>{fmtCommissionPct(min)}%</span>
+        <span>{fmtCommissionPct(max)}%</span>
+      </div>
+
+      {commission && amount != null && (
+        <div
+          className={`rounded-md border px-4 py-3 flex flex-col gap-1 transition-opacity ${dim ? 'opacity-60' : ''} ${
+            amount >= 0 ? 'bg-success-soft border-success-border' : 'bg-danger-soft border-danger-border'
+          }`}
+        >
+          <div className={`flex flex-wrap items-baseline gap-x-2 ${amount >= 0 ? 'text-success-fg' : 'text-danger-fg'}`}>
+            <span className="text-sm font-medium">
+              {amount >= 0 ? t('fin1Plan.commissionShopGets') : t('fin1Plan.commissionShopPays')}
+            </span>
+            <span className="text-xl font-semibold tabular-nums">{fmtCurrency(Math.abs(amount))}</span>
+            <span className="text-sm">{t('fin1Plan.baht')}</span>
+          </div>
+          <div className="text-xs text-subtle tabular-nums">
+            {financed != null && t('fin1Plan.commissionOfFinanced', {
+              pct: fmtCommissionPct(commission.chosen_pct),
+              financed: fmtCurrency(financed),
+            })}
+            {cut > 0 && <> · {t('fin1Plan.commissionCut', { amount: fmtCurrency(cut) })}</>}
+          </div>
+          {commission.saving_per_installment > 0 && (
+            <div className="text-xs text-subtle tabular-nums">
+              {t('fin1Plan.commissionSaving', {
+                amount: fmtCurrency(commission.saving_per_installment),
+                full: fmtCurrency(commission.installment_at_ceiling),
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="flex flex-col mt-1">
+        <label className="form-label">{t('fin1Plan.installmentTargetLabel')}</label>
+        <div className="w-44">
+          <MaskedInput
+            mask="number"
+            decimalScale={0}
+            size="sm"
+            value={installmentStr}
+            onChange={(raw) => onInstallmentStr(raw)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onInstallmentSubmit(); } }}
+            onBlur={() => onInstallmentSubmit()}
+            disabled={installmentBusy}
+            error={!!installmentError}
+            className="w-full"
+          />
+        </div>
+        {installmentError ? (
+          <span className="text-xs text-danger-fg mt-1">{installmentError}</span>
+        ) : commission && (
+          <span className="text-xs text-subtle tabular-nums mt-1">
+            {t('fin1Plan.installmentTargetHint', {
+              min: fmtCurrency(commission.installment_min),
+              max: fmtCurrency(commission.installment_max),
+              minPct: fmtCommissionPct(commission.min_pct),
+              maxPct: fmtCommissionPct(commission.ceiling_pct),
+            })}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Summary block — every figure straight from the RPC response ──────────
 
 function PlanSummary({ plan, t }: { plan: Fin1PlanResponse; t: TFn }) {
   const uniform = plan.plan.is_uniform;
@@ -671,6 +941,11 @@ function PlanSummary({ plan, t }: { plan: Fin1PlanResponse; t: TFn }) {
           // percent is decimal (25.02) and the owner asked for no decimals.
           { label: t('fin1Plan.rowDown'), value: fmtCurrency(plan.down_amount) },
           { label: t('fin1Plan.rowFinanced'), value: fmtCurrency(plan.financed_amount) },
+          // The shop's own commission — only where the shop chose it.
+          ...(plan.commission?.adjustable ? [{
+            label: t('fin1Plan.rowCommission'),
+            value: `${fmtCommissionPct(plan.commission.chosen_pct)}% · ${fmtCurrency(plan.commission.commission_amount)}`,
+          }] : []),
           { label: t('fin1Plan.rowMonths'), value: t('fin1Plan.months', { count: plan.term_months }) },
           { label: t('fin1Plan.rowInstallmentTotal'), value: fmtCurrency(plan.total_effective) },
           { label: t('fin1Plan.rowAgreedPrice'), value: fmtCurrency(plan.agreed_price) },

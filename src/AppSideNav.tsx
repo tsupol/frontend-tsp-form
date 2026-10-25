@@ -25,7 +25,7 @@ import {
   ChevronsUpDown,
   Languages,
   // Fanout child icons — Products
-  Tag, Layers, SlidersHorizontal, Box,
+  Tag, Layers, SlidersHorizontal, Box, BadgePercent,
   // Fanout child icons — Pricing
   TrendingUp, Percent, Handshake,
   // Fanout child icons — Price check
@@ -774,6 +774,10 @@ export const AppSideNav = () => {
         // NOTICE 2026-09-05: FIN1 rate config is holding/company-side only — never in branch menus.
         ...(role.startsWith('HOLDING_') || role.startsWith('COMPANY_') || role === 'SYSTEM_DEV' ? [
           { key: 'fin1-rate-config', icon: <SlidersHorizontal size="1rem" />, label: t('nav.fin1RateConfig'), path: '/admin/pricing/fin1-rate-config' },
+          // Shops that pick their own commission belong to the fund side only.
+          ...(isFundCompany ? [
+            { key: 'fin1-commission-rates', icon: <BadgePercent size="1rem" />, label: t('nav.fin1CommissionRates'), path: '/admin/pricing/fin1-commission-rates' },
+          ] : []),
         ] : []),
         { key: 'fin2-rates', icon: <TrendingUp size="1rem" />, label: t('nav.fin2Rates'), path: '/admin/pricing/fin2-rates' },
         { key: 'discount-policies', icon: <Percent size="1rem" />, label: t('nav.discountPolicies'), path: '/admin/pricing/discount-policies' },

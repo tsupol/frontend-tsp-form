@@ -31,6 +31,7 @@ import { Fin2RatesPage } from './pages/pricing/Fin2RatesPage';
 import { DiscountPoliciesPage } from './pages/pricing/DiscountPoliciesPage';
 import { DealPartnerRatesPage } from './pages/pricing/DealPartnerRatesPage';
 import { Fin1RateConfigPage } from './pages/pricing/Fin1RateConfigPage';
+import { Fin1CommissionRatePage } from './pages/pricing/Fin1CommissionRatePage';
 import { InventoryLayout } from './pages/inventory/InventoryLayout';
 import { StockDashboardPage } from './pages/inventory/StockDashboardPage';
 import { BranchStockPage } from './pages/inventory/BranchStockPage';
@@ -475,6 +476,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <PricingLayout><Fin1RateConfigPage /></PricingLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/pricing/fin1-commission-rates"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <PricingLayout><Fin1CommissionRatePage /></PricingLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
