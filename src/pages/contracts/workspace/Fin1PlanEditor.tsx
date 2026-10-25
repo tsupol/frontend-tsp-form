@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, MaskedInput, Slider } from 'tsp-form';
 import { Check, ShieldCheck, XCircle, AlertTriangle, Loader2 } from 'lucide-react';
-import { apiClient, ApiError } from '../../../lib/api';
+import { apiClient } from '../../../lib/api';
 import { translateApiError } from '../../../lib/apiErrors';
 import { fmtCurrency } from '../../../lib/format';
 
@@ -44,8 +44,9 @@ export type Fin1PriceMode = 'NEW_PRICEBOOK' | 'USED_RANGE';
 export interface Fin1Policy {
   min_down_percent: number;
   max_down_percent: number;
-  min_down_amount: number;
-  max_down_amount: number;
+  /** Null until the price is known (a used device before one is named). */
+  min_down_amount: number | null;
+  max_down_amount: number | null;
   rounding_unit: number;
   uplift_min: number | null;
   uplift_max: number | null;
@@ -200,26 +201,20 @@ export function Fin1PlanEditor({
   // leaves usable sliders on screen instead of collapsing the form.
   const [policy, setPolicy] = useState<Fin1Policy | null>(null);
 
-  // The used-price bounds, which can arrive two ways: inside `policy` once a
-  // priced preview succeeds, or — before that ever happens — inside the
-  // FIN1_USED_PRICE error, which is the only answer a used contract gives
-  // until a price is supplied. Held separately so the box stays on screen.
-  const [usedBounds, setUsedBounds] = useState<{ min: number | null; max: number | null; step: number } | null>(null);
-
-  // Bootstrap: the very first call has to guess an input to learn `policy`.
-  // A term the holding doesn't offer would fail before policy comes back, so
-  // the probe uses the contract's own term when it has one, else 12 (inside
-  // every realistic term list), and the minimum down the branch allows is
-  // discovered from the error itself if the guess is out of range.
+  // Bootstrap: one policy-only call (contract id + dry run, no inputs) returns
+  // the branch's down range, terms, uplift and used-price bounds before the
+  // user touches anything (HANDOFF 2026-10-25). It replaced a probe that sent
+  // a deliberately wrong 0% down and read the range out of the error — that
+  // broke the day the error code changed and left no down controls on screen.
   const bootstrappedRef = useRef(false);
 
   // Which of the two price screens to draw. The contract decides this, not the
   // user, so it is read from the server and never toggled locally.
-  const isUsedRange = policy?.price_mode === 'USED_RANGE' || usedBounds != null;
+  const isUsedRange = policy?.price_mode === 'USED_RANGE';
   const priceNum = priceStr === '' ? null : parseFloat(priceStr);
-  const usedMin = policy?.used_retail_min ?? usedBounds?.min ?? null;
-  const usedMax = policy?.used_retail_max ?? usedBounds?.max ?? null;
-  const usedStep = policy?.used_price_rounding_unit ?? usedBounds?.step ?? 100;
+  const usedMin = policy?.used_retail_min ?? null;
+  const usedMax = policy?.used_retail_max ?? null;
+  const usedStep = policy?.used_price_rounding_unit ?? 100;
 
   const buildParams = (dryRun: boolean) => {
     const params: Record<string, unknown> = {
@@ -236,7 +231,7 @@ export function Fin1PlanEditor({
     return params;
   };
 
-  // ── Bootstrap probe — learn `policy` before the user touches anything ──
+  // ── Bootstrap — learn `policy` before the user touches anything ───────
   useEffect(() => {
     if (bootstrappedRef.current) return;
     bootstrappedRef.current = true;
@@ -248,94 +243,66 @@ export function Fin1PlanEditor({
     // landing its result late is harmless.
     (async () => {
       setPreviewing(true);
-      const probeTerm = initialTermMonths ?? 12;
       try {
-        // Seed with whatever the contract already holds; when it holds nothing
-        // the probe deliberately sends an out-of-range 0% down so the server
-        // answers with the branch's real range in the error params — cheaper
-        // and more honest than guessing a percentage that might be rejected.
-        const res = await apiClient.rpc<Fin1PlanResponse>('fn_contract_set_fin1_plan', {
-          p_contract_id: contractId,
-          p_term_months: probeTerm,
-          p_uplift: initialUplift ?? 0,
-          p_dry_run: true,
-          ...(initialDownAmount != null
-            ? { p_down_amount: initialDownAmount }
-            : { p_down_percent: 0 }),
-          // Re-opening a saved used plan: send the price it was saved with, or
-          // the probe fails on the missing price before it can answer anything
-          // else. A contract with no price to send simply doesn't pass one, and
-          // the used-price error below supplies the bounds instead.
-          ...(initialPrice != null ? { p_price: initialPrice } : {}),
-        });
-        setPolicy(res.policy);
-        setPreview(res);
-        setPreviewError('');
-        setTermMonths(res.term_months);
-        // Integer: the % slider steps by 1 and its label shows the chosen
-        // whole percent — never seed it with the resolved decimal (25.02).
-        setDownPercent(Math.round(res.down_percent));
-        setDownAmountStr(String(res.down_amount));
-        if (res.policy?.price_mode === 'USED_RANGE' && res.base_price != null) {
-          setPriceStr(String(res.base_price));
-        }
-      } catch (err) {
-        // The out-of-range probe is expected to fail — the error carries the
-        // branch's down range, which is all we needed to build the controls.
-        if (err instanceof ApiError && err.code === 'PRICING.VALIDATION.FIN1_DOWN_BELOW_MIN') {
-          const p = (err.messageParams ?? {}) as Record<string, number>;
-          if (p.min_down_percent != null) {
-            setTermMonths(probeTerm);
-            setDownPercent(p.min_down_percent);
-            setPreviewError('');
-            return; // the debounced preview below fires with the valid minimum
-          }
-        }
-        // A used contract answers the price question first (verified live: the
-        // price check runs before the down check), so the probe never reaches
-        // the down error and `policy` never arrives. The bounds the price box
-        // needs are in THIS error instead — take them and draw the box; the
-        // rest of `policy` follows from the first preview that carries a price.
-        if (err instanceof ApiError && err.code === 'PRICING.VALIDATION.FIN1_USED_PRICE') {
-          const p = (err.messageParams ?? {}) as Record<string, number>;
-          setUsedBounds({
-            min: p.used_retail_min ?? null,
-            max: p.used_retail_max ?? null,
-            step: p.rounding_unit ?? 100,
+        // A saved used plan sends its price, so the down range comes back in
+        // baht too; if that price no longer fits the model's used range, ask
+        // again without it rather than leave the step empty.
+        let res: Fin1PlanResponse;
+        try {
+          res = await apiClient.rpc<Fin1PlanResponse>('fn_contract_set_fin1_plan', {
+            p_contract_id: contractId,
+            p_dry_run: true,
+            ...(initialPrice != null ? { p_price: initialPrice } : {}),
           });
-          setTermMonths(probeTerm);
-          setPreviewError('');
-          // Start the price where the slider's thumb is drawn — the bottom of
-          // the range. Left empty, the thumb looked set while nothing was, and a
-          // model whose range is one price (min = max) gave a slider that can't
-          // be dragged, so the step never got a price at all.
-          if (initialPrice == null && p.used_retail_min != null) {
-            setPriceStr(String(p.used_retail_min));
-          }
-          // The down controls still need a starting percentage, and the branch's
-          // range is only quoted once a price is on the table. Ask again with
-          // the price the contract already holds, if it has one, and take the
-          // range from that answer. With no saved price the box simply waits
-          // for the user, and the first preview seeds the down from the reply.
-          if (initialPrice != null) {
-            try {
-              await apiClient.rpc<Fin1PlanResponse>('fn_contract_set_fin1_plan', {
-                p_contract_id: contractId,
-                p_term_months: probeTerm,
-                p_uplift: initialUplift ?? 0,
-                p_dry_run: true,
-                p_down_percent: 0,
-                p_price: initialPrice,
-              });
-            } catch (err2) {
-              if (err2 instanceof ApiError && err2.code === 'PRICING.VALIDATION.FIN1_DOWN_BELOW_MIN') {
-                const p2 = (err2.messageParams ?? {}) as Record<string, number>;
-                if (p2.min_down_percent != null) setDownPercent(p2.min_down_percent);
-              }
-            }
-          }
-          return;
+        } catch (err) {
+          if (initialPrice == null) throw err;
+          res = await apiClient.rpc<Fin1PlanResponse>('fn_contract_set_fin1_plan', {
+            p_contract_id: contractId,
+            p_dry_run: true,
+          });
         }
+        const pol = res.policy;
+        setPolicy(pol);
+        setPreviewError('');
+        const term = initialTermMonths != null && pol.terms.includes(initialTermMonths)
+          ? initialTermMonths
+          : pol.terms.includes(12) ? 12 : (pol.terms[pol.terms.length - 1] ?? null);
+        setTermMonths(term);
+        // Start the used price where the slider's thumb is drawn — the bottom
+        // of the range. Left empty, the thumb looked set while nothing was, and
+        // a one-price range (min = max) can't be dragged to set it.
+        const price = pol.price_mode === 'USED_RANGE'
+          ? (initialPrice ?? pol.used_retail_min)
+          : null;
+        if (pol.price_mode === 'USED_RANGE' && initialPrice == null && pol.used_retail_min != null) {
+          setPriceStr(String(pol.used_retail_min));
+        }
+        // Re-opening a saved plan: resolve its own down once so the % slider
+        // shows the whole percent it was saved at. If it no longer fits the
+        // branch's range, fall through to the minimum like a fresh plan.
+        if (initialDownAmount != null && term != null) {
+          try {
+            const saved = await apiClient.rpc<Fin1PlanResponse>('fn_contract_set_fin1_plan', {
+              p_contract_id: contractId,
+              p_term_months: term,
+              p_uplift: initialUplift ?? 0,
+              p_dry_run: true,
+              p_down_amount: initialDownAmount,
+              ...(price != null ? { p_price: price } : {}),
+            });
+            setPolicy(saved.policy);
+            setPreview(saved);
+            // Integer: the % slider steps by 1 and its label shows the chosen
+            // whole percent — never seed it with the resolved decimal (25.02).
+            setDownPercent(Math.round(saved.down_percent));
+            setDownAmountStr(String(saved.down_amount));
+            return;
+          } catch { /* saved down out of range now — start from the minimum */ }
+        }
+        // A fresh plan starts at the branch's own minimum — never a hardcoded
+        // number, which the branch may not allow.
+        setDownPercent(pol.min_down_percent);
+      } catch (err) {
         setPreviewError(translateApiError(err, t));
       } finally {
         setPreviewing(false);
@@ -354,38 +321,6 @@ export function Fin1PlanEditor({
     // — previewing before that just buys an error the user can't act on.
     (!isUsedRange || (priceNum != null && priceNum > 0));
 
-  // A used contract with no saved price reaches the price box with no down
-  // percentage yet, because the branch's range is only quoted once a price is
-  // on the table. The moment one is typed, ask for the range and seed the
-  // controls from it — after that the normal preview takes over.
-  useEffect(() => {
-    if (!isUsedRange || policy || saved) return;
-    if (downPercent != null || termMonths == null) return;
-    if (priceNum == null || priceNum <= 0) return;
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      try {
-        await apiClient.rpc<Fin1PlanResponse>('fn_contract_set_fin1_plan', {
-          p_contract_id: contractId,
-          p_term_months: termMonths,
-          p_uplift: uplift,
-          p_dry_run: true,
-          p_down_percent: 0,
-          p_price: priceNum,
-        });
-      } catch (err) {
-        if (cancelled) return;
-        if (err instanceof ApiError && err.code === 'PRICING.VALIDATION.FIN1_DOWN_BELOW_MIN') {
-          const p = (err.messageParams ?? {}) as Record<string, number>;
-          if (p.min_down_percent != null) setDownPercent(p.min_down_percent);
-          return;
-        }
-        setPreviewError(translateApiError(err, t));
-      }
-    }, 400);
-    return () => { cancelled = true; clearTimeout(timer); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isUsedRange, policy, saved, downPercent, termMonths, priceStr, uplift]);
 
   useEffect(() => {
     if (!inputsReady) return;
@@ -640,6 +575,7 @@ export function Fin1PlanEditor({
                   className="w-full"
                 />
               </div>
+              {policy.min_down_amount != null && policy.max_down_amount != null && (
               <span className="text-xs text-subtle tabular-nums">
                 {t('fin1Plan.downAmountHint', {
                   min: fmtCurrency(policy.min_down_amount),
@@ -647,6 +583,7 @@ export function Fin1PlanEditor({
                   unit: policy.rounding_unit,
                 })}
               </span>
+              )}
             </div>
           )}
         </div>

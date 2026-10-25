@@ -166,7 +166,20 @@ export function PartnerCaseApproveModal({ open, detail, onClose, onApproved }: P
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inputsReady, detail?.contract_id, term, uplift, downStr, priceStr, isUsed]);
 
-  const policy = preview?.policy ?? null;
+  // The branch's bounds before any preview (policy-only dry run, HANDOFF
+  // 2026-10-25) — a used device with no saved price can't preview until a
+  // price is typed, and the price box must say what range it accepts.
+  const { data: basePolicy = null } = useQuery({
+    queryKey: ['fin1-plan-policy', detail?.contract_id],
+    queryFn: async () => (await apiClient.rpc<Fin1PlanResponse>('fn_contract_set_fin1_plan', {
+      p_contract_id: detail!.contract_id,
+      p_dry_run: true,
+    })).policy,
+    enabled: open && adjustOn && detail != null,
+    staleTime: 60 * 1000,
+    retry: false,
+  });
+  const policy = preview?.policy ?? basePolicy;
   const upliftMax = policy?.uplift_max ?? 0;
   const upliftOptions = useMemo(() => {
     const steps = new Set<number>([uplift, requested.uplift ?? 0]);
@@ -337,7 +350,7 @@ export function PartnerCaseApproveModal({ open, detail, onClose, onApproved }: P
                           requested={requested.down_amount}
                           changed={changedKeys.includes('down_amount')}
                           k="down_amount"
-                          range={policy
+                          range={policy?.min_down_amount != null && policy.max_down_amount != null
                             ? t('fin1Plan.downAmountHint', {
                               min: fmtCurrency(policy.min_down_amount),
                               max: fmtCurrency(policy.max_down_amount),

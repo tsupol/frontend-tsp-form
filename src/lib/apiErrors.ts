@@ -81,7 +81,8 @@ export function prepareErrorParams(
   for (const k of ['excess', 'max_slip', 'implied_discount', 'max_amount', 'over_by', 'min_slip',
     'expected_slip', 'bill_total', 'discount_amount',
     // mig 1492c FIN1 down errors (BELOW_MIN / ABOVE_MAX / NOT_ROUNDED).
-    'min_down_amount', 'max_down_amount', 'rounded_down', 'rounded_up'] as const) {
+    'min_down_amount', 'max_down_amount', 'rounded_down', 'rounded_up',
+    'used_retail_min', 'used_retail_max'] as const) {
     if (typeof params[k] === 'number') params[k] = fmtCurrency(params[k] as number);
   }
   // mig 1357 IDENTIFIER_FORMAT_INVALID ships `reason` (IMEI_FORMAT, APPLE_SERIAL_FORMAT, …) —
