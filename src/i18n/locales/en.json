@@ -1486,7 +1486,7 @@
         "noChallenge": "The server did not return a confirmation code. Try again."
       },
       "allowance": {
-        "title": "Let the customer remove apps (permanent)",
+        "title": "Allowed on this device",
         "state": {
           "notGranted": "Not allowed (same as any other device)",
           "onDevice": "Allowed permanently",
@@ -1513,9 +1513,14 @@
         "historyLess": "Show less",
         "grantTitle": "Allow permanently",
         "revokeTitle": "Withdraw permission",
-        "grantBody": "This stays on until someone withdraws it — it does not run out like the timed option above. The system sends it to the device within about a minute once the device is online.",
+        "grantBody": "This stays on until someone withdraws it. The system sends it to the device within about a minute once the device is online. If the customer falls behind on payments far enough for a medium or hard restriction, it is switched off until they catch up.",
+        "grantBodyNotTimed": "It does not run out like the timed option above.",
+        "askCompanyAdmin": "Only a company admin can turn these on or off — ask your company admin, with the customer’s reason.",
         "revokeBody": "The device goes back to normal. The system sends this to the device within about a minute once the device is online.",
         "reasonPlaceholder": "e.g. the branch says the customer asked for it",
+        "reasonPlaceholderByCode": {
+          "VPN": "e.g. the customer needs their employer’s VPN (company name)"
+        },
         "reasonRequired": "Enter a reason",
         "reasonKept": "The reason is kept in the history for good.",
         "doneGrant": "Allowed permanently",

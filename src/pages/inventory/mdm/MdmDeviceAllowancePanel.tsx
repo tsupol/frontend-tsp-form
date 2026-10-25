@@ -1,7 +1,10 @@
 // ============================================================================
-// "อนุญาตให้ลบแอปเอง (ถาวร)" — per-device permanent allowances.
+// "อนุญาตเฉพาะเครื่องนี้" — per-device permanent allowances.
 // IMPLEMENT 2026-10-06 app_removal_min_paid_installments §0.2, §7-§9 ·
-// DELIVERY 2026-10-07 device_allowance_rpcs (nnf-mdm mig 348).
+// DELIVERY 2026-10-07 device_allowance_rpcs (nnf-mdm mig 348) ·
+// IMPLEMENT 2026-10-25 mdm_vpn_allowance_378 — the panel now carries more than
+// app removal (VPN, Find My, iCloud menu), so its title and grant wording are
+// generic; the "unlike the timed option above" sentence is app removal's only.
 //
 // Placement (§0.2, owner 2026-10-07): sub-tab 5, directly under the temporary
 // "ให้ลูกค้าลบแอปเอง" panel. Same subject, different lifetime — seeing both lets
@@ -114,6 +117,10 @@ function AllowancePanelBody({ serial, onChanged }: { serial: string; onChanged: 
 
   const labelOf = (code: string) =>
     data.allowances.find((a) => a.allowance_code === code)?.label_th ?? code;
+  // Branch staff see every row but can set none — say who can, instead of rows
+  // that silently have no button. Not per row: an admin also gets can_set=false
+  // on the engineering-only rows, and "ask your company admin" would be wrong there.
+  const noneSettable = !data.allowances.some((a) => a.can_set);
 
   return (
     <div className="border border-line rounded-md px-3 py-2.5 flex flex-col gap-2.5">
@@ -123,10 +130,13 @@ function AllowancePanelBody({ serial, onChanged }: { serial: string; onChanged: 
         <AllowanceRow
           key={a.allowance_code}
           a={a}
-          showLabel={data.allowances.length > 1}
           onSet={(allowed) => setTarget({ allowance: a, allowed })}
         />
       ))}
+
+      {noneSettable && (
+        <div className="text-xs text-subtle">{t('asset.mdm.allowance.askCompanyAdmin')}</div>
+      )}
 
       {data.log.length > 0 && <AllowanceLog log={data.log} labelOf={labelOf} />}
 
@@ -143,10 +153,9 @@ function AllowancePanelBody({ serial, onChanged }: { serial: string; onChanged: 
 // ── One allowance ────────────────────────────────────────────────────────────
 
 function AllowanceRow({
-  a, showLabel, onSet,
+  a, onSet,
 }: {
   a: MdmDeviceAllowance;
-  showLabel: boolean;
   onSet: (allowed: boolean) => void;
 }) {
   const { t } = useTranslation();
@@ -179,9 +188,10 @@ function AllowanceRow({
           {isOn
             ? <Unlock size={14} className="text-warning-fg shrink-0 mt-0.5" />
             : <Lock size={14} className="text-subtle shrink-0 mt-0.5" />}
+          {/* The panel title is generic, so every row names what it allows. */}
           <div className="flex flex-col min-w-0">
-            {showLabel && <span className="font-medium">{a.label_th}</span>}
-            <span className={showLabel ? 'text-subtle' : undefined}>{headline}</span>
+            <span className="font-medium">{a.label_th}</span>
+            <span className="text-subtle">{headline}</span>
           </div>
         </div>
 
@@ -394,7 +404,13 @@ function SetAllowanceModal({
                 {a && <> · {a.label_th}</>}
               </p>
               <p className="text-sm text-subtle">
-                {allowed ? t('asset.mdm.allowance.grantBody') : t('asset.mdm.allowance.revokeBody')}
+                {allowed ? (
+                  <>
+                    {/* Only app removal has a timed twin (the panel above). */}
+                    {a?.allowance_code.toUpperCase() === 'APP_REMOVAL' && <>{t('asset.mdm.allowance.grantBodyNotTimed')} </>}
+                    {t('asset.mdm.allowance.grantBody')}
+                  </>
+                ) : t('asset.mdm.allowance.revokeBody')}
               </p>
               {!allowed && a?.rule_says_yes && (
                 <div className="alert alert-warning">
@@ -413,7 +429,9 @@ function SetAllowanceModal({
                   onChange={(e) => setReason(e.target.value)}
                   onBlur={() => setTouched(true)}
                   rows={3}
-                  placeholder={t('asset.mdm.allowance.reasonPlaceholder')}
+                  placeholder={t(`asset.mdm.allowance.reasonPlaceholderByCode.${a?.allowance_code.toUpperCase() ?? ''}`, {
+                    defaultValue: t('asset.mdm.allowance.reasonPlaceholder'),
+                  })}
                   error={touched && reasonMissing}
                 />
                 {/* The error line draws into the space below it, so it takes the hint's place. */}
