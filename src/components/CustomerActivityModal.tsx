@@ -4,11 +4,11 @@ import { useQuery } from '@tanstack/react-query';
 import { Modal, Badge } from 'tsp-form';
 import { CheckCircle, XCircle, User, Shield, Cog, Smartphone, Loader2 } from 'lucide-react';
 import { apiClient } from '../lib/api';
-import { formatDateTime, formatSmart } from '../lib/format';
+import { formatDateTime, formatSmart, formatTel } from '../lib/format';
 
 type AuditAction =
   | 'LOGIN_RESET' | 'USERNAME_CHANGED' | 'PASSWORD_CHANGED'
-  | 'ACCOUNT_LOCKED' | 'ACCOUNT_UNLOCKED' | 'UPDATE_IDENTITY';
+  | 'ACCOUNT_LOCKED' | 'ACCOUNT_UNLOCKED' | 'UPDATE_IDENTITY' | 'UPDATE_CONTACT';
 
 type ActorKind = 'STAFF' | 'CUSTOMER' | 'SYSTEM';
 
@@ -105,7 +105,7 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
       type="button"
       onClick={onClick}
       className={`px-3 py-1.5 text-sm border-b-2 -mb-px transition-colors cursor-pointer ${
-        active ? 'border-primary text-primary font-medium' : 'border-transparent text-subtle hover:text-fg'
+        active ? 'border-primary text-primary-fg font-medium' : 'border-transparent text-subtle hover:text-fg'
       }`}
     >
       {children}
@@ -177,6 +177,25 @@ function ActorIcon({ kind }: { kind: ActorKind }) {
   return <Cog size={13} className="text-subtle" />;
 }
 
+// UPDATE_CONTACT writes one row per changed field (mig 1516).
+const CONTACT_FIELD_LABEL: Record<string, string> = {
+  tel: 'customer.phone',
+  tel2: 'customer.phone2',
+  prefix: 'customer.prefix',
+  first_name: 'customer.firstName',
+  last_name: 'customer.lastName',
+  facebook: 'customer.facebook',
+  line_id: 'customer.lineId',
+  date_of_birth: 'customer.dateOfBirth',
+};
+
+function contactValue(field: string | null, value: string | null, lang: string): string {
+  if (!value) return '—';
+  if (field === 'tel' || field === 'tel2') return formatTel(value);
+  if (field === 'date_of_birth') return formatDateTime(`${value}T00:00:00+07:00`, lang, false);
+  return value;
+}
+
 function AuditRowView({ row, lang, t }: {
   row: AuditRow;
   lang: string;
@@ -184,8 +203,11 @@ function AuditRowView({ row, lang, t }: {
 }) {
   const actionLabel = t(`customer.login.action_${row.action}`, { defaultValue: row.action });
   const actorLabel = t(`customer.login.actor_${row.actor_kind}`, { defaultValue: row.actor_kind });
-  const showDelta = (row.action === 'USERNAME_CHANGED' || row.action === 'UPDATE_IDENTITY')
+  const isContact = row.action === 'UPDATE_CONTACT';
+  const showDelta = (row.action === 'USERNAME_CHANGED' || row.action === 'UPDATE_IDENTITY' || isContact)
     && (row.old_value || row.new_value);
+  const fieldKey = isContact && row.field_name ? CONTACT_FIELD_LABEL[row.field_name] : undefined;
+  const fieldLabel = isContact && row.field_name ? (fieldKey ? t(fieldKey) : row.field_name) : null;
 
   return (
     <div className="rounded-md border border-line bg-surface px-3 py-2 text-sm">
@@ -200,10 +222,10 @@ function AuditRowView({ row, lang, t }: {
           </div>
           {showDelta && (
             <div className="text-xs text-subtle mt-0.5 break-all">
-              {t('customer.login.valueChange', {
-                from: row.old_value ?? '—',
-                to: row.new_value ?? '—',
-              })}
+              {fieldLabel && <span className="text-fg">{fieldLabel}: </span>}
+              {isContact ? contactValue(row.field_name, row.old_value, lang) : (row.old_value ?? '—')}
+              <span className="text-primary-fg font-medium mx-1">→</span>
+              {isContact ? contactValue(row.field_name, row.new_value, lang) : (row.new_value ?? '—')}
             </div>
           )}
           {row.reason && (

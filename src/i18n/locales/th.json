@@ -4009,6 +4009,7 @@
       "action_ACCOUNT_LOCKED": "บัญชีถูกล็อกอัตโนมัติ",
       "action_ACCOUNT_UNLOCKED": "ปลดล็อกบัญชี",
       "action_UPDATE_IDENTITY": "อัปเดตข้อมูลบัตร",
+      "action_UPDATE_CONTACT": "แก้ข้อมูลติดต่อ",
       "actor_STAFF": "พนักงาน",
       "actor_CUSTOMER": "ลูกค้า",
       "actor_SYSTEM": "ระบบ",

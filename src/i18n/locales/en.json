@@ -4013,6 +4013,7 @@
       "action_ACCOUNT_LOCKED": "Account locked",
       "action_ACCOUNT_UNLOCKED": "Account unlocked",
       "action_UPDATE_IDENTITY": "Identity updated",
+      "action_UPDATE_CONTACT": "Contact updated",
       "actor_STAFF": "Staff",
       "actor_CUSTOMER": "Customer",
       "actor_SYSTEM": "System",
