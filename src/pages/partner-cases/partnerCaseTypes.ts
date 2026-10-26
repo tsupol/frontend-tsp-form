@@ -79,6 +79,21 @@ export interface PartnerCase {
   last_installment_amount: number | null;
   doc_fee_amount: number | null;
 
+  /** The deal (mig 1526): credit's figures when it adjusted, else the
+   *  request — the same numbers the shop is paid on. Show these wherever the
+   *  case's money appears; the plain columns above are only the "asked for"
+   *  side of the before → after table. Never combine the two on screen. */
+  deal_agreed_price: number | null;
+  deal_down_payment: number | null;
+  deal_uplift_amount: number | null;
+  deal_financed_amount: number | null;
+  deal_term_months: number | null;
+  deal_installment_amount: number | null;
+  deal_last_installment_amount: number | null;
+  deal_doc_fee_amount: number | null;
+  /** APPROVED_PAYLOAD = credit adjusted · SUBMITTED = as asked. */
+  deal_source: 'APPROVED_PAYLOAD' | 'SUBMITTED' | null;
+
   snapshot_hash: string | null;
   anchor_version: number | null;
 

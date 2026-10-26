@@ -91,7 +91,8 @@ const fromHistory = (r: PartnerCase): RailRow => ({
   customer_name: r.customer_name,
   branch_name: r.branch_name,
   model_label: r.product_display_name,
-  financed_amount: r.financed_amount,
+  // The deal, not the request: an adjusted approval's financed amount (mig 1526).
+  financed_amount: r.deal_financed_amount,
   is_used_asset: r.is_used_asset,
   submitted_by_name: r.submitted_by_name,
   timestamp: r.updated_at,

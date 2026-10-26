@@ -241,7 +241,6 @@ export function PartnerCaseDetailPanel({
   // ── Derived for display ───────────────────────────────────────────────────
 
   const snapshot = detail.snapshot_payload;
-  const agreed = snapshot?.agreed;
   const asset = snapshot?.asset;
   const parties = snapshot?.parties ?? [];
   const lessee = parties.find(p => p.role === 'LESSEE') ?? parties[0];
@@ -690,7 +689,8 @@ export function PartnerCaseDetailPanel({
           <PaymentRecordList record={record} emptyText={t('partnerCase.noPaymentRecord')} />
         </Section>
 
-        {/* 6. The deal: the money, exactly as submitted */}
+        {/* 6. The deal: the money as approved — credit's figures when it
+             adjusted, else the request (the deal_* columns, mig 1526). */}
         <Section icon={<Wallet size={14} />} title={t('partnerCase.moneyTitle')}>
           {/* No agreed price here. It is a derived figure — the down payment
            *  plus every instalment — and on a shop contract there is no price
@@ -705,7 +705,7 @@ export function PartnerCaseDetailPanel({
            *  uplift; net − down = financed on every case). */}
           {(() => {
             const retail = snapshot?.rated?.retail_price ?? null;
-            const uplift = agreed?.uplift_amount ?? detail.uplift_amount ?? 0;
+            const uplift = detail.deal_uplift_amount ?? 0;
             const net = retail != null ? retail + uplift : null;
             return (
               <div className="rounded-md border border-line divide-y divide-line text-sm mb-3">
@@ -728,23 +728,29 @@ export function PartnerCaseDetailPanel({
             {detail.guarantee_days != null && (
               <Field label={t('partnerCase.guarantee')} value={t('partnerCase.guaranteeDays', { n: detail.guarantee_days })} />
             )}
-            <Field label={t('partnerCase.downPayment')} value={fmtCurrency(agreed?.down_payment ?? detail.down_payment)} />
+            <Field label={t('partnerCase.downPayment')} value={fmtCurrency(detail.deal_down_payment)} />
             <Field
               label={t('partnerCase.financedAmount')}
-              value={fmtCurrency(agreed?.financed_amount ?? detail.financed_amount)}
+              value={fmtCurrency(detail.deal_financed_amount)}
               emphasis
             />
             <Field
               label={t('partnerCase.installments')}
-              value={`${agreed?.value_month ?? detail.term_months ?? '—'} × ${fmtCurrency(agreed?.installment_amount ?? detail.installment_amount)}`}
+              value={`${detail.deal_term_months ?? '—'} × ${fmtCurrency(detail.deal_installment_amount)}`}
             />
             <Field
               label={t('partnerCase.lastInstallment')}
-              value={fmtCurrency(agreed?.last_installment_amount ?? detail.last_installment_amount)}
+              value={fmtCurrency(detail.deal_last_installment_amount)}
             />
-            <Field label={t('partnerCase.docFee')} value={fmtCurrency(agreed?.doc_fee_amount ?? detail.doc_fee_amount)} />
-            {agreed?.installment_total != null && (
-              <Field label={t('partnerCase.installmentTotal')} value={fmtCurrency(agreed.installment_total)} />
+            <Field label={t('partnerCase.docFee')} value={fmtCurrency(detail.deal_doc_fee_amount)} />
+            {/* No deal total comes down ready-made; the agreed price is the
+                down plus every installment (BE's own definition), so the
+                total is that price less the down. */}
+            {detail.deal_agreed_price != null && detail.deal_down_payment != null && (
+              <Field
+                label={t('partnerCase.installmentTotal')}
+                value={fmtCurrency(detail.deal_agreed_price - detail.deal_down_payment)}
+              />
             )}
           </div>
         </Section>
