@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, MaskedInput, Slider } from 'tsp-form';
 import { Check, ShieldCheck, XCircle, AlertTriangle, Loader2 } from 'lucide-react';
@@ -809,7 +809,7 @@ const COMMISSION_SLIDER_STEP = 0.5;
 
 export function CommissionChooser({
   policy, pct, onPct, commission, financed, dim,
-  installmentStr, onInstallmentStr, onInstallmentSubmit, installmentError, installmentBusy, t,
+  installmentStr, onInstallmentStr, onInstallmentSubmit, installmentError, installmentBusy, badge, sliderDisabled, t,
 }: {
   policy: Fin1CommissionPolicy;
   pct: number;
@@ -825,6 +825,10 @@ export function CommissionChooser({
   onInstallmentSubmit?: () => void;
   installmentError?: string;
   installmentBusy?: boolean;
+  /** Shown beside the percent (e.g. the calculator's lock / follows marker). */
+  badge?: ReactNode;
+  /** The percent follows something else on screen — the slider can't be dragged. */
+  sliderDisabled?: boolean;
   t: TFn;
 }) {
   const min = policy.min_pct;
@@ -838,8 +842,10 @@ export function CommissionChooser({
       <div className="flex flex-wrap items-baseline gap-x-2">
         <label className="form-label mb-0">{t('fin1Plan.commissionTitle')}</label>
         <span className={BIG_NUM}>{fmtCommissionPct(pct)}%</span>
+        {badge}
       </div>
       <Slider
+        disabled={sliderDisabled}
         value={pct}
         onChange={(v) => onPct(Math.min(max, Math.max(min, Math.round(v / COMMISSION_SLIDER_STEP) * COMMISSION_SLIDER_STEP)))}
         min={min}

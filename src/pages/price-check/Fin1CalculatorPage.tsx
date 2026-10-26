@@ -3,13 +3,14 @@ import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Button, DataTable, Input, MaskedInput, MobileHeader, PageNav, PageNavPanel, Slider } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Calculator, Search, ShieldCheck, X, XCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ArrowRightFromLine, Calculator, Lock, RefreshCw, Search, ShieldCheck, X, XCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { fmtCurrency } from '../../lib/format';
 import { isSearchable, isBelowSearchMin, SEARCH_MIN_CHARS } from '../../lib/searchKeyword';
 import {
   CommissionChooser,
+  fmtCommissionPct,
   type Fin1Commission,
   type Fin1CommissionPolicy,
 } from '../contracts/workspace/Fin1PlanEditor';
@@ -571,36 +572,35 @@ export function Fin1CalculatorPage() {
     }
   };
 
-  // The amount found a commission for one price, down and term. Moving any of
-  // them keeps the commission and moves the installment (ticket §4.4), so the
-  // amount no longer describes the plan — clear it. (The months slider clears
-  // it itself.)
-  const lastCellArgsKey = useRef<string | null>(null);
-  useEffect(() => {
-    // Only while the amount drives the commission — switching modes moves the
-    // term the plan is read at, which is not the user changing an input.
-    if (!commissionTarget) { lastCellArgsKey.current = null; return; }
-    const prev = lastCellArgsKey.current;
-    lastCellArgsKey.current = cellArgsKey;
-    if (prev != null && cellArgsKey != null && prev !== cellArgsKey) {
-      setMonthlyStr('');
-      setTargetError('');
-    }
-  }, [cellArgsKey, commissionTarget]);
-
   useEffect(() => {
     if (targetAmount == null) { targetSeq.current++; setTargetError(''); setTargetBusy(false); return; }
     const tm = setTimeout(() => { void runTarget(!targetTypingRef.current); }, 500);
     return () => clearTimeout(tm);
+    // The months, down and price are what the user holds: moving one re-solves
+    // the commission for the same amount.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runTarget reads the same inputs
-  }, [targetAmount]);
+  }, [targetAmount, cellArgsKey]);
 
   const changeCommission = (pct: number) => {
-    // The slider takes over from an amount the commission was following.
-    if (commissionTarget) setMonthlyStr('');
     setTargetError('');
     setCommissionPct(pct);
   };
+
+  // While an amount is typed, one of months / commission is held (locked) and
+  // the other follows the amount. Marked on both, so the shop sees which is which.
+  const lockBadge = (
+    <span className="inline-flex items-center gap-1 text-xs font-medium text-warning-fg">
+      <Lock size={12} />
+      {t('fin1Calc.badgeLocked')}
+    </span>
+  );
+  const followsBadge = (
+    <span className="inline-flex items-center gap-1 text-xs font-medium text-primary-fg">
+      <RefreshCw size={12} />
+      {t('fin1Calc.badgeFollows')}
+    </span>
+  );
+  const showLocks = commissionPolicy != null && monthlyTyped;
 
   const pickTargetMode = (m: 'commission' | 'months') => {
     setTargetMode(m);
@@ -703,6 +703,24 @@ export function Fin1CalculatorPage() {
         docFee: table.policy.doc_fee_amount,
         exact: true,
       });
+
+  // The answer to the typed amount, in one line under the box. Hidden while
+  // it is being worked out or when the amount was refused (the alert says why).
+  const targetResult = (() => {
+    if (!monthlyTyped || targetError || !commissionPolicy) return null;
+    if (commissionTarget) {
+      const c = cellQuote?.commission;
+      if (!c?.adjustable || targetBusy || cellQuote?.installment_amount !== targetAmount) return null;
+      return t('fin1Calc.resultCommission', {
+        pct: fmtCommissionPct(c.chosen_pct),
+        earn: fmtCurrency(c.commission_amount),
+      });
+    }
+    if (!plan || planLoading) return null;
+    return plan.last_installment_amount !== plan.installment_amount
+      ? t('fin1Calc.resultMonthsLast', { count: plan.term_months, last: fmtCurrency(plan.last_installment_amount) })
+      : t('fin1Calc.resultMonths', { count: plan.term_months });
+  })();
 
   const searchRows = searchResults?.rows ?? [];
 
@@ -820,14 +838,16 @@ export function Fin1CalculatorPage() {
                             <div className="flex items-center gap-1">
                               <Button
                                 size="sm"
-                                variant={condition === 'new' ? 'primary' : 'outline'}
+                                variant={condition === 'new' ? 'solid' : 'outline'}
+                                color={condition === 'new' ? 'primary' : 'default'}
                                 onClick={() => pickCondition('new')}
                               >
                                 {t('fin1Calc.conditionNew')}
                               </Button>
                               <Button
                                 size="sm"
-                                variant={condition === 'used' ? 'primary' : 'outline'}
+                                variant={condition === 'used' ? 'solid' : 'outline'}
+                                color={condition === 'used' ? 'primary' : 'default'}
                                 onClick={() => pickCondition('used')}
                               >
                                 {t('fin1Calc.conditionUsed')}
@@ -936,14 +956,16 @@ export function Fin1CalculatorPage() {
                                 <div className="flex items-center gap-1">
                                   <Button
                                     size="sm"
-                                    variant={!amountMode ? 'primary' : 'outline'}
+                                    variant={!amountMode ? 'solid' : 'outline'}
+                                    color={!amountMode ? 'primary' : 'default'}
                                     onClick={() => { setDownMode('percent'); setDownNotice(false); }}
                                   >
                                     {t('fin1Calc.downByPercent')}
                                   </Button>
                                   <Button
                                     size="sm"
-                                    variant={amountMode ? 'primary' : 'outline'}
+                                    variant={amountMode ? 'solid' : 'outline'}
+                                    color={amountMode ? 'primary' : 'default'}
                                     onClick={() => {
                                       setDownMode('amount');
                                       // Seed the box from whatever the % slider
@@ -1035,19 +1057,19 @@ export function Fin1CalculatorPage() {
                               <div className={`flex flex-col gap-1 ${monthlyMode ? 'opacity-50' : ''}`}>
                                 <div className="flex flex-wrap items-baseline gap-x-2">
                                   <span className="form-label mb-0">
-                                    {monthlyMode && plan ? t('fin1Calc.termFromMonthly') : t('fin1Calc.termTitle')}
+                                    {monthlyMode && plan && !showLocks ? t('fin1Calc.termFromMonthly') : t('fin1Calc.termTitle')}
                                   </span>
                                   <span className="text-2xl font-semibold tabular-nums leading-none">
                                     {monthlyMode && plan ? plan.term_months : termMonths}
                                   </span>
                                   <span className="text-sm text-subtle">{t('fin1Calc.monthsUnit')}</span>
+                                  {showLocks && (commissionTarget ? lockBadge : followsBadge)}
                                 </div>
                                 <Slider
                                   value={terms.indexOf(termMonths)}
                                   onChange={(v) => {
                                     const idx = Math.min(terms.length - 1, Math.max(0, Math.round(v)));
                                     setTermMonths(terms[idx]);
-                                    setMonthlyStr('');
                                   }}
                                   min={0}
                                   max={terms.length - 1}
@@ -1070,30 +1092,40 @@ export function Fin1CalculatorPage() {
                                 commission={cellQuote?.commission?.adjustable ? cellQuote.commission : null}
                                 financed={cellQuote?.financed_amount ?? null}
                                 dim={cellQuoteLoading || targetBusy || cellKey !== cellKeyDebounced}
+                                badge={showLocks ? (commissionTarget ? followsBadge : lockBadge) : undefined}
+                                sliderDisabled={commissionTarget}
                                 t={t}
                               />
                             )}
 
                             {/* ── Customer's target monthly ──────────────── */}
-                            <div className="flex flex-col">
-                              <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
+                            {/* One card: the amount, what the system finds for it,
+                                and the answer in one line under the box. */}
+                            <div className="rounded-md border border-line px-4 py-3 flex flex-col gap-2">
+                              <div className="flex items-center justify-between gap-2 flex-wrap">
                                 <label className="form-label mb-0">{t('fin1Calc.monthlyTarget')}</label>
                                 {commissionPolicy && (
-                                  <div className="flex items-center gap-1">
-                                    <Button
-                                      size="sm"
-                                      variant={targetMode === 'commission' ? 'primary' : 'outline'}
-                                      onClick={() => pickTargetMode('commission')}
-                                    >
-                                      {t('fin1Calc.targetMovesCommission')}
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant={targetMode === 'months' ? 'primary' : 'outline'}
-                                      onClick={() => pickTargetMode('months')}
-                                    >
-                                      {t('fin1Calc.targetMovesMonths')}
-                                    </Button>
+                                  <div
+                                    role="radiogroup"
+                                    aria-label={t('fin1Calc.monthlyTarget')}
+                                    className="inline-flex rounded-md border border-line overflow-hidden text-sm"
+                                  >
+                                    {(['commission', 'months'] as const).map(m => (
+                                      <button
+                                        key={m}
+                                        type="button"
+                                        role="radio"
+                                        aria-checked={targetMode === m}
+                                        onClick={() => pickTargetMode(m)}
+                                        className={`px-3 py-1 transition-colors cursor-pointer border-none ${
+                                          targetMode === m
+                                            ? 'bg-primary text-primary-contrast font-medium'
+                                            : 'bg-transparent text-subtle hover:bg-item-hover-bg hover:text-fg'
+                                        }`}
+                                      >
+                                        {m === 'commission' ? t('fin1Calc.targetFindCommission') : t('fin1Calc.targetFindMonths')}
+                                      </button>
+                                    ))}
                                   </div>
                                 )}
                               </div>
@@ -1127,7 +1159,13 @@ export function Fin1CalculatorPage() {
                                   reserveIconSlots
                                 />
                               </div>
-                              <span className="text-xs text-subtle mt-1 tabular-nums">
+                              {targetResult ? (
+                                <span className="text-sm font-medium tabular-nums inline-flex items-center gap-1.5">
+                                  <ArrowRight size={14} className="text-primary-fg shrink-0" />
+                                  {targetResult}
+                                </span>
+                              ) : (
+                              <span className="text-xs text-subtle tabular-nums">
                                 {commissionPolicy && targetMode === 'commission'
                                   ? (targetRange
                                     ? t('fin1Calc.targetCommissionHint', {
@@ -1135,8 +1173,9 @@ export function Fin1CalculatorPage() {
                                         max: fmtCurrency(targetRange.installment_max),
                                       })
                                     : t('fin1Calc.targetCommissionHintBare'))
-                                  : t('fin1Calc.monthlyTargetHint')}
+                                  : commissionPolicy ? t('fin1Calc.targetMonthsHint') : t('fin1Calc.monthlyTargetHint')}
                               </span>
+                              )}
                             </div>
 
                             {(targetError || planError || (floorNotice && belowFloor && monthlyFloor != null)) && (
