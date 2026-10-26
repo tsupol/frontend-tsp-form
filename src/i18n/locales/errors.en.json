@@ -1132,6 +1132,8 @@
   "contract.state.partner_snapshot_mismatch": "The contract no longer matches what was approved. Withdraw the request and submit it again.",
   "partner.validation.not_ready": "This contract isn't ready to submit yet.",
   "partner.validation.asset_in_open_case": "This device is already on another contract's open request. Pick a different device.",
+  "partner.validation.asset_evidence_incomplete": "Device photos are incomplete: {{labels}} — take them before submitting.",
+  "partner.validation.asset_evidence_incomplete_basic": "Device photos are incomplete — take every required photo before submitting.",
   "partner.validation.fin1_only": "Credit approval applies to FIN1 contracts only.",
   "partner.validation.reason_required": "Pick a reason, and write a note for \"Other\".",
   "partner.validation.reason_code_invalid": "That return reason isn't valid.",

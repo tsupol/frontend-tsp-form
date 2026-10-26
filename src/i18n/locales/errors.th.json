@@ -1132,6 +1132,8 @@
   "contract.state.partner_snapshot_mismatch": "ข้อมูลสัญญาไม่ตรงกับที่อนุมัติไว้ ถอนคำขอแล้วยื่นใหม่",
   "partner.validation.not_ready": "สัญญานี้ยังยื่นไม่ได้ ข้อมูลไม่ครบ",
   "partner.validation.asset_in_open_case": "เครื่องนี้อยู่ในคำขอของสัญญาอื่น กรุณาเปลี่ยนเครื่อง",
+  "partner.validation.asset_evidence_incomplete": "รูปเครื่องยังไม่ครบ: {{labels}} — ถ่ายให้ครบก่อนยื่น",
+  "partner.validation.asset_evidence_incomplete_basic": "รูปเครื่องยังไม่ครบ — ถ่ายให้ครบทุกหมวดบังคับก่อนยื่น",
   "partner.validation.fin1_only": "การขออนุมัติสินเชื่อใช้ได้เฉพาะสัญญา FIN1",
   "partner.validation.reason_required": "กรุณาเลือกเหตุผล และระบุข้อความสำหรับ \"อื่น ๆ\"",
   "partner.validation.reason_code_invalid": "เหตุผลส่งกลับไม่ถูกต้อง",
