@@ -373,6 +373,9 @@ export interface EvidenceSlot {
   slot: string;
   label_th: string;
   photo_count: number;
+  /** false = a required slot still short of its minimum — the same count the
+   *  shop's submit checks (mig 1523). */
+  ok?: boolean;
   photos: Array<{
     entity_media_id: number;
     storage_path: string;
@@ -389,4 +392,9 @@ export function useAssetEvidence(assetId: number | null | undefined) {
     enabled: assetId != null,
     staleTime: 30 * 1000,
   });
+}
+
+/** The device's photo album page. */
+export function assetAlbumPath(assetId: number): string {
+  return `/admin/inventory/assets/${assetId}?tab=evidence`;
 }

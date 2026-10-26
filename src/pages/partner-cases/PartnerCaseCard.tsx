@@ -10,10 +10,11 @@
 
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Badge, Button, useSnackbarContext } from 'tsp-form';
-import { ChevronDown, ChevronRight, ClipboardCheck, Clock, CheckCircle, Undo2, AlertTriangle, XCircle } from 'lucide-react';
+import { ArrowRight, Camera, ChevronDown, ChevronRight, ClipboardCheck, Clock, CheckCircle, Undo2, AlertTriangle, XCircle } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { DateTime } from '../../components/DateTime';
@@ -23,6 +24,8 @@ import {
   usePartnerCaseDetail,
   usePartnerCaseInvalidate,
   usePartnerCaseReturnReasons,
+  useAssetEvidence,
+  assetAlbumPath,
 } from './usePartnerCases';
 import { outcomeBadgeColor, type PartnerCase } from './partnerCaseTypes';
 import { adjustmentRows } from './adjustFormat';
@@ -37,6 +40,8 @@ interface PartnerCaseCardProps {
   commercialModel?: string | null;
   /** Live contract state, so the card can tell "draft, never asked" from "returned". */
   contractState?: string | null;
+  /** The device the contract points at — its required photos must be complete before submitting. */
+  targetAssetId?: number | null;
   /** Card chrome. `plain` for a bordered card in a detail panel, `flush` inside the wizard's card column. */
   variant?: 'plain' | 'flush';
   className?: string;
@@ -61,6 +66,7 @@ export function PartnerCaseCard({
   contractCode,
   commercialModel,
   contractState,
+  targetAssetId,
   variant = 'plain',
   className,
   fixReason,
@@ -123,6 +129,13 @@ export function PartnerCaseCard({
     enabled: applies && contractId != null,
     staleTime: 30 * 1000,
   });
+
+  // Required device photos (mig 1523): checked on submit only, not in the
+  // readiness checklist — so the card lists the missing slots before the shop
+  // presses. `ok` is the backend's own count, the one submit uses.
+  const canStillSubmit = contractState == null || contractState === 'DRAFT' || contractState === 'SAVING';
+  const { data: evidence } = useAssetEvidence(applies && canStillSubmit ? targetAssetId ?? null : null);
+  const missingPhotos = (evidence ?? []).filter(s => s.ok === false);
 
   if (!applies) return null;
 
@@ -188,7 +201,7 @@ export function PartnerCaseCard({
         </Button>
       )}
       {canSubmit && (
-        <Button size="sm" color="primary" onClick={() => setSubmitOpen(true)}>
+        <Button size="sm" color="primary" onClick={() => setSubmitOpen(true)} disabled={missingPhotos.length > 0}>
           {latest ? t('partnerCase.resubmit') : t('partnerCase.submit')}
         </Button>
       )}
@@ -316,6 +329,23 @@ export function PartnerCaseCard({
 
               {!latest && (
                 <div className="text-subtle">{t('partnerCase.neverHint')}</div>
+              )}
+
+              {canSubmit && targetAssetId != null && missingPhotos.length > 0 && (
+                <div className="rounded-md border border-warning-border bg-warning-soft px-3 py-2 text-warning-fg">
+                  <div className="font-medium inline-flex items-center gap-1.5">
+                    <Camera size={14} className="shrink-0" />
+                    {t('partnerCase.photosMissingTitle')}
+                  </div>
+                  <div className="mt-0.5">{missingPhotos.map(s => s.label_th).join(', ')}</div>
+                  <Link
+                    to={assetAlbumPath(targetAssetId)}
+                    className="mt-1 font-medium text-primary-fg hover:underline inline-flex items-center gap-0.5"
+                  >
+                    {t('partnerCase.goToAlbum')}
+                    <ArrowRight size={14} />
+                  </Link>
+                </div>
               )}
             </>
           )}

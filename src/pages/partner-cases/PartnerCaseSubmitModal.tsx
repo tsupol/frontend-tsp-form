@@ -6,14 +6,16 @@
 // that list is what tells the shop what to go and fix.
 
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
 import { Modal, Button, TextArea } from 'tsp-form';
 import { ArrowRight } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError, translateErrorCode } from '../../lib/apiErrors';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { ActionDoneView } from '../contracts/ActionDoneView';
-import { usePartnerCaseInvalidate } from './usePartnerCases';
+import { usePartnerCaseInvalidate, useAssetEvidence, assetAlbumPath } from './usePartnerCases';
 import type { PartnerCaseSubmitResult } from './partnerCaseTypes';
 
 interface PartnerCaseSubmitModalProps {
@@ -34,6 +36,12 @@ export interface ReasonFix {
   run: () => void;
 }
 
+/** Submit refused because required device photos are missing (mig 1523). */
+interface EvidenceGap {
+  assetId: number;
+  missing: string[];
+}
+
 /** A failed readiness check, as the RPC reports it. */
 interface ReadyError {
   code: string;
@@ -46,12 +54,14 @@ export function PartnerCaseSubmitModal({
 }: PartnerCaseSubmitModalProps) {
   const { t } = useTranslation();
   const invalidate = usePartnerCaseInvalidate();
+  const queryClient = useQueryClient();
 
   const [view, setView] = useState<'form' | 'done'>('form');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [readyErrors, setReadyErrors] = useState<ReadyError[]>([]);
+  const [evidenceGap, setEvidenceGap] = useState<EvidenceGap | null>(null);
   const [result, setResult] = useState<PartnerCaseSubmitResult | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
   // Read once per opening: sending creates the request this flag is derived
@@ -66,6 +76,7 @@ export function PartnerCaseSubmitModal({
     setSaving(false);
     setError(null);
     setReadyErrors([]);
+    setEvidenceGap(null);
     setResult(null);
     setConfirmClose(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- isResubmit is sampled on open only
@@ -84,6 +95,7 @@ export function PartnerCaseSubmitModal({
     setSaving(true);
     setError(null);
     setReadyErrors([]);
+    setEvidenceGap(null);
     try {
       const res = await apiClient.rpc<PartnerCaseSubmitResult>('fn_partner_case_submit', {
         p_contract_id: contractId,
@@ -98,6 +110,13 @@ export function PartnerCaseSubmitModal({
         // the shop knows which card to go back to, not just "not ready".
         const params = err.messageParams as { errors?: ReadyError[] } | undefined;
         if (Array.isArray(params?.errors)) setReadyErrors(params.errors);
+        // Missing photos come as slot codes; their names are read from the
+        // album (the owner renames slots), and the band links to it.
+        const gap = err.messageParams as { asset_id?: number; missing?: string[] } | undefined;
+        if (err.code === 'PARTNER.VALIDATION.ASSET_EVIDENCE_INCOMPLETE' && gap?.asset_id != null) {
+          setEvidenceGap({ assetId: gap.asset_id, missing: gap.missing ?? [] });
+          queryClient.invalidateQueries({ queryKey: ['asset-evidence', gap.asset_id] });
+        }
         setError(translateApiError(err, t));
       } else {
         setError(String(err));
@@ -106,6 +125,17 @@ export function PartnerCaseSubmitModal({
       setSaving(false);
     }
   };
+
+  const { data: gapSlots } = useAssetEvidence(evidenceGap?.assetId ?? null);
+  // Until the album's names load, the band says the plain "photos incomplete".
+  const gapMessage = evidenceGap && gapSlots
+    ? t('partner.validation.asset_evidence_incomplete', {
+        ns: 'apiErrors',
+        labels: evidenceGap.missing
+          .map(code => gapSlots?.find(s => s.slot === code)?.label_th ?? code)
+          .join(', '),
+      })
+    : null;
 
   return (
     <>
@@ -148,9 +178,19 @@ export function PartnerCaseSubmitModal({
             {/* The reasons live in the band beside the button that failed — one
                 place, in view, each with its way out where the screen has one. */}
             <ModalErrorBand
-              message={readyErrors.length > 0 ? t('partnerCase.notReadyTitle') : error}
-              onDismiss={() => { setError(null); setReadyErrors([]); }}
-              action={readyErrors.length > 0 ? (
+              message={readyErrors.length > 0 ? t('partnerCase.notReadyTitle') : (gapMessage ?? error)}
+              onDismiss={() => { setError(null); setReadyErrors([]); setEvidenceGap(null); }}
+              action={evidenceGap ? (
+                <Link
+                  to={assetAlbumPath(evidenceGap.assetId)}
+                  // A ctrl/cmd-click opens the album in a new tab — keep the window here.
+                  onClick={(e) => { if (!e.ctrlKey && !e.metaKey) forceClose(); }}
+                  className="font-medium text-primary-fg hover:underline inline-flex items-center gap-0.5"
+                >
+                  {t('partnerCase.goToAlbum')}
+                  <ArrowRight size={14} />
+                </Link>
+              ) : readyErrors.length > 0 ? (
                 <ul className="flex flex-col gap-1">
                   {readyErrors.map((e, i) => {
                     const fix = fixReason?.(e.code) ?? null;

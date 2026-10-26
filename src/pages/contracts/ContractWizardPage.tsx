@@ -411,6 +411,7 @@ function WorkspaceContent() {
             contractCode={data.contractCode ?? contract?.code_display ?? ''}
             commercialModel={contract?.commercial_model}
             contractState={contract?.state}
+            targetAssetId={contract?.target_asset_id}
             variant="flush"
             actionsTarget={isPartnerFin1 ? partnerActionBar : undefined}
             fixReason={(code) => code === 'CONTRACT.VALIDATION.STAFF_CONFIDENCE_SCORE_REQUIRED'

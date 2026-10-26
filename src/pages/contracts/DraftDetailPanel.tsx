@@ -15,6 +15,7 @@ interface ContractDetail {
   id: number;
   code: string;
   code_display: string | null;
+  target_asset_id?: number | null;
   holding_id: number;
   company_id: number;
   branch_id: number;
@@ -166,6 +167,7 @@ function DraftOverviewTab({ contract, t }: { contract: ContractDetail; t: Return
         contractCode={contract.code_display ?? contract.code}
         commercialModel={contract.commercial_model}
         contractState={contract.state}
+        targetAssetId={contract.target_asset_id}
       />
 
       <div className="border border-line rounded-md px-4 py-3">
