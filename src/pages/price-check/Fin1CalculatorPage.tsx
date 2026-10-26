@@ -8,6 +8,11 @@ import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { fmtCurrency } from '../../lib/format';
 import { isSearchable, isBelowSearchMin, SEARCH_MIN_CHARS } from '../../lib/searchKeyword';
+import {
+  CommissionChooser,
+  type Fin1Commission,
+  type Fin1CommissionPolicy,
+} from '../contracts/workspace/Fin1PlanEditor';
 
 // ============================================================================
 // เช็คราคา — deal-partner face (DELIVERY 2026-09-04, merged 09-06).
@@ -26,6 +31,15 @@ import { isSearchable, isBelowSearchMin, SEARCH_MIN_CHARS } from '../../lib/sear
 // Layout: PageNav two-panel like the internal price-check face — product rail
 // left, negotiation right. mobileBreakpoint 1024 so iPad portrait gets the
 // stacked pick-then-negotiate flow instead of two cramped panels.
+//
+// A shop on an adjustable commission plan (IMPLEMENT 2026-10-26 calculator
+// commission) also tries its own commission here — the same control as the
+// contract's plan step, and every figure is the one the contract would get.
+// Drawn only when `commission.adjustable`; staff and fixed plans see the page
+// as before and never send a commission. Moving the commission refetches the
+// grid / the baht quotes / the monthly plan with `p_commission_pct`; once
+// touched it rides along on every later call. The selected cell's commission
+// box and the typed installment come from fn_fin1_quote. Nothing is saved.
 // ============================================================================
 
 // Model-level rows (fn_product_search): FIN1 retail price lives on the model —
@@ -53,6 +67,26 @@ interface PriceTableRow {
   financed_amount: number;
   cells: PriceTableCell[];
 }
+
+/** `data.commission` on the price table / baht quotes / monthly plan. */
+interface CommissionInfo extends Fin1CommissionPolicy {
+  chosen_pct: number | null;
+  commission_amount?: number;
+}
+
+/** fn_fin1_quote — one cell, priced the way the contract would be. */
+interface CellQuote {
+  price: number;
+  down_payment: number;
+  financed_amount: number;
+  term_months: number;
+  installment_amount: number;
+  last_installment_amount: number;
+  total_effective: number;
+  commission: Fin1Commission;
+}
+
+const COMMISSION_NOT_ADJUSTABLE = 'PRICING.VALIDATION.FIN1_COMMISSION_NOT_ADJUSTABLE';
 
 interface PriceTable {
   price: number;
@@ -87,6 +121,7 @@ interface PriceTable {
   };
   terms: Array<{ term_months: number }>;
   rows: PriceTableRow[];
+  commission?: CommissionInfo | null;
 }
 
 /** One row of fn_fin1_quote_all. A wrong down fails the whole call (mig 1492c);
@@ -176,11 +211,33 @@ export function Fin1CalculatorPage() {
   // ── Product selection ──────────────────────────────────────────────────────
   // ?q= seeds the search — the finance-rates page's per-model "คำนวณ" button
   // jumps here with the model name so the rail opens on its capacity models.
-  const [searchParams] = useSearchParams();
+  // ?model= keeps the picked phone, so a reload or a shared link reopens it.
+  const [searchParams, setSearchParams] = useSearchParams();
   const [keyword, setKeyword] = useState(() => searchParams.get('q') ?? '');
   const [debounced, setDebounced] = useState('');
   const [model, setModel] = useState<ModelSearchRow | null>(null);
+  // The model from the address, picked once the search returns its row.
+  const [pendingModelId, setPendingModelId] = useState<number | null>(() => {
+    const v = Number(searchParams.get('model'));
+    return Number.isInteger(v) && v > 0 ? v : null;
+  });
   const [uplift, setUplift] = useState(0);
+
+  // ── Shop commission (adjustable plans only) ────────────────────────────────
+  // Null until the shop touches it: nothing is sent and the backend prices at
+  // the ceiling. Once set it is sent on every call, whatever else changes.
+  const [commissionPct, setCommissionPct] = useState<number | null>(null);
+  // The plan stopped being adjustable while the page was open — drop the section.
+  const [commissionOff, setCommissionOff] = useState(false);
+  const commParam = commissionPct != null ? { p_commission_pct: commissionPct } : {};
+  const dropCommission = (err: unknown) => {
+    if (err instanceof ApiError && err.code === COMMISSION_NOT_ADJUSTABLE) {
+      setCommissionPct(null);
+      setCommissionOff(true);
+      return true;
+    }
+    return false;
+  };
 
   // ── มือ 1 / มือสอง ─────────────────────────────────────────────────────────
   // Used mode keeps the same model selection — only the price source changes:
@@ -222,13 +279,16 @@ export function Fin1CalculatorPage() {
   // the used path can't ask for itself: the model's new/used uplift bounds, and
   // whether the model has a used price at all (used_retail_min/max non-null).
   const { data: bounds } = useQuery({
-    queryKey: ['fin1-price-table', model?.model_id, 0],
+    queryKey: ['fin1-price-table', model?.model_id, 0, null],
     queryFn: () =>
       apiClient.rpc<PriceTable>('fn_fin1_price_table', { p_model_id: model!.model_id, p_uplift: 0 }),
     enabled: model != null,
     staleTime: 60 * 1000,
     retry: false,
   });
+
+  // Who sees the commission section: `adjustable` alone, never the plan code.
+  const commissionPolicy = !commissionOff && bounds?.commission?.adjustable ? bounds.commission : null;
 
   const hasUsed = bounds?.used_retail_min != null && bounds?.used_retail_max != null;
   const usedMode = condition === 'used' && hasUsed;
@@ -257,12 +317,12 @@ export function Fin1CalculatorPage() {
     isFetching: tableLoading,
   } = useQuery({
     queryKey: usedMode
-      ? ['fin1-price-table-manual', usedPrice != null ? usedPrice + uplift : null]
-      : ['fin1-price-table', model?.model_id, uplift],
+      ? ['fin1-price-table-manual', usedPrice != null ? usedPrice + uplift : null, commissionPct]
+      : ['fin1-price-table', model?.model_id, uplift, commissionPct],
     queryFn: () =>
       apiClient.rpc<PriceTable>('fn_fin1_price_table', usedMode
-        ? { p_price: usedPrice! + uplift }
-        : { p_model_id: model!.model_id, p_uplift: uplift }),
+        ? { p_price: usedPrice! + uplift, ...commParam }
+        : { p_model_id: model!.model_id, p_uplift: uplift, ...commParam }),
     enabled: usedMode ? usedPrice != null : model != null,
     placeholderData: keepPreviousData,
     staleTime: 60 * 1000,
@@ -290,9 +350,16 @@ export function Fin1CalculatorPage() {
   const [downAmountDebounced, setDownAmountDebounced] = useState('');
   const [downNotice, setDownNotice] = useState(false);
   const amountMode = downMode === 'amount';
+  // One box for "the customer wants X a month". A shop that picks its own
+  // commission chooses what that amount moves: the commission (months stay —
+  // the contract's own equal payments) or the months (commission stays — the
+  // bank-style search). Shops without the choice only get the months search.
   // The monthly search takes a down in % or in baht (mig 1492c), so it works
   // in both down modes.
-  const monthlyMode = monthlyStr !== '' && parseFloat(monthlyStr) > 0;
+  const [targetMode, setTargetMode] = useState<'commission' | 'months'>('commission');
+  const monthlyTyped = monthlyStr !== '' && parseFloat(monthlyStr) > 0;
+  const commissionTarget = monthlyTyped && commissionPolicy != null && targetMode === 'commission';
+  const monthlyMode = monthlyTyped && !commissionTarget;
 
   useEffect(() => {
     const tm = setTimeout(() => setDownAmountDebounced(downAmountStr), 300);
@@ -318,11 +385,12 @@ export function Fin1CalculatorPage() {
   // question the other way round: one row per active term at this exact down.
   const downAmountNum = downAmountDebounced === '' ? null : parseFloat(downAmountDebounced);
   const { data: quoteAll, error: quotesError, isFetching: quotesLoading } = useQuery({
-    queryKey: ['fin1-quote-all', effectivePrice, downAmountNum],
+    queryKey: ['fin1-quote-all', effectivePrice, downAmountNum, commissionPct],
     queryFn: () =>
       apiClient.rpc<{ quotes: QuoteRow[]; down?: DownBounds }>('fn_fin1_quote_all', {
         p_price: effectivePrice!,
         p_down: downAmountNum!,
+        ...commParam,
       }),
     enabled: amountMode && effectivePrice != null && downAmountNum != null && downAmountNum > 0,
     placeholderData: keepPreviousData,
@@ -408,12 +476,15 @@ export function Fin1CalculatorPage() {
           ...(usedMode
             ? { p_price: effectivePrice }
             : { p_model_id: model.model_id, p_uplift: uplift }),
+          ...commParam,
         });
         if (seq === planSeq.current) { setPlan(res); setPlanError(''); }
       } catch (err) {
         if (seq === planSeq.current) {
           setPlan(null);
-          if (err instanceof ApiError && err.code === 'PRICING.VALIDATION.FIN1_MONTHLY_TOO_LOW') {
+          if (dropCommission(err)) {
+            setPlanError('');
+          } else if (err instanceof ApiError && err.code === 'PRICING.VALIDATION.FIN1_MONTHLY_TOO_LOW') {
             const p = err.messageParams as { min_monthly?: number; at_term_months?: number } | undefined;
             setPlanError(t('fin1Calc.monthlyTooLow', {
               min: fmtCurrency(p?.min_monthly ?? 0),
@@ -430,7 +501,132 @@ export function Fin1CalculatorPage() {
     return () => clearTimeout(tm);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [monthlyMode, monthlyStr, downPct, uplift, model?.model_id, belowFloor, usedMode, effectivePrice,
-    amountMode, downAmountNum, !!downError]);
+    amountMode, downAmountNum, !!downError, commissionPct]);
+
+  // The grid or the baht quotes refused the commission: the plan is no longer
+  // adjustable — refetch without it and hide the section.
+  useEffect(() => { dropCommission(tableError); dropCommission(quotesError); }, [tableError, quotesError]);
+
+  // ── The selected cell, priced the way the contract would be ────────────────
+  // Same price, down (baht) and term as the cell on screen — in the monthly
+  // mode, the term the plan landed on. Debounced so sliding doesn't fire a call
+  // per step.
+  const cellArgs = commissionPolicy && table && termMonths != null
+    ? {
+        p_price: table.price,
+        p_down: amountMode ? (quote?.down_payment ?? null) : (row?.down_amount ?? null),
+        p_term: monthlyMode && plan ? plan.term_months : termMonths,
+      }
+    : null;
+  const cellKey = cellArgs && cellArgs.p_down != null && !downError
+    ? JSON.stringify({ ...cellArgs, ...commParam })
+    : null;
+  const [cellKeyDebounced, setCellKeyDebounced] = useState<string | null>(null);
+  useEffect(() => {
+    const tm = setTimeout(() => setCellKeyDebounced(cellKey), 300);
+    return () => clearTimeout(tm);
+  }, [cellKey]);
+  const { data: cellQuote, error: cellQuoteError, isFetching: cellQuoteLoading } = useQuery({
+    queryKey: ['fin1-quote', cellKeyDebounced],
+    queryFn: () => apiClient.rpc<CellQuote>('fn_fin1_quote', JSON.parse(cellKeyDebounced!)),
+    enabled: cellKeyDebounced != null,
+    placeholderData: keepPreviousData,
+    staleTime: 60 * 1000,
+    retry: false,
+  });
+  useEffect(() => { dropCommission(cellQuoteError); }, [cellQuoteError]);
+
+  // ── Monthly amount → the backend finds the commission (months stay) ───────
+  // Re-priced a moment after typing stops, and again whenever the down, term or
+  // price moves — the customer's amount stays, the commission follows it.
+  const [targetError, setTargetError] = useState('');
+  const [targetBusy, setTargetBusy] = useState(false);
+  const targetSeq = useRef(0);
+  // True while the user is typing in the box (until they leave it).
+  const targetTypingRef = useRef(false);
+  const targetAmount = commissionTarget ? parseFloat(monthlyStr) : null;
+  const cellArgsKey = cellArgs && cellArgs.p_down != null ? JSON.stringify(cellArgs) : null;
+  // The installments reachable at this down and term (0% … ceiling).
+  const targetRange = cellQuote?.commission?.adjustable ? cellQuote.commission : null;
+
+  const runTarget = async (settled: boolean) => {
+    if (targetAmount == null || !cellArgs || cellArgs.p_down == null) return;
+    // A half-typed amount is always below the lowest installment — stay quiet
+    // until the user leaves the box.
+    if (!settled && targetRange && targetAmount < targetRange.installment_min) { setTargetError(''); return; }
+    const seq = ++targetSeq.current;
+    setTargetBusy(true);
+    try {
+      // One or the other, never both: the amount replaces the commission.
+      const res = await apiClient.rpc<CellQuote>('fn_fin1_quote', { ...cellArgs, p_installment: targetAmount });
+      if (seq !== targetSeq.current) return;
+      setTargetError('');
+      setCommissionPct(res.commission.chosen_pct);
+    } catch (err) {
+      if (seq !== targetSeq.current) return;
+      // The commission and the plan on screen stay as they were.
+      if (!dropCommission(err)) setTargetError(translateApiError(err, t));
+    } finally {
+      if (seq === targetSeq.current) setTargetBusy(false);
+    }
+  };
+
+  // The amount found a commission for one price, down and term. Moving any of
+  // them keeps the commission and moves the installment (ticket §4.4), so the
+  // amount no longer describes the plan — clear it. (The months slider clears
+  // it itself.)
+  const lastCellArgsKey = useRef<string | null>(null);
+  useEffect(() => {
+    // Only while the amount drives the commission — switching modes moves the
+    // term the plan is read at, which is not the user changing an input.
+    if (!commissionTarget) { lastCellArgsKey.current = null; return; }
+    const prev = lastCellArgsKey.current;
+    lastCellArgsKey.current = cellArgsKey;
+    if (prev != null && cellArgsKey != null && prev !== cellArgsKey) {
+      setMonthlyStr('');
+      setTargetError('');
+    }
+  }, [cellArgsKey, commissionTarget]);
+
+  useEffect(() => {
+    if (targetAmount == null) { targetSeq.current++; setTargetError(''); setTargetBusy(false); return; }
+    const tm = setTimeout(() => { void runTarget(!targetTypingRef.current); }, 500);
+    return () => clearTimeout(tm);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runTarget reads the same inputs
+  }, [targetAmount]);
+
+  const changeCommission = (pct: number) => {
+    // The slider takes over from an amount the commission was following.
+    if (commissionTarget) setMonthlyStr('');
+    setTargetError('');
+    setCommissionPct(pct);
+  };
+
+  const pickTargetMode = (m: 'commission' | 'months') => {
+    setTargetMode(m);
+    setTargetError('');
+    setFloorNotice(false);
+  };
+
+  // ── Picked phone ↔ address ─────────────────────────────────────────────────
+  // Restore: select the phone from the address once the search returns it.
+  useEffect(() => {
+    if (pendingModelId == null || model || !searchResults) return;
+    const found = searchResults.rows.find(m => m.model_id === pendingModelId);
+    if (found) setModel(found);
+    setPendingModelId(null);
+  }, [searchResults, pendingModelId, model]);
+
+  // Write: replace (not push), so switching phones doesn't fill the back history.
+  useEffect(() => {
+    const next = new URLSearchParams();
+    const q = keyword.trim();
+    if (q) next.set('q', q);
+    const modelId = model?.model_id ?? pendingModelId;
+    if (modelId != null) next.set('model', String(modelId));
+    if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- searchParams is only compared, never a trigger
+  }, [keyword, model, pendingModelId]);
 
   const pickModel = (m: ModelSearchRow) => {
     if (m.model_id !== model?.model_id) {
@@ -511,7 +707,13 @@ export function Fin1CalculatorPage() {
   const searchRows = searchResults?.rows ?? [];
 
   return (
-    <PageNav panels={['list', 'detail']} mobileBreakpoint={1024} className="h-dvh overflow-hidden">
+    <PageNav
+      panels={['list', 'detail']}
+      mobileBreakpoint={1024}
+      // Reopened from the address with a model: go straight to the plan on mobile.
+      defaultPanel={pendingModelId != null ? 'detail' : undefined}
+      className="h-dvh overflow-hidden"
+    >
       {({ isMobile, isRoot, goTo, goBack }) => (
         <>
           {isMobile && (
@@ -859,9 +1061,42 @@ export function Fin1CalculatorPage() {
                               </div>
                             )}
 
+                            {/* ── Shop commission (adjustable plans only) ── */}
+                            {commissionPolicy && (
+                              <CommissionChooser
+                                policy={commissionPolicy}
+                                pct={commissionPct ?? commissionPolicy.ceiling_pct}
+                                onPct={changeCommission}
+                                commission={cellQuote?.commission?.adjustable ? cellQuote.commission : null}
+                                financed={cellQuote?.financed_amount ?? null}
+                                dim={cellQuoteLoading || targetBusy || cellKey !== cellKeyDebounced}
+                                t={t}
+                              />
+                            )}
+
                             {/* ── Customer's target monthly ──────────────── */}
                             <div className="flex flex-col">
-                              <label className="form-label">{t('fin1Calc.monthlyTarget')}</label>
+                              <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
+                                <label className="form-label mb-0">{t('fin1Calc.monthlyTarget')}</label>
+                                {commissionPolicy && (
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      size="sm"
+                                      variant={targetMode === 'commission' ? 'primary' : 'outline'}
+                                      onClick={() => pickTargetMode('commission')}
+                                    >
+                                      {t('fin1Calc.targetMovesCommission')}
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant={targetMode === 'months' ? 'primary' : 'outline'}
+                                      onClick={() => pickTargetMode('months')}
+                                    >
+                                      {t('fin1Calc.targetMovesMonths')}
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
                               <div className="w-56">
                                 <MaskedInput
                                   mask="number"
@@ -869,12 +1104,15 @@ export function Fin1CalculatorPage() {
                                   size="lg"
                                   className="w-full fin1-amount-input"
                                   value={monthlyStr}
-                                  onChange={(raw) => { setMonthlyStr(raw); setFloorNotice(false); }}
-                                  // A below-floor amount stays silent while it is
+                                  onChange={(raw) => { targetTypingRef.current = true; setMonthlyStr(raw); setFloorNotice(false); setTargetError(''); }}
+                                  // A too-low amount stays silent while it is
                                   // being typed; on blur the customer has settled
-                                  // on it, so the "lowest possible" guidance is
-                                  // finally worth showing.
-                                  onBlur={() => setFloorNotice(belowFloor)}
+                                  // on it, so the guidance is finally worth showing.
+                                  onBlur={() => {
+                                    targetTypingRef.current = false;
+                                    if (commissionTarget) void runTarget(true);
+                                    else setFloorNotice(belowFloor);
+                                  }}
                                   placeholder={amountMode
                                     ? (quote?.installment_amount != null ? fmtCurrency(quote.installment_amount) : '')
                                     : (cell ? fmtCurrency(cell.installment_amount) : '')}
@@ -884,21 +1122,28 @@ export function Fin1CalculatorPage() {
                                   // in the slot never receives the click.
                                   endIcon={monthlyStr ? <X size={14} /> : undefined}
                                   onEndIconClick={monthlyStr
-                                    ? () => { setMonthlyStr(''); setFloorNotice(false); }
+                                    ? () => { setMonthlyStr(''); setFloorNotice(false); setTargetError(''); }
                                     : undefined}
                                   reserveIconSlots
                                 />
                               </div>
-                              <span className="text-xs text-subtle mt-1">
-                                {t('fin1Calc.monthlyTargetHint')}
+                              <span className="text-xs text-subtle mt-1 tabular-nums">
+                                {commissionPolicy && targetMode === 'commission'
+                                  ? (targetRange
+                                    ? t('fin1Calc.targetCommissionHint', {
+                                        min: fmtCurrency(targetRange.installment_min),
+                                        max: fmtCurrency(targetRange.installment_max),
+                                      })
+                                    : t('fin1Calc.targetCommissionHintBare'))
+                                  : t('fin1Calc.monthlyTargetHint')}
                               </span>
                             </div>
 
-                            {(planError || (floorNotice && belowFloor && monthlyFloor != null)) && (
+                            {(targetError || planError || (floorNotice && belowFloor && monthlyFloor != null)) && (
                               <div className="alert alert-warning">
                                 <XCircle size={16} />
                                 <span>
-                                  {planError || t('fin1Calc.monthlyTooLow', {
+                                  {targetError || planError || t('fin1Calc.monthlyTooLow', {
                                     min: fmtCurrency(monthlyFloor ?? 0),
                                     months: terms[terms.length - 1] ?? 0,
                                   })}

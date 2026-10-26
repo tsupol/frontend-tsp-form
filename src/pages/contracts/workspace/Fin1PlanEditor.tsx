@@ -807,7 +807,7 @@ type TFn = (key: string, opts?: Record<string, unknown>) => string;
  *  installment can land on (13.95). */
 const COMMISSION_SLIDER_STEP = 0.5;
 
-function CommissionChooser({
+export function CommissionChooser({
   policy, pct, onPct, commission, financed, dim,
   installmentStr, onInstallmentStr, onInstallmentSubmit, installmentError, installmentBusy, t,
 }: {
@@ -818,11 +818,13 @@ function CommissionChooser({
   commission: Fin1Commission | null;
   financed: number | null;
   dim: boolean;
-  installmentStr: string;
-  onInstallmentStr: (v: string) => void;
-  onInstallmentSubmit: () => void;
-  installmentError: string;
-  installmentBusy: boolean;
+  /** The "set the installment yourself" field. Omit `onInstallmentSubmit` to
+   *  leave it out (the calculator has its own monthly-amount box). */
+  installmentStr?: string;
+  onInstallmentStr?: (v: string) => void;
+  onInstallmentSubmit?: () => void;
+  installmentError?: string;
+  installmentBusy?: boolean;
   t: TFn;
 }) {
   const min = policy.min_pct;
@@ -880,15 +882,15 @@ function CommissionChooser({
         </div>
       )}
 
-      <div className="flex flex-col mt-1">
+      {onInstallmentSubmit && <div className="flex flex-col mt-1">
         <label className="form-label">{t('fin1Plan.installmentTargetLabel')}</label>
         <div className="w-44">
           <MaskedInput
             mask="number"
             decimalScale={0}
             size="sm"
-            value={installmentStr}
-            onChange={(raw) => onInstallmentStr(raw)}
+            value={installmentStr ?? ''}
+            onChange={(raw) => onInstallmentStr?.(raw)}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onInstallmentSubmit(); } }}
             onBlur={() => onInstallmentSubmit()}
             disabled={installmentBusy}
@@ -908,7 +910,7 @@ function CommissionChooser({
             })}
           </span>
         )}
-      </div>
+      </div>}
     </div>
   );
 }
