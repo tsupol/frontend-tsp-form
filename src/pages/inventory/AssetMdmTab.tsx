@@ -24,24 +24,27 @@ import { useMdmStatus } from './mdm/useMdmStatus';
 import { EnforcementPausedBar } from './mdm/MdmSharedBits';
 import { SubTabEnroll } from './mdm/SubTabEnroll';
 import { SubTabStatus } from './mdm/SubTabStatus';
+import { MdmReliefBar, useMdmRelief } from './mdm/MdmReliefPanel';
 import { SubTabDunning } from './mdm/SubTabDunning';
 import { SubTabWallpaper } from './mdm/SubTabWallpaper';
 import { SubTabAppControl } from './mdm/SubTabAppControl';
 import { SubTabLostMode } from './mdm/SubTabLostMode';
 import { SubTabPause } from './mdm/SubTabPause';
-import type { AssetMdmStatus } from './mdm/mdmApi';
+import type { AssetMdmStatus, MdmReliefStatus } from './mdm/mdmApi';
 
 type MdmSubTab = 'enroll' | 'status' | 'dunning' | 'wallpaper' | 'appControl' | 'lostMode' | 'pause';
 
 /** Which sub-tabs to show, given enrollment + per-device permissions (§12). */
-function visibleSubTabs(status: AssetMdmStatus | null): MdmSubTab[] {
+function visibleSubTabs(status: AssetMdmStatus | null, relief: MdmReliefStatus | null | undefined): MdmSubTab[] {
   // Pause (§9) is DB-only and allowed even before enrollment (§12 exception).
   if (!status) return ['enroll'];
   if (!status.in_mdm) {
     return status.may_pause ? ['enroll', 'pause'] : ['enroll'];
   }
   const tabs: MdmSubTab[] = ['enroll', 'status'];
-  if (status.may_dunning) tabs.push('dunning');
+  // The 24-hour relief lives with dunning, and more roles may press it than
+  // may enforce — whoever may press gets the sub-tab (IMPLEMENT relief_24h).
+  if (status.may_dunning || relief?.can_grant) tabs.push('dunning');
   if (status.may_wallpaper) tabs.push('wallpaper');
   if (status.may_app_control) tabs.push('appControl');
   if (status.may_lost_mode || status.may_location) tabs.push('lostMode');
@@ -76,7 +79,8 @@ export function AssetMdmTab({ assetId, onRefresh, onAddSerial }: {
     });
   };
 
-  const tabs = useMemo(() => visibleSubTabs(status ?? null), [status]);
+  const { data: relief, refetch: refetchRelief } = useMdmRelief(status?.serial_number ?? null, !!status?.in_mdm);
+  const tabs = useMemo(() => visibleSubTabs(status ?? null, relief), [status, relief]);
 
   // Land on status when enrolled, enroll otherwise (§0). Kept in state so the
   // user can move between sub-tabs; clamped to the visible set below.
@@ -134,6 +138,9 @@ export function AssetMdmTab({ assetId, onRefresh, onAddSerial }: {
           <EnforcementPausedBar status={status} onGoToPause={() => setActive('pause')} />
         )}
 
+        {/* 24-hour relief running — on every sub-tab. */}
+        <MdmReliefBar relief={relief} />
+
         {effectiveActive === 'enroll' && (
           <SubTabEnroll
             status={status}
@@ -151,6 +158,8 @@ export function AssetMdmTab({ assetId, onRefresh, onAddSerial }: {
         {effectiveActive === 'dunning' && (
           <SubTabDunning
             status={status}
+            relief={relief ?? null}
+            onReliefChanged={() => { refetchRelief(); refetch(); }}
             onAck={() => refetch()}
             onNotEnrolled={goToEnroll}
             onGoToWallpaperSettings={goToWallpaperSettings}

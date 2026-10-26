@@ -1597,6 +1597,13 @@
         "reason": "Because",
         "next": "Next",
         "goToEnroll": "Go to enrollment"
+      },
+      "relief": {
+        "desc": "Steps the device down for 24 hours so the customer can open their bank app and transfer. The dunning image stays. If they still haven't paid when the time is up, the system restricts the apps again by itself. Pressing again restarts the 24 hours.",
+        "overdue": "{{days}} days overdue · restricted from day {{from}}",
+        "reasonLabel": "Reason",
+        "reasonPlaceholder": "Customer called to transfer a payment",
+        "doneHeadline": "24-hour relief sent"
       }
     },
     "icloud_appleOnly": "iCloud applies to Apple devices only.",

@@ -20,8 +20,9 @@ import { Button, Modal } from 'tsp-form';
 import { ShieldAlert, Unlock, ImageOff, ArrowRight } from 'lucide-react';
 import {
   enforceDunning, releaseDunning, fetchBranchWallpapers,
-  type AssetMdmStatus,
+  type AssetMdmStatus, type MdmReliefStatus,
 } from './mdmApi';
+import { MdmReliefPanel } from './MdmReliefPanel';
 import { useMdmCommand } from './useMdmCommand';
 import { MDM_NO_CACHE } from './useMdmStatus';
 import { MdmActivityLine } from './MdmActivityCard';
@@ -31,11 +32,16 @@ import { MdmErrorAlert, CommandAckNote } from './MdmSharedBits';
 
 export function SubTabDunning({
   status,
+  relief,
+  onReliefChanged,
   onAck,
   onNotEnrolled,
   onGoToWallpaperSettings,
 }: {
   status: AssetMdmStatus;
+  /** 24-hour relief state (null while loading / not enrolled). */
+  relief: MdmReliefStatus | null;
+  onReliefChanged: () => void;
   onAck: (intentIds: number[]) => void;
   onNotEnrolled: () => void;
   onGoToWallpaperSettings?: () => void;
@@ -57,7 +63,10 @@ export function SubTabDunning({
   const hasDefault = !!defaultWp;
 
   const paused = status.is_enforcement_paused;
-  const enforceDisabled = cmd.pending || paused || !hasDefault;
+  // A running relief turns the lock button off: pressing it would be undone
+  // by the relief within a minute and look broken (IMPLEMENT relief_24h ③).
+  const reliefHoldsLock = !!relief?.lock_buttons_disabled;
+  const enforceDisabled = cmd.pending || paused || !hasDefault || reliefHoldsLock;
   const releaseDisabled = cmd.pending || paused;
 
   // release() outcome that needs its own explanation (unlocked but image kept).
@@ -114,7 +123,7 @@ export function SubTabDunning({
       )}
 
       {/* No branch default image → enforce can't run; point to settings (§12). */}
-      {!wpLoading && !hasDefault && (
+      {status.may_dunning && !wpLoading && !hasDefault && (
         <div className="alert alert-info">
           <ImageOff size={16} />
           <div>
@@ -132,6 +141,9 @@ export function SubTabDunning({
         </div>
       )}
 
+      {/* Only for those who may enforce — the relief can reach this sub-tab
+          for roles that may press it but not lock or release. */}
+      {status.may_dunning && (
       <div className="grid grid-cols-1 @md:grid-cols-2 gap-3">
         {/* Enforce */}
         <div className="border border-line rounded-md p-4 flex flex-col gap-2">
@@ -149,6 +161,9 @@ export function SubTabDunning({
           >
             {t('asset.mdm.dunning.enforce.button')}
           </Button>
+          {reliefHoldsLock && relief?.lock_buttons_disabled_th && (
+            <p className="text-xs text-warning-fg">{relief.lock_buttons_disabled_th}</p>
+          )}
         </div>
 
         {/* Release */}
@@ -169,6 +184,10 @@ export function SubTabDunning({
           </Button>
         </div>
       </div>
+      )}
+
+      {/* 24-hour relief — shown when the DB says this user may press it. */}
+      <MdmReliefPanel serial={status.serial_number} relief={relief} onGranted={onReliefChanged} />
 
       {/* Confirm dialog — stands in for the missing preview (§5.2). Shows the
           image that WILL be sent (enforce) + names the device. */}

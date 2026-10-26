@@ -1385,5 +1385,11 @@
   "pricing.fin1.lever": "ส่วนที่กองทุนลดเพิ่มต่อ 1 จุด ต้องอยู่ระหว่าง 0 ถึง 0.1 และมีทศนิยมไม่เกิน 4 ตำแหน่ง",
   "partner.state.commission_reprice_required": "แผนค่าคอมของร้านเปลี่ยน — คำนวณแผนผ่อนใหม่ก่อนยื่น",
   "partner.auth.commission_shop_only": "ค่าคอมเป็นสิ่งที่ร้านเลือก — ถ้าไม่เห็นด้วยให้ส่งใบกลับร้าน",
-  "contract.state.partner_commission_plan_changed": "แผนค่าคอมของร้านเปลี่ยนหลังอนุมัติ — ถอนใบแล้วยื่นใหม่"
+  "contract.state.partner_commission_plan_changed": "แผนค่าคอมของร้านเปลี่ยนหลังอนุมัติ — ถอนใบแล้วยื่นใหม่",
+  "mdm.validation.relief_reason_required": "กรุณาระบุเหตุผล",
+  "MDM.VALIDATION.RELIEF_REASON_REQUIRED": "กรุณาระบุเหตุผล",
+  "mdm.state.relief_not_on_hard": "เครื่องนี้ไม่ได้อยู่ระดับ hard — ไม่ต้องผ่อนปรน (เช่น ลูกค้าเพิ่งจ่าย/มีนัดชำระ) กดรีเฟรชเพื่อดูสถานะล่าสุด",
+  "MDM.STATE.RELIEF_NOT_ON_HARD": "เครื่องนี้ไม่ได้อยู่ระดับ hard — ไม่ต้องผ่อนปรน (เช่น ลูกค้าเพิ่งจ่าย/มีนัดชำระ) กดรีเฟรชเพื่อดูสถานะล่าสุด",
+  "mdm.state.relief_not_under_care": "เครื่องไม่ได้อยู่กับลูกค้าตามสัญญาที่มีผล",
+  "MDM.STATE.RELIEF_NOT_UNDER_CARE": "เครื่องไม่ได้อยู่กับลูกค้าตามสัญญาที่มีผล"
 }

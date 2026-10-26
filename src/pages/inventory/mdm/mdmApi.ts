@@ -281,11 +281,13 @@ export interface AssetMdmStory {
   customer_sees_level: number;
   customer_sees_th: string;
 
-  reason_code: 'OVERDUE' | 'SLIP_UNDER_REVIEW' | 'STAFF_HOLD' | 'PROMISE_ACTIVE' | 'NO_LOGIN_YET' | 'NONE';
+  reason_code: 'OVERDUE' | 'SLIP_UNDER_REVIEW' | 'STAFF_HOLD' | 'PROMISE_ACTIVE' | 'NO_LOGIN_YET' | 'RELIEF_24H' | 'NONE';
   /** Empty string = no reason to show; hide the line rather than print blank. */
   reason_th: string;
 
-  next_code: 'WILL_ESCALATE' | 'RELEASE_ON_PAYMENT' | 'HOLD_UNTIL' | 'RELEASE_ON_LOGIN' | 'NONE';
+  next_code: 'WILL_ESCALATE' | 'RELEASE_ON_PAYMENT' | 'HOLD_UNTIL' | 'RELEASE_ON_LOGIN' | 'RELIEF_ENDS' | 'NONE';
+  /** End of a running 24-hour relief (nnf-mdm mig 385); null = none. */
+  relief_until?: string | null;
   next_date: string | null;
   next_th: string;
 
@@ -969,6 +971,64 @@ export interface MdmAppGateStatus {
 
 export function fetchAppGateStatus(serial: string): Promise<MdmAppGateStatus> {
   return apiClient.rpc<MdmAppGateStatus>('fn_mdm_app_gate_status', { p_serial: serial });
+}
+
+// ── 24-hour relief ("ผ่อนปรน 24 ชั่วโมง") ────────────────────────────────────
+// IMPLEMENT 2026-10-26 mdm_relief_24h (nnf mig 1527 · nnf-mdm 383-386). Steps a
+// device at `hard` down to `medium` for 24 hours so the customer can use their
+// bank app to pay. Who may press is `can_grant` — never checked by role here.
+
+export interface MdmReliefHistoryRow {
+  starts_at: string;
+  ends_at: string;
+  granted_by: number | null;
+  granted_role: string | null;
+  reason: string | null;
+}
+
+export interface MdmReliefStatus {
+  /** false = not at hard — no button. */
+  on_hard: boolean;
+  /** Show the button. */
+  can_grant: boolean;
+  /** The button's name, ready to show. */
+  label_th: string | null;
+  active: boolean;
+  active_until: string | null;
+  /** The top-of-tab line while active; null = no bar. */
+  banner_th: string | null;
+  /** While active, the lock button is off (pressing it would be undone within a minute). */
+  lock_buttons_disabled: boolean;
+  lock_buttons_disabled_th: string | null;
+  /** Device hasn't checked in for over 24 hours — say so before pressing. */
+  device_silent: boolean;
+  last_checkin_at: string | null;
+  warning_th: string | null;
+  overdue_days: number | null;
+  hard_from_days: number | null;
+  /** Last ten, only for those who may press. */
+  history: MdmReliefHistoryRow[];
+}
+
+export interface MdmReliefGrantResult {
+  message_th: string;
+  warning_th: string | null;
+  active_until: string;
+  device_silent: boolean;
+  last_checkin_at: string | null;
+  relief_id: number;
+  contract_id: number | null;
+}
+
+export function fetchReliefStatus(serial: string): Promise<MdmReliefStatus> {
+  return apiClient.rpc<MdmReliefStatus>('fn_mdm_relief_24h_status', { p_serial: serial });
+}
+
+/** The DB takes the presser from the JWT; `p_actor_id` is sent as the doc shows. */
+export function grantRelief(serial: string, actorId: number, reason: string): Promise<MdmReliefGrantResult> {
+  return apiClient.rpc<MdmReliefGrantResult>('fn_mdm_relief_24h', {
+    p_serial: serial, p_actor_id: actorId, p_reason: reason,
+  });
 }
 
 // ── Per-device permanent allowances ("อนุญาตให้ลบแอปเอง (ถาวร)") ─────────────

@@ -1385,5 +1385,11 @@
   "pricing.fin1.lever": "The fund’s extra cut per point must be between 0 and 0.1, with at most 4 decimal places",
   "partner.state.commission_reprice_required": "The shop’s commission plan changed — recalculate the installment plan before submitting",
   "partner.auth.commission_shop_only": "The commission is the shop’s choice — if you disagree, send the case back",
-  "contract.state.partner_commission_plan_changed": "The shop’s commission plan changed after approval — withdraw the case and submit again"
+  "contract.state.partner_commission_plan_changed": "The shop’s commission plan changed after approval — withdraw the case and submit again",
+  "mdm.validation.relief_reason_required": "Enter a reason.",
+  "MDM.VALIDATION.RELIEF_REASON_REQUIRED": "Enter a reason.",
+  "mdm.state.relief_not_on_hard": "This device isn't at the strictest level, so no relief is needed — the customer may have just paid or made a promise. Refresh to see its state.",
+  "MDM.STATE.RELIEF_NOT_ON_HARD": "This device isn't at the strictest level, so no relief is needed — the customer may have just paid or made a promise. Refresh to see its state.",
+  "mdm.state.relief_not_under_care": "This device isn't with a customer on an active contract.",
+  "MDM.STATE.RELIEF_NOT_UNDER_CARE": "This device isn't with a customer on an active contract."
 }
