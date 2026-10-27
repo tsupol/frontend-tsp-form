@@ -274,7 +274,7 @@ export function usePartnerCaseStatusRef() {
 }
 
 /** Return-reason codes for the send-back dialog, and for labelling a returned request. */
-export function usePartnerCaseReturnReasons() {
+export function usePartnerCaseReturnReasons({ enabled = true }: { enabled?: boolean } = {}) {
   const { isDealPartner } = useAuth();
   const view = isDealPartner
     ? 'v_partner_ref_partner_case_return_reasons'
@@ -286,6 +286,7 @@ export function usePartnerCaseReturnReasons() {
       `/${view}?is_active=eq.true&order=sort_order`,
     ),
     staleTime: 60 * 60 * 1000,
+    enabled,
   });
 
   return query.data ?? [];

@@ -8,7 +8,7 @@ import { wsClient } from '../lib/api/ws';
 import { ownCountersChannel } from '../lib/scope';
 import { useAuth } from '../contexts/AuthContext';
 import {
-  contractCodeOf, customerNameOf, deeplinkFor, detailFor, resolveCategory, titleFor,
+  approvalLineOf, contractCodeOf, customerNameOf, deeplinkFor, detailFor, resolveCategory, titleFor, useReasonName,
   type ListResponse, type NotificationRow,
 } from './NotificationMenu';
 
@@ -133,6 +133,7 @@ export function ApprovalNotices() {
     const cid = contractIdOf(r);
     return cid == null || shown.findIndex(o => contractIdOf(o) === cid) === i;
   });
+  const reasonName = useReasonName(notices);
 
   // Pressing a card (open or ×) is the acknowledgement. It also covers the
   // older notices it replaced for the same contract — the user has seen the
@@ -170,7 +171,7 @@ export function ApprovalNotices() {
         const to = deeplinkFor(row);
         const code = contractCodeOf(row);
         const customer = customerNameOf(row);
-        const detail = detailFor(row, t);
+        const detail = detailFor(row, t, reasonName);
         const body = (
           <>
             <span className="flex-none mt-0.5 w-7 h-7 rounded-full bg-primary-soft text-primary-fg flex items-center justify-center">
@@ -178,10 +179,12 @@ export function ApprovalNotices() {
             </span>
             <span className="min-w-0 flex-1 flex flex-col gap-0.5 pr-6">
               <span className="font-medium text-sm">{titleFor(row, t)}</span>
-              {(customer || code) && (
+              {(customer || code) ? (
                 <span className="text-xs text-subtle truncate">
                   {[customer, code].filter(Boolean).join(' · ')}
                 </span>
+              ) : approvalLineOf(row) && (
+                <span className="text-xs text-subtle truncate">{approvalLineOf(row)}</span>
               )}
               {detail && <span className="text-xs">{detail}</span>}
               {to && (

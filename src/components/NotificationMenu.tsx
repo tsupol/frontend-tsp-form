@@ -10,6 +10,8 @@ import {
 import clsx from 'clsx';
 import { apiClient } from '../lib/api';
 import { fmtCurrency } from '../lib/format';
+import { usePartnerCaseReturnReasons } from '../pages/partner-cases/usePartnerCases';
+import { useSettlementReturnReasons } from '../pages/partner-settlement/usePartnerSettlement';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -38,6 +40,8 @@ export type NotificationRow = {
     po_id?: number;
     po_type?: string;
     po_code?: string;
+    // Sell-out approval (mig 553): the request's code, beside amount + branch_name.
+    code?: string;
     branch_name?: string;
     requested_by_name?: string;
     // ABM enrollment OTP relay (UI_SUMMARY/137). otp_code is empty when the
@@ -53,8 +57,16 @@ export type NotificationRow = {
     settlement_id?: number;
     settlement_code?: string;
     net_amount_text?: string;
+    // On a return (case or close-out). The name is Thai only — label the
+    // code from the reason list instead, so the screen language holds.
+    return_reason_code?: string;
     return_reason_name?: string;
     return_note?: string;
+    // Free text the shop typed when it withdrew a request (mig 1501).
+    withdraw_reason?: string;
+    // The contract state that cancelled a close-out (mig 1528): VOIDED,
+    // TERMINATED, EXPIRED or CANCELLED.
+    contract_state?: string;
   } | null;
   contract_ids: number[] | null;
   created_at: string;
@@ -128,6 +140,7 @@ export function deeplinkFor(row: NotificationRow): string | null {
   if (evt === 'buyback_approval_required_staff' || row.payload?.po_type === 'BUYBACK') {
     return '/admin/approvals';
   }
+  if (evt === 'sell_out_approval_required_staff') return '/admin/approvals';
   // ABM enrollment OTP — not contract-related; the full SMS lives on the
   // ABM account OTP screen (UI_SUMMARY/137).
   if (evt === 'abm_otp_received') return '/admin/company/abm-otp';
@@ -212,6 +225,14 @@ function subtitleFallbackOf(row: NotificationRow): string | null {
   return row.body?.trim() || null;
 }
 
+// An approval request that isn't about a contract (buyback, sell-out): its
+// code, branch and amount — the same line the list shows under the title.
+export function approvalLineOf(row: NotificationRow): string | null {
+  const p = row.payload;
+  const amount = p?.amount != null ? `฿${fmtCurrency(Number(p.amount))}` : null;
+  return [p?.po_code || p?.code, p?.branch_name, amount].map(x => x?.trim()).filter(Boolean).join(' · ') || null;
+}
+
 // Visible placeholder for a missing payload field. Renders "[field_name]" with
 // a tooltip explaining what's missing. Style is muted-warning so the gap is
 // obvious but not alarming.
@@ -247,21 +268,60 @@ function RowShell({ to, onOpen, children }: {
   );
 }
 
+/** Send-back reason code → its name in the screen language, or null while the list loads. */
+export type ReasonName = (kind: 'case' | 'settlement', code: string) => string | null;
+
+const CASE_RETURNED = 'partner_case_returned_staff';
+const SETTLEMENT_RETURNED = 'partner_settlement_returned_staff';
+
+/** Names the send-back reasons on these rows. The lists load only when a
+ *  returned notice is among them. */
+export function useReasonName(rows: NotificationRow[]): ReasonName {
+  const { i18n } = useTranslation();
+  const caseReasons = usePartnerCaseReturnReasons({ enabled: rows.some(r => r.event_type === CASE_RETURNED) });
+  const settlementReasons = useSettlementReturnReasons({ enabled: rows.some(r => r.event_type === SETTLEMENT_RETURNED) });
+  return (kind, code) => {
+    const hit = (kind === 'case' ? caseReasons : settlementReasons).find(r => r.code === code);
+    if (!hit) return null;
+    return i18n.language === 'th' ? hit.name_th : (hit.name_en || hit.name_th);
+  };
+}
+
+// "Reason — note". The payload's own name is Thai only, so it is the fallback
+// for a code the list doesn't have (yet).
+function returnedLine(row: NotificationRow, kind: 'case' | 'settlement', reasonName?: ReasonName): string | null {
+  const code = row.payload?.return_reason_code?.trim();
+  const name = (code && reasonName?.(kind, code)) || row.payload?.return_reason_name?.trim() || code;
+  return [name, row.payload?.return_note?.trim()].filter(Boolean).join(' — ') || null;
+}
+
 // The line under the contract: what to do next, or why it came back. One
 // line per event, so the title stays a short name for what happened.
-export function detailFor(row: NotificationRow, t: ReturnType<typeof useTranslation>['t']): string | null {
+export function detailFor(row: NotificationRow, t: ReturnType<typeof useTranslation>['t'], reasonName?: ReasonName): string | null {
+  const net = row.payload?.net_amount_text?.trim();
   switch (row.event_type) {
     case 'partner_case_approved_staff': return t('notifCenter.detail.partner_case_approved_staff');
     case 'partner_case_approved_adjusted_staff': return t('notifCenter.detail.partner_case_approved_adjusted_staff');
-    case 'partner_case_returned_staff': return row.payload?.reason_text?.trim() || null;
+    case CASE_RETURNED: return returnedLine(row, 'case', reasonName);
     case 'partner_case_submitted_staff': return row.payload?.branch_name?.trim() || null;
-    case 'partner_settlement_submitted_staff': {
-      const net = row.payload?.net_amount_text?.trim();
-      return net ? t('notifCenter.detail.partner_settlement_submitted_staff', { amount: net }) : null;
-    }
-    case 'partner_settlement_returned_staff':
-      return [row.payload?.return_reason_name?.trim(), row.payload?.return_note?.trim()]
+    // The fund's desk: which shop, and what it typed when withdrawing.
+    case 'partner_case_withdrawn_staff':
+      return [row.payload?.branch_name?.trim(), row.payload?.withdraw_reason?.trim()]
         .filter(Boolean).join(' — ') || null;
+    case 'partner_settlement_submitted_staff':
+    case 'partner_settlement_in_payout_staff':
+    case 'partner_settlement_paid_staff':
+      return net ? t(`notifCenter.detail.${row.event_type}`, { amount: net }) : null;
+    case SETTLEMENT_RETURNED: return returnedLine(row, 'settlement', reasonName);
+    // Only ever the system, when the contract ends before the close-out is
+    // locked (mig 1250). contract_state (mig 1528) names how it ended; rows
+    // sent before that have none and keep the plain line.
+    case 'partner_settlement_void_staff': {
+      const state = row.payload?.contract_state;
+      return state
+        ? t('notifCenter.detail.partner_settlement_void_staff_state', { state: t(`contract.state_${state}`, { defaultValue: state }) })
+        : t('notifCenter.detail.partner_settlement_void_staff');
+    }
     default: return null;
   }
 }
@@ -358,6 +418,7 @@ export function NotificationMenuItem({ collapsed, isMobile, unreadCount }: Props
   };
 
   const items = useMemo(() => collapseRows(data?.items ?? []), [data?.items]);
+  const reasonName = useReasonName(data?.items ?? []);
 
   const label = unreadCount > 99 ? '99+' : String(unreadCount);
   const showCollapsedDot = collapsed && !isMobile && unreadCount > 0;
@@ -482,7 +543,7 @@ export function NotificationMenuItem({ collapsed, isMobile, unreadCount }: Props
                 extras.push(<span key="new-lessee" className="text-subtle truncate">→ {row.payload.new_lessee_name}</span>);
               }
               const actor = row.payload?.staff_name;
-              const detail = detailFor(row, t);
+              const detail = detailFor(row, t, reasonName);
               // Every message about a contract reads the same: what happened,
               // then whose contract it is, then (if any) what to do next.
               const contractShaped = row.event_type.startsWith('partner_case_') || (templated && cat !== 'approval');
@@ -514,7 +575,7 @@ export function NotificationMenuItem({ collapsed, isMobile, unreadCount }: Props
                         </div>
                       ) : cat === 'approval' ? (
                         <div className="text-xs leading-snug truncate mt-0.5 inline-flex items-center gap-1.5 min-w-0 flex-wrap">
-                          {row.payload?.po_code && <span className="text-primary-fg truncate">{row.payload.po_code}</span>}
+                          {(row.payload?.po_code || row.payload?.code) && <span className="text-primary-fg truncate">{row.payload.po_code || row.payload.code}</span>}
                           {row.payload?.settlement_code && (
                             <><span className="text-primary-fg shrink-0">{row.payload.settlement_code}</span>
                               {code && <><span className="text-subtle">·</span><span className="text-subtle truncate">{code}</span></>}</>

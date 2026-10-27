@@ -162,7 +162,7 @@ export function useSettlementStatusRef() {
 }
 
 /** Send-back reasons — what the finance team picked when it returned a request. */
-export function useSettlementReturnReasons() {
+export function useSettlementReturnReasons({ enabled = true }: { enabled?: boolean } = {}) {
   const { isDealPartner } = useAuth();
   const view = isDealPartner
     ? 'v_partner_ref_partner_settlement_return_reasons'
@@ -174,6 +174,7 @@ export function useSettlementReturnReasons() {
       `/${view}?is_active=eq.true&order=sort_order`,
     ),
     staleTime: 60 * 60 * 1000,
+    enabled,
   });
 
   return query.data ?? [];

@@ -6261,7 +6261,11 @@
     "detail": {
       "partner_case_approved_staff": "Collect the down payment and sign",
       "partner_settlement_submitted_staff": "Shop receives {{amount}} net",
-      "partner_case_approved_adjusted_staff": "Acknowledge the changes before collecting the down payment or signing"
+      "partner_case_approved_adjusted_staff": "Acknowledge the changes before collecting the down payment or signing",
+      "partner_settlement_in_payout_staff": "Shop receives {{amount}} net",
+      "partner_settlement_paid_staff": "Shop received {{amount}} net",
+      "partner_settlement_void_staff": "Its contract has ended",
+      "partner_settlement_void_staff_state": "Contract: {{state}}"
     },
     "title": "Notifications",
     "markAllRead": "Mark all as read",
@@ -6295,12 +6299,17 @@
       "bill_paid_staff": "Bill paid",
       "bill_voided_staff": "Bill voided",
       "buyback_approval_required_staff": "Buyback approval required",
+      "sell_out_approval_required_staff": "Sell-out approval required",
       "partner_case_submitted_staff": "Shop credit case waiting for approval",
       "partner_case_approved_staff": "Credit approved",
       "partner_case_returned_staff": "Credit request returned",
       "partner_settlement_submitted_staff": "Shop close-out waiting for review",
       "partner_settlement_returned_staff": "Close-out returned for fixes",
-      "partner_case_approved_adjusted_staff": "Approved — with changes from credit"
+      "partner_case_approved_adjusted_staff": "Approved — with changes from credit",
+      "partner_case_withdrawn_staff": "Shop withdrew its credit case",
+      "partner_settlement_in_payout_staff": "Close-out is in the payout run",
+      "partner_settlement_paid_staff": "Fund paid the shop",
+      "partner_settlement_void_staff": "Close-out cancelled"
     },
     "signingType": {
       "ADDENDUM": "addendum",
