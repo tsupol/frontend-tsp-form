@@ -27,6 +27,16 @@ const STATUS_META: Record<MdmIntentDisplayStatus, { color: 'success' | 'info' | 
   CANCELED: { color: 'default', icon: Ban },
 };
 
+// command_kind → the kind tag's colour (mig 389 suggestion). The words are
+// command_kind_th, printed as sent; unlisted kinds stay grey.
+const KIND_COLOR: Record<string, 'danger' | 'warning' | 'success' | 'info'> = {
+  RESTRICT: 'warning',
+  ERASE: 'danger',
+  LOST_MODE: 'warning',
+  RELEASE: 'success',
+  ONBOARD_WAIT_LOGIN: 'info',
+};
+
 const SOURCE_ICON: Record<MdmIntentSourceLayer, typeof User> = {
   STAFF: User,
   AUTO: Bot,
@@ -125,6 +135,11 @@ function IntentRow({ intent, highlighted, t }: {
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium truncate">{intentTypeLabel(intent.intent_type, t)}</span>
+          {intent.command_kind_th && (
+            <Badge color={KIND_COLOR[intent.command_kind ?? ''] ?? 'default'} variant="outline" size="xs">
+              {intent.command_kind_th}
+            </Badge>
+          )}
           <Badge color={meta.color} size="xs">{t(`asset.mdm.queue.status.${intent.display_status}`)}</Badge>
         </div>
         {/* Failure/cancel reason — always a sentence, never bare "failed". */}

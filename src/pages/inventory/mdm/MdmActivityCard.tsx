@@ -62,7 +62,11 @@ export function MdmActivityLine({ status }: { status: AssetMdmStatus }) {
   return (
     <div className={`rounded-md border px-3 py-2 text-sm inline-flex items-center gap-2 ${PILL_CLASS[a.tone]}`}>
       <Icon size={15} className={`shrink-0 ${a.spin ? 'animate-spin' : ''}`} />
-      <span className="font-medium">{t(`asset.mdm.activity.code.${status.activity_code}`)}</span>
+      <span className="font-medium">
+        {/* A waiting command says what it does (mig 389); fixed words only if the DB sent none. */}
+        {(status.activity_code === 'COMMAND_IN_FLIGHT' && status.activity_th?.trim())
+          || t(`asset.mdm.activity.code.${status.activity_code}`)}
+      </span>
       {showLevel && (
         <span className="inline-flex items-center">
           {t('asset.mdm.activity.levelOf', { level: status.enforcement_level, max: status.enforcement_level_max })}

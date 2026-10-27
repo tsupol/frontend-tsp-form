@@ -126,6 +126,12 @@ export interface AssetMdmStatus {
   // All on the same row — no extra query. activity_code is the single header
   // driver (icon/colour/sentence); the rest fill in the detail lines.
   activity_code: MdmActivityCode;
+  // nnf-mdm mig 389: what the waiting command does ("กำลังจำกัดสิทธิ์…"), set
+  // only on COMMAND_IN_FLIGHT — print it in place of the fixed wording.
+  // pending_kind_* is the most important waiting command's kind.
+  activity_th?: string | null;
+  pending_kind_code?: MdmCommandKind | null;
+  pending_kind_th?: string | null;
 
   // Enforcement ladder. LEVEL 0 = the baseline `light` lock (the floor, applied
   // at handover, stays for the whole contract) — NOT "no restriction". Dunning
@@ -343,7 +349,17 @@ export interface MdmRecentIntent {
   acked_at: string | null;
   attempt_no: number | null;
   max_attempts: number | null;
+  // mig 389: what the command does to the phone, so a wallpaper change reads
+  // as a restriction, a release or the wait-for-login screen. Print the _th.
+  command_kind?: MdmCommandKind | null;
+  command_kind_th?: string | null;
 }
+
+// mdm.ref_command_kind (mig 389). ROUTINE never drives the status line.
+export type MdmCommandKind =
+  | 'RESTRICT' | 'RELEASE' | 'ERASE' | 'LOST_MODE' | 'APP_REMOVAL_WINDOW'
+  | 'ONBOARD_WAIT_LOGIN' | 'REMOVE_APP' | 'INSTALL_APP' | 'LOCATION'
+  | 'NNF_APP_CARE' | 'DEVICE_SETUP' | 'ROUTINE';
 
 export function fetchRecentIntents(assetId: number, limit = 5, offset = 0): Promise<MdmRecentIntent[]> {
   return apiClient.get<MdmRecentIntent[]>(
