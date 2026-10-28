@@ -23,10 +23,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Button, Badge } from 'tsp-form';
-import { AlertTriangle, KeyRound, RefreshCw, Smartphone } from 'lucide-react';
+import { AlertTriangle, KeyRound, RefreshCw } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
-import { CopyButton } from '../../components/CopyButton';
+import { PhoneSetupSteps } from '../../components/PhoneSetupSteps';
 import { DateTime } from '../../components/DateTime';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
 import type { AbmOtpSetup } from './abmOtpTypes';
@@ -104,8 +104,6 @@ export function AbmOtpSetupModal({ open, sourceId, loginEmail, onClose, onRotate
     onClose();
   };
 
-  const fields = shown?.body_fields;
-
   return (
     <>
       <Modal open={open} onClose={handleClose} maxWidth="34rem" width="100%">
@@ -163,17 +161,18 @@ export function AbmOtpSetupModal({ open, sourceId, loginEmail, onClose, onRotate
                 </div>
               )}
 
-              {/* Key. has_token false = an account from before the DB kept a
-                  readable key; there is nothing to show and rotate is the only
-                  way to get one, so say that instead of rendering a blank box. */}
-              <div className="mt-3 flex flex-col gap-1">
-                <label className="form-label">{t('abmOtp.create.tokenLabel')}</label>
-                {shown.has_token && shown.token ? (
-                  <div className="flex items-center gap-2 rounded-md border border-line bg-surface p-3">
-                    <code className="flex-1 min-w-0 font-mono text-sm break-all select-all">{shown.token}</code>
-                    <CopyButton value={shown.token} size={16} className="shrink-0" />
-                  </div>
-                ) : (
+              {/* The Shortcuts recipe as steps, with the URL and key in the step
+                  where they're entered. Field names come from body_fields so a
+                  backend rename can't make this lie. has_token false = an
+                  account from before the DB kept a readable key; there is
+                  nothing to show and rotate is the only way to get one. */}
+              <PhoneSetupSteps
+                title={t('abmOtp.setup.stepsTitle')}
+                ingestUrl={shown.ingest_url}
+                httpMethod={shown.http_method}
+                bodyFields={shown.body_fields}
+                token={shown.has_token ? shown.token : null}
+                missingToken={(
                   <div className="alert alert-warning">
                     <KeyRound size={16} className="shrink-0" />
                     <div>
@@ -182,40 +181,10 @@ export function AbmOtpSetupModal({ open, sourceId, loginEmail, onClose, onRotate
                     </div>
                   </div>
                 )}
-                {shown.token_rotated_at && (
-                  <span className="text-xs text-subtler">
-                    {t('abmOtp.setup.rotatedAt')} <DateTime value={shown.token_rotated_at} showTime />
-                  </span>
-                )}
-              </div>
-
-              <div className="mt-3 flex flex-col gap-1">
-                <label className="form-label">{t('abmOtp.create.ingestUrlLabel')}</label>
-                <div className="flex items-center gap-2 rounded-md border border-line bg-surface p-3">
-                  <code className="flex-1 min-w-0 font-mono text-xs break-all select-all">{shown.ingest_url}</code>
-                  <CopyButton value={shown.ingest_url} size={16} className="shrink-0" />
-                </div>
-              </div>
-
-              {/* The Shortcuts recipe, rendered from body_fields rather than
-                  hardcoded — if the backend renames a param this table follows
-                  instead of quietly telling people the wrong thing. */}
-              {fields && (
-                <div className="mt-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Smartphone size={15} className="text-subtle" />
-                    <span className="text-sm font-medium">{t('abmOtp.setup.shortcutTitle')}</span>
-                  </div>
-                  <div className="rounded-md border border-line overflow-hidden">
-                    <SetupRow label={t('abmOtp.setup.rowUrl')} value={shown.ingest_url} mono />
-                    <SetupRow label={t('abmOtp.setup.rowMethod')} value={shown.http_method} mono />
-                    <SetupRow label={fields.token} value={t('abmOtp.setup.fieldToken')} monoLabel />
-                    <SetupRow label={fields.text} value={t('abmOtp.setup.fieldText')} monoLabel />
-                    <SetupRow label={fields.sender} value={t('abmOtp.setup.fieldSender')} monoLabel last />
-                  </div>
-                  <p className="text-xs text-subtle mt-2">{t('abmOtp.setup.shortcutHint')}</p>
-                </div>
-              )}
+                tokenRotatedAt={shown.token_rotated_at}
+                filterHint={t('abmOtp.setup.filterHint')}
+                testHint={t('abmOtp.setup.testHint')}
+              />
             </>
           )}
         </div>
@@ -262,20 +231,5 @@ export function AbmOtpSetupModal({ open, sourceId, loginEmail, onClose, onRotate
         </div>
       </Modal>
     </>
-  );
-}
-
-function SetupRow({ label, value, mono, monoLabel, last }: {
-  label: string;
-  value: string;
-  mono?: boolean;
-  monoLabel?: boolean;
-  last?: boolean;
-}) {
-  return (
-    <div className={`flex items-start gap-3 px-3 py-2 ${last ? '' : 'border-b border-line'}`}>
-      <span className={`shrink-0 w-24 text-xs ${monoLabel ? 'font-mono text-fg' : 'text-subtle'}`}>{label}</span>
-      <span className={`flex-1 min-w-0 text-xs break-all ${mono ? 'font-mono' : 'text-subtle'}`}>{value}</span>
-    </div>
   );
 }

@@ -8,10 +8,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Button } from 'tsp-form';
-import { AlertTriangle, RefreshCw, Smartphone } from 'lucide-react';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
-import { CopyButton } from '../../components/CopyButton';
+import { PhoneSetupSteps } from '../../components/PhoneSetupSteps';
 import { DateTime } from '../../components/DateTime';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
 import type { SmsSourceSetup } from './smsRelayTypes';
@@ -180,69 +180,22 @@ export function SourceTargetBox({ label, purpose }: { label: string | null; purp
   );
 }
 
-/** Key, URL and the Shortcut recipe. Shared by this modal and the create
- *  modal's success step, which receives the same payload. */
+/** The phone-setup steps for an SMS phone. Shared by this modal and the
+ *  create modal's success step, which receives the same payload. */
 export function SmsSetupDetails({ setup }: { setup: SmsSourceSetup }) {
   const { t } = useTranslation();
-  const fields = setup.body_fields;
   return (
-    <>
-      <div className="mt-3 flex flex-col gap-1">
-        <label className="form-label">{t('smsRelay.setup.token')}</label>
-        <div className="flex items-center gap-2 rounded-md border border-line bg-surface p-3">
-          <code className="flex-1 min-w-0 font-mono text-sm break-all select-all">{setup.token}</code>
-          <CopyButton value={setup.token} size={16} className="shrink-0" />
-        </div>
-        {setup.token_rotated_at && (
-          <span className="text-xs text-subtler">
-            {t('smsRelay.setup.rotatedAt')} <DateTime value={setup.token_rotated_at} showTime />
-          </span>
-        )}
-      </div>
-
-      <div className="mt-3 flex flex-col gap-1">
-        <label className="form-label">{t('smsRelay.setup.ingestUrl')}</label>
-        <div className="flex items-center gap-2 rounded-md border border-line bg-surface p-3">
-          <code className="flex-1 min-w-0 font-mono text-xs break-all select-all">{setup.ingest_url}</code>
-          <CopyButton value={setup.ingest_url} size={16} className="shrink-0" />
-        </div>
-      </div>
-
-      {fields && (
-        <div className="mt-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Smartphone size={15} className="text-subtle" />
-            <span className="text-sm font-medium">{t('smsRelay.setup.shortcutTitle')}</span>
-          </div>
-          <div className="rounded-md border border-line overflow-hidden">
-            <SetupRow label={t('smsRelay.setup.rowUrl')} value={setup.ingest_url} mono />
-            <SetupRow label={t('smsRelay.setup.rowMethod')} value={setup.http_method} mono />
-            <SetupRow label={fields.token} value={t('smsRelay.setup.fieldToken')} monoLabel />
-            <SetupRow label={fields.text} value={t('smsRelay.setup.fieldText')} monoLabel />
-            <SetupRow label={fields.sender} value={t('smsRelay.setup.fieldSender')} monoLabel last />
-          </div>
-          <p className="text-xs text-subtle mt-2">{t('smsRelay.setup.shortcutHint')}</p>
-          {/* The one step that differs from the ABM phone: the bank also texts
-              OTPs to this number, and those must not be forwarded here. */}
-          <p className="text-xs text-subtle mt-1">{t('smsRelay.setup.filterHint')}</p>
-          <p className="text-xs text-subtler mt-1">{t('smsRelay.setup.dailyCap', { n: setup.daily_cap.toLocaleString() })}</p>
-        </div>
-      )}
-    </>
-  );
-}
-
-function SetupRow({ label, value, mono, monoLabel, last }: {
-  label: string;
-  value: string;
-  mono?: boolean;
-  monoLabel?: boolean;
-  last?: boolean;
-}) {
-  return (
-    <div className={`flex items-start gap-3 px-3 py-2 ${last ? '' : 'border-b border-line'}`}>
-      <span className={`shrink-0 w-24 text-xs ${monoLabel ? 'font-mono text-fg' : 'text-subtle'}`}>{label}</span>
-      <span className={`flex-1 min-w-0 text-xs break-all ${mono ? 'font-mono' : 'text-subtle'}`}>{value}</span>
-    </div>
+    <PhoneSetupSteps
+      title={t('smsRelay.setup.stepsTitle')}
+      ingestUrl={setup.ingest_url}
+      httpMethod={setup.http_method}
+      bodyFields={setup.body_fields}
+      token={setup.token}
+      tokenRotatedAt={setup.token_rotated_at}
+      // The bank also texts OTPs to this number; those must not be forwarded here.
+      filterHint={t('smsRelay.setup.filterHint')}
+      testHint={t('smsRelay.setup.testHint')}
+      footnote={t('smsRelay.setup.dailyCap', { n: setup.daily_cap.toLocaleString() })}
+    />
   );
 }

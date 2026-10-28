@@ -34,10 +34,7 @@
       "branchHint": "Pick a branch to limit this account to that branch. Leave empty and everyone in the company can see its codes.",
       "submit": "Add account",
       "tokenNextTitle": "Now enter this on the phone",
-      "tokenNextBody": "Take the key and the URL to the phone that receives the SMS. You can reopen them any time from this account's \"Phone setup\" button.",
-      "tokenLabel": "Key",
-      "ingestUrlLabel": "Send-to URL",
-      "phoneSetupHint": "Enter both on the phone that receives the SMS, following the phone setup guide.",
+      "tokenNextBody": "Follow the steps below on the iPhone that holds the SIM. You can open them again any time with \"Phone setup\" on this account.",
       "tokenSaved": "I've saved the key",
       "emailHasActiveKey": "This email already has an account with a working key. Replacing it is a key change, which only a company administrator can do — ask them to use \"Change key\". To add a different ABM account, use a different email.",
       "abmOrg": "ABM organisation",
@@ -48,14 +45,6 @@
     "setup": {
       "openButton": "Phone setup",
       "title": "Phone setup",
-      "shortcutTitle": "What to enter in the Shortcut",
-      "shortcutHint": "In the Shortcuts app: Get Contents of URL → Method POST → Request Body JSON, then add the three text fields above. Full steps are in the phone setup guide.",
-      "rowUrl": "URL",
-      "rowMethod": "Method",
-      "fieldToken": "Paste the key",
-      "fieldText": "Pick the Message variable",
-      "fieldSender": "Pick the Sender variable",
-      "rotatedAt": "Key last changed",
       "neverReceivedTitle": "This phone has never sent anything in",
       "neverReceivedBody": "The setup on the phone isn't finished or isn't working. Check the key and URL below against what's entered there.",
       "noTokenTitle": "No key to show for this account",
@@ -65,7 +54,10 @@
       "rotateConfirmBody": "The current key stops working immediately. The phone using it will silently stop sending codes until you enter the new key there.",
       "rotateConfirmSubmit": "Change key",
       "rotatedTitle": "New key issued",
-      "rotatedBody": "Enter the key below on the phone now — the old one no longer works."
+      "rotatedBody": "Enter the key below on the phone now — the old one no longer works.",
+      "stepsTitle": "Set up the iPhone with the ABM account's SIM",
+      "filterHint": "Under \"Message contains\", type Apple — or leave it empty to forward every SMS.",
+      "testHint": "From another phone, send this number a normal SMS such as \"test Apple 123456\", then check it shows up under View OTP. Pressing ▶ in the Shortcuts app does not work as a test."
     },
     "tenant": {
       "title": "Change ABM organisation",
@@ -10273,7 +10265,7 @@
       "doneTitle": "Phone added",
       "submit": "Add phone",
       "nextTitle": "Next — enter these on the phone",
-      "nextBody": "Copy the key and URL into the phone that receives the bank SMS. You can open them again any time with \"Phone setup\" on this phone.",
+      "nextBody": "Follow the steps below on the iPhone that receives the bank SMS. You can open them again any time with \"Phone setup\" on this phone.",
       "openMessages": "View this phone's messages"
     },
     "edit": {
@@ -10284,23 +10276,15 @@
     "setup": {
       "title": "Phone setup",
       "neverReceivedBody": "The setup on the phone isn't finished or isn't working. Check the key and URL below against what's entered there.",
-      "token": "Key",
-      "ingestUrl": "Destination URL",
-      "rotatedAt": "Key last changed",
-      "shortcutTitle": "What to enter in the Shortcut",
-      "rowUrl": "URL",
-      "rowMethod": "Method",
-      "fieldToken": "Paste the key",
-      "fieldText": "Pick the Message variable",
-      "fieldSender": "Pick the Sender variable",
-      "shortcutHint": "In the Shortcuts app: Get Contents of URL → Method POST → Request Body JSON, then add the three text fields above. Full steps are in the phone setup guide.",
-      "filterHint": "For the automation's filter word, pick a word that appears in the bank's money-in/money-out SMS but not in its OTP SMS.",
       "dailyCap": "Accepts at most {{n}} messages a day.",
       "rotate": "Change key",
       "rotateConfirmTitle": "Change this phone's key?",
       "rotateConfirmBody": "The current key stops working immediately. The phone using it will silently stop sending messages until you enter the new key there.",
       "rotatedTitle": "New key issued",
-      "rotatedBody": "Enter the key below on the phone now — the old one no longer works."
+      "rotatedBody": "Enter the key below on the phone now — the old one no longer works.",
+      "stepsTitle": "Set up the iPhone that receives the bank SMS",
+      "filterHint": "Under \"Message contains\", type a word that appears in the bank's money-in/money-out SMS but not in its OTP SMS.",
+      "testHint": "From another phone, send this number a normal SMS containing your filter word, then check it shows up under Messages. Pressing ▶ in the Shortcuts app does not work as a test."
     },
     "link": {
       "button": "Link account",
@@ -10321,5 +10305,21 @@
       "submit": "Unlink",
       "done": "Account unlinked"
     }
+  },
+  "phoneSetup": {
+    "step1Title": "Create an automation",
+    "step1Body": "Open the Shortcuts app → Automation tab → + → Message.",
+    "step1Run": "Choose Run Immediately and turn off \"Notify When Run\" — otherwise the phone asks every time and does nothing while locked.",
+    "step2Title": "Add \"Get Contents of URL\"",
+    "step2Body": "Tap Next → Add Action → search for Get Contents of URL. Put this address in the URL box:",
+    "step2Options": "Then set Method to {{method}} and Request Body to JSON.",
+    "step3Title": "Add three text fields",
+    "step3Body": "Tap \"Add new field\" three times, choose Text each time, and fill them in:",
+    "step3Token": "paste this key",
+    "step3Text": "pick the variable Message",
+    "step3Sender": "pick the variable Sender",
+    "step3Chip": "The last two must show as blue variable bubbles, not typed words.",
+    "step4Title": "Test it",
+    "rotatedAt": "Key last changed"
   }
 }

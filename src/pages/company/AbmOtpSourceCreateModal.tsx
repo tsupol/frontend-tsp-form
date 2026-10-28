@@ -22,9 +22,16 @@ import { AlertTriangle, KeyRound, CheckCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAbmServers } from './abmServers';
 import { translateApiError } from '../../lib/apiErrors';
-import { CopyButton } from '../../components/CopyButton';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
-import type { AbmOtpSourceCreated } from './abmOtpTypes';
+import { PhoneSetupSteps } from '../../components/PhoneSetupSteps';
+import type { AbmOtpSetup, AbmOtpSourceCreated } from './abmOtpTypes';
+
+/** The phone recipe as UI_SUMMARY/137 §6 documents it — only used when the
+ *  setup RPC can't be read for this user. */
+const DOC_RECIPE: Pick<AbmOtpSetup, 'http_method' | 'body_fields'> = {
+  http_method: 'POST',
+  body_fields: { token: 'p_token', text: 'p_text', sender: 'p_sender' },
+};
 
 interface Branch { id: number; name: string; }
 
@@ -49,6 +56,7 @@ export function AbmOtpSourceCreateModal({ open, companyId, onClose, onCreated }:
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<AbmOtpSourceCreated | null>(null);
+  const [recipe, setRecipe] = useState<Pick<AbmOtpSetup, 'http_method' | 'body_fields'> | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
 
   const { data: branches = [] } = useQuery({
@@ -71,7 +79,7 @@ export function AbmOtpSourceCreateModal({ open, companyId, onClose, onCreated }:
   useEffect(() => {
     if (open) {
       setView('form'); setEmail(''); setLabel(''); setBranchId(''); setTenantId('');
-      setBusy(false); setError(''); setResult(null); setConfirmClose(false);
+      setBusy(false); setError(''); setResult(null); setRecipe(null); setConfirmClose(false);
     }
   }, [open]);
 
@@ -105,6 +113,12 @@ export function AbmOtpSourceCreateModal({ open, companyId, onClose, onCreated }:
       setResult(res);
       setView('done');
       onCreated();
+      // The create reply has no Shortcut field names; the setup RPC does.
+      // A branch manager may create but not read setup (403) — then the
+      // documented names stand in.
+      apiClient.rpc<AbmOtpSetup>('fn_abm_otp_source_get_setup', { p_source_id: res.source_id })
+        .then(setRecipe)
+        .catch(() => {});
     } catch (err) {
       // The generic permission string would leave a branch manager staring at
       // a valid-looking form with no idea the email is the problem.
@@ -224,23 +238,17 @@ export function AbmOtpSourceCreateModal({ open, companyId, onClose, onCreated }:
                 </div>
               </div>
 
-              <div className="mt-3 flex flex-col gap-1">
-                <label className="form-label">{t('abmOtp.create.tokenLabel')}</label>
-                <div className="flex items-center gap-2 rounded-md border border-line bg-surface p-3">
-                  <code className="flex-1 min-w-0 font-mono text-sm break-all select-all">{result?.token}</code>
-                  {result?.token && <CopyButton value={result.token} size={16} className="shrink-0" />}
-                </div>
-              </div>
-
-              <div className="mt-3 flex flex-col gap-1">
-                <label className="form-label">{t('abmOtp.create.ingestUrlLabel')}</label>
-                <div className="flex items-center gap-2 rounded-md border border-line bg-surface p-3">
-                  <code className="flex-1 min-w-0 font-mono text-xs break-all select-all">{result?.ingest_url}</code>
-                  {result?.ingest_url && <CopyButton value={result.ingest_url} size={16} className="shrink-0" />}
-                </div>
-              </div>
-
-              <p className="text-xs text-subtle mt-3">{t('abmOtp.create.phoneSetupHint')}</p>
+              {result && (
+                <PhoneSetupSteps
+                  title={t('abmOtp.setup.stepsTitle')}
+                  ingestUrl={result.ingest_url}
+                  httpMethod={recipe?.http_method ?? DOC_RECIPE.http_method}
+                  bodyFields={recipe?.body_fields ?? DOC_RECIPE.body_fields}
+                  token={result.token}
+                  filterHint={t('abmOtp.setup.filterHint')}
+                  testHint={t('abmOtp.setup.testHint')}
+                />
+              )}
             </div>
             <div className="modal-footer">
               <Button color="primary" onClick={forceClose}>{t('abmOtp.create.tokenSaved')}</Button>
