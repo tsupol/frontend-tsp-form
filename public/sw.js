@@ -43,6 +43,10 @@ function routeFor(data) {
   if (eventType.startsWith('slip_')) {
     return '/admin/payment-submissions';
   }
+  if (eventType === 'sms_received') {
+    const sid = data.payload && data.payload.source_id;
+    return '/admin/company/sms-relay?tab=inbox' + (sid ? '&source=' + sid : '');
+  }
   return '/admin';
 }
 

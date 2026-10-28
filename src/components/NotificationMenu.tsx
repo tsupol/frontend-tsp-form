@@ -48,6 +48,14 @@ export type NotificationRow = {
     // SMS couldn't be parsed — the title must still render.
     otp_code?: string;
     login_email?: string;
+    // Bank SMS forwarded by a company phone (UI_SUMMARY/154 §5). purpose is the
+    // title; sms_text is the whole message and is what the row shows — the
+    // server-rendered body can lose a line shaped like "xxx:" with nothing after.
+    message_id?: number;
+    source_id?: number;
+    purpose?: string;
+    source_label?: string;
+    sms_text?: string;
     // Shop credit request (mig 1449). reason_text is "reason name — note",
     // only on a returned request.
     case_id?: number;
@@ -144,6 +152,11 @@ export function deeplinkFor(row: NotificationRow): string | null {
   // ABM enrollment OTP — not contract-related; the full SMS lives on the
   // ABM account OTP screen (UI_SUMMARY/137).
   if (evt === 'abm_otp_received') return '/admin/company/abm-otp';
+  // Bank SMS: the inbox, already filtered to the phone that sent it.
+  if (evt === 'sms_received') {
+    const sid = row.payload?.source_id;
+    return `/admin/company/sms-relay?tab=inbox${sid ? `&source=${sid}` : ''}`;
+  }
   // Shop credit request (mig 1449): the credit desk lands on the case itself;
   // the shop lands on the contract in the stage it has just moved to.
   if (evt === 'partner_case_submitted_staff' && row.payload?.case_id) {
@@ -170,7 +183,7 @@ export function deeplinkFor(row: NotificationRow): string | null {
 
 // Events that are not about a contract, so the "customer · contract code"
 // subtitle never applies to them even though the FE does have a title template.
-const NON_CONTRACT_EVENTS = new Set(['abm_otp_received']);
+const NON_CONTRACT_EVENTS = new Set(['abm_otp_received', 'sms_received']);
 
 // True when the contract-shaped subtitle (customer · contract code) applies.
 // Events with no FE template at all, and events known not to concern a
@@ -203,6 +216,10 @@ export function titleFor(row: NotificationRow, t: ReturnType<typeof useTranslati
     return code
       ? t('notifCenter.event.abm_otp_received', { code })
       : t('notifCenter.event.abm_otp_received_nocode');
+  }
+  // Bank SMS: the admin's own words for that phone, as it was when sent.
+  if (evt === 'sms_received') {
+    return row.payload?.purpose?.trim() || row.title || evt;
   }
   if (row.event_variant) {
     const k = `notifCenter.event.${evt}.${row.event_variant}`;
@@ -588,6 +605,12 @@ export function NotificationMenuItem({ collapsed, isMobile, unreadCount }: Props
                           )}
                         </div>
                       ) : (
+                        row.event_type === 'sms_received' ? (
+                          // The whole SMS, line breaks kept — never the body.
+                          <div className="text-xs leading-snug mt-0.5 text-subtle min-w-0 whitespace-pre-wrap break-words">
+                            {row.payload?.sms_text ?? row.body}
+                          </div>
+                        ) :
                         // No FE template — the contract-shaped subtitle doesn't
                         // apply, so show the server-rendered body (or nothing).
                         subtitleFallback && (

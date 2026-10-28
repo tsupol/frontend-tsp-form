@@ -1,7 +1,8 @@
 import { useMemo, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { MapPin, Building2, Landmark, CalendarDays, ShieldBan, Cloud, KeyRound, UserCheck, PenLine, Stamp, Wallet, Boxes, Wrench, Smartphone, ShieldCheck } from 'lucide-react';
+import { MapPin, Building2, Landmark, CalendarDays, ShieldBan, Cloud, KeyRound, UserCheck, PenLine, Stamp, Wallet, Boxes, Wrench, Smartphone, ShieldCheck, MessageSquareText } from 'lucide-react';
+import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { filterSubNavForShop } from '../../lib/shopMenu';
@@ -19,6 +20,8 @@ export function CompanyLayout({ children }: { children: ReactNode }) {
   const { user, isDealPartner } = useAuth();
   const role = user?.role_code ?? '';
   const isAdmin = ADMIN_ROLES.includes(role);
+  const { hasPermission } = useMyPermissions();
+  const canSms = hasPermission('SMS.VIEW') || hasPermission('SMS.MANAGE');
 
   const allItems: NavItem[] = useMemo(() => [
     { type: 'group', labelKey: 'nav.groupOrganization' },
@@ -32,6 +35,8 @@ export function CompanyLayout({ children }: { children: ReactNode }) {
       : []),
     { type: 'group', labelKey: 'nav.groupFinance' },
     { type: 'link', path: '/admin/company/bank-accounts', labelKey: 'nav.bankAccounts', icon: Landmark },
+    // Bank SMS phones (UI_SUMMARY/154) — by permission, COMPANY_ADMIN today.
+    ...(canSms ? [{ type: 'link' as const, path: '/admin/company/sms-relay', labelKey: 'nav.smsRelay', icon: MessageSquareText }] : []),
     ...(isAdmin ? [{ type: 'link' as const, path: '/admin/company/finance-models', labelKey: 'nav.financeModels', icon: Wallet }] : []),
     { type: 'link', path: '/admin/company/config', labelKey: 'nav.companyConfig', icon: Building2 },
     ...(isAdmin ? [{ type: 'link' as const, path: '/admin/company/owner-config', labelKey: 'nav.ownerConfig', icon: Boxes }] : []),
@@ -44,7 +49,7 @@ export function CompanyLayout({ children }: { children: ReactNode }) {
     { type: 'link', path: '/admin/company/abm-otp', labelKey: 'nav.abmOtp', icon: Smartphone },
     { type: 'group', labelKey: 'nav.groupStaff' },
     { type: 'link', path: '/admin/company/staff-commission', labelKey: 'nav.staffCommission', icon: UserCheck },
-  ], [isAdmin, role]);
+  ], [isAdmin, role, canSms]);
 
   // Deal-partner shops: PIN / signers / ABM OTP only (dual-nav rule — mirrors AppSideNav).
   const navItems = isDealPartner ? filterSubNavForShop(allItems) : allItems;

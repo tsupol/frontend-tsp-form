@@ -17,6 +17,8 @@ const DEFAULT_PASSWORD = 'Test123456';
 const PASSWORD_OVERRIDES: Record<string, string> = {
   'dev.collector1': 'DevCollect!2026',
   'dev.collector2': 'DevCollect!2026',
+  // COMPANY_ADMIN of the training fund co.88 — BE's test user for the SMS phones (1530).
+  'demo_fund_admin': 'Test@1234',
 };
 
 // Bare role names → the mcp_* account to use. Branch/company roles need a

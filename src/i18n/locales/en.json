@@ -6183,7 +6183,8 @@
     "repoAuthority": "Authority letters",
     "shopCommission": "Shop commission",
     "myShopCommission": "My commission",
-    "openMenu": "Open menu"
+    "openMenu": "Open menu",
+    "smsRelay": "SMS phones"
   },
   "nnfApp": {
     "title": "NNF App",
@@ -10229,5 +10230,96 @@
     "region": "Approval notices",
     "open": "Open",
     "more": "+{{count}} more in notifications"
+  },
+  "smsRelay": {
+    "title": "SMS phones",
+    "subtitle": "Bank SMS about money in and out of the company accounts, forwarded by the phones that receive them",
+    "loadedAt": "As of",
+    "refresh": "Refresh",
+    "addPhone": "Add phone",
+    "noAccess": "You do not have access to the SMS phones.",
+    "tabInbox": "Messages",
+    "tabManage": "Manage phones",
+    "filterAllPhones": "All phones",
+    "noMessages": "No messages yet",
+    "noMessagesForPhone": "No messages from this phone yet",
+    "showAllPhones": "Show all phones",
+    "noPhones": "No phones yet",
+    "noPhonesHint": "Add a phone, then set up SMS forwarding on it with the setup details.",
+    "toggleFailed": "Could not switch the phone on or off. Please try again.",
+    "duplicate": "Duplicate",
+    "sender": "Sender",
+    "inactive": "Off",
+    "notifyOn": "On",
+    "notifyOff": "No notifications",
+    "noLinkedAccount": "No bank account linked",
+    "neverReceived": "Never received a message — the phone is not set up yet",
+    "lastMessage": "Last message",
+    "todayCount": "today {{n}}",
+    "todayDups": "(duplicates {{n}})",
+    "totalCount": "total {{n}}",
+    "activeSwitch": "Phone on or off",
+    "field": {
+      "label": "Phone name",
+      "labelPlaceholder": "e.g. Finance iPhone",
+      "purpose": "Purpose",
+      "purposePlaceholder": "e.g. Shop payout account, fund A",
+      "purposeHint": "Shown as the title of every notification from this phone.",
+      "notify": "Notify when an SMS arrives",
+      "notifyHint": "Turn off for a busy account. Messages are still kept."
+    },
+    "create": {
+      "title": "Add phone",
+      "doneTitle": "Phone added",
+      "submit": "Add phone",
+      "nextTitle": "Next — enter these on the phone",
+      "nextBody": "Copy the key and URL into the phone that receives the bank SMS. You can open them again any time with \"Phone setup\" on this phone.",
+      "openMessages": "View this phone's messages"
+    },
+    "edit": {
+      "title": "Edit phone",
+      "done": "Phone saved",
+      "purposeChangedHint": "New notifications will use the new purpose. Ones already sent keep the old one."
+    },
+    "setup": {
+      "title": "Phone setup",
+      "neverReceivedBody": "The setup on the phone isn't finished or isn't working. Check the key and URL below against what's entered there.",
+      "token": "Key",
+      "ingestUrl": "Destination URL",
+      "rotatedAt": "Key last changed",
+      "shortcutTitle": "What to enter in the Shortcut",
+      "rowUrl": "URL",
+      "rowMethod": "Method",
+      "fieldToken": "Paste the key",
+      "fieldText": "Pick the Message variable",
+      "fieldSender": "Pick the Sender variable",
+      "shortcutHint": "In the Shortcuts app: Get Contents of URL → Method POST → Request Body JSON, then add the three text fields above. Full steps are in the phone setup guide.",
+      "filterHint": "For the automation's filter word, pick a word that appears in the bank's money-in/money-out SMS but not in its OTP SMS.",
+      "dailyCap": "Accepts at most {{n}} messages a day.",
+      "rotate": "Change key",
+      "rotateConfirmTitle": "Change this phone's key?",
+      "rotateConfirmBody": "The current key stops working immediately. The phone using it will silently stop sending messages until you enter the new key there.",
+      "rotatedTitle": "New key issued",
+      "rotatedBody": "Enter the key below on the phone now — the old one no longer works."
+    },
+    "link": {
+      "button": "Link account",
+      "title": "Link bank account",
+      "account": "Bank account",
+      "branch": "Branch",
+      "pick": "Pick an account",
+      "hint": "Optional — records which account this phone receives SMS for. Messages arrive the same either way.",
+      "noAccounts": "This company has no active bank accounts.",
+      "allLinked": "Every account of this company is already linked to this phone.",
+      "submit": "Link",
+      "done": "Account linked"
+    },
+    "unlink": {
+      "button": "Unlink account",
+      "title": "Unlink this account?",
+      "body": "The phone keeps receiving and forwarding SMS as before. You can link the account again later.",
+      "submit": "Unlink",
+      "done": "Account unlinked"
+    }
   }
 }

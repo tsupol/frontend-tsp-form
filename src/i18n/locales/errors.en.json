@@ -1391,5 +1391,19 @@
   "mdm.state.relief_not_on_hard": "This device isn't at the strictest level, so no relief is needed — the customer may have just paid or made a promise. Refresh to see its state.",
   "MDM.STATE.RELIEF_NOT_ON_HARD": "This device isn't at the strictest level, so no relief is needed — the customer may have just paid or made a promise. Refresh to see its state.",
   "mdm.state.relief_not_under_care": "This device isn't with a customer on an active contract.",
-  "MDM.STATE.RELIEF_NOT_UNDER_CARE": "This device isn't with a customer on an active contract."
+  "MDM.STATE.RELIEF_NOT_UNDER_CARE": "This device isn't with a customer on an active contract.",
+  "CORE.NOT_FOUND.SMS_SOURCE": "That phone no longer exists. Reload the list.",
+  "core.not_found.sms_source": "That phone no longer exists. Reload the list.",
+  "CORE.NOT_FOUND.SMS_ACCOUNT_LINK": "That account is not linked to this phone any more. Reload the list.",
+  "core.not_found.sms_account_link": "That account is not linked to this phone any more. Reload the list.",
+  "CORE.VALIDATION.SMS_LABEL_REQUIRED": "Enter a name for the phone.",
+  "core.validation.sms_label_required": "Enter a name for the phone.",
+  "CORE.VALIDATION.SMS_PURPOSE_REQUIRED": "Enter the purpose.",
+  "core.validation.sms_purpose_required": "Enter the purpose.",
+  "CORE.VALIDATION.SMS_SOURCE_FIELD_TOO_LONG": "Too long — the name may be up to 100 characters and the purpose up to 200.",
+  "core.validation.sms_source_field_too_long": "Too long — the name may be up to 100 characters and the purpose up to 200.",
+  "CORE.VALIDATION.SMS_ACCOUNT_OTHER_COMPANY": "That account belongs to another company.",
+  "core.validation.sms_account_other_company": "That account belongs to another company.",
+  "CORE.CONFLICT.SMS_ACCOUNT_ALREADY_LINKED": "This account is already linked to this phone.",
+  "core.conflict.sms_account_already_linked": "This account is already linked to this phone."
 }

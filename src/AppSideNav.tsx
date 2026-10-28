@@ -62,6 +62,8 @@ import {
   KeySquare,
   // Fund company — daily money summary + reconciliation history
   CalendarClock, History,
+  // Bank SMS phones
+  MessageSquareText,
 } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
 import { filterSideNavForShop } from './lib/shopMenu';
@@ -810,6 +812,10 @@ export const AppSideNav = () => {
         ] : []),
         { type: 'group', key: 'grp-finance', label: t('nav.groupFinance') },
         { key: 'bank-accounts', icon: <Landmark size="1rem" />, label: t('nav.bankAccounts'), path: '/admin/company/bank-accounts' },
+        // Bank SMS phones (UI_SUMMARY/154) — by permission, COMPANY_ADMIN today.
+        ...(hasPermission('SMS.VIEW') || hasPermission('SMS.MANAGE') ? [
+          { key: 'sms-relay', icon: <MessageSquareText size="1rem" />, label: t('nav.smsRelay'), path: '/admin/company/sms-relay' },
+        ] : []),
         ...(['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role) ? [
           { key: 'finance-models', icon: <Wallet size="1rem" />, label: t('nav.financeModels'), path: '/admin/company/finance-models' },
         ] : []),

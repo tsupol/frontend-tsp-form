@@ -1391,5 +1391,19 @@
   "mdm.state.relief_not_on_hard": "เครื่องนี้ไม่ได้อยู่ระดับ hard — ไม่ต้องผ่อนปรน (เช่น ลูกค้าเพิ่งจ่าย/มีนัดชำระ) กดรีเฟรชเพื่อดูสถานะล่าสุด",
   "MDM.STATE.RELIEF_NOT_ON_HARD": "เครื่องนี้ไม่ได้อยู่ระดับ hard — ไม่ต้องผ่อนปรน (เช่น ลูกค้าเพิ่งจ่าย/มีนัดชำระ) กดรีเฟรชเพื่อดูสถานะล่าสุด",
   "mdm.state.relief_not_under_care": "เครื่องไม่ได้อยู่กับลูกค้าตามสัญญาที่มีผล",
-  "MDM.STATE.RELIEF_NOT_UNDER_CARE": "เครื่องไม่ได้อยู่กับลูกค้าตามสัญญาที่มีผล"
+  "MDM.STATE.RELIEF_NOT_UNDER_CARE": "เครื่องไม่ได้อยู่กับลูกค้าตามสัญญาที่มีผล",
+  "CORE.NOT_FOUND.SMS_SOURCE": "ไม่พบมือถือเครื่องนี้แล้ว · โหลดรายการใหม่",
+  "core.not_found.sms_source": "ไม่พบมือถือเครื่องนี้แล้ว · โหลดรายการใหม่",
+  "CORE.NOT_FOUND.SMS_ACCOUNT_LINK": "บัญชีนี้ไม่ได้ผูกกับเครื่องนี้แล้ว · โหลดรายการใหม่",
+  "core.not_found.sms_account_link": "บัญชีนี้ไม่ได้ผูกกับเครื่องนี้แล้ว · โหลดรายการใหม่",
+  "CORE.VALIDATION.SMS_LABEL_REQUIRED": "กรอกชื่อเครื่อง",
+  "core.validation.sms_label_required": "กรอกชื่อเครื่อง",
+  "CORE.VALIDATION.SMS_PURPOSE_REQUIRED": "กรอกวัตถุประสงค์",
+  "core.validation.sms_purpose_required": "กรอกวัตถุประสงค์",
+  "CORE.VALIDATION.SMS_SOURCE_FIELD_TOO_LONG": "ยาวเกินไป — ชื่อเครื่องได้ไม่เกิน 100 ตัวอักษร วัตถุประสงค์ไม่เกิน 200",
+  "core.validation.sms_source_field_too_long": "ยาวเกินไป — ชื่อเครื่องได้ไม่เกิน 100 ตัวอักษร วัตถุประสงค์ไม่เกิน 200",
+  "CORE.VALIDATION.SMS_ACCOUNT_OTHER_COMPANY": "บัญชีนี้อยู่คนละบริษัทกับเครื่อง",
+  "core.validation.sms_account_other_company": "บัญชีนี้อยู่คนละบริษัทกับเครื่อง",
+  "CORE.CONFLICT.SMS_ACCOUNT_ALREADY_LINKED": "ผูกบัญชีนี้กับเครื่องนี้อยู่แล้ว",
+  "core.conflict.sms_account_already_linked": "ผูกบัญชีนี้กับเครื่องนี้อยู่แล้ว"
 }
