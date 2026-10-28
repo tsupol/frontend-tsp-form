@@ -262,6 +262,9 @@
     --color-table-row-selected-rail: color-mix(in srgb, var(--color-table-row-tint) 18%, transparent);
     --color-table-row-active: var(--color-primary-soft);
     --color-table-row-disabled: transparent;
+    /* Unset, rows fell back to the button hover grey — far too bright on a
+       whole row. Same faint grey as a menu item hover. */
+    --color-table-row-hover: var(--color-item-hover-bg);
     --color-badge-outline-primary-border: var(--color-primary);
     --color-badge-outline-secondary-border: var(--color-secondary);
     --color-badge-outline-success-border: var(--color-success);
