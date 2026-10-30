@@ -1041,7 +1041,7 @@ function App() {
         }
       />
       <Route
-        path="/admin/approvals"
+        path="/admin/approvals/:approvalType?/:approvalId?"
         element={
           <ProtectedRoute>
             <AdminLayout>

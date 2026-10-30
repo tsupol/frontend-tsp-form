@@ -10,6 +10,7 @@ import {
 import clsx from 'clsx';
 import { apiClient } from '../lib/api';
 import { fmtCurrency } from '../lib/format';
+import { approvalPath } from '../lib/approvalLinks';
 import { usePartnerCaseReturnReasons } from '../pages/partner-cases/usePartnerCases';
 import { useSettlementReturnReasons } from '../pages/partner-settlement/usePartnerSettlement';
 
@@ -37,10 +38,12 @@ export type NotificationRow = {
     amount?: number | string;
     staff_name?: string;
     // Buyback approval (PART_022 mig 100) — routes to /admin/approvals.
+    // Purchase PO approval (mig 1533) — routes to the PO by po_id.
     po_id?: number;
     po_type?: string;
     po_code?: string;
     // Sell-out approval (mig 553): the request's code, beside amount + branch_name.
+    request_id?: number;
     code?: string;
     branch_name?: string;
     requested_by_name?: string;
@@ -144,11 +147,23 @@ export function customerNameOf(row: NotificationRow): string | null {
 export function deeplinkFor(row: NotificationRow): string | null {
   const evt = row.event_type;
   // Buyback approval (PART_022 mig 100) — no contract_id; the approval lives on
-  // the Approvals page (BUYBACK type). Routed before the contract_id guard below.
+  // the Approvals page, opened on that request (its id is the po_id).
+  // Routed before the contract_id guard below.
   if (evt === 'buyback_approval_required_staff' || row.payload?.po_type === 'BUYBACK') {
-    return '/admin/approvals';
+    const poId = row.payload?.po_id;
+    return poId ? approvalPath('BUYBACK', poId) : '/admin/approvals';
   }
-  if (evt === 'sell_out_approval_required_staff') return '/admin/approvals';
+  // Sell-out approval (mig 553): opened on that request (its id is the request_id).
+  if (evt === 'sell_out_approval_required_staff') {
+    const requestId = row.payload?.request_id;
+    return requestId ? approvalPath('ASSET_SELL_OUT', requestId) : '/admin/approvals';
+  }
+  // A branch's purchase PO waiting for the company (mig 1533): the PO itself,
+  // where the approve button is.
+  if (evt === 'po_approval_required_staff') {
+    const poId = row.payload?.po_id;
+    return poId ? `/admin/inventory/po/${poId}` : '/admin/approvals';
+  }
   // ABM enrollment OTP — not contract-related; the full SMS lives on the
   // ABM account OTP screen (UI_SUMMARY/137).
   if (evt === 'abm_otp_received') return '/admin/company/abm-otp';

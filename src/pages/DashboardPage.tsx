@@ -28,6 +28,7 @@ import { fmtCurrency } from '../lib/format';
 import { DateTime } from '../components/DateTime';
 import { useAuth } from '../contexts/AuthContext';
 import { useMyPermissions } from '../hooks/useMyPermissions';
+import { useApprovalScope, useScopedPendingApprovalCount } from '../hooks/useApprovalScope';
 import { DashboardScopePicker } from '../components/DashboardScopePicker';
 import { ReportSideSelect, ReportSideTag } from '../components/ReportSideSelect';
 import { MonthPicker } from '../components/MonthPicker';
@@ -57,8 +58,6 @@ import {
   type DayCloseHistoryRow,
   type Branch,
 } from './accounting/accountingTypes';
-
-const APPROVER_ROLES = new Set(['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV']);
 
 // Holding any of these means the user does (or oversees) a branch's daily
 // money — closing days, checking slips, fixing bills. The day-close / slips /
@@ -143,7 +142,12 @@ interface TodayRollup {
 export function DashboardPage() {
   const { t, i18n } = useTranslation();
   const { user, isFundCompany } = useAuth();
-  const canApprove = !!user?.role_code && APPROVER_ROLES.has(user.role_code);
+  // Company admins see every kind of request; company inventory only POs and
+  // buybacks, counted from the inbox itself (see useApprovalScope).
+  const approvalScope = useApprovalScope();
+  const { canApprove } = approvalScope;
+  const scopedApprovals = approvalScope.types !== null;
+  const scopedApprovalsQuery = useScopedPendingApprovalCount(approvalScope);
   const isBranchUser = !!user?.branch_id;
   const { permissions, hasPermission } = useMyPermissions();
   // An empty list means "not known" (still loading, or the view refuses this
@@ -206,7 +210,7 @@ export function DashboardPage() {
       apiClient.get<PendingSummaryRow[]>(
         `/v_dashboard_pending_approvals_summary?select=pending_count,pending_amount${sqr}`,
       ),
-    enabled: canApprove,
+    enabled: canApprove && !scopedApprovals,
     refetchInterval: 60_000,
   });
 
@@ -263,6 +267,8 @@ export function DashboardPage() {
 
   const unclosedRow = unclosedQuery.data?.[0];
   const approvalsRow = approvalsQuery.data?.[0];
+  const approvalsCount = scopedApprovals ? (scopedApprovalsQuery.data ?? 0) : (approvalsRow?.pending_count ?? 0);
+  const approvalsCardQuery = scopedApprovals ? scopedApprovalsQuery : approvalsQuery;
   const submissionsRow = submissionsQuery.data?.[0];
   const reconRow = reconQuery.data?.[0];
 
@@ -272,7 +278,7 @@ export function DashboardPage() {
         (submissionsRow?.pending_count ?? 0) +
         (reconRow?.mismatch_count ?? 0)
       : 0) +
-    (canApprove ? (approvalsRow?.pending_count ?? 0) : 0) +
+    (canApprove ? approvalsCount : 0) +
     (canReviewPartnerCases ? partnerCaseCount : 0) +
     (canCheckCloseouts ? closeoutCount : 0);
 
@@ -543,12 +549,14 @@ export function DashboardPage() {
               <CountCard
                 icon={<ShieldCheck size={20} />}
                 title={t('dashboard.pendingApprovals')}
-                count={approvalsRow?.pending_count ?? 0}
-                isLoading={approvalsQuery.isLoading}
-                isError={approvalsQuery.isError}
-                error={approvalsQuery.error}
+                count={approvalsCount}
+                isLoading={approvalsCardQuery.isLoading}
+                isError={approvalsCardQuery.isError}
+                error={approvalsCardQuery.error}
                 subtitle={
-                  (approvalsRow?.pending_count ?? 0) > 0
+                  // The summary's amount spans every kind; a scoped inbox has no
+                  // total of its own, so it shows the count alone.
+                  !scopedApprovals && (approvalsRow?.pending_count ?? 0) > 0
                     ? t('dashboard.amountTotal', { amount: fmtCurrency(approvalsRow!.pending_amount) })
                     : undefined
                 }

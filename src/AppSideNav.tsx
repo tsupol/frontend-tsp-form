@@ -77,6 +77,7 @@ import { isLocalDev } from './lib/devEnv';
 import { useNavCounts, NAV_COUNT_CAP } from './hooks/useNavCounts';
 import { useMyCommercialModels } from './hooks/useMyCommercialModels';
 import { useMyPermissions } from './hooks/useMyPermissions';
+import { useApprovalScope, useScopedPendingApprovalCount } from './hooks/useApprovalScope';
 import { useChatDock } from './contexts/ChatDockContext';
 import { NotificationMenuItem } from './components/NotificationMenu';
 import { SystemSignalSection, SystemSignalDialog, type SignalRow } from './components/SystemSignalSection';
@@ -213,7 +214,11 @@ export const AppSideNav = () => {
   const role = user?.role_code ?? '';
   const { showFin1, showFin2 } = useMyCommercialModels();
   const { hasPermission } = useMyPermissions();
-  const canApprove = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV'].includes(role);
+  // Company inventory approves POs and buybacks only (NOTICE 2026-10-30), so its
+  // badge counts those kinds rather than counters.pending_approvals.
+  const approvalScope = useApprovalScope();
+  const { canApprove } = approvalScope;
+  const scopedApprovalCount = useScopedPendingApprovalCount(approvalScope).data ?? 0;
   // Deal-partner credit review — the credit desk plus the admins above it.
   // Visibility only; every RPC re-checks PARTNER.CREDIT_APPROVE and pool
   // membership server-side.
@@ -466,7 +471,7 @@ export const AppSideNav = () => {
     ...(canApprove
       ? [{
           key: 'approvals',
-          ...iconWithCount(<ClipboardCheck size="1rem" />, pendingApprovals),
+          ...iconWithCount(<ClipboardCheck size="1rem" />, approvalScope.types ? scopedApprovalCount : pendingApprovals),
           label: t('nav.approvals'),
           path: '/admin/approvals',
         }]

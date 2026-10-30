@@ -6293,6 +6293,7 @@
       "bill_voided_staff": "Bill voided",
       "buyback_approval_required_staff": "Buyback approval required",
       "sell_out_approval_required_staff": "Sell-out approval required",
+      "po_approval_required_staff": "PO waiting for approval",
       "partner_case_submitted_staff": "Shop credit case waiting for approval",
       "partner_case_approved_staff": "Credit approved",
       "partner_case_returned_staff": "Credit request returned",

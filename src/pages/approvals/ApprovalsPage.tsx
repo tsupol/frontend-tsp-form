@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
@@ -17,6 +17,9 @@ import { translateApiError } from '../../lib/apiErrors';
 import { PartnerCaseDetailPanel } from '../partner-cases/PartnerCaseDetailPanel';
 import { usePartnerCaseDetail } from '../partner-cases/usePartnerCases';
 import { useAuth } from '../../contexts/AuthContext';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { approvalPath } from '../../lib/approvalLinks';
+import { useApprovalScope, approvalTypeFilter } from '../../hooks/useApprovalScope';
 import { wsClient } from '../../lib/api/ws';
 import { defaultScopeFor, scopeCountersChannel } from '../../lib/scope';
 
@@ -87,6 +90,22 @@ const typeColor = (type: ApprovalType): 'info' | 'primary' | 'secondary' | 'warn
 
 const rowKey = (r: ApprovalRow) => `${r.type}-${r.id}`;
 
+/** The list's query for a status/type filter. The pending inbox reads
+ *  v_pending_approvals; decided statuses read v_approvals_all_statuses. */
+function listUrl(status: ApprovalStatus | null, type: ApprovalType | null, scopeFilter: string): string {
+  const params: string[] = [];
+  if (type) params.push(`type=eq.${type}`);
+  else if (scopeFilter) params.push(scopeFilter);
+  if (!status || status === 'PENDING') {
+    // v_pending_approvals is PENDING-only — no status filter needed.
+    params.push('order=requested_at.desc');
+    return `/v_pending_approvals?${params.join('&')}`;
+  }
+  params.push(`status=eq.${status}`);
+  params.push('order=decided_at.desc.nullslast');
+  return `/v_approvals_all_statuses?${params.join('&')}`;
+}
+
 /* ───────────────────────────────────────────────────────────────────────────
  * Component — PageNav 2-panel. Narrow rail of custom stacked rows (click =
  * select), right panel dispatches on row.type. Buyback reuses the real
@@ -99,37 +118,35 @@ export function ApprovalsPage() {
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
   const { user } = useAuth();
+  // Company inventory sees only the kinds it may approve (PO, buyback); null = all.
+  const { types: scopeTypes } = useApprovalScope();
+  const scopeFilter = approvalTypeFilter(scopeTypes);
 
   const [statusFilter, setStatusFilter] = useState<ApprovalStatus | null>('PENDING');
   const [typeFilter, setTypeFilter] = useState<ApprovalType | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
 
-  const [selected, setSelected] = useState<ApprovalRow | null>(null);
+  // The open request lives in the address (/admin/approvals/<type>/<id>), so a
+  // notification, a copied link or a ctrl-click lands on that request.
+  const navigate = useNavigate();
+  const { approvalType, approvalId } = useParams<{ approvalType?: string; approvalId?: string }>();
+  const urlKey = approvalType && approvalId ? `${approvalType.toUpperCase()}-${approvalId}` : null;
+  const clearSelection = () => navigate('/admin/approvals');
 
-  useEffect(() => { setPageIndex(0); }, [statusFilter, typeFilter]);
 
   // The PENDING inbox reads v_pending_approvals — the newer, complete union BE
   // maintains (it carries every approval type incl. ASSET_SELL_OUT + the
   // payload_snapshot the detail panels need). Decided-status tabs read
   // v_approvals_all_statuses, the only view with decided_at / historical rows.
   // (Decided sell-out history also lives in the asset-sale ledger.)
-  const isPendingInbox = !statusFilter || statusFilter === 'PENDING';
-  const queryUrl = useMemo(() => {
-    const params: string[] = [];
-    if (typeFilter) params.push(`type=eq.${typeFilter}`);
-    if (isPendingInbox) {
-      // v_pending_approvals is PENDING-only — no status filter needed.
-      params.push('order=requested_at.desc');
-      return `/v_pending_approvals?${params.join('&')}`;
-    }
-    if (statusFilter) params.push(`status=eq.${statusFilter}`);
-    params.push('order=decided_at.desc.nullslast');
-    return `/v_approvals_all_statuses?${params.join('&')}`;
-  }, [statusFilter, typeFilter, isPendingInbox]);
+  const queryUrl = useMemo(
+    () => listUrl(statusFilter, typeFilter, scopeFilter),
+    [statusFilter, typeFilter, scopeFilter],
+  );
 
   const { data, isFetching } = useQuery({
-    queryKey: ['approvals-all', statusFilter, typeFilter, pageIndex, pageSize],
+    queryKey: ['approvals-all', statusFilter, typeFilter, scopeFilter, pageIndex, pageSize],
     queryFn: () => apiClient.getPaginated<ApprovalRow>(queryUrl, { page: pageIndex + 1, pageSize }),
     placeholderData: keepPreviousData,
   });
@@ -137,11 +154,54 @@ export function ApprovalsPage() {
   const rows = data?.data ?? [];
   const totalCount = data?.totalCount ?? 0;
 
+  // A linked request that isn't on the list's current page or filter is read on
+  // its own: the pending view first, then the decided history.
+  const listed = urlKey ? rows.find(r => rowKey(r) === urlKey) ?? null : null;
+  const { data: linked } = useQuery({
+    queryKey: ['approvals-one', urlKey],
+    enabled: !!urlKey && !listed,
+    queryFn: async () => {
+      const f = `type=eq.${approvalType!.toUpperCase()}&id=eq.${Number(approvalId)}`;
+      const pending = await apiClient.get<ApprovalRow[]>(`/v_pending_approvals?${f}`);
+      if (pending[0]) return pending[0];
+      const decided = await apiClient.get<ApprovalRow[]>(`/v_approvals_all_statuses?${f}`);
+      return decided[0] ?? null;
+    },
+  });
+  const selected = listed ?? (linked && rowKey(linked) === urlKey ? linked : null);
+
+  // Arriving by link on a request the list doesn't show (decided, or further
+  // down): turn the list to that request's status and page, so its row is
+  // there and highlighted. Once per link — after that the filters are the
+  // user's again.
+  const syncedKey = useRef<string | null>(null);
+  useEffect(() => {
+    if (!urlKey || listed || !linked || rowKey(linked) !== urlKey || syncedKey.current === urlKey) return;
+    syncedKey.current = urlKey;
+    const status = linked.status;
+    const type = typeFilter && typeFilter !== linked.type ? null : typeFilter;
+    // Rows ahead of it in the list's own order decide its page.
+    const sortCol = status === 'PENDING' ? 'requested_at' : 'decided_at';
+    const sortVal = status === 'PENDING' ? linked.requested_at : linked.decided_at;
+    const base = listUrl(status, type, scopeFilter).replace(/&?order=[^&]*/, '');
+    const ahead = sortVal
+      ? apiClient.getPaginated<{ id: number }>(
+          `${base}&select=id&${sortCol}=gt.${encodeURIComponent(sortVal)}`, { page: 1, pageSize: 1 },
+        ).then(r => r.totalCount).catch(() => 0)
+      : Promise.resolve(0);
+    void ahead.then(n => {
+      setStatusFilter(status);
+      setTypeFilter(type);
+      setPageIndex(Math.floor(n / pageSize));
+    });
+  }, [urlKey, listed, linked, typeFilter, scopeFilter, pageSize]);
+
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['approvals-all'] });
     // The side-nav badge counts the same queue, so it moves with the list
     // instead of waiting out its own timer.
     queryClient.invalidateQueries({ queryKey: ['nav', 'counters'] });
+    queryClient.invalidateQueries({ queryKey: ['nav', 'scoped-pending-approvals'] });
   };
 
   // A request entering or leaving the queue is announced, so the list follows a
@@ -168,7 +228,7 @@ export function ApprovalsPage() {
     { value: 'COMPLETED', label: t('approvals.status_COMPLETED') },
   ];
 
-  const typeOptions: { value: ApprovalType; label: string }[] = [
+  const allTypeOptions: { value: ApprovalType; label: string }[] = [
     { value: 'NEGOTIATION', label: t('approvals.type_NEGOTIATION') },
     { value: 'BILL_LINE_DISCOUNT', label: t('approvals.type_BILL_LINE_DISCOUNT') },
     { value: 'BUYBACK', label: t('approvals.type_BUYBACK') },
@@ -176,11 +236,11 @@ export function ApprovalsPage() {
     { value: 'PO', label: t('approvals.type_PO') },
     { value: 'DEAL_PARTNER', label: t('approvals.type_DEAL_PARTNER') },
   ];
+  const typeOptions = scopeTypes ? allTypeOptions.filter(o => scopeTypes.includes(o.value)) : allTypeOptions;
 
   return (
-    <PageNav panels={['list', 'detail']} className="h-dvh">
+    <PageNav panels={['list', 'detail']} defaultPanel={urlKey ? 'detail' : undefined} className="h-dvh overflow-hidden">
       {({ isMobile, isRoot, goTo, goBack }) => {
-        const select = (row: ApprovalRow) => { setSelected(row); if (isMobile) goTo('detail'); };
 
         return (
           <>
@@ -225,7 +285,7 @@ export function ApprovalsPage() {
                     <Select
                       options={statusOptions}
                       value={statusFilter}
-                      onChange={val => setStatusFilter((val as ApprovalStatus) || null)}
+                      onChange={val => { setStatusFilter((val as ApprovalStatus) || null); setPageIndex(0); }}
                       placeholder={t('approvals.allStatuses')}
                       size="sm"
                       showChevron
@@ -237,7 +297,7 @@ export function ApprovalsPage() {
                     <Select
                       options={typeOptions}
                       value={typeFilter}
-                      onChange={val => setTypeFilter((val as ApprovalType) || null)}
+                      onChange={val => { setTypeFilter((val as ApprovalType) || null); setPageIndex(0); }}
                       placeholder={t('approvals.allTypes')}
                       size="sm"
                       showChevron
@@ -254,11 +314,11 @@ export function ApprovalsPage() {
                   renderRow={row => {
                     const r = row.original;
                     return (
-                      <button
+                      <Link
                         key={rowKey(r)}
-                        type="button"
-                        className="w-full text-left px-4 py-3 flex flex-col gap-1 transition-colors cursor-pointer"
-                        onClick={() => select(r)}
+                        to={approvalPath(r.type, r.id)}
+                        className="w-full text-left px-4 py-3 flex flex-col gap-1 transition-colors cursor-pointer no-underline text-inherit"
+                        onClick={(e) => { if (isMobile && !(e.ctrlKey || e.metaKey || e.shiftKey)) goTo('detail'); }}
                       >
                         {/* Line 1: label + badges ............ amount */}
                         <div className="flex items-center gap-2 min-w-0">
@@ -278,7 +338,7 @@ export function ApprovalsPage() {
                             <DateTime value={r.requested_at} showTime={false} />
                           </span>
                         </div>
-                      </button>
+                      </Link>
                     );
                   }}
                   enablePagination
@@ -311,7 +371,7 @@ export function ApprovalsPage() {
                   <SellOutApprovalPanel
                     row={selected}
                     onSuccess={action => {
-                      setSelected(null);
+                      clearSelection();
                       if (isMobile) goBack();
                       refresh();
                       const key = action === 'approve' ? 'approvals.approveSuccess' : 'approvals.rejectSuccess';
@@ -325,7 +385,7 @@ export function ApprovalsPage() {
                     caseId={selected.id}
                     isMobile={isMobile}
                     onDecided={() => {
-                      setSelected(null);
+                      clearSelection();
                       if (isMobile) goBack();
                       refresh();
                     }}
@@ -334,7 +394,7 @@ export function ApprovalsPage() {
                   <PoApprovalPanel
                     row={selected}
                     onSuccess={action => {
-                      setSelected(null);
+                      clearSelection();
                       if (isMobile) goBack();
                       refresh();
                       const key = action === 'approve' ? 'approvals.approveSuccess' : 'approvals.rejectSuccess';
@@ -348,7 +408,7 @@ export function ApprovalsPage() {
                   <SimpleApprovalPanel
                     row={selected}
                     onSuccess={action => {
-                      setSelected(null);
+                      clearSelection();
                       if (isMobile) goBack();
                       refresh();
                       const key = action === 'approve'
