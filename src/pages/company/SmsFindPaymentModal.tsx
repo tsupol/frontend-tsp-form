@@ -14,7 +14,7 @@ import { DateTime } from '../../components/DateTime';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import {
-  LinkedResultLine, PaymentCandidateList, SmsFilterRow, SmsText,
+  LinkedResultLine, PaymentCandidateList, SmsFilterRow, SmsParseBadge, SmsParsedSummary, SmsText,
 } from '../../components/SmsLinkParts';
 import { fmtCurrency } from '../../lib/format';
 import { translateApiError } from '../../lib/apiErrors';
@@ -50,6 +50,13 @@ export function SmsFindPaymentModal({ open, message: messageProp, onClose }: Pro
     message?.message_id ?? null, filters, open && view !== 'done',
   );
   const results = search?.results ?? [];
+  // The reading of this SMS (mig 1537) — from the search once it has run, else the inbox row's own columns.
+  const parsed = search?.sms.parsed ?? (message?.parse_status ? {
+    status: message.parse_status, direction: message.direction, amount: message.parsed_amount,
+    balance_after: message.balance_after, our_account_last4: message.our_account_last4,
+    counter_account_last4: message.counter_account_last4, counter_role: message.counter_role,
+    bank_time: message.bank_time, pattern_code: message.pattern_code, suspect_reason: message.suspect_reason,
+  } : null);
   const pick = usePresetPick(results, paymentKey);
   const picked = pick.pickedRow;
   const { reset: resetPick } = pick;
@@ -94,7 +101,10 @@ export function SmsFindPaymentModal({ open, message: messageProp, onClose }: Pro
     // From this side a picked line that already has an SMS can't take another:
     // the backend answers PAYMENT_ALREADY_LINKED, so say it here instead.
     if (picked.linked_to) { setError(t('smsLink.lineHasSmsUnlinkFirst')); return; }
-    const need = confirmNeeded({ ...picked, linked_to: null }, picked.amount);
+    const need = confirmNeeded(
+      { ...picked, linked_to: null, direction_matches: picked.flow_matches },
+      { amount: picked.amount, flow: picked.flow, smsDirection: parsed?.direction ?? null },
+    );
     if (need) { setConfirm(need); setView('confirm'); return; }
     void doLink(false);
   };
@@ -127,8 +137,10 @@ export function SmsFindPaymentModal({ open, message: messageProp, onClose }: Pro
                   <div className="text-xs text-subtle flex items-center gap-1.5 flex-wrap">
                     <Smartphone size={12} />{message.source_label}
                     <span>·</span><DateTime value={message.received_at} showTime />
+                    <SmsParseBadge status={parsed?.status} reason={parsed?.suspect_reason} />
                   </div>
-                  <SmsText text={message.sms_text} />
+                  <SmsText text={message.sms_text} smsAmount={parsed?.amount} match={parsed?.amount != null ? 'EXACT' : undefined} />
+                  <SmsParsedSummary parsed={parsed} />
                 </div>
               )}
               <SmsFilterRow
@@ -145,6 +157,8 @@ export function SmsFindPaymentModal({ open, message: messageProp, onClose }: Pro
                 <div className={`${isFetching ? 'opacity-60' : ''} transition-opacity`}>
                   <PaymentCandidateList
                     results={results}
+                    smsDirection={parsed?.direction}
+                    smsAccountLast4={parsed?.our_account_last4}
                     pickedKey={picked ? paymentKey(picked) : null}
                     onPick={k => { pick.pick(k); setConfirm(null); setError(''); setView('search'); }}
                     loading={isLoading}

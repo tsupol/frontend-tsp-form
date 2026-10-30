@@ -110,7 +110,9 @@ export function PassbookSmsModal({ open, line: lineProp, onClose }: Props) {
 
   const submitLink = () => {
     if (!picked || !line) return;
-    const need = confirmNeeded(picked, search?.line.amount ?? line.amount);
+    const need = confirmNeeded(picked, {
+      amount: search?.line.amount ?? line.amount, flow: search?.line.flow ?? line.direction, smsDirection: picked.direction,
+    });
     if (need) { setConfirm(need); setView('confirm'); return; }
     void doLink(false);
   };
@@ -241,6 +243,8 @@ export function PassbookSmsModal({ open, line: lineProp, onClose }: Props) {
                   <SmsCandidateList
                     results={results}
                     lineAmount={search?.line.amount ?? line?.amount ?? null}
+                    lineFlow={search?.line.flow ?? line?.direction}
+                    lineAccountLast4={search?.line.account_last4}
                     pickedId={picked?.sms_message_id ?? null}
                     onPick={id => { pick.pick(String(id)); setConfirm(null); setView('search'); }}
                     loading={isLoading}

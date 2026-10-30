@@ -3,9 +3,13 @@
 //
 // Phones that receive the bank's money-in/money-out SMS for the company's
 // accounts forward each message into NNF (iOS Shortcuts, same as the ABM OTP
-// phone). This round the system only stores, shows and notifies — nothing reads
-// amounts out of the text. So the text is shown exactly as it arrived: no
-// trimming, no parsing, line breaks kept.
+// phone). The text is shown exactly as it arrived: no trimming, line breaks
+// kept. Since mig 1537 the system also reads it (direction · amount · balance ·
+// account · bank time) and shows that reading under the raw text with a badge
+// — PARSED / SUSPECT / UNPARSED. The reading helps the person attaching the SMS
+// to a line; it is never booked as money (KB #437). A "flagged" filter and a
+// count on the inbox tab show what the parser could not read, so someone can
+// tell a new bank format from a phone linked to the wrong account.
 //
 // Two tabs, each bound to its own permission (both COMPANY_ADMIN for now):
 //   inbox  — v_sms_messages, newest first, filter by phone   (SMS.VIEW)
@@ -23,6 +27,7 @@ import {
   Plus, RefreshCw, Search, Smartphone, X,
 } from 'lucide-react';
 import { SmsFindPaymentModal } from './SmsFindPaymentModal';
+import { SmsParseBadge, SmsParsedSummary } from '../../components/SmsLinkParts';
 import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { useAuth } from '../../contexts/AuthContext';
@@ -56,6 +61,8 @@ export function SmsRelayPage() {
   const filterSource = params.get('source') ?? '';
   // ?linked=unlinked — only SMS not yet attached to any line (the passbook's check bar links here).
   const unlinkedOnly = params.get('linked') === 'unlinked';
+  // ?parse=flagged — only SMS the parser could not read, or read with a contradiction (mig 1537).
+  const flaggedOnly = params.get('parse') === 'flagged';
   const canLink = hasPermission('SMS.LINK');
   const [findMessage, setFindMessage] = useState<SmsMessage | null>(null);
 
@@ -76,6 +83,14 @@ export function SmsRelayPage() {
   const setUnlinkedOnly = (on: boolean) => {
     const p = new URLSearchParams(params);
     if (on) p.set('linked', 'unlinked'); else p.delete('linked');
+    p.delete('parse');
+    setParams(p, { replace: true });
+    setPageIndex(0);
+  };
+  const setFlaggedOnly = () => {
+    const p = new URLSearchParams(params);
+    p.set('parse', 'flagged');
+    p.delete('linked');
     setParams(p, { replace: true });
     setPageIndex(0);
   };
@@ -89,10 +104,11 @@ export function SmsRelayPage() {
   // No realtime push for this list — a refresh button is the contract. Never
   // serve a cached list: someone is usually waiting for a message to land.
   const messages = useQuery({
-    queryKey: ['sms-relay', 'messages', filterSource, unlinkedOnly, pageIndex, pageSize],
+    queryKey: ['sms-relay', 'messages', filterSource, unlinkedOnly, flaggedOnly, pageIndex, pageSize],
     queryFn: () => apiClient.getPaginated<SmsMessage>(
       `/v_sms_messages?order=received_at.desc${filterSource ? `&source_id=eq.${filterSource}` : ''}`
-      + (unlinkedOnly ? '&link_id=is.null&is_duplicate=is.false' : ''),
+      + (unlinkedOnly ? '&link_id=is.null&is_duplicate=is.false' : '')
+      + (flaggedOnly ? '&parse_status=neq.PARSED&is_duplicate=is.false' : ''),
       { page: pageIndex + 1, pageSize },
     ),
     enabled: canView,
@@ -100,6 +116,16 @@ export function SmsRelayPage() {
     refetchOnMount: 'always',
     placeholderData: (prev) => prev,
   });
+
+  // How many the parser could not read — the count on the inbox tab (doc 154 §4.1).
+  const unparsed = useQuery({
+    queryKey: ['sms-relay', 'unparsed-count', filterSource],
+    queryFn: () => apiClient.count(`/v_sms_unparsed?select=message_id${filterSource ? `&source_id=eq.${filterSource}` : ''}`),
+    enabled: canView,
+    staleTime: 0,
+    refetchOnMount: 'always',
+  });
+  const unparsedCount = unparsed.data ?? 0;
 
   const sources = useQuery({
     queryKey: ['sms-relay', 'sources'],
@@ -189,7 +215,7 @@ export function SmsRelayPage() {
 
         {canView && canManage && (
           <div className="flex-none flex border-b border-line">
-            <TabButton active={tab === 'inbox'} onClick={() => setTab('inbox')} label={t('smsRelay.tabInbox')} />
+            <TabButton active={tab === 'inbox'} onClick={() => setTab('inbox')} label={t('smsRelay.tabInbox')} count={unparsedCount} />
             <TabButton active={tab === 'manage'} onClick={() => setTab('manage')} label={t('smsRelay.tabManage')} />
           </div>
         )}
@@ -198,11 +224,14 @@ export function SmsRelayPage() {
           <>
             <div className="flex-none flex items-center gap-3 flex-wrap">
               <div className="btn-group">
-                <Button size="sm" variant={!unlinkedOnly ? 'solid' : 'outline'} color={!unlinkedOnly ? 'primary' : 'default'} onClick={() => setUnlinkedOnly(false)}>
+                <Button size="sm" variant={!unlinkedOnly && !flaggedOnly ? 'solid' : 'outline'} color={!unlinkedOnly && !flaggedOnly ? 'primary' : 'default'} onClick={() => setUnlinkedOnly(false)}>
                   {t('smsRelay.linkFilterAll')}
                 </Button>
                 <Button size="sm" variant={unlinkedOnly ? 'solid' : 'outline'} color={unlinkedOnly ? 'primary' : 'default'} onClick={() => setUnlinkedOnly(true)}>
                   {t('smsRelay.linkFilterUnlinked')}
+                </Button>
+                <Button size="sm" variant={flaggedOnly ? 'solid' : 'outline'} color={flaggedOnly ? 'primary' : 'default'} onClick={setFlaggedOnly}>
+                  {t('smsRelay.parseFilterFlagged')}{unparsedCount > 0 ? ` (${unparsedCount})` : ''}
                 </Button>
               </div>
               {sourceOptions.length > 0 && (
@@ -236,6 +265,7 @@ export function SmsRelayPage() {
                   <p className="text-sm text-subtle">
                     {messages.isLoading ? t('common.loading')
                       : unlinkedOnly ? t('smsRelay.noUnlinked')
+                      : flaggedOnly ? t('smsRelay.noFlagged')
                       : filterSource ? t('smsRelay.noMessagesForPhone') : t('smsRelay.noMessages')}
                   </p>
                   {!messages.isLoading && filterSource && (
@@ -325,16 +355,18 @@ export function SmsRelayPage() {
   );
 }
 
-function TabButton({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
+function TabButton({ active, onClick, label, count }: { active: boolean; onClick: () => void; label: string; count?: number }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer border-b-2 ${
+      className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer border-b-2 inline-flex items-center gap-1.5 ${
         active ? 'border-primary-fg text-primary-fg' : 'border-transparent text-fg'
       }`}
     >
       {label}
+      {/* SMS the parser could not read — someone should look (doc 154 §4.1). */}
+      {count != null && count > 0 && <Badge size="xs" color="warning">{count}</Badge>}
     </button>
   );
 }
@@ -349,6 +381,7 @@ function MessageRow({ m, onFind }: { m: SmsMessage; onFind?: () => void }) {
         <div className="flex items-center gap-2 min-w-0 flex-wrap">
           <span className="text-sm font-medium break-words">{m.purpose}</span>
           {m.is_duplicate && <Badge size="xs" color="warning">{t('smsRelay.duplicate')}</Badge>}
+          {!m.is_duplicate && <SmsParseBadge status={m.parse_status} reason={m.suspect_reason} />}
           {/* Is this SMS the slip of a line yet? A repeat of another SMS is never attached. */}
           {!m.is_duplicate && (m.link_id != null ? (
             <Badge size="xs" color={m.linked_amount_matches === false ? 'warning' : 'success'}>
@@ -377,6 +410,14 @@ function MessageRow({ m, onFind }: { m: SmsMessage; onFind?: () => void }) {
       </div>
       {/* Exactly as received — never trimmed or reflowed. */}
       <p className="text-sm whitespace-pre-wrap break-words rounded-md bg-surface border border-line px-3 py-2">{m.sms_text}</p>
+      {/* What the system read out of it (mig 1537) — a reading, shown under the evidence, never instead of it. */}
+      <SmsParsedSummary
+        parsed={{
+          status: m.parse_status, direction: m.direction, amount: m.parsed_amount, balance_after: m.balance_after,
+          our_account_last4: m.our_account_last4, counter_account_last4: m.counter_account_last4, counter_role: m.counter_role,
+          bank_time: m.bank_time, pattern_code: m.pattern_code, suspect_reason: m.suspect_reason,
+        }}
+      />
     </div>
   );
 }

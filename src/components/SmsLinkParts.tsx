@@ -13,16 +13,16 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Badge, Button, LabeledCheckbox, RadioCircle } from 'tsp-form';
-import { AlertTriangle, CheckCircle2, Landmark, Link2, MessageSquareText, Smartphone } from 'lucide-react';
+import { AlertTriangle, ArrowDownLeft, ArrowUpRight, CheckCircle2, Landmark, Link2, MessageSquareText, Smartphone } from 'lucide-react';
 import { DateTime } from './DateTime';
 import { fmtCurrency, formatRelativeAgo } from '../lib/format';
 import { translateApiError } from '../lib/apiErrors';
 import { useMyPermissions } from '../hooks/useMyPermissions';
 import {
-  DEFAULT_SMS_FILTERS, confirmNeeded, linkConfirmMessage, linkSms, linkedToFromError, paymentKey, splitSmsAmounts,
+  DEFAULT_SMS_FILTERS, confirmNeeded, directionLabel, linkConfirmMessage, linkSms, linkedToFromError, paymentKey, splitSmsAmounts,
   useSmsLinkInvalidate, useSmsSearchForPayment, usePresetPick,
-  type LinkConfirm, type PaymentCandidate, type SmsCandidate, type SmsHours, type SmsLinkResult,
-  type SmsMatch, type SmsPaymentTable, type SmsSearchFilters, type SmsSearchWindow,
+  type LinkConfirm, type PaymentCandidate, type SmsCandidate, type SmsDirection, type SmsHours, type SmsLinkResult,
+  type SmsMatch, type SmsParseStatus, type SmsParsed, type SmsPaymentTable, type SmsSearchFilters, type SmsSearchWindow,
 } from '../lib/smsLink';
 
 // ── Filters ──────────────────────────────────────────────────────────────────
@@ -92,19 +92,88 @@ export function SmsMatchBadge({ match, diff }: { match: SmsMatch; diff: number |
   return <Badge size="sm" color="default">{t('smsLink.matchNone')}</Badge>;
 }
 
-/** The SMS exactly as received, with the amount that matters marked. */
+/** How the system read the text (mig 1537): PARSED green · SUSPECT amber with its reason · UNPARSED grey. */
+export function SmsParseBadge({ status, reason }: { status: SmsParseStatus | null | undefined; reason?: string | null }) {
+  const { t } = useTranslation();
+  if (!status) return null;
+  if (status === 'PARSED') return <Badge size="sm" color="success">{t('smsLink.parsed')}</Badge>;
+  if (status === 'SUSPECT') {
+    return (
+      <Badge size="sm" color="warning">
+        {t('smsLink.suspect')}{reason ? ` · ${suspectReasonLabel(reason, t)}` : ''}
+      </Badge>
+    );
+  }
+  return <Badge size="sm" color="default">{t('smsLink.unparsed')}</Badge>;
+}
+
+/** `ACCOUNT_MISMATCH:2147<>0002` → "บัญชีในข้อความ X-2147 ≠ บัญชีที่ผูก X-0002"; unknown codes shown raw. */
+function suspectReasonLabel(reason: string, t: (k: string, o?: Record<string, unknown>) => string): string {
+  const at = reason.indexOf(':');
+  const code = at < 0 ? reason : reason.slice(0, at);
+  const detail = at < 0 ? '' : reason.slice(at + 1);
+  if (code === 'ACCOUNT_MISMATCH' && detail) {
+    const [inText, linked] = detail.split('<>');
+    return t('smsLink.suspectAccountMismatch', { text: inText, linked });
+  }
+  if (code === 'TIME_IN_FUTURE') return t('smsLink.suspectTimeInFuture');
+  if (code === 'PARSER_ERROR') return t('smsLink.suspectParserError');
+  return reason;
+}
+
+/** One line of what was read: "เงินออก 0.01 → X-1111 · คงเหลือ 200.03 · 30/10 21:23". Nothing when unparsed. */
+export function SmsParsedSummary({ parsed, className }: { parsed: SmsParsed | null | undefined; className?: string }) {
+  const { t } = useTranslation();
+  if (!parsed || parsed.status === 'UNPARSED' || parsed.amount == null) return null;
+  const out = parsed.direction === 'OUT';
+  const counter = parsed.counter_account_last4 ? `X-${parsed.counter_account_last4}` : null;
+  return (
+    <div className={`text-xs flex items-center gap-1.5 flex-wrap ${className ?? ''}`}>
+      <span className={`inline-flex items-center gap-1 font-medium tabular-nums ${out ? 'text-danger-fg' : 'text-success-fg'}`}>
+        {out ? <ArrowUpRight size={12} /> : <ArrowDownLeft size={12} />}
+        {directionLabel(parsed.direction, t)} {fmtCurrency(parsed.amount)}
+      </span>
+      {counter && (
+        <span className="text-subtle">{parsed.counter_role === 'FROM' ? `← ${counter}` : `→ ${counter}`}</span>
+      )}
+      {parsed.our_account_last4 && <span className="text-subtle">· {t('smsLink.ourAccount')} X-{parsed.our_account_last4}</span>}
+      {parsed.balance_after != null && (
+        <span className="text-subtle tabular-nums">· {t('smsLink.balanceAfter')} {fmtCurrency(parsed.balance_after)}</span>
+      )}
+      {parsed.bank_time && <span className="text-subtle">· <DateTime value={parsed.bank_time} showTime /></span>}
+    </div>
+  );
+}
+
+/** A direction or account disagreement under a result row (mig 1537). */
+function MismatchLine({ children }: { children: ReactNode }) {
+  return (
+    <span className="text-xs text-warning-fg inline-flex items-center gap-1">
+      <AlertTriangle size={12} className="shrink-0" />{children}
+    </span>
+  );
+}
+
+/**
+ * The SMS exactly as received, with the amount that matters marked.
+ * The figure the backend compared (`smsAmount`) is the one marked: green on a
+ * 100% match, amber on a near one. A balance equal to the line's amount is not
+ * a match any more (mig 1537), so only when the backend read no amount at all
+ * does an equal figure anywhere in the text get the mark.
+ */
 export function SmsText({ text, lineAmount, smsAmount, match }: {
   text: string;
-  /** The line's amount: an equal figure in the text is marked as the match. */
+  /** The line's amount: marked when the text has no read-out amount of its own. */
   lineAmount?: number | null;
-  /** For a near match: the figure the backend compared, marked as "close". */
+  /** The figure the backend compared. */
   smsAmount?: number | null;
   match?: SmsMatch;
 }) {
+  const exactTarget = match === 'EXACT' ? (smsAmount ?? lineAmount) : (smsAmount == null ? lineAmount : null);
   return (
     <p className="text-sm whitespace-pre-wrap break-words rounded-md bg-surface border border-line px-3 py-2 m-0">
       {splitSmsAmounts(text).map((part, i) => {
-        if (part.amount != null && lineAmount != null && part.amount === lineAmount) {
+        if (part.amount != null && exactTarget != null && part.amount === exactTarget) {
           return <mark key={i} className="bg-success-soft text-success-fg font-semibold rounded px-0.5">{part.text}</mark>;
         }
         if (part.amount != null && match === 'NEAR' && smsAmount != null && part.amount === smsAmount) {
@@ -148,9 +217,12 @@ function PickRow({ selected, dim, onPick, children }: {
 
 // ── Lists ────────────────────────────────────────────────────────────────────
 
-export function SmsCandidateList({ results, lineAmount, pickedId, onPick, loading }: {
+export function SmsCandidateList({ results, lineAmount, lineFlow, lineAccountLast4, pickedId, onPick, loading }: {
   results: SmsCandidate[];
   lineAmount: number | null;
+  /** The line's direction and account, named in the warnings when an SMS disagrees. */
+  lineFlow?: SmsDirection | null;
+  lineAccountLast4?: string | null;
   pickedId: number | null;
   onPick: (id: number) => void;
   loading: boolean;
@@ -176,12 +248,31 @@ export function SmsCandidateList({ results, lineAmount, pickedId, onPick, loadin
         >
           <div className="flex items-center gap-2 flex-wrap text-xs text-subtle">
             <SmsMatchBadge match={r.match} diff={r.diff} />
+            <SmsParseBadge status={r.parse_status} />
             <When iso={r.received_at} />
+            {/* The bank's own time, when the text carried one — the reading above is "when it reached us". */}
+            {r.bank_time && (
+              <span className="inline-flex items-center gap-1">
+                <Landmark size={11} />{t('smsLink.bankTime')} <DateTime value={r.bank_time} showTime />
+              </span>
+            )}
             {r.source_label && (
               <span className="inline-flex items-center gap-1"><Smartphone size={11} />{r.source_label}</span>
             )}
           </div>
           <SmsText text={r.sms_text} lineAmount={lineAmount} smsAmount={r.sms_amount} match={r.match} />
+          {r.direction_matches === false && (
+            <MismatchLine>
+              {t('smsLink.directionMismatch', { sms: directionLabel(r.direction, t), line: directionLabel(lineFlow, t) })}
+            </MismatchLine>
+          )}
+          {r.account_matches === false && (
+            <MismatchLine>
+              {lineAccountLast4
+                ? t('smsLink.accountMismatch', { line: `X-${lineAccountLast4}` })
+                : t('smsLink.accountMismatchNoLine')}
+            </MismatchLine>
+          )}
           {r.linked_to && (
             <span className="text-xs text-warning-fg inline-flex items-center gap-1">
               <Link2 size={12} />{t('smsLink.linkedTo', { doc: r.linked_to.doc_code ?? `#${r.linked_to.payment_id}` })}
@@ -193,11 +284,14 @@ export function SmsCandidateList({ results, lineAmount, pickedId, onPick, loadin
   );
 }
 
-export function PaymentCandidateList({ results, pickedKey, onPick, loading }: {
+export function PaymentCandidateList({ results, pickedKey, onPick, loading, smsDirection, smsAccountLast4 }: {
   results: PaymentCandidate[];
   pickedKey: string | null;
   onPick: (key: string) => void;
   loading: boolean;
+  /** What the SMS says, named in the warnings when a line disagrees. */
+  smsDirection?: SmsDirection | null;
+  smsAccountLast4?: string | null;
 }) {
   const { t } = useTranslation();
   if (results.length === 0) {
@@ -233,6 +327,18 @@ export function PaymentCandidateList({ results, pickedKey, onPick, loading }: {
               {r.party && <span>· {r.party}</span>}
               {(r.account_name || r.account_key) && <span>· {r.account_name ?? r.account_key}</span>}
             </div>
+            {r.flow_matches === false && (
+              <MismatchLine>
+                {t('smsLink.directionMismatch', { sms: directionLabel(smsDirection, t), line: directionLabel(r.flow, t) })}
+              </MismatchLine>
+            )}
+            {r.account_matches === false && (
+              <MismatchLine>
+                {smsAccountLast4
+                  ? t('smsLink.accountMismatchLine', { sms: `X-${smsAccountLast4}` })
+                  : t('smsLink.accountMismatchNoLine')}
+              </MismatchLine>
+            )}
             {r.linked_to && (
               <span className="text-xs text-warning-fg inline-flex items-center gap-1">
                 <Link2 size={12} />{t('smsLink.lineHasSms')}
@@ -329,7 +435,7 @@ export function SmsAttachInline({ paymentId, paymentTable = 'sale.fund_bill_paym
 
   const submit = () => {
     if (!picked || lineAmount == null) return;
-    const need = confirmNeeded(picked, lineAmount);
+    const need = confirmNeeded(picked, { amount: lineAmount, flow: search?.line.flow ?? 'OUT', smsDirection: picked.direction });
     if (need) { setConfirm(need); return; }
     void doLink(false);
   };
@@ -380,6 +486,8 @@ export function SmsAttachInline({ paymentId, paymentTable = 'sale.fund_bill_paym
                 <SmsCandidateList
                   results={results}
                   lineAmount={lineAmount}
+                  lineFlow={search?.line.flow}
+                  lineAccountLast4={search?.line.account_last4}
                   pickedId={picked?.sms_message_id ?? null}
                   onPick={id => { pick.pick(String(id)); setConfirm(null); }}
                   loading={isLoading}

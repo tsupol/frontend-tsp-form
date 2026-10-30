@@ -1840,8 +1840,8 @@
     "account": "Account",
     "accountPlaceholder": "Pick an account",
     "saved": "Channel account updated",
-    "channel_PARTNER_REMIT": "Shop remittance",
-    "remitHint": "The \"shop remittance\" channel is the account shops pay the fund back into, so only the fund's own accounts can be picked — not a branch account"
+    "channel_PARTNER_REMIT": "Fund",
+    "remitHint": "The \"fund\" channel is the account shops pay the fund back into, so only the fund's own accounts can be picked — not a branch account"
   },
   "barcodeScanner": {
     "title": "Scan barcode",
@@ -6507,12 +6507,13 @@
     "HOLDING": "Central fund (Holding)"
   },
   "partnerAccounts": {
-    "channel_INSTALLMENT": "Customers pay instalments here",
-    "channel_PARTNER_REMIT": "The shop pays the fund back here",
+    "channel_INSTALLMENT": "Instalments",
+    "channel_PARTNER_REMIT": "Fund",
     "notSet": "Not set yet — ask the fund company.",
-    "remitHint": "Not the account customers pay into — this one is the fund's.",
+    "remitHint": "Pay the fund back into this account · not the one customers pay into",
     "remitTitle": "Pay the fund back into this account",
-    "title": "Accounts for this shop"
+    "title": "Accounts for this shop",
+    "installmentHint": "Tell customers to pay their instalments into this account"
   },
   "partnerBalance": {
     "title": "Outstanding per shop",
@@ -10328,7 +10329,9 @@
     "noUnlinked": "No SMS waiting to be attached",
     "linkedTo": "Attached to {{doc}}",
     "notLinked": "Not attached",
-    "findLine": "Find line"
+    "findLine": "Find line",
+    "parseFilterFlagged": "Unread / suspect",
+    "noFlagged": "Every message was read"
   },
   "phoneSetup": {
     "step1Title": "Create an automation",
@@ -10451,7 +10454,8 @@
       "withoutSms": "{{count}} lines without SMS",
       "mismatch": "{{count}} amount mismatch",
       "smsUnlinked": "{{count}} SMS not attached",
-      "earlierOpen": "Earlier days not complete:"
+      "earlierOpen": "Earlier days not complete:",
+      "balanceGaps": "SMS balances do not chain in {{count}} places — an SMS may be missing"
     },
     "setAccount": {
       "title": "Change the line's account",
@@ -10514,7 +10518,23 @@
     "unlinkBody": "The SMS goes back to \"not attached\" and can be attached to the right line · the history is kept",
     "unlinkReason": "Reason",
     "unlinkReasonPlaceholder": "e.g. attached to the wrong line",
-    "unlinkSubmit": "Remove SMS"
+    "unlinkSubmit": "Remove SMS",
+    "parsed": "Read",
+    "suspect": "Suspect",
+    "unparsed": "Unread",
+    "suspectAccountMismatch": "account in text X-{{text}} ≠ phone’s account X-{{linked}}",
+    "suspectTimeInFuture": "bank time is in the future",
+    "suspectParserError": "parser failed",
+    "dirIn": "money in",
+    "dirOut": "money out",
+    "ourAccount": "account",
+    "balanceAfter": "balance",
+    "bankTime": "bank time",
+    "directionMismatch": "The SMS is {{sms}} but this line is {{line}}",
+    "accountMismatch": "The account in the text is not this line’s account ({{line}})",
+    "accountMismatchLine": "This line’s account is not the one in the text ({{sms}})",
+    "accountMismatchNoLine": "The account in the text is not this line’s account",
+    "confirmDirection": "This SMS is {{sms}} but the line is {{line}} — attach anyway?"
   },
   "bankAccountForm": {
     "qrOnlyShort": "QR",
@@ -10600,5 +10620,36 @@
       "l1": "The contract fee the shop collected on signing day is the company's money, so the fund deducts it from the payout",
       "l2": "This line is a record; no money moves today"
     }
+  },
+  "partnerDashboard": {
+    "workCount_one": "{{count}} item waiting",
+    "workCount_other": "{{count}} items waiting",
+    "work": "Work waiting",
+    "pendingDelivery": "Not handed over",
+    "noPendingDelivery": "Every device handed over",
+    "drafts": "Drafts",
+    "noDrafts": "No drafts open",
+    "casesPending": "Waiting on the fund",
+    "noCasesPending": "No requests waiting",
+    "actionList": "Contracts to follow up",
+    "noActions": "Nothing outstanding",
+    "action_PENDING_DELIVERY": "Not handed over",
+    "action_PENDING_DEVICE_BIND": "Device not bound",
+    "action_DRAFT_EXPIRING_SOON": "Draft expiring",
+    "action_PENDING_SIGN": "Awaiting signature",
+    "casesTitle": "Credit requests needing the shop",
+    "noCases": "No requests waiting on the shop",
+    "caseInForce": "Approved · open the contract",
+    "caseReturned": "Sent back to fix",
+    "usableUntil": "usable until",
+    "rankTitle": "Today's rank",
+    "rankHint": "Among this fund's shops · by contracts opened today, ties by financed total",
+    "rankOf": "#{{rank}} of {{total}} shops",
+    "rankFinanced": "financed: #{{rank}}",
+    "noneToday": "No contracts opened today yet",
+    "noneTodayHint": "None of the fund’s {{total}} shops has opened one",
+    "myContracts": "Opened today",
+    "myFinanced": "Financed today",
+    "monthTitle": "Contracts opened by month"
   }
 }

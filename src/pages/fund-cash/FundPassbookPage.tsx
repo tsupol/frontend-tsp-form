@@ -43,7 +43,7 @@ import { FundBookLineDrillModal } from '../fund-book/FundBookLineDrillModal';
 import { PassbookSmsModal } from './PassbookSmsModal';
 import { FundPaymentSetAccountModal } from './FundPaymentSetAccountModal';
 import {
-  useFundAccountBalances, useFundCashPosition, useFundPassbook, useFundPassbookDayCheck, type FundPassbookLine,
+  useFundAccountBalances, useFundCashPosition, useFundPassbook, useFundPassbookDayCheck, useSmsBalanceGaps, type FundPassbookLine,
 } from './useFundCash';
 
 function parseTypedDate(raw: string): Date | null {
@@ -61,6 +61,8 @@ function parseTypedDate(raw: string): Date | null {
 /** One pickable passbook. */
 interface PassbookChoice {
   key: string;
+  /** The company bank account behind the passbook; null for a branch account. */
+  bankAccountId: number | null;
   label: string;
   bankCode: string | null;
   number: string | null;
@@ -102,14 +104,14 @@ export function FundPassbookPage() {
     const out: PassbookChoice[] = [];
     for (const a of position?.accounts ?? []) {
       out.push({
-        key: a.account_key, label: a.account_name ?? a.account_key, bankCode: a.bank_code, number: a.account_number,
+        key: a.account_key, bankAccountId: a.bank_account_id, label: a.account_name ?? a.account_key, bankCode: a.bank_code, number: a.account_number,
         balance: a.balance, lineCount: a.line_count, isUsual: a.is_default, isCompany: true,
       });
     }
     for (const b of balances.rows) {
       if (b.is_unassigned || out.some(c => c.key === b.account_key)) continue;
       out.push({
-        key: b.account_key, label: b.account_name ?? b.account_key, bankCode: b.bank_code, number: b.account_number,
+        key: b.account_key, bankAccountId: b.company_bank_account_id, label: b.account_name ?? b.account_key, bankCode: b.bank_code, number: b.account_number,
         balance: b.balance, lineCount: b.line_count, isUsual: false, isCompany: b.is_company_account,
       });
     }
@@ -140,6 +142,8 @@ export function FundPassbookPage() {
 
   const today = toLocalDateStr(new Date());
   const dayCheck = useFundPassbookDayCheck(companyId, unassigned ? null : accountKey, today);
+  // Balances in consecutive bank SMS that do not chain = an SMS is missing (mig 1537).
+  const balanceGaps = useSmsBalanceGaps(canSeeInbox ? companyId : null, shown?.bankAccountId ?? null);
   /** Narrow the passbook to one day, from the check bar. */
   const showDay = (day: string) => { setDateFrom(day); setDateTo(day); setPresetKey(null); setPageIndex(0); };
   const dayLinkCls = 'inline-flex items-center gap-1 text-primary-fg hover:underline bg-transparent border-none p-0 cursor-pointer';
@@ -448,6 +452,16 @@ export function FundPassbookPage() {
                         <span className="text-subtle">{t('fundPassbook.dayCheck.smsUnlinked', { count: dayCheck.todayRow.sms_unlinked })}</span>
                       ))}
                     </>
+                  )}
+                  {balanceGaps.rows.length > 0 && (
+                    <Link
+                      to="/admin/company/sms-relay?tab=inbox"
+                      className={`${dayLinkCls} text-warning-fg`}
+                    >
+                      <AlertTriangle size={13} />
+                      {t('fundPassbook.dayCheck.balanceGaps', { count: balanceGaps.rows.length })}
+                      <ExternalLink size={12} />
+                    </Link>
                   )}
                   {dayCheck.earlierOpen.length > 0 && (
                     <span className="inline-flex items-center gap-2 flex-wrap text-subtle">

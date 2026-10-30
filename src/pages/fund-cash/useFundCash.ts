@@ -211,6 +211,38 @@ export function useFundPassbookDayCheck(companyId: number | null, accountKey: st
   };
 }
 
+/**
+ * One row per place where the balances in two consecutive bank SMS do not chain
+ * (previous balance ± amount ≠ next balance) — an SMS is missing, or the phone
+ * was off (mig 1537, doc 154 §4.2). Only PARSED messages with a balance count.
+ */
+export interface SmsBalanceGap {
+  company_id: number;
+  bank_account_id: number;
+  prev_message_id: number;
+  message_id: number;
+  prev_bank_time: string;
+  bank_time: string;
+  prev_balance: number;
+  signed_amount: number;
+  balance_after: number;
+  expected_balance: number;
+  gap_amount: number;
+}
+
+export function useSmsBalanceGaps(companyId: number | null, bankAccountId: number | null) {
+  const query = useQuery({
+    queryKey: ['fund-book', 'sms-balance-gaps', companyId, bankAccountId],
+    queryFn: () => apiClient.get<SmsBalanceGap[]>(
+      `/v_sms_balance_gaps?company_id=eq.${companyId}&bank_account_id=eq.${bankAccountId}&order=bank_time.desc&limit=20`,
+    ),
+    enabled: companyId != null && bankAccountId != null,
+    // Only SMS.VIEW holders can read it; for anyone else the 403 just means "no bar".
+    retry: false,
+  });
+  return { ...query, rows: query.data ?? [] };
+}
+
 /** Who set the target, when, from what to what. */
 export function useCashTargetLog(companyId: number | null) {
   const changed = encodeURIComponent('{"fund_cash_target":{}}');

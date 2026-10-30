@@ -24,6 +24,28 @@ export type SmsPaymentTable = 'sale.fund_bill_payment' | 'sale.bill_payment';
 export type SmsMatch = 'EXACT' | 'NEAR' | '' | 'UNREADABLE';
 /** p_hours: 24, 48, or null = all time. */
 export type SmsHours = 24 | 48 | null;
+/** What the system read out of the text (mig 1537): a reading, never a fact. */
+export type SmsParseStatus = 'PARSED' | 'SUSPECT' | 'UNPARSED';
+export type SmsDirection = 'IN' | 'OUT';
+
+/**
+ * The parsed block of one SMS — on v_sms_messages as flat columns and inside
+ * fn_payment_search_for_sms as `sms.parsed`. PARSED = read in full · SUSPECT =
+ * read but contradicts what we know (`suspect_reason`, e.g.
+ * ACCOUNT_MISMATCH:2147<>0002) · UNPARSED = no known pattern (every value null).
+ */
+export interface SmsParsed {
+  status: SmsParseStatus;
+  direction: SmsDirection | null;
+  amount: number | null;
+  balance_after: number | null;
+  our_account_last4: string | null;
+  counter_account_last4: string | null;
+  counter_role: 'FROM' | 'TO' | null;
+  bank_time: string | null;
+  pattern_code: string | null;
+  suspect_reason: string | null;
+}
 
 export interface SmsSearchFilters {
   unlinkedOnly: boolean;
@@ -63,6 +85,16 @@ export interface SmsCandidate {
   match: SmsMatch;
   diff: number | null;
   linked_to: SmsLinkedTo | null;
+  // mig 1537 — what the text says, judged against the line.
+  parse_status: SmsParseStatus;
+  direction: SmsDirection | null;
+  /** false = the SMS is money in but the line pays out (or the reverse). null = unreadable. */
+  direction_matches: boolean | null;
+  /** false = the account in the text is not the line's account. null = unreadable. */
+  account_matches: boolean | null;
+  /** The bank's own time, from the text — vs received_at, when it reached us. */
+  bank_time: string | null;
+  balance_after: number | null;
 }
 
 export interface SmsSearchForPayment {
@@ -74,6 +106,7 @@ export interface SmsSearchForPayment {
     money_date: string;
     bank_account_id: number | null;
     account_key: string | null;
+    account_last4: string | null;
     doc_code: string | null;
   };
   window: SmsSearchWindow;
@@ -98,6 +131,9 @@ export interface PaymentCandidate {
   sms_amount: number | null;
   diff: number | null;
   linked_to: { link_id: number; sms_message_id: number; linked_at: string } | null;
+  // mig 1537 — the line judged against what the SMS says.
+  flow_matches: boolean | null;
+  account_matches: boolean | null;
 }
 
 export interface PaymentSearchForSms {
@@ -108,6 +144,8 @@ export interface PaymentSearchForSms {
     bank_account_id: number | null;
     account_key: string | null;
     amounts: number[];
+    /** null while the message is UNPARSED on an older server. */
+    parsed: SmsParsed | null;
   };
   window: SmsSearchWindow;
   count: number;
@@ -215,14 +253,24 @@ export function usePresetPick<T extends { match: SmsMatch; linked_to: unknown }>
 /** What has to be confirmed before linking this pick, if anything. */
 export type LinkConfirm =
   | { kind: 'mismatch'; smsAmount: number | null; lineAmount: number; diff: number | null; match: SmsMatch }
+  /** The SMS is money in but the line pays out, or the reverse (mig 1537). */
+  | { kind: 'direction'; smsDirection: SmsDirection | null; lineFlow: SmsDirection }
   | { kind: 'move'; fromDoc: string | null };
 
 export function confirmNeeded(
-  pick: { match: SmsMatch; sms_amount: number | null; diff: number | null; linked_to: { doc_code?: string | null } | null },
-  lineAmount: number,
+  pick: {
+    match: SmsMatch; sms_amount: number | null; diff: number | null;
+    linked_to: { doc_code?: string | null } | null;
+    /** `direction_matches` of an SMS row, `flow_matches` of a line row. */
+    direction_matches?: boolean | null;
+  },
+  line: { amount: number; flow: SmsDirection; smsDirection?: SmsDirection | null },
 ): LinkConfirm | null {
   if (pick.match !== 'EXACT') {
-    return { kind: 'mismatch', smsAmount: pick.sms_amount, lineAmount, diff: pick.diff, match: pick.match };
+    return { kind: 'mismatch', smsAmount: pick.sms_amount, lineAmount: line.amount, diff: pick.diff, match: pick.match };
+  }
+  if (pick.direction_matches === false) {
+    return { kind: 'direction', smsDirection: line.smsDirection ?? null, lineFlow: line.flow };
   }
   if (pick.linked_to) return { kind: 'move', fromDoc: pick.linked_to.doc_code ?? null };
   return null;
@@ -279,12 +327,25 @@ export function splitSmsAmounts(text: string): { text: string; amount: number | 
 /** The question asked before a link the backend would flag, or a move. */
 export function linkConfirmMessage(confirm: LinkConfirm, t: TFunction): string {
   if (confirm.kind === 'move') return t('smsLink.confirmMove', { doc: confirm.fromDoc ?? '—' });
+  if (confirm.kind === 'direction') {
+    return t('smsLink.confirmDirection', {
+      sms: directionLabel(confirm.smsDirection, t),
+      line: directionLabel(confirm.lineFlow, t),
+    });
+  }
   if (confirm.smsAmount == null) return t('smsLink.confirmUnreadable', { line: fmtCurrency(confirm.lineAmount) });
   return t('smsLink.confirmMismatch', {
     sms: fmtCurrency(confirm.smsAmount),
     line: fmtCurrency(confirm.lineAmount),
     diff: fmtCurrency(confirm.diff),
   });
+}
+
+/** "เงินเข้า" / "เงินออก" / "—". */
+export function directionLabel(d: SmsDirection | null | undefined, t: TFunction): string {
+  if (d === 'IN') return t('smsLink.dirIn');
+  if (d === 'OUT') return t('smsLink.dirOut');
+  return '—';
 }
 
 /** One key per line across both payment tables. */

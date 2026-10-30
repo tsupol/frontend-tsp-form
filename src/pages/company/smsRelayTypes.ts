@@ -1,6 +1,8 @@
 // Shapes from api.v_sms_sources / api.v_sms_messages and the fn_sms_source_*
 // RPCs (mig 1529-1530). Spec: UI_SUMMARY/154_SMS_RELAY.md.
 
+import type { SmsDirection, SmsParseStatus } from '../../lib/smsLink';
+
 /** One bank account a phone is linked to (`linked_accounts` on the source row). */
 export interface SmsLinkedAccount {
   /** Pass to fn_sms_source_unlink_account. */
@@ -62,6 +64,20 @@ export interface SmsMessage {
   /** false = attached although the amounts differ. */
   linked_amount_matches: boolean | null;
   linked_at: string | null;
+  // What the system read out of the text (mig 1537) — a reading to help the
+  // person attaching it, never a figure to book money from (KB #437).
+  parse_status: SmsParseStatus;
+  direction: SmsDirection | null;
+  parsed_amount: number | null;
+  balance_after: number | null;
+  our_account_last4: string | null;
+  counter_account_last4: string | null;
+  counter_role: 'FROM' | 'TO' | null;
+  /** The bank's own time from the text; received_at is when it reached us. */
+  bank_time: string | null;
+  pattern_code: string | null;
+  /** e.g. ACCOUNT_MISMATCH:2147<>0002 · TIME_IN_FUTURE · PARSER_ERROR:… */
+  suspect_reason: string | null;
 }
 
 /** Returned identically by fn_sms_source_create, fn_sms_source_get_setup and
