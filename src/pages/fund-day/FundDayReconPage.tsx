@@ -22,6 +22,7 @@ import {
   fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr,
 } from '../../lib/format';
 import { OverflowTabs } from '../../components/OverflowTabs';
+import { BankAccountLine } from '../../components/BankAccountLine';
 import { FundReconVersionsModal } from './FundReconVersionsModal';
 import {
   useFundCompanyId, useFundDayCloses, useFundReconHistory, useFundReconOverview,
@@ -75,6 +76,11 @@ export function FundDayReconPage() {
     row.account_key === UNSPECIFIED_ACCOUNT
       ? t('fundDay.unspecifiedAccount')
       : [row.bank_name ?? row.account_key, row.account_number].filter(Boolean).join(' · ');
+  // The fund's own accounts only — no "where".
+  const accountLine = (row: FundReconOverviewAccount | FundReconHistoryRow, size?: number, wrap?: boolean) =>
+    row.account_key === UNSPECIFIED_ACCOUNT
+      ? <span className="font-medium">{t('fundDay.unspecifiedAccount')}</span>
+      : <BankAccountLine showWhere={false} size={size} wrap={wrap} account={{ ...row, bank_name: row.bank_name ?? row.account_key }} />;
 
   const columns: ColumnDef<FundReconHistoryRow>[] = [
     {
@@ -85,7 +91,8 @@ export function FundDayReconPage() {
     {
       accessorKey: 'account_key',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('fundDay.colAccount')} />,
-      cell: ({ row }) => <span className="font-medium">{accountLabel(row.original)}</span>,
+      // wraps like the old text did, so the table doesn't grow a sideways scroll
+      cell: ({ row }) => accountLine(row.original, 24, true),
     },
     {
       id: 'system',
@@ -290,10 +297,7 @@ export function FundDayReconPage() {
     const net = account.cumulative_diff_net;
     return (
       <div key={account.account_key} className="border border-line rounded-lg px-4 py-3 min-w-0">
-        <div className="font-medium truncate">{accountLabel(account)}</div>
-        {account.account_name && (
-          <div className="text-xs text-subtle truncate">{account.account_name}</div>
-        )}
+        {accountLine(account)}
         <div className="mt-2">
           <div className="text-xs text-subtle">{t('fundDay.cumulativeDiff')}</div>
           <div className={`text-lg font-medium tabular-nums ${

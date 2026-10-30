@@ -10,12 +10,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Modal, Button, Select } from 'tsp-form';
+import { Modal, Button } from 'tsp-form';
 import { Link2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { ActionDoneView } from '../contracts/ActionDoneView';
+import { BankAccountSelect } from '../../components/BankAccountSelect';
 import { SourceTargetBox } from './SmsSetupModal';
 import { accountLine, type SmsBankAccountOption, type SmsSource } from './smsRelayTypes';
 
@@ -56,13 +57,11 @@ export function SmsLinkAccountModal({ open, source: sourceProp, onClose, onLinke
   const unlinkedRef = useRef<number | null>(null);
   const isChange = current != null;
   const linkedIds = new Set((source?.linked_accounts ?? []).map(a => a.bank_account_id));
-  // The same number can sit on a branch row and a fund row; say which is which.
-  const optionLabel = (a: SmsBankAccountOption) => `${accountLine(a)} · ${
-    a.is_company_account ? t('smsRelay.link.fundAccount') : (a.branch_name ?? t('smsRelay.link.branchAccount'))}`;
+  // The same number can sit on a branch row and a fund row; the line's "where"
+  // (branch or บัญชีกองทุน) says which is which.
   const options = [...accounts]
     .sort((x, y) => Number(y.is_company_account) - Number(x.is_company_account) || x.id - y.id)
-    .filter(a => !linkedIds.has(a.id))
-    .map(a => ({ value: String(a.id), label: optionLabel(a) }));
+    .filter(a => !linkedIds.has(a.id));
 
   const [confirmClose, setConfirmClose] = useState(false);
   const forceClose = () => { setConfirmClose(false); onClose(); };
@@ -136,12 +135,12 @@ export function SmsLinkAccountModal({ open, source: sourceProp, onClose, onLinke
                     {accounts.length === 0 ? t('smsRelay.link.noAccounts') : t('smsRelay.link.allLinked')}
                   </p>
                 ) : (
-                  <Select
-                    options={options}
+                  <BankAccountSelect
+                    accounts={options}
+                    valueOf={a => String(a.id)}
                     value={accountId || null}
-                    onChange={(v) => setAccountId((v as string) ?? '')}
+                    onChange={(v) => setAccountId(v ?? '')}
                     placeholder={t('smsRelay.link.pick')}
-                    showChevron
                   />
                 )}
                 <p className="text-xs text-subtle mt-1">{t('smsRelay.link.hint')}</p>

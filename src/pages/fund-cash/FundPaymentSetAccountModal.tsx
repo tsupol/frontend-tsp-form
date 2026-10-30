@@ -10,7 +10,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, Select, TextArea } from 'tsp-form';
+import { Badge, Button, Modal, TextArea } from 'tsp-form';
 import { Landmark } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
@@ -18,7 +18,8 @@ import { fmtCurrency } from '../../lib/format';
 import { DateTime } from '../../components/DateTime';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { ActionDoneView } from '../contracts/ActionDoneView';
-import { fundAccountLabel } from '../../hooks/useFundAccountChoice';
+import { BankAccountSelect } from '../../components/BankAccountSelect';
+import { bankAccountLabel } from '../../lib/bankAccount';
 import { useFundSourceAccounts } from '../fund-bills/useFundBills';
 import { useSmsLinkInvalidate } from '../../lib/smsLink';
 import type { FundPassbookLine } from './useFundCash';
@@ -39,7 +40,7 @@ interface Props {
 }
 
 export function FundPaymentSetAccountModal({ open, line: lineProp, companyId, onClose }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const invalidate = useSmsLinkInvalidate();
   const { accounts, isLoading } = useFundSourceAccounts(companyId);
 
@@ -63,12 +64,10 @@ export function FundPaymentSetAccountModal({ open, line: lineProp, companyId, on
   // The account the line sits in now (null in the "no account named" group).
   const currentId = line?.is_unassigned ? null : line?.company_bank_account_id ?? null;
   const usual = t('fundAccount.usual');
-  const options = accounts
-    .filter(a => a.id !== currentId)
-    .map(a => ({ value: String(a.id), label: fundAccountLabel(a, usual) }));
+  const choices = accounts.filter(a => a.id !== currentId);
   const nameOf = (id: number | null | undefined) => {
     const a = accounts.find(x => x.id === id);
-    return a ? fundAccountLabel(a, usual) : t('fundPassbook.unassigned');
+    return a ? bankAccountLabel(a, t, i18n.language) : t('fundPassbook.unassigned');
   };
 
   const dirty = !!accountId || !!reason.trim();
@@ -138,13 +137,16 @@ export function FundPaymentSetAccountModal({ open, line: lineProp, companyId, on
               <div className="form-grid mt-4">
                 <div className="flex flex-col">
                   <label className="form-label">{t('fundPassbook.setAccount.to')} *</label>
-                  <Select
-                    options={options}
+                  <BankAccountSelect
+                    accounts={choices}
+                    valueOf={a => String(a.id)}
                     value={accountId || null}
-                    onChange={v => setAccountId((v as string) ?? '')}
+                    onChange={v => setAccountId(v ?? '')}
+                    badges={a => a.is_default && <Badge color="primary" size="sm">{usual}</Badge>}
+                    labelSuffix={a => (a.is_default ? ` · ${usual}` : '')}
+                    showWhere={false}
                     placeholder={isLoading ? t('common.loading') : t('fundAccount.placeholder')}
                     disabled={busy}
-                    showChevron
                   />
                 </div>
                 <div className="flex flex-col">

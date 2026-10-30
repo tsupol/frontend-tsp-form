@@ -16,10 +16,11 @@
 
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Select } from 'tsp-form';
+import { Badge } from 'tsp-form';
 import { ExternalLink } from 'lucide-react';
 import { useMyPermissions } from '../hooks/useMyPermissions';
-import { fundAccountLabel, type FundAccountChoice } from '../hooks/useFundAccountChoice';
+import type { FundAccountChoice } from '../hooks/useFundAccountChoice';
+import { BankAccountSelect } from './BankAccountSelect';
 
 interface FundAccountFieldProps {
   choice: FundAccountChoice;
@@ -54,13 +55,16 @@ export function FundAccountField({ choice, label, disabled }: FundAccountFieldPr
           </div>
         </div>
       ) : (
-        <Select
-          options={choice.accounts.map(a => ({ value: String(a.id), label: fundAccountLabel(a, usual) }))}
+        <BankAccountSelect
+          accounts={choice.accounts}
+          valueOf={a => String(a.id)}
           value={choice.accountId || null}
-          onChange={v => choice.setAccountId((v as string) ?? '')}
+          onChange={v => choice.setAccountId(v ?? '')}
+          badges={a => a.is_default && <Badge color="primary" size="sm">{usual}</Badge>}
+          labelSuffix={a => (a.is_default ? ` · ${usual}` : '')}
+          showWhere={false}
           placeholder={choice.loading ? t('common.loading') : t('fundAccount.placeholder')}
           disabled={disabled}
-          showChevron
         />
       )}
     </div>

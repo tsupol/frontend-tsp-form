@@ -29,6 +29,8 @@ import { WaiveLateFeeModal } from './WaiveLateFeeModal';
 import { useBillActions, type BillAction, type BillActionCode } from '../../hooks/useBillActions';
 import { useVoidReasons } from '../../hooks/useVoidReasons';
 import { SearchInput } from '../../components/SearchInput';
+import { BankAccountSelect } from '../../components/BankAccountSelect';
+import { BankAccountInline } from '../../components/BankAccountLine';
 import { BillReceipt } from '../contracts/workspace/BillReceipt';
 import { blockingReasonText, translateApiError } from '../../lib/apiErrors';
 
@@ -36,9 +38,14 @@ import { blockingReasonText, translateApiError } from '../../lib/apiErrors';
 
 interface BankAccount {
   id: number;
+  bank_code: string | null;
   bank_name: string;
-  account_number: string;
+  bank_name_en?: string | null;
+  account_number: string | null;
+  account_number_display: string | null;
   account_name: string;
+  branch_id: number;
+  branch_name: string;
 }
 
 type PaymentMethod = 'CASH' | 'TRANSFER';
@@ -450,10 +457,6 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
     queryFn: () => apiClient.get<BankAccount[]>('/v_bank_accounts?is_active=is.true&branch_id=not.is.null&order=bank_name'),
     staleTime: 5 * 60 * 1000,
   });
-  const bankOptions = (bankAccounts ?? []).map(b => ({
-    value: String(b.id),
-    label: `${b.bank_name} - ${b.account_number} (${b.account_name})`,
-  }));
 
   // Pay state
   const [payments, setPayments] = useState<PaymentLine[]>([]);
@@ -909,7 +912,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
                         <ExternalLink size={12} />
                       </Link>
                       {pay.bank_name && (
-                        <span className="block">{pay.bank_name} {pay.account_number ?? ''}</span>
+                        <span className="block"><BankAccountInline account={pay} /></span>
                       )}
                       {pay.reference && <span className="opacity-70 block">· {pay.reference}</span>}
                     </span>
@@ -987,13 +990,13 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
                 {payment.method === 'TRANSFER' && (
                   <div className="flex flex-col">
                     <label className="form-label text-xs">{t('accounting.bills.bankAccount')}</label>
-                    <Select
-                      options={bankOptions}
+                    <BankAccountSelect
+                      accounts={bankAccounts ?? []}
+                      valueOf={b => String(b.id)}
                       value={payment.bank_account_id ? String(payment.bank_account_id) : null}
                       onChange={(val) => updatePayment(idx, { bank_account_id: val ? Number(val) : null })}
                       placeholder={t('accounting.bills.selectBank')}
                       size="sm"
-                      showChevron
                       searchable
                     />
                   </div>
@@ -1281,7 +1284,7 @@ function VoidPaymentModal({
                   <div className="flex items-center gap-2 text-sm rounded-md bg-surface px-3 py-2 border border-line">
                     <Badge color={METHOD_COLOR[payment.method] ?? 'default'} size="sm">{payment.method}</Badge>
                     <span className="flex-1 min-w-0 truncate text-subtle">
-                      {payment.bank_name ? `${payment.bank_name} ${payment.account_number ?? ''}` : payment.code_display}
+                      {payment.bank_name ? <BankAccountInline account={payment} /> : payment.code_display}
                     </span>
                     <span className="tabular-nums font-medium shrink-0">{fmtCurrency(payment.amount)}</span>
                   </div>

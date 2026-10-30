@@ -28,6 +28,7 @@ import { beMediaRepairPdf, openPdfInNewTab } from '../../../lib/beMedia';
 import { RepairConditionPhotos } from './RepairConditionPhotos';
 import { RepairTimeline } from './RepairTimeline';
 import { PauseContractModal } from '../../contracts/PauseContractModal';
+import { BankAccountInline } from '../../../components/BankAccountLine';
 
 // fn_contract_check_pausable — just the slice the repair-page pause prompt needs.
 interface PausableCheck {
@@ -540,7 +541,7 @@ export function RepairDetailPanel({
                             <div className="flex items-center gap-2 min-w-0">
                               <span className="text-subtle">└</span>
                               <span>{p.method ? t(`wizard.method_${p.method}`, { defaultValue: p.method }) : '—'}</span>
-                              {p.bank_name && <span className="text-subtle truncate">{p.bank_name}</span>}
+                              {p.bank_name && <span className="text-subtle truncate"><BankAccountInline account={{ bank_name: p.bank_name }} size={14} /></span>}
                               {p.reference && <span className="text-subtle font-mono truncate">{p.reference}</span>}
                               {p.is_reversal && <Badge size="xs" color="danger">VOID</Badge>}
                             </div>

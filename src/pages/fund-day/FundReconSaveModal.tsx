@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, Modal, TextArea } from 'tsp-form';
 import { fmtCurrency } from '../../lib/format';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
+import { BankAccountLine } from '../../components/BankAccountLine';
 import { ActionDoneView, type ActionDoneDetailRow } from '../contracts/ActionDoneView';
 import { translateApiError } from '../../lib/apiErrors';
 import { useFundReconSave } from './useFundDay';
@@ -129,12 +130,11 @@ export function FundReconSaveModal({
                   const diffOut = d.counted_out - d.account.out_amount;
                   return (
                     <div key={d.account.account_key} className="border border-line rounded-md px-3 py-2">
-                      <div className="font-medium text-sm">
-                        {d.account.bank_name ?? d.account.account_key}
-                      </div>
-                      {d.account.account_number && (
-                        <div className="text-xs text-subtle">{d.account.account_number}</div>
-                      )}
+                      <BankAccountLine
+                        showWhere={false}
+                        size={24}
+                        account={{ ...d.account, bank_name: d.account.bank_name ?? d.account.account_key }}
+                      />
                       <div className="mt-1 text-sm tabular-nums flex flex-wrap gap-x-4 gap-y-0.5">
                         <span>
                           {t('fundDay.countedIn')}: {fmtCurrency(d.counted_in)}

@@ -19,7 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, DataTable, MobileHeader, Modal, Select, Switch } from 'tsp-form';
 import {
-  AlertTriangle, ArrowRightFromLine, BellOff, Inbox, Landmark, Link2, MessageSquareText,
+  AlertTriangle, ArrowRightFromLine, BellOff, Inbox, Link2, MessageSquareText,
   Plus, RefreshCw, Search, Smartphone, X,
 } from 'lucide-react';
 import { SmsFindPaymentModal } from './SmsFindPaymentModal';
@@ -34,6 +34,7 @@ import { SmsSourceEditModal } from './SmsSourceEditModal';
 import { SmsSetupModal, SourceTargetBox } from './SmsSetupModal';
 import { SmsLinkAccountModal } from './SmsLinkAccountModal';
 import { ActionDoneView } from '../contracts/ActionDoneView';
+import { BankAccountLine } from '../../components/BankAccountLine';
 import { accountLine, type SmsLinkedAccount, type SmsMessage, type SmsSource } from './smsRelayTypes';
 
 type Tab = 'inbox' | 'manage';
@@ -417,9 +418,8 @@ function SourceRow({ s, busy, onEdit, onSetup, onLink, onUnlink, onToggle }: {
         {s.linked_accounts.length > 0 ? (
           <div className="flex flex-col gap-1 mt-0.5">
             {s.linked_accounts.map(a => (
-              <span key={a.link_id} className="text-xs text-subtle inline-flex items-center gap-1.5 min-w-0">
-                <Landmark size={12} className="shrink-0 text-subtle" />
-                <span className="break-words">{accountLine(a)}</span>
+              <span key={a.link_id} className="inline-flex items-center gap-1.5 min-w-0">
+                <BankAccountLine account={a} size={22} />
                 <button
                   type="button"
                   className="shrink-0 inline-flex items-center justify-center w-5 h-5 rounded text-subtler hover:text-danger-fg hover:bg-surface-hover cursor-pointer bg-transparent border-none"

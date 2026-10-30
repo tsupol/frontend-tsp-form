@@ -50,6 +50,7 @@ import { CustomerLoginCard, useCustomerLoginInfo, useInvalidateLoginInfo, type C
 import { OwnerBadge } from '../../components/OwnerBadge';
 import type { OwnerType } from '../../lib/ownerTypes';
 import { blockingReasonText, translateApiError } from '../../lib/apiErrors';
+import { BankAccountInline } from '../../components/BankAccountLine';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -2366,7 +2367,7 @@ function BillsTab({ contractId, contract, t }: {
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="text-subtle">└</span>
                         <span>{p.method ? t(`wizard.method_${p.method}`, { defaultValue: p.method }) : '—'}</span>
-                        {p.bank_name && <span className="text-subtle">{p.bank_name}</span>}
+                        {p.bank_name && <span className="text-subtle"><BankAccountInline account={{ bank_name: p.bank_name }} size={14} /></span>}
                         {p.reference && <span className="text-subtle font-mono">{p.reference}</span>}
                         {p.is_reversal && (
                           <Badge size="xs" color="danger">VOID</Badge>

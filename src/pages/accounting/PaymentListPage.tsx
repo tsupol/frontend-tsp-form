@@ -20,12 +20,19 @@ import {
 import type { Branch, PaymentRow } from './accountingTypes';
 import { PaymentChannelCorrectModal } from './PaymentChannelCorrectModal';
 import { SearchInput } from '../../components/SearchInput';
+import { BankLogo } from '../../components/BankLogo';
+import { BankAccountInline, BankAccountLine } from '../../components/BankAccountLine';
+import { bankAccountLabel } from '../../lib/bankAccount';
 
 interface BankAccountOption {
   id: number;
   branch_id: number;
+  branch_name: string;
+  bank_code: string | null;
   bank_name: string;
-  account_number: string;
+  bank_name_en?: string | null;
+  account_number: string | null;
+  account_number_display: string | null;
   account_name: string;
   is_active: boolean;
 }
@@ -251,25 +258,21 @@ export function PaymentListPage() {
   const channelOptions = [
     ...METHODS.filter(m => m !== 'TRANSFER').map(m => ({ value: m, label: t(`accounting.payments.m_${m}`) })),
     { value: 'TRANSFER', label: t('accounting.payments.m_TRANSFER') },
-    ...bankAccounts.map(b => ({ value: `TRANSFER:${b.id}`, label: `${b.bank_name} · ${b.account_number}` })),
+    ...bankAccounts.map(b => ({
+      value: `TRANSFER:${b.id}`,
+      label: `${t('accounting.payments.m_TRANSFER')} · ${bankAccountLabel(b, t, i18n.language)}`,
+      icon: <BankLogo code={b.bank_code} size={20} />,
+    })),
   ];
   const bankById = new Map(bankAccounts.map(b => [b.id, b]));
   const renderChannelOption = (opt: { value: string; label: string }) => {
     if (opt.value.startsWith('TRANSFER:')) {
       const id = Number(opt.value.slice('TRANSFER:'.length));
       const b = bankById.get(id);
-      if (b) {
-        return (
-          <div className="flex flex-col leading-tight py-0.5 min-w-0">
-            <div className="text-sm truncate">
-              {t('accounting.payments.m_TRANSFER')}<span className="text-subtle"> · {b.bank_name}</span>
-            </div>
-            <div className="text-xs text-subtle truncate">{b.account_number}</div>
-          </div>
-        );
-      }
+      // one branch picked → its accounts only, no "where"
+      if (b) return <BankAccountLine key={opt.value} account={b} size={22} showWhere={!branchId} />;
     }
-    return <span className="text-sm">{opt.label}</span>;
+    return <span key={opt.value} className="text-sm">{opt.label}</span>;
   };
   const onChannelChange = (raw: string | string[] | null | undefined) => {
     const v = (raw as string) ?? '';
@@ -486,7 +489,7 @@ export function PaymentListPage() {
                                 />
                               </>
                             )}
-                            {p.bank_name && <span className="truncate">· {p.bank_name} {p.account_number}</span>}
+                            {p.bank_name && <span className="truncate">· <BankAccountInline account={p} size={14} /></span>}
                             {p.payer_name && <span className="truncate">· {p.payer_name}</span>}
                           </span>
                           <span className="ml-auto text-subtler shrink-0">
@@ -564,7 +567,7 @@ function PaymentDetailPanel({
     { label: t('accounting.paymentList.amount', { defaultValue: 'Amount' }), value: (
       <span className={`tabular-nums font-semibold ${p.amount < 0 ? 'text-danger' : ''}`}>{fmtCurrency(p.amount)}</span>
     ) },
-    { label: t('accounting.reconcile.bank', { defaultValue: 'Bank' }), value: p.bank_name ? `${p.bank_name} ${p.account_number ?? ''}` : '—' },
+    { label: t('accounting.reconcile.bank', { defaultValue: 'Bank' }), value: p.bank_name ? <BankAccountInline account={p} /> : '—' },
     { label: t('accounting.reconcile.payer', { defaultValue: 'Payer' }), value: p.payer_name ?? '—' },
     { label: t('accounting.paymentList.date', { defaultValue: 'Date' }), value: <DateTime value={p.bill_date} showTime={false} /> },
     { label: t('accounting.payments.createdAt', { defaultValue: 'Recorded' }), value: <DateTime value={p.created_at} /> },

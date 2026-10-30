@@ -30,10 +30,12 @@ import {
   createDateRangePresets, type ColumnDef,
 } from 'tsp-form';
 import {
-  AlertTriangle, ArrowLeftRight, ArrowRightFromLine, CheckCircle2, ExternalLink, Keyboard, Landmark, Link2,
+  AlertTriangle, ArrowLeftRight, ArrowRightFromLine, CheckCircle2, ExternalLink, Keyboard, Link2,
   MessageSquareText,
 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
+import { BankAccountLine } from '../../components/BankAccountLine';
+import { useBankNames } from '../../hooks/useBankNames';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../../lib/format';
@@ -60,6 +62,7 @@ function parseTypedDate(raw: string): Date | null {
 interface PassbookChoice {
   key: string;
   label: string;
+  bankCode: string | null;
   number: string | null;
   balance: number;
   lineCount: number;
@@ -75,6 +78,7 @@ export function FundPassbookPage() {
 
   const { position } = useFundCashPosition(companyId);
   const balances = useFundAccountBalances(companyId);
+  const bankNames = useBankNames();
 
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -98,14 +102,14 @@ export function FundPassbookPage() {
     const out: PassbookChoice[] = [];
     for (const a of position?.accounts ?? []) {
       out.push({
-        key: a.account_key, label: a.account_name ?? a.account_key, number: a.account_number,
+        key: a.account_key, label: a.account_name ?? a.account_key, bankCode: a.bank_code, number: a.account_number,
         balance: a.balance, lineCount: a.line_count, isUsual: a.is_default, isCompany: true,
       });
     }
     for (const b of balances.rows) {
       if (b.is_unassigned || out.some(c => c.key === b.account_key)) continue;
       out.push({
-        key: b.account_key, label: b.account_name ?? b.account_key, number: b.account_number,
+        key: b.account_key, label: b.account_name ?? b.account_key, bankCode: b.bank_code, number: b.account_number,
         balance: b.balance, lineCount: b.line_count, isUsual: false, isCompany: b.is_company_account,
       });
     }
@@ -326,15 +330,18 @@ export function FundPassbookPage() {
               <div className="flex-none p-2 border-b border-line flex gap-2 overflow-x-auto better-scroll">
                 {choices.map(c => (
                   <button key={c.key} type="button" onClick={() => pick(c.key)} className={chipClass(!unassigned && c.key === accountKey)}>
-                    <div className="flex items-center gap-1.5">
-                      <Landmark size={13} className="text-subtle shrink-0" />
-                      <span className="text-sm font-medium whitespace-nowrap">{c.label}</span>
-                      {c.isUsual && <Badge color="primary" size="sm">{t('fundAccount.usual')}</Badge>}
-                      {!c.isCompany && <Badge color="default" size="sm">{t('fundPassbook.branchAccount')}</Badge>}
-                    </div>
-                    <div className="text-xs text-subtle tabular-nums mt-0.5 whitespace-nowrap">
-                      {c.number} · {t('fundPassbook.balance')} <span className="font-medium text-fg">{fmtCurrency(c.balance)}</span>
-                    </div>
+                    {/* the badge already says when it is a branch account — no "where" */}
+                    <BankAccountLine
+                      className="whitespace-nowrap"
+                      size={24}
+                      showWhere={false}
+                      account={{ bank_code: c.bankCode, ...bankNames(c.bankCode), account_name: c.label, account_number: c.number }}
+                      badges={<>
+                        {c.isUsual && <Badge color="primary" size="sm">{t('fundAccount.usual')}</Badge>}
+                        {!c.isCompany && <Badge color="default" size="sm">{t('fundPassbook.branchAccount')}</Badge>}
+                      </>}
+                      detail={<>{t('fundPassbook.balance')} <span className="font-medium text-fg">{fmtCurrency(c.balance)}</span></>}
+                    />
                   </button>
                 ))}
                 {(unassignedRow || unassigned) && (

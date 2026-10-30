@@ -44,6 +44,7 @@ import {
 import { PushSubscribeBanner } from '../components/PushSubscribeBanner';
 import { MediaLightbox } from '../components/MediaLightbox';
 import { useBranchPaymentAccounts, type BranchPaymentAccount } from '../components/BranchPaymentAccountField';
+import { BankAccountLine } from '../components/BankAccountLine';
 import {
   defaultScopeFor,
   scopeQuery,
@@ -931,17 +932,16 @@ function ReceivingAccount({
                       <Badge color="warning" size="sm">{t('dashboard.receivingAccountOverride')}</Badge>
                     )}
                   </div>
-                  {/* line 2 — account/promptpay number (omitted for QR-only accounts) */}
-                  {(() => {
-                    const num = account.account_number_display ?? account.account_number ?? account.promptpay_id;
-                    return num ? (
-                      <div className="text-fg tabular-nums tracking-widest font-semibold truncate">{num}</div>
-                    ) : null;
-                  })()}
-                  {/* line 3 — bank */}
-                  <div className="text-subtle text-xs truncate mt-0.5">{account.bank_name}</div>
-                  {/* line 4 — account name */}
-                  <div className="text-subtle text-xs truncate">{account.account_name}</div>
+                  {/* the account — own branch, no "where"; PromptPay id stands in
+                      for the number, "QR" for a QR-only account */}
+                  <BankAccountLine
+                    showWhere={false}
+                    wrap
+                    account={{
+                      ...account,
+                      account_number_display: account.account_number_display ?? account.account_number ?? account.promptpay_id,
+                    }}
+                  />
                   {/* line 5 — show QR button (only when a QR image exists) */}
                   {account.qr_media && (
                     <button

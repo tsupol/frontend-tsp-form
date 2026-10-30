@@ -10499,6 +10499,7 @@
   },
   "bankAccountForm": {
     "qrOnlyShort": "QR",
+    "whereFund": "บัญชีกองทุน",
     "incomplete": "ข้อมูลไม่ครบ",
     "incompleteHint": "ธนาคารถูกพิมพ์ไว้ ไม่ได้เลือกจากรายการ — เปิดแก้ไขแล้วเลือกธนาคาร",
     "qrMissing": "ยังไม่มีรูป QR",

@@ -25,6 +25,7 @@ import { useState } from 'react';
 import { Button } from 'tsp-form';
 import { Check, Copy, Landmark } from 'lucide-react';
 import { apiClient } from '../lib/api';
+import { BankAccountLine } from './BankAccountLine';
 
 /** One account the shop is told to use, per channel. */
 interface PartnerBankAccount {
@@ -99,12 +100,17 @@ export function PartnerRemitAccounts({ only, className }: PartnerRemitAccountsPr
             <div className="text-xs text-subtle">
               {row.channel_name ?? t(`partnerAccounts.channel_${row.channel}`, { defaultValue: row.channel })}
             </div>
-            <div className="text-sm font-medium tabular-nums mt-0.5">{row.account_no ?? '—'}</div>
-            <div className="text-xs text-subtle mt-0.5">
-              {/* The bank name can be empty when the record keeps it as text. */}
-              {row.bank_name || row.bank_code || '—'}
-              {row.account_name && <> · {row.account_name}</>}
-            </div>
+            <BankAccountLine
+              className="mt-1"
+              showWhere={false}
+              account={{
+                bank_code: row.bank_code,
+                // The bank name can be empty when the record keeps it as text.
+                bank_name: row.bank_name || row.bank_code,
+                account_name: row.account_name,
+                account_number_display: row.account_no ?? '—',
+              }}
+            />
             {/* Said on the remittance row only: this is the one people get wrong,
              *  because the obvious guess is the account customers pay into. */}
             {row.channel === 'PARTNER_REMIT' && (

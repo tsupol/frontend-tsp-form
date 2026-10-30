@@ -10517,6 +10517,7 @@
   },
   "bankAccountForm": {
     "qrOnlyShort": "QR",
+    "whereFund": "Fund account",
     "incomplete": "Incomplete",
     "incompleteHint": "The bank was typed in, not picked from the list — edit the account and pick its bank",
     "qrMissing": "No QR picture yet",

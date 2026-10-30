@@ -24,6 +24,7 @@ import { PageNav, PageNavPanel, DataTable, MobileHeader, Badge } from 'tsp-form'
 import { ArrowLeft, ArrowRightFromLine, Banknote } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { CopyButton } from '../../components/CopyButton';
+import { BankAccountInline } from '../../components/BankAccountLine';
 import { EntityCodeLink } from '../../components/EntityCodeLink';
 import { SearchInput } from '../../components/SearchInput';
 import { useStagePick } from '../../lib/stagePick';
@@ -434,7 +435,7 @@ function ShopFundBillPanel({ bill }: { bill: PartnerMyFundBill }) {
                     {i18n.language === 'th' && p.method_name
                       ? p.method_name
                       : t(`settlement.method_${p.method}`, { defaultValue: p.method })}
-                    {p.dest_account_no && <> · {p.dest_bank_code} {p.dest_account_no}</>}
+                    {p.dest_account_no && <> · <BankAccountInline account={{ bank_code: p.dest_bank_code, account_number: p.dest_account_no }} /></>}
                     {p.reference && <> · {p.reference}</>}
                   </div>
                   {/* The fund's slips for a transfer that went through a bank.

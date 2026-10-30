@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Badge } from 'tsp-form';
 import { AlertCircle, Check } from 'lucide-react';
 import { apiClient } from '../lib/api';
+import { BankAccountLine } from './BankAccountLine';
 
 export type PaymentChannel = 'STORE_FRONT' | 'INSTALLMENT';
 
@@ -21,7 +22,9 @@ export interface PaymentQrMedia {
  *  branch (JWT-scoped). 2 rows: STORE_FRONT + INSTALLMENT. */
 export interface BranchPaymentAccount {
   account_id: number;
+  bank_code: string | null;
   bank_name: string;
+  bank_name_en?: string | null;
   account_number: string;
   account_number_display: string | null;
   account_name: string;
@@ -112,18 +115,6 @@ export function BranchPaymentAccountField({ onResolve, active = true, recommendC
     ) : null;
   }
 
-  const AccountLine = ({ a }: { a: BranchPaymentAccount }) => (
-    <div className="min-w-0 flex-1">
-      <div className="text-sm font-medium truncate text-fg">{a.bank_name}</div>
-      <div className="text-xs truncate">
-        <span className="text-fg tabular-nums tracking-widest font-semibold">
-          {a.account_number_display ?? a.account_number}
-        </span>
-        <span className="text-subtle"> · {a.account_name}</span>
-      </div>
-    </div>
-  );
-
   // Always a per-channel picker — even when both slots resolve to the same
   // account — so the staff explicitly choose where the transfer landed.
   const channels: PaymentChannel[] = ['STORE_FRONT', 'INSTALLMENT'];
@@ -146,7 +137,8 @@ export function BranchPaymentAccountField({ onResolve, active = true, recommendC
             <Badge size="sm" color={ch === 'INSTALLMENT' ? 'info' : 'default'}>
               {t(`bankChannel.channel_${ch}`, { defaultValue: ch })}
             </Badge>
-            <AccountLine a={a} />
+            {/* the staff's own branch — no "where" */}
+            <BankAccountLine account={a} showWhere={false} className="flex-1" />
             {a.source === 'OVERRIDE' && (
               <Badge color="warning" size="sm">{t('bankAccount.temporary')}</Badge>
             )}

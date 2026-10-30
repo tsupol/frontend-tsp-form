@@ -22,8 +22,8 @@ import {
   ArrowDownCircle, ArrowRightFromLine, ArrowUpCircle, ChevronRight, Landmark, Receipt, Target,
 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
-import { BankLogo } from '../../components/BankLogo';
-import { useRefBanks } from '../../components/DealPartnerPayoutAccountField';
+import { BankAccountLine } from '../../components/BankAccountLine';
+import { useBankNames } from '../../hooks/useBankNames';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { fmtCurrency } from '../../lib/format';
@@ -34,7 +34,7 @@ import { FundCashTargetModal } from './FundCashTargetModal';
 import { useCashTargetLog, useFundCashPosition } from './useFundCash';
 
 export function FundCashPositionPage() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { hasPermission } = useMyPermissions();
   const companyId = user?.company_id ?? null;
@@ -56,10 +56,10 @@ export function FundCashPositionPage() {
   // turns into "KBANK:…" once codes are filled in (BE response 10-30), so it is
   // never shown; only an account still without a code falls back to the name
   // the key was built from.
-  const { data: banks = [] } = useRefBanks();
-  const bankName = (a: { bank_code: string | null; account_key: string }) => {
-    const b = a.bank_code ? banks.find(x => x.code === a.bank_code) : null;
-    return b ? ((i18n.language === 'en' && b.name_en) || b.short_name_th) : a.account_key.split(':')[0];
+  const bankNames = useBankNames();
+  const bankOf = (a: { bank_code: string | null; account_key: string }) => {
+    const n = bankNames(a.bank_code);
+    return n.bank_name ? n : { bank_name: a.account_key.split(':')[0], bank_name_en: null };
   };
 
   const status = position?.target_status ?? 'NO_TARGET';
@@ -201,18 +201,17 @@ export function FundCashPositionPage() {
                           to={`/admin/fund-passbook?account=${encodeURIComponent(a.account_key)}`}
                           className="px-4 py-3 border-t border-line flex items-center gap-3 hover:bg-surface-hover transition-colors"
                         >
-                          <BankLogo code={a.bank_code} size={28} />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium truncate">{a.account_name}</span>
-                              {a.is_default && <Badge color="primary" size="sm">{t('fundAccount.usual')}</Badge>}
-                            </div>
-                            <div className="text-xs text-subtle tabular-nums mt-0.5">
-                              {bankName(a)} · {a.account_number}
-                              {' · '}{t('fundCash.lineCount', { count: a.line_count })}
+                          {/* all of them are the fund's own accounts — no "where" */}
+                          <BankAccountLine
+                            className="flex-1"
+                            showWhere={false}
+                            account={{ ...a, ...bankOf(a) }}
+                            badges={a.is_default && <Badge color="primary" size="sm">{t('fundAccount.usual')}</Badge>}
+                            detail={<>
+                              {t('fundCash.lineCount', { count: a.line_count })}
                               {a.last_date && <> · <DateTime value={a.last_date} showTime={false} /></>}
-                            </div>
-                          </div>
+                            </>}
+                          />
                           <span className="text-base font-semibold tabular-nums shrink-0">{fmtCurrency(a.balance)}</span>
                           <ChevronRight size={16} className="text-subtler shrink-0" />
                         </Link>

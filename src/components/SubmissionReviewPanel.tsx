@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Badge, Select, Button,
+  Badge, Button,
 } from 'tsp-form';
 import { XCircle, AlertTriangle, ImageOff, ExternalLink, CheckCircle, Loader2, Copy } from 'lucide-react';
 import { apiClient, ApiError } from '../lib/api';
@@ -25,6 +25,7 @@ import {
 } from './SlipPayoff';
 import { SlipReopenModal } from './SlipReopenModal';
 import { SlipRejectModal } from './SlipRejectModal';
+import { BankAccountSelect } from './BankAccountSelect';
 
 export type SubmissionStatus = 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
 
@@ -164,7 +165,9 @@ interface EntityMedia {
 interface BankAccount {
   id: number;
   branch_id: number;
+  bank_code: string | null;
   bank_name: string;
+  bank_name_en?: string | null;
   account_number: string;
   account_name: string;
   is_active: boolean;
@@ -306,10 +309,7 @@ export function useSubmissionReview({
   const [rejectOpen, setRejectOpen] = useState(false);
   useEffect(() => { if (!active) { setPayoffOpen(false); setWithdrawOpen(false); setReopenOpen(false); setRejectOpen(false); } }, [active]);
 
-  const bankOptions = bankAccounts.map(b => ({
-    value: String(b.id),
-    label: `${b.bank_name} · ${b.account_number}${b.is_default ? ' ★' : ''}`,
-  }));
+  const fallbackBadge = t('settings.bankAccounts.fallbackBadge');
 
   const overlays = (
     <>
@@ -624,10 +624,15 @@ export function useSubmissionReview({
               {isPending && canApprove ? (
                 <div className="flex-1 min-w-[16rem]">
                   <div className="form-label mb-1">{t('paymentSubmissions.bankAccount')}</div>
-                  <Select
-                    options={bankOptions}
+                  {/* the slip's own branch only — no "where" */}
+                  <BankAccountSelect
+                    accounts={bankAccounts}
+                    valueOf={b => String(b.id)}
                     value={bankAccountId || null}
-                    onChange={v => setBankAccountId((v as string) || '')}
+                    onChange={v => setBankAccountId(v || '')}
+                    badges={b => b.is_default && <Badge color="default" size="sm">{fallbackBadge}</Badge>}
+                    labelSuffix={b => (b.is_default ? ` · ${fallbackBadge}` : '')}
+                    showWhere={false}
                     size="sm"
                     placeholder={t('paymentSubmissions.selectBankAccount')}
                     searchable={false}

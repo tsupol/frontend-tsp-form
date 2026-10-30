@@ -21,6 +21,7 @@ import {
   payoutAccountDigits, EMPTY_PAYOUT_VALUE, type DealPartnerPayoutValue,
 } from '../../components/DealPartnerPayoutAccountField';
 import { DealPartnerCompanySection } from '../../components/DealPartnerCompanySection';
+import { BankAccountInline } from '../../components/BankAccountLine';
 import { planTranchesLabel, type PlanTranche } from '../shop-commission/shopCommissionTypes';
 import { CommissionPlanModal } from '../shop-commission/CommissionPlanModal';
 import type { SavedRow as PlanSavedRow } from '../shop-commission/CommissionPlanModal';
@@ -1185,7 +1186,9 @@ export function DealPartnerRatesPage() {
             {row.original.company_name ?? '—'}
             {' · '}
             {row.original.has_payout_account
-              ? (row.original.payout_bank_name ?? t('common.yes'))
+              ? (row.original.payout_bank_code || row.original.payout_bank_name
+                  ? <BankAccountInline account={{ bank_code: row.original.payout_bank_code, bank_name: row.original.payout_bank_name }} />
+                  : t('common.yes'))
               : <span className="text-warning-fg">{t('dealPartnerRate.payoutColumn')} {t('dealPartnerRate.payoutMissing')}</span>}
           </div>
         </div>

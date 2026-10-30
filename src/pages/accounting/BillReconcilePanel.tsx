@@ -7,6 +7,7 @@ import { ChevronDown, ChevronRight, CheckCircle2, AlertTriangle, ExternalLink } 
 import { apiClient } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
 import { type BillRow, type BillDetail } from './accountingTypes';
+import { BankAccountInline } from '../../components/BankAccountLine';
 
 const TYPE_FILTERS = ['', 'INVOICE', 'CREDIT_NOTE', 'JOURNAL'] as const;
 const STATUS_FILTERS = ['', 'OPEN', 'PARTIAL', 'PAID', 'VOIDED'] as const;
@@ -253,7 +254,7 @@ function BillExpand({ billId }: { billId: number }) {
               <div key={p.id} className="flex items-center gap-2 text-xs py-1">
                 <Badge color={METHOD_COLOR[p.method] ?? 'default'} size="sm">{p.method}</Badge>
                 <span className="flex-1 min-w-0 truncate text-subtle">
-                  {p.bank_name ? `${p.bank_name} ${p.account_number ?? ''}` : p.code_display}
+                  {p.bank_name ? <BankAccountInline account={p} size={14} /> : p.code_display}
                 </span>
                 <span className="tabular-nums shrink-0">{fmtCurrency(p.amount)}</span>
               </div>

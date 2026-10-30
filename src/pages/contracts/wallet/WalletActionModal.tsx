@@ -6,6 +6,7 @@ import { XCircle, AlertTriangle, Wallet } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { BranchPinInput } from '../../../components/BranchPinInput';
 import { BranchPaymentAccountField } from '../../../components/BranchPaymentAccountField';
+import { BankAccountSelect } from '../../../components/BankAccountSelect';
 import { fmtCurrency } from '../../../lib/format';
 import {
   useWalletActions,
@@ -20,8 +21,13 @@ import { translateApiError } from '../../../lib/apiErrors';
 
 interface BankAccount {
   id: number;
+  bank_code: string | null;
   bank_name: string;
-  account_number: string;
+  bank_name_en?: string | null;
+  branch_id: number;
+  branch_name: string;
+  account_number: string | null;
+  account_number_display: string | null;
   account_name: string;
   is_promptpay: boolean;
   is_default: boolean;
@@ -298,15 +304,11 @@ export function WalletActionForm({
               />
             ) : (
               // Money OUT (CASHOUT) — staff may pay from any branch account.
-              <Select
-                options={
-                  bankAccounts?.map(b => ({
-                    value: String(b.id),
-                    label: `${b.bank_name} · ${b.account_number} · ${b.account_name}`,
-                  })) ?? []
-                }
+              <BankAccountSelect
+                accounts={bankAccounts ?? []}
+                valueOf={b => String(b.id)}
                 value={bankAccountId}
-                onChange={val => setBankAccountId(val as string)}
+                onChange={val => setBankAccountId(val ?? '')}
               />
             )}
           </div>

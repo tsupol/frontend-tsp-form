@@ -43,9 +43,3 @@ export function useFundAccountChoice(companyId: number | null): FundAccountChoic
   };
 }
 
-export function fundAccountLabel(a: FundSourceAccount, usualLabel: string): string {
-  const number = a.account_number_display ?? a.account_number ?? '';
-  return [a.bank_name, number, a.account_name].filter(Boolean).join(' · ')
-    + (a.is_default ? ` · ${usualLabel}` : '');
-}
-

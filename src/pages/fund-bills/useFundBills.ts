@@ -295,7 +295,11 @@ export function useFundBillDeviceTransfers(billId: number | null) {
  *  name (mig 1531, doc 149 §4). */
 export interface FundSourceAccount {
   id: number;
+  bank_code: string | null;
   bank_name: string;
+  bank_name_en?: string | null;
+  branch_id: number | null;
+  is_company_account: boolean;
   account_number_display: string | null;
   account_number: string | null;
   account_name: string | null;

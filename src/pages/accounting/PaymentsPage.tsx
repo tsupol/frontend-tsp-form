@@ -17,6 +17,7 @@ import {
   fmtCurrency, toLocalDateStr, parseLocalDate, makeDateRangePickerFormat,
 } from '../../lib/format';
 import type { Branch, SettlementTenderLine } from './accountingTypes';
+import { BankAccountInline } from '../../components/BankAccountLine';
 
 // Methods that can appear in v_settlement_tender_lines, grouped under their tender_class.
 const PHYSICAL_METHODS = ['CASH', 'TRANSFER'] as const;
@@ -308,7 +309,7 @@ export function PaymentsPage() {
                           className="font-mono"
                         /></>
                       )}
-                      {p.bank_name && <> · <span>{p.bank_name} {p.account_number_display}</span></>}
+                      {p.bank_name && <> · <BankAccountInline account={p} size={14} /></>}
                       {p.payer_name && <> · <span>{p.payer_name}</span></>}
                     </span>
                   </div>

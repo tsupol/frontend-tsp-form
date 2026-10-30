@@ -39,6 +39,8 @@ import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { DateTime } from '../../components/DateTime';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { BankLogo } from '../../components/BankLogo';
+import { BankAccountLine } from '../../components/BankAccountLine';
+import { accountNumberText } from '../../lib/bankAccount';
 import { useRefBanks } from '../../components/DealPartnerPayoutAccountField';
 
 type AccountLevel = 'branch' | 'company';
@@ -119,41 +121,30 @@ function useRefBankKinds() {
   });
 }
 
-type TFn = ReturnType<typeof useTranslation>['t'];
-
-/** Dashed when the bank has a pattern, plain otherwise, "QR" for a QR-only account. */
-function accountNumberText(a: BankAccount, t: TFn): string {
-  return a.account_number_display ?? a.account_number ?? t('bankAccountForm.qrOnlyShort');
-}
-
-/** Bank logo, bank, number and holder — the same two lines in every list here. */
-function AccountBankLine({ account, badges, showHolder = true }: {
+/** The shared account line, plus the two warnings only this page shows:
+ *  "ข้อมูลไม่ครบ" (no bank code) and "ยังไม่มีรูป QR". The desktop tables have a
+ *  branch column and the fund tab is all fund accounts, so "where" is off unless asked. */
+function AccountBankLine({ account, badges, showWhere = false }: {
   account: BankAccount;
   badges?: React.ReactNode;
-  showHolder?: boolean;
+  showWhere?: boolean;
 }) {
-  const { t, i18n } = useTranslation();
-  const name = (i18n.language === 'en' && account.bank_name_en) || account.bank_name;
+  const { t } = useTranslation();
   const qrMissing = account.requires_qr_image && !account.qr_media;
   return (
-    <div className="flex items-center gap-2.5 min-w-0">
-      <BankLogo code={account.bank_code} size={28} />
-      <div className="min-w-0">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="font-medium text-sm truncate">{name}</span>
-          {!account.bank_code && (
-            <Tooltip content={t('bankAccountForm.incompleteHint')} placement="top">
-              <Badge color="warning" size="sm">{t('bankAccountForm.incomplete')}</Badge>
-            </Tooltip>
-          )}
-          {qrMissing && <Badge color="warning" size="sm">{t('bankAccountForm.qrMissing')}</Badge>}
-          {badges}
-        </div>
-        <div className="text-xs text-subtle tabular-nums mt-0.5">
-          {accountNumberText(account, t)}{showHolder && <> · {account.account_name}</>}
-        </div>
-      </div>
-    </div>
+    <BankAccountLine
+      account={account}
+      showWhere={showWhere}
+      badges={<>
+        {!account.bank_code && (
+          <Tooltip content={t('bankAccountForm.incompleteHint')} placement="top">
+            <Badge color="warning" size="sm">{t('bankAccountForm.incomplete')}</Badge>
+          </Tooltip>
+        )}
+        {qrMissing && <Badge color="warning" size="sm">{t('bankAccountForm.qrMissing')}</Badge>}
+        {badges}
+      </>}
+    />
   );
 }
 
@@ -1452,8 +1443,8 @@ export function BankAccountsPage() {
                           {account.is_default && <Badge color="default" size="sm">{t('settings.bankAccounts.fallbackBadge')}</Badge>}
                           {!account.is_active && <Badge color="default" size="sm">{t('common.inactive')}</Badge>}
                         </>}
+                        showWhere
                       />
-                      <div className="text-xs text-subtler mt-0.5 pl-[38px]">{account.branch_name}</div>
                     </div>
                     <RowActions
                       account={account}

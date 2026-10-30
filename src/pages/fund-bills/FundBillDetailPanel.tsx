@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { CopyButton } from '../../components/CopyButton';
+import { BankAccountInline } from '../../components/BankAccountLine';
 import { EntityCodeLink } from '../../components/EntityCodeLink';
 import { fmtCurrency, formatEntityCode } from '../../lib/format';
 import { blockingReasonText } from '../../lib/apiErrors';
@@ -692,7 +693,7 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
                               : t(`fundBill.method_${p.method}`, { defaultValue: p.method })}
                           </span>
                           {p.dest_account_no && (
-                            <span>{p.dest_bank_code} · {p.dest_account_no}</span>
+                            <BankAccountInline account={{ bank_code: p.dest_bank_code, account_number: p.dest_account_no }} />
                           )}
                           {p.reference && <span>{p.reference}</span>}
                         </div>

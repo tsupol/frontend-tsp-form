@@ -25,6 +25,7 @@ import { CreateRetailBillModal } from './CreateRetailBillModal';
 import { useBillActions, type BillAction, type BillBlockingReason } from '../../hooks/useBillActions';
 import { BranchPaymentAccountField } from '../../components/BranchPaymentAccountField';
 import { translateApiError } from '../../lib/apiErrors';
+import { BankAccountInline } from '../../components/BankAccountLine';
 
 interface Branch {
   id: number;
@@ -446,7 +447,7 @@ function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: bool
             <div key={pay.id} className="px-4 py-2.5 border-b border-line flex items-center gap-3">
               <Badge color={METHOD_COLOR[pay.method] ?? 'default'} size="sm">{pay.method}</Badge>
               <span className="flex-1 min-w-0 truncate text-sm text-subtle">
-                {pay.bank_name ? `${pay.bank_name} ${pay.account_number ?? ''}` : '—'}
+                {pay.bank_name ? <BankAccountInline account={pay} /> : '—'}
               </span>
               <span className="tabular-nums font-medium shrink-0 text-sm">
                 {fmtCurrency(pay.amount)}

@@ -88,7 +88,10 @@ export interface SmsSourceSetup {
 /** Company bank account, as offered for linking (api.v_bank_accounts). */
 export interface SmsBankAccountOption {
   id: number;
+  bank_code: string | null;
   bank_name: string | null;
+  bank_name_en?: string | null;
+  branch_id: number | null;
   account_name: string | null;
   account_number: string | null;
   account_number_display: string | null;

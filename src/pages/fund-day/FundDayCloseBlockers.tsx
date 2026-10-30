@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { prepareErrorParams, translateErrorCode } from '../../lib/apiErrors';
 import { fmtCurrency, formatDateTime } from '../../lib/format';
+import { BankAccountLine } from '../../components/BankAccountLine';
 import type {
   FundDayCloseBlocker, FundDayPendingAccount, FundDayPendingBill,
 } from './fundDayTypes';
@@ -110,8 +111,12 @@ export function FundDayCloseBlockers({
           <ul className="flex flex-col gap-1 w-full">
             {accounts.map(a => (
               <li key={a.account_key} className="flex items-center gap-2 flex-wrap text-sm">
-                <span className="font-medium">{a.bank_name ?? a.account_key}</span>
-                {a.account_number && <span className="text-subtle">{a.account_number}</span>}
+                {/* no bank_code in this blocker's accounts — grey logo */}
+                <BankAccountLine
+                  showWhere={false}
+                  size={22}
+                  account={{ bank_name: a.bank_name ?? a.account_key, account_number: a.account_number }}
+                />
                 <Badge color={a.reason === 'DRIFTED' ? 'danger' : 'warning'} size="xs">
                   {t(`fundDay.close.reason.${a.reason}`, { defaultValue: a.reason })}
                 </Badge>

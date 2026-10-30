@@ -23,6 +23,7 @@ import { useReconcileBranchScope, useReconcileDateRange, branchRpcParams, type B
 import { BranchScopeSelect } from './BranchScopeSelect';
 import { BranchBreakdownStrip } from './BranchBreakdownStrip';
 import { translateApiError } from '../../lib/apiErrors';
+import { BankAccountInline } from '../../components/BankAccountLine';
 
 type Channel = 'CASH' | 'TRANSFER' | 'HOLDING_BUDGET' | 'WALLET';
 
@@ -577,7 +578,7 @@ function ChannelRow({
                   )}
                 </div>
                 <span className="text-xs text-subtle truncate">
-                  {p.bank_name && <>{p.bank_name} {p.account_number} · </>}
+                  {p.bank_name && <><BankAccountInline account={p} size={14} /> · </>}
                   {p.payer_name && <>{p.payer_name} · </>}
                   <DateTime value={p.created_at} showTime={true} />
                 </span>

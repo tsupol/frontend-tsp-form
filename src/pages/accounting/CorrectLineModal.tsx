@@ -7,6 +7,7 @@ import { BranchPinInput } from '../../components/BranchPinInput';
 import { fmtCurrency } from '../../lib/format';
 import type { BillLineItem, BillPayment } from './accountingTypes';
 import { translateApiError } from '../../lib/apiErrors';
+import { BankAccountInline } from '../../components/BankAccountLine';
 
 // แก้ยอด — correct a manual line's amount on a PAID bill (before day-close).
 // Backend: api.fn_bill_correct_manual_line (adjusts the line + one CASH/TRANSFER
@@ -202,7 +203,7 @@ export function CorrectLineModal({ line, payments, billTotal, onClose, onCorrect
                         {t(`accounting.payments.m_${selectedPayment.method}`, { defaultValue: selectedPayment.method })}
                       </Badge>
                       <span className="text-subtle truncate">
-                        {selectedPayment.bank_name ? `${selectedPayment.bank_name} ${selectedPayment.account_number ?? ''}` : selectedPayment.code_display}
+                        {selectedPayment.bank_name ? <BankAccountInline account={selectedPayment} /> : selectedPayment.code_display}
                       </span>
                       <span className="ml-auto tabular-nums">{fmtCurrency(selectedPayment.amount)}</span>
                     </div>

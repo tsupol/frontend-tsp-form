@@ -2,13 +2,15 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Modal, Select, Badge } from 'tsp-form';
+import { Button, Modal, Badge } from 'tsp-form';
 import { Pencil, Landmark, Clock, ExternalLink } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { translateApiError } from '../../lib/apiErrors';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { ActionDoneView } from '../contracts/ActionDoneView';
+import { BankAccountLine } from '../../components/BankAccountLine';
+import { BankAccountSelect } from '../../components/BankAccountSelect';
 
 // One row per (branch × channel) in the caller's company — v_bank_account_channel_config.
 //
@@ -29,7 +31,10 @@ interface ChannelConfigRow {
   channel_name_th: string;
   configured_account_id: number | null;
   effective_account_id: number | null;
+  effective_bank_code: string | null;
   effective_bank_name: string | null;
+  /** false for a QR-only account — its line shows "QR" instead of a number. */
+  effective_has_account_number: boolean | null;
   effective_account_number_display: string | null;
   effective_account_name: string | null;
   effective_source: 'PRIMARY' | 'OVERRIDE';
@@ -40,9 +45,11 @@ interface ChannelConfigRow {
 // Account picker source — v_bank_accounts, filtered to the branch being edited.
 interface PickableAccount {
   id: number;
+  bank_code: string | null;
   bank_name: string;
+  bank_name_en?: string | null;
   account_number_display: string | null;
-  account_number: string;
+  account_number: string | null;
   account_name: string;
   is_active: boolean;
 }
@@ -94,13 +101,20 @@ export function BankChannelConfig() {
                     </div>
                     <div className="flex-1 min-w-0">
                       {c.effective_account_id ? (
-                        <>
-                          <div className="text-sm font-medium truncate">{c.effective_bank_name}</div>
-                          <div className="text-xs text-subtle truncate">
-                            <span className="tabular-nums">{c.effective_account_number_display ?? '—'}</span>
-                            <span> · {c.effective_account_name}</span>
-                          </div>
-                        </>
+                        // under its branch's heading — no "where"
+                        <BankAccountLine
+                          showWhere={false}
+                          account={{
+                            bank_code: c.effective_bank_code,
+                            bank_name: c.effective_bank_name,
+                            account_name: c.effective_account_name,
+                            // QR-only → null number, shown as "QR". The view has no raw number,
+                            // so an account without a dashed display keeps the old "—".
+                            account_number_display: c.effective_account_number_display
+                              ?? (c.effective_has_account_number === false ? null : '—'),
+                            account_number: c.effective_has_account_number === false ? null : undefined,
+                          }}
+                        />
                       ) : (
                         <span className="text-sm text-subtler italic">{t('bankChannel.unset', { defaultValue: 'Not configured' })}</span>
                       )}
@@ -175,10 +189,6 @@ function SetChannelAccountModal({
     setConfirmClose(false);
   }, [open, initial]);
 
-  const options = accounts.map(a => ({
-    value: String(a.id),
-    label: `${a.bank_name} · ${a.account_number_display ?? a.account_number} · ${a.account_name}`,
-  }));
   const picked = accounts.find(a => String(a.id) === accountId) ?? null;
 
   const dirty = accountId !== initial;
@@ -264,13 +274,15 @@ function SetChannelAccountModal({
                       </div>
                     </div>
                   ) : (
-                    <Select
-                      options={options}
+                    // one branch's accounts, or the fund's own — no "where"
+                    <BankAccountSelect
+                      accounts={accounts}
+                      valueOf={a => String(a.id)}
                       value={accountId}
-                      onChange={(v) => setAccountId((v as string) || null)}
+                      onChange={(v) => setAccountId(v || null)}
+                      showWhere={false}
                       placeholder={t('bankChannel.accountPlaceholder', { defaultValue: 'Pick an account' })}
                       searchable
-                      showChevron
                     />
                   )}
                 </div>

@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { CurrencyInput } from '../../components/CurrencyInput';
 import { DateTime } from '../../components/DateTime';
+import { BankAccountLine } from '../../components/BankAccountLine';
 import {
   fmtCurrency, formatDateTime, makeDatePickerFormat, parseLocalDate, toLocalDateStr,
 } from '../../lib/format';
@@ -250,15 +251,14 @@ export function FundDayMoneyPage() {
           )}
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div className="min-w-0">
-              <div className="font-medium">
-                {isUnspecified
-                  ? t('fundDay.unspecifiedAccount')
-                  : (account.bank_name ?? account.account_key)}
-              </div>
-              {!isUnspecified && (
-                <div className="text-xs text-subtle">
-                  {[account.account_number, account.account_name].filter(Boolean).join(' · ')}
-                </div>
+              {isUnspecified ? (
+                <div className="font-medium">{t('fundDay.unspecifiedAccount')}</div>
+              ) : (
+                // the fund's own day — no "where"
+                <BankAccountLine
+                  showWhere={false}
+                  account={{ ...account, bank_name: account.bank_name ?? account.account_key }}
+                />
               )}
               {isUnspecified && (
                 <div className="text-xs text-subtle">{t('fundDay.unspecifiedHint')}</div>
