@@ -55,6 +55,7 @@ import {
 } from 'lucide-react';
 import { formatRelativeAgo } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
+import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { ColorSwatch } from '../../components/ColorAutocomplete';
 import {
   prepareAsset, applyLightLock, searchMdmDevices,
@@ -68,12 +69,11 @@ import { MDM_SEARCH_MIN_CHARS, isSearchable } from '../../lib/searchKeyword';
 import { SearchInput } from '../../components/SearchInput';
 
 // Activation Lock codes can unlock a repossessed device for resale, so the
-// owner restricted reveal to company level on purpose — a branch must ask a
-// company admin. This is the anti-fraud control, not an inconvenience.
+// owner restricted reveal to company level on purpose — a branch must ask
+// someone at the company. This is the anti-fraud control, not an inconvenience.
 // The RPC enforces it too; hiding the button just avoids a guaranteed 403.
-// (IMPLEMENT 2026-08-07 — this is the one place role_code IS the right check:
-// it's UI visibility of an action, not data scoping.)
-const MAY_REVEAL_ACTIVATION_LOCK = new Set(['COMPANY_ADMIN', 'SYSTEM_DEV']);
+// Read the permission, not role_code: company inventory got it too (mig 1532,
+// NOTICE 2026-10-30), and branch roles still don't hold it.
 
 const POLL_MS = 20_000;
 /** RPC default is 20, hard ceiling 50. Past this the answer is a better keyword. */
@@ -123,6 +123,7 @@ export function MdmDevicesPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { hasPermission } = useMyPermissions();
   const actorId = user?.user_id ?? null;
   const { addSnackbar } = useSnackbarContext();
 
@@ -132,7 +133,7 @@ export function MdmDevicesPage() {
   const [enrollTarget, setEnrollTarget] = useState<MdmDeviceListRow | null>(null);
   const [lockTarget, setLockTarget] = useState<MdmDeviceListRow | null>(null);
   const [revealTarget, setRevealTarget] = useState<MdmDeviceListRow | null>(null);
-  const mayRevealLock = MAY_REVEAL_ACTIVATION_LOCK.has(user?.role_code ?? '');
+  const mayRevealLock = hasPermission('MDM.ACTIVATION_LOCK_REVEAL');
 
   // `enabled` keeps the screen silent until the keyword is long enough — the
   // empty state is the resting state here, not an unfiltered list.

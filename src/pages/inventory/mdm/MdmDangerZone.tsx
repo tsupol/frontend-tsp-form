@@ -29,6 +29,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from 'tsp-form';
 import { ShieldOff, Trash2, KeyRound, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useMyPermissions } from '../../../hooks/useMyPermissions';
 import { ActivationLockRevealModal } from '../../nnf-extra/ActivationLockRevealModal';
 import { MdmChallengeDialog } from './MdmChallengeDialog';
 import {
@@ -45,11 +46,14 @@ export function MdmDangerZone({ status, onChanged }: {
   onChanged: () => void;
 }) {
   const { t } = useTranslation();
-  const { user, can } = useAuth();
+  const { user } = useAuth();
+  // v_my_permissions, not my_capabilities: it also sees per-user grants
+  // (NOTICE 2026-10-30 — company inventory holds all three since mig 1532).
+  const { hasPermission } = useMyPermissions();
 
-  const mayRemove = can('MDM.PROFILE_REMOVE');
-  const mayErase = can('MDM.ERASE');
-  const mayReveal = can('MDM.ACTIVATION_LOCK_REVEAL');
+  const mayRemove = hasPermission('MDM.PROFILE_REMOVE');
+  const mayErase = hasPermission('MDM.ERASE');
+  const mayReveal = hasPermission('MDM.ACTIVATION_LOCK_REVEAL');
 
   const [flow, setFlow] = useState<Flow | null>(null);
   const [challenge, setChallenge] = useState<MdmChallenge | null>(null);

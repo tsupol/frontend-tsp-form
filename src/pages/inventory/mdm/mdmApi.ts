@@ -462,10 +462,11 @@ export function applyLightLock(
 
 // ── Activation Lock reveal (migs 1038+1039; IMPLEMENT 2026-08-07) ────────────
 // Shows the bypass codes that unlock a device stuck on Activation Lock (e.g. a
-// customer erased it). COMPANY_ADMIN / SYSTEM_DEV only — the owner made the
+// customer erased it). Company level only (MDM.ACTIVATION_LOCK_REVEAL: company
+// admin, and company inventory since mig 1532) — the owner made the
 // company-level bottleneck deliberate anti-fraud control, since these codes can
-// unlock a repossessed device for resale. Hide the button for every other role;
-// the RPC would reject anyway, and a dead button invites a support call.
+// unlock a repossessed device for resale. Hide the button without the
+// permission; the RPC would reject anyway, and a dead button invites a support call.
 //
 // Every reveal is written to mdm.device_escrow_access_log server-side. The UI
 // does nothing extra for auditing, but p_reason should be filled in — it lands
