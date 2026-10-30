@@ -3,6 +3,7 @@ import { Shield, CheckCircle } from 'lucide-react';
 import { fmtCurrency } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
 import { SummaryCard } from './SummaryCard';
+import { InfoHint } from '../../../components/InfoHint';
 
 export function CardInsurance({ onEdit, active, shake }: { onEdit?: () => void; active?: boolean; shake?: boolean }) {
   const { t } = useTranslation();
@@ -35,6 +36,9 @@ export function CardInsurance({ onEdit, active, shake }: { onEdit?: () => void; 
       shake={shake}
       disabled={isReadOnly || !isFin2 || !hasCustomer}
       className={!active && isFin2 && hasAmount ? 'border-info-border bg-info-soft' : undefined}
+      actions={!isFin2 ? (
+        <InfoHint title={t('hint.insuranceFin1.title')} lines={[t('hint.insuranceFin1.l1'), t('hint.insuranceFin1.l2')]} placement="left" />
+      ) : undefined}
     >
       {!isFin2 ? (
         <div className="text-subtle flex items-center gap-2 text-xs">

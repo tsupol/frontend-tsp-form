@@ -5,6 +5,7 @@ import { Check, ShieldCheck, XCircle, AlertTriangle, Loader2 } from 'lucide-reac
 import { apiClient } from '../../../lib/api';
 import { translateApiError } from '../../../lib/apiErrors';
 import { fmtCurrency } from '../../../lib/format';
+import { InfoHint } from '../../../components/InfoHint';
 
 // ============================================================================
 // FIN1 rate step — DELIVERY 2026-09-09 "เลือกเรท FIN1" (mig 1178 / 1179 / 1182)
@@ -841,6 +842,10 @@ export function CommissionChooser({
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-baseline gap-x-2">
         <label className="form-label mb-0">{t('fin1Plan.commissionTitle')}</label>
+        <InfoHint
+          title={t('hint.commission.title')}
+          lines={[t('hint.commission.l1'), t('hint.commission.l2'), t('hint.commission.l3')]}
+        />
         <span className={BIG_NUM}>{fmtCommissionPct(pct)}%</span>
         {badge}
       </div>
@@ -958,13 +963,26 @@ function PlanSummary({ plan, t }: { plan: Fin1PlanResponse; t: TFn }) {
           { label: t('fin1Plan.rowInstallmentTotal'), value: fmtCurrency(plan.total_effective) },
           { label: t('fin1Plan.rowAgreedPrice'), value: fmtCurrency(plan.agreed_price) },
           { label: t('fin1Plan.rowDocFee'), value: fmtCurrency(plan.doc_fee_amount) },
-          { label: t('fin1Plan.rowDueAtSigning'), value: fmtCurrency(plan.due_at_signing), strong: true },
-        ].map((r, i) => (
+          {
+            label: t('fin1Plan.rowDueAtSigning'),
+            value: fmtCurrency(plan.due_at_signing),
+            strong: true,
+            // The one figure the shop collects itself — say what it is made of
+            // and that the doc fee is the company's, deducted from the payout.
+            hint: (
+              <InfoHint
+                title={t('hint.dueAtSigning.title', { down: fmtCurrency(plan.down_amount), fee: fmtCurrency(plan.doc_fee_amount) })}
+                lines={[t('hint.dueAtSigning.l1')]}
+                placement="top"
+              />
+            ),
+          },
+        ].map((r: { label: string; value: string; strong?: boolean; hint?: ReactNode }, i) => (
           <div
             key={i}
             className="flex items-center justify-between px-4 py-2 border-b border-line last:border-b-0"
           >
-            <span className="text-sm text-subtle">{r.label}</span>
+            <span className="text-sm text-subtle inline-flex items-center gap-1">{r.label}{r.hint}</span>
             <span className={`text-sm tabular-nums ${r.strong ? 'font-semibold text-primary-fg' : 'font-medium'}`}>
               {r.value}
             </span>

@@ -23,6 +23,7 @@ import { Navigate } from 'react-router-dom';
 import { PageNav, PageNavPanel, DataTable, MobileHeader, Badge } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine, Banknote } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
+import { InfoHint } from '../../components/InfoHint';
 import { CopyButton } from '../../components/CopyButton';
 import { BankAccountInline } from '../../components/BankAccountLine';
 import { EntityCodeLink } from '../../components/EntityCodeLink';
@@ -414,7 +415,16 @@ function ShopFundBillPanel({ bill }: { bill: PartnerMyFundBill }) {
                     {p.is_reversal && (
                       <Badge color="warning" size="sm">{t('settlement.reversalRow')}</Badge>
                     )}
-                    <span className="text-sm truncate flex-1 min-w-0">{paymentName(p)}</span>
+                    <span className="text-sm flex-1 min-w-0 inline-flex items-center gap-1">
+                      <span className="truncate">{paymentName(p)}</span>
+                      {p.payment_kind === 'SHOP_HELD_COMPANY_MONEY' && (
+                        <InfoHint
+                          title={t('hint.shopHeldCompanyMoney.title')}
+                          lines={[t('hint.shopHeldCompanyMoney.l1'), t('hint.shopHeldCompanyMoney.l2')]}
+                          size={12}
+                        />
+                      )}
+                    </span>
                     {p.shop_amount == null ? (
                       <span className="text-xs text-subtle shrink-0">
                         {fmtCurrency(p.amount)} · {t('settlement.shopAmountHeld')}

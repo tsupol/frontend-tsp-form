@@ -3,6 +3,7 @@ import { PiggyBank } from 'lucide-react';
 import { fmtCurrency } from '../../../lib/format';
 import { useWorkspace } from './WorkspaceContext';
 import { SummaryCard } from './SummaryCard';
+import { InfoHint } from '../../../components/InfoHint';
 
 export function CardSaving({ onEdit, active, shake }: { onEdit?: () => void; active?: boolean; shake?: boolean }) {
   const { t } = useTranslation();
@@ -24,6 +25,9 @@ export function CardSaving({ onEdit, active, shake }: { onEdit?: () => void; act
       shake={shake}
       disabled={isReadOnly || !hasCustomer}
       className={!active && hasBalance ? 'border-info-border bg-info-soft' : undefined}
+      actions={hasCustomer && !hasBalance ? (
+        <InfoHint title={t('hint.saving.title')} lines={[t('hint.saving.l1'), t('hint.saving.l2')]} placement="left" />
+      ) : undefined}
     >
       {!hasCustomer ? (
         <div className="text-subtle text-xs">{t('workspace.needCustomerFirst')}</div>

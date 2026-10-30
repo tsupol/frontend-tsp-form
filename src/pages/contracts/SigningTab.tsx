@@ -33,6 +33,7 @@ import type { BeMediaContractDoc } from '../../lib/beMedia';
 import { apiClient } from '../../lib/api';
 import { formatCid, formatTel } from '../../lib/format';
 import { DateTime } from '../../components/DateTime';
+import { InfoHint } from '../../components/InfoHint';
 import { SigningVoidModal } from './SigningVoidModal';
 import { SigningSignModal } from './SigningSignModal';
 import { SigningDetailModal } from './SigningDetailModal';
@@ -540,10 +541,26 @@ function SigningCard({
         <div className="border-t border-line/60">
           {/* Meta strip */}
           <div className="px-3 py-2 text-[11px] text-subtle flex flex-wrap gap-x-3 gap-y-0.5">
-            <span>
+            <span className="inline-flex items-center gap-1">
               <Badge size="xs" color={statusBadgeColor(signing.status)}>
                 {t(`signing.status_${signing.status}`, { defaultValue: signing.status })}
               </Badge>
+              {/* What "1/4" means and how the rest get signed — only while collecting. */}
+              {isCollecting && signing.change_reason !== 'BIND' && (
+                <InfoHint
+                  title={t('hint.signingParties.title', { total: signing.total_parties })}
+                  lines={[t('hint.signingParties.l1'), t('hint.signingParties.l2'), t('hint.signingParties.l3'), t('hint.signingParties.l4')]}
+                  size={12}
+                />
+              )}
+              {/* The second document — why it exists and what it gates. */}
+              {signing.change_reason === 'BIND' && signing.status !== 'VOIDED' && (
+                <InfoHint
+                  title={t('hint.bindDoc.title')}
+                  lines={[t('hint.bindDoc.l1'), t('hint.bindDoc.l2'), t('hint.bindDoc.l3')]}
+                  size={12}
+                />
+              )}
             </span>
             {signing.type && (
               <span>{signing.type === 'FULL_CONTRACT' ? t('signing.category_CONTRACT') : t('signing.category_AMENDMENT')}</span>

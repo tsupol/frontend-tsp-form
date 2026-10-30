@@ -21,6 +21,7 @@ import {
   Wallet, CheckCircle2, XCircle, AlertTriangle, Undo2, ChevronDown, ChevronRight, Images, History,
 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
+import { InfoHint } from '../../components/InfoHint';
 import { fmtCurrency } from '../../lib/format';
 import { blockingReasonText } from '../../lib/apiErrors';
 import { useAuth } from '../../contexts/AuthContext';
@@ -149,6 +150,14 @@ export function SettlementCard({
             {t('settlement.cardTitle')}
           </span>
           <Badge color={settlementBadgeColor(detail.status)} size="sm">{statusLabel}</Badge>
+          {detail.status === 'CLOSE_SUBMITTED' && (
+            <InfoHint
+              title={t('hint.closeSubmitted.title')}
+              lines={[t('hint.closeSubmitted.l1'), t('hint.closeSubmitted.l2')]}
+              link={{ to: '/admin/contracts/partner-payouts', label: t('hint.closeSubmitted.link') }}
+              align="end"
+            />
+          )}
         </div>
 
         <div className="mt-1 text-xs text-subtle">{detail.settlement_code}</div>
@@ -171,8 +180,13 @@ export function SettlementCard({
                     <div className="text-xs text-subtle">{t('settlement.heldByShop')}</div>
                   )}
                   {line.rate_percent != null && line.base_amount != null && (
-                    <div className="text-xs text-subtle tabular-nums">
-                      {line.rate_percent}% · {fmtCurrency(line.base_amount)}
+                    <div className="text-xs text-subtle tabular-nums inline-flex items-center gap-1">
+                      <span>{line.rate_percent}% · {fmtCurrency(line.base_amount)}</span>
+                      <InfoHint
+                        title={t('hint.commissionBase.title', { pct: line.rate_percent, base: fmtCurrency(line.base_amount) })}
+                        lines={[t('hint.commissionBase.l1'), t('hint.commissionBase.l2')]}
+                        size={12}
+                      />
                     </div>
                   )}
                 </div>
@@ -187,7 +201,14 @@ export function SettlementCard({
             );
           })}
           <div className="flex items-center justify-between gap-2 px-3 py-2 bg-surface-hover">
-            <span className="text-sm font-medium">{t('settlement.netAmount')}</span>
+            <span className="text-sm font-medium inline-flex items-center gap-1">
+              {t('settlement.netAmount')}
+              <InfoHint
+                title={t('hint.netToShop.title')}
+                lines={[t('hint.netToShop.l1'), t('hint.netToShop.l2'), t('hint.netToShop.l3')]}
+                placement="top"
+              />
+            </span>
             <span className="text-sm font-semibold tabular-nums">{fmtCurrency(detail.net_amount)}</span>
           </div>
         </div>

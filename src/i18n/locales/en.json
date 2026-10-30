@@ -3154,7 +3154,8 @@
     "unsavedChangesMessage": "You have unsaved changes. Are you sure you want to discard them?",
     "view": "View",
     "yes": "Yes",
-    "later": "Later"
+    "later": "Later",
+    "moreInfo": "More info"
   },
   "contract": {
     "acceptAndSign": "Accept & sign",
@@ -10537,5 +10538,67 @@
     "kind_BEMERCHANT": "BeMerchant (Bangkok Bank) — QR",
     "qrOnlyNoteHint": "The shop’s merchant number, if any, can go here — it isn’t a number customers pay to",
     "qrNextStep": "This account is QR only — attach the QR picture customers will scan"
+  },
+  "hint": {
+    "commission": {
+      "title": "Lower commission = lower instalment for the customer, less money for the shop",
+      "l1": "The customer's interest cut comes from the commission the shop gives up plus what the fund adds",
+      "l2": "Credit cannot change this figure; if they disagree they send the case back",
+      "l3": "Once submitted it is fixed until you withdraw the request"
+    },
+    "dueAtSigning": {
+      "title": "Collected at the counter on signing day = down payment {{down}} + contract fee {{fee}}",
+      "l1": "The contract fee is the company's money; the shop holds it and the fund deducts it from the payout at close-out"
+    },
+    "saving": {
+      "title": "Optional, can be skipped",
+      "l1": "Money the customer saved up with the shop before opening the contract; it can go towards the device",
+      "l2": "This customer has none, so the card is empty; it does not block submission"
+    },
+    "insuranceFin1": {
+      "title": "Optional, and FIN1 plans have none",
+      "l1": "The insurance deposit is paid when the contract opens and kept as a wallet for the last instalment or refunded at close",
+      "l2": "FIN2 plans only"
+    },
+    "approvalUsable": {
+      "title": "Collect the down payment before this date",
+      "l1": "After it the approval expires; submit again and credit reviews again",
+      "l2": "Withdraw request is for changing the contract (device, plan, customer) and resubmitting"
+    },
+    "commissionBase": {
+      "title": "{{pct}}% of the financed amount {{base}}",
+      "l1": "Financed amount = device price minus the down payment, not the full price",
+      "l2": "The rate is the commission the shop set when building the plan"
+    },
+    "netToShop": {
+      "title": "The amount the fund will transfer to the shop's account",
+      "l1": "Money the shop already collected on signing day (down payment, contract fee) is deducted, not owed back",
+      "l2": "The contract fee is the company's, not shop income",
+      "l3": "Paid after fund finance reviews the close-out and issues the payout"
+    },
+    "signingParties": {
+      "title": "{{total}} signatures needed: lessee · lessor · witnesses",
+      "l1": "The lessor (the company) is signed automatically",
+      "l2": "Witnesses are picked from branch staff; confirming counts as signing",
+      "l3": "The customer signs on their phone via Sign QR (link lasts 60 minutes) or on this device",
+      "l4": "Finish before the document's expiry"
+    },
+    "bindDoc": {
+      "title": "The customer confirms the device and items were received",
+      "l1": "Created automatically once the contract is fully signed; separate from the hire-purchase contract",
+      "l2": "The customer ticks the items received, then signs (Sign QR, like the first document)",
+      "l3": "Must be complete before Submit close-out can be pressed"
+    },
+    "closeSubmitted": {
+      "title": "Fund finance is reviewing this request",
+      "l1": "Next: reviewed → payout issued → transfer to the shop account",
+      "l2": "Meanwhile handover photos and contract cancellation are locked; withdraw the submission to change anything",
+      "link": "See Awaiting payout / Received"
+    },
+    "shopHeldCompanyMoney": {
+      "title": "Nothing to send back; already taken off the transfer",
+      "l1": "The contract fee the shop collected on signing day is the company's money, so the fund deducts it from the payout",
+      "l2": "This line is a record; no money moves today"
+    }
   }
 }

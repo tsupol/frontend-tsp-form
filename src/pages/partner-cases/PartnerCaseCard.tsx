@@ -18,6 +18,7 @@ import { ArrowRight, Camera, ChevronDown, ChevronRight, ClipboardCheck, Clock, C
 import { apiClient } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { DateTime } from '../../components/DateTime';
+import { InfoHint } from '../../components/InfoHint';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   useContractPartnerCases,
@@ -250,9 +251,15 @@ export function PartnerCaseCard({
 
               {/* Approved — the date the approval stops being usable. */}
               {isApproved && latest?.approved_expires_at && (
-                <div className="text-subtle">
-                  {t('partnerCase.usableUntil')}{' '}
-                  <DateTime value={latest.approved_expires_at} showTime />
+                <div className="text-subtle inline-flex items-center gap-1 flex-wrap">
+                  <span>
+                    {t('partnerCase.usableUntil')}{' '}
+                    <DateTime value={latest.approved_expires_at} showTime />
+                  </span>
+                  <InfoHint
+                    title={t('hint.approvalUsable.title')}
+                    lines={[t('hint.approvalUsable.l1'), t('hint.approvalUsable.l2')]}
+                  />
                 </div>
               )}
 
