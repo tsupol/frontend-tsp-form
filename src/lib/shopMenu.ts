@@ -20,6 +20,8 @@ import type { SideMenuItemData } from 'tsp-form';
 // endpoints (v_saving_contracts, v_users, user_*, …) are not in the
 // nnf_partner whitelist and 403 at the DB.
 export const SHOP_ALLOWED_PATHS = new Set<string>([
+  // The shop's own dashboard (mig 1539) — accounts, work waiting, today's rank, the month's contracts.
+  '/admin',
   // Contracts — the FIN1 wizard + the shop's own contract lists
   '/admin/contracts/search',
   '/admin/contracts/draft',

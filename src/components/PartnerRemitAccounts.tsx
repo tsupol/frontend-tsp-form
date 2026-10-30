@@ -111,10 +111,13 @@ export function PartnerRemitAccounts({ only, className }: PartnerRemitAccountsPr
                 account_number_display: row.account_no ?? '—',
               }}
             />
-            {/* Said on the remittance row only: this is the one people get wrong,
-             *  because the obvious guess is the account customers pay into. */}
+            {/* What each account is for. The remittance one is the one people get
+             *  wrong, because the obvious guess is the account customers pay into. */}
             {row.channel === 'PARTNER_REMIT' && (
               <div className="text-xs text-subtler mt-1">{t('partnerAccounts.remitHint')}</div>
+            )}
+            {row.channel === 'INSTALLMENT' && (
+              <div className="text-xs text-subtler mt-1">{t('partnerAccounts.installmentHint')}</div>
             )}
           </div>
           {row.account_no && (

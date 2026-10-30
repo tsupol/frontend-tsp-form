@@ -16,7 +16,7 @@ import { BankAccountSelect } from '../../components/BankAccountSelect';
 //
 // The account level depends on the channel (mig 1531, doc 116 §2e):
 //   STORE_FRONT / INSTALLMENT  — customers pay in, so a branch account.
-//   PARTNER_REMIT ("ร้านนำส่ง") — the shop pays the fund back, so one of the
+//   PARTNER_REMIT ("กองทุน", renamed from "ร้านนำส่ง" in mig 1539) — the shop pays the fund back, so one of the
 //                                  fund's own company accounts.
 // The wrong level is refused (CHANNEL_ACCOUNT_LEVEL_MISMATCH), so the picker
 // only ever offers the right one.

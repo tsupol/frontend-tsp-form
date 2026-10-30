@@ -33,13 +33,11 @@ import { DashboardScopePicker } from '../components/DashboardScopePicker';
 import { ReportSideSelect, ReportSideTag } from '../components/ReportSideSelect';
 import { MonthPicker } from '../components/MonthPicker';
 import {
-  ContractsOpenedChart,
-  ChartLegend,
+  MonthOpenedView,
   monthStartIso,
   useDayPoints,
   useMonthTotals,
   type MonthlyRow,
-  type DayPoint,
 } from '../components/ContractsOpenedChart';
 import { PushSubscribeBanner } from '../components/PushSubscribeBanner';
 import { MediaLightbox } from '../components/MediaLightbox';
@@ -846,54 +844,6 @@ export function DashboardPage() {
 
 // ── Sub-components ────────────────────────────────────────────────────────
 
-// Month view of the branch-ranking card — the same bars as the รายงานเปิดสัญญา
-// page, over a compact totals strip. Shorter chart than the full report page
-// (this sits in a card among other sections, not on its own screen).
-function MonthOpenedView({ loading, fetching, hasData, points, totals, t }: {
-  loading: boolean;
-  fetching: boolean;
-  hasData: boolean;
-  points: DayPoint[];
-  totals: { contracts: number; agreed: number; down: number };
-  t: (key: string, opts?: Record<string, unknown>) => string;
-}) {
-  if (loading) {
-    return <div className="text-sm text-subtle py-6 text-center">—</div>;
-  }
-  if (!hasData) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-2 py-10 text-subtler">
-        <TrendingUp size={28} strokeWidth={1.5} />
-        <span className="text-sm">{t('contractsOpened.noData')}</span>
-      </div>
-    );
-  }
-  return (
-    <div className={fetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
-      <div className="flex items-stretch divide-x divide-line border border-line rounded-md mb-3">
-        <MonthTotalCell label={t('contractsOpened.sumContracts')} value={String(totals.contracts)} />
-        <MonthTotalCell label={t('contractsOpened.sumAgreed')} value={`฿${fmtCurrency(totals.agreed)}`} />
-        <MonthTotalCell label={t('contractsOpened.sumDown')} value={`฿${fmtCurrency(totals.down)}`} />
-      </div>
-      <ChartLegend
-        downLabel={t('contractsOpened.legendDown')}
-        financedLabel={t('contractsOpened.legendFinanced')}
-      />
-      <div className="h-[260px]">
-        <ContractsOpenedChart points={points} />
-      </div>
-    </div>
-  );
-}
-
-function MonthTotalCell({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex-1 px-3 py-2 min-w-0">
-      <div className="text-xs text-subtle truncate">{label}</div>
-      <div className="text-base font-semibold tabular-nums truncate">{value}</div>
-    </div>
-  );
-}
 
 // Today's receiving account — branch-level users only. Compact, right-aligned
 // in the desktop header so it doesn't push the title down. Account number

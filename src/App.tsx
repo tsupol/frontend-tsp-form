@@ -10,6 +10,7 @@ import { useChatRealtimeSnackbars } from './hooks/useChatRealtimeSnackbars';
 import { LoginPage } from './pages/LoginPage';
 import { HomePage } from './pages/HomePage';
 import { DashboardPage } from './pages/DashboardPage';
+import { PartnerDashboardPage } from './pages/PartnerDashboardPage';
 import { UserPage } from './pages/UserPage';
 import { EnrollRedirectPage } from './pages/EnrollRedirectPage';
 import { HoldingSelectModal } from './components/HoldingSelectModal';
@@ -226,12 +227,12 @@ function RealtimeBridge() {
   return null;
 }
 
-// /admin lands on the dashboard — except for deal-partner shops, whose menu
-// set has no dashboard yet (NOTICE 1193: the shop home page comes with its
-// read model later). Until then they land on their own contract list.
+// /admin lands on the dashboard — the branch one, or the deal-partner shop's
+// own (mig 1539: shop endpoints only; the branch dashboard's views are 403 for
+// a shop).
 function DashboardOrShopHome() {
   const { isDealPartner } = useAuth();
-  if (isDealPartner) return <Navigate to="/admin/contracts/search" replace />;
+  if (isDealPartner) return <PartnerDashboardPage />;
   return <DashboardPage />;
 }
 
