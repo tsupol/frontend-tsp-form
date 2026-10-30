@@ -1431,5 +1431,9 @@
   "fund.not_found.payment": "That transfer line was not found — only bank transfer lines can carry an SMS or change account",
   "FUND.NOT_FOUND.PAYMENT": "That transfer line was not found — only bank transfer lines can carry an SMS or change account",
   "core.validation.sms_company_mismatch": "The SMS came from another company's phone",
-  "CORE.VALIDATION.SMS_COMPANY_MISMATCH": "The SMS came from another company's phone"
+  "CORE.VALIDATION.SMS_COMPANY_MISMATCH": "The SMS came from another company's phone",
+  "core.validation.bank_code_required": "Pick the bank from the list",
+  "CORE.VALIDATION.BANK_CODE_REQUIRED": "Pick the bank from the list",
+  "core.validation.qr_only_has_number": "A QR-only account has no account number — put the shop’s number in the note",
+  "CORE.VALIDATION.QR_ONLY_HAS_NUMBER": "A QR-only account has no account number — put the shop’s number in the note"
 }

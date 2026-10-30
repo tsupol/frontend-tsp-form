@@ -22,6 +22,8 @@ import {
   ArrowDownCircle, ArrowRightFromLine, ArrowUpCircle, ChevronRight, Landmark, Receipt, Target,
 } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
+import { BankLogo } from '../../components/BankLogo';
+import { useRefBanks } from '../../components/DealPartnerPayoutAccountField';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { fmtCurrency } from '../../lib/format';
@@ -32,7 +34,7 @@ import { FundCashTargetModal } from './FundCashTargetModal';
 import { useCashTargetLog, useFundCashPosition } from './useFundCash';
 
 export function FundCashPositionPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const { hasPermission } = useMyPermissions();
   const companyId = user?.company_id ?? null;
@@ -49,6 +51,16 @@ export function FundCashPositionPage() {
   const canTopUp = hasPermission('FUND.TOPUP');
   const canWithdraw = hasPermission('FUND.WITHDRAW');
   const canSpend = hasPermission('FUND.EXPENSE');
+
+  // The bank by its code, from the bank list. The key is the backend's own and
+  // turns into "KBANK:…" once codes are filled in (BE response 10-30), so it is
+  // never shown; only an account still without a code falls back to the name
+  // the key was built from.
+  const { data: banks = [] } = useRefBanks();
+  const bankName = (a: { bank_code: string | null; account_key: string }) => {
+    const b = a.bank_code ? banks.find(x => x.code === a.bank_code) : null;
+    return b ? ((i18n.language === 'en' && b.name_en) || b.short_name_th) : a.account_key.split(':')[0];
+  };
 
   const status = position?.target_status ?? 'NO_TARGET';
   const over = position?.over_target ?? null;
@@ -189,13 +201,14 @@ export function FundCashPositionPage() {
                           to={`/admin/fund-passbook?account=${encodeURIComponent(a.account_key)}`}
                           className="px-4 py-3 border-t border-line flex items-center gap-3 hover:bg-surface-hover transition-colors"
                         >
+                          <BankLogo code={a.bank_code} size={28} />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <span className="text-sm font-medium truncate">{a.account_name}</span>
                               {a.is_default && <Badge color="primary" size="sm">{t('fundAccount.usual')}</Badge>}
                             </div>
                             <div className="text-xs text-subtle tabular-nums mt-0.5">
-                              {a.account_key.split(':')[0]} · {a.account_number}
+                              {bankName(a)} · {a.account_number}
                               {' · '}{t('fundCash.lineCount', { count: a.line_count })}
                               {a.last_date && <> · <DateTime value={a.last_date} showTime={false} /></>}
                             </div>

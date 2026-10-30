@@ -10514,5 +10514,27 @@
     "unlinkReason": "Reason",
     "unlinkReasonPlaceholder": "e.g. attached to the wrong line",
     "unlinkSubmit": "Remove SMS"
+  },
+  "bankAccountForm": {
+    "qrOnlyShort": "QR",
+    "incomplete": "Incomplete",
+    "incompleteHint": "The bank was typed in, not picked from the list — edit the account and pick its bank",
+    "qrMissing": "No QR picture yet",
+    "qrMissingHint": "A QR-only account can only be paid by scanning this picture — attach the QR",
+    "digitsExact": "This bank usually has {{n}} digits",
+    "digitsRange": "This bank usually has {{min}}–{{max}} digits",
+    "digitsCounted": "{{hint}} · {{count}} entered",
+    "digitsOnly": "Dashes and spaces are fine — only the digits are saved",
+    "legacyNoBank": "Incomplete — this account’s bank was typed in as “{{typed}}”, not picked from the list. Pick its bank.",
+    "bankPlaceholder": "Choose a bank",
+    "kind": "Account type",
+    "kind_BANK_ACCOUNT": "Has a number to pay to",
+    "kindHint_BANK_ACCOUNT": "Account number, PromptPay or Biller ID — the customer can type it in to pay",
+    "kind_QR_ONLY": "QR only",
+    "kindHint_QR_ONLY": "A shop account paid only by scanning — no number to type",
+    "kind_PROMPTPAY": "PromptPay / shop",
+    "kind_BEMERCHANT": "BeMerchant (Bangkok Bank) — QR",
+    "qrOnlyNoteHint": "The shop’s merchant number, if any, can go here — it isn’t a number customers pay to",
+    "qrNextStep": "This account is QR only — attach the QR picture customers will scan"
   }
 }

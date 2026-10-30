@@ -10496,5 +10496,27 @@
     "unlinkReason": "เหตุผล",
     "unlinkReasonPlaceholder": "เช่น แนบผิดรายการ",
     "unlinkSubmit": "เลิกแนบ SMS"
+  },
+  "bankAccountForm": {
+    "qrOnlyShort": "QR",
+    "incomplete": "ข้อมูลไม่ครบ",
+    "incompleteHint": "ธนาคารถูกพิมพ์ไว้ ไม่ได้เลือกจากรายการ — เปิดแก้ไขแล้วเลือกธนาคาร",
+    "qrMissing": "ยังไม่มีรูป QR",
+    "qrMissingHint": "บัญชี QR อย่างเดียว ลูกค้าจ่ายได้ด้วยการสแกนรูปนี้เท่านั้น — แนบรูป QR",
+    "digitsExact": "ธนาคารนี้ปกติ {{n}} หลัก",
+    "digitsRange": "ธนาคารนี้ปกติ {{min}}–{{max}} หลัก",
+    "digitsCounted": "{{hint}} · กรอกแล้ว {{count}} หลัก",
+    "digitsOnly": "พิมพ์ขีดหรือเว้นวรรคได้ ระบบเก็บเฉพาะตัวเลข",
+    "legacyNoBank": "ข้อมูลไม่ครบ — ธนาคารของบัญชีนี้ถูกพิมพ์ไว้ว่า “{{typed}}” ไม่ได้เลือกจากรายการ เลือกธนาคารให้ตรง",
+    "bankPlaceholder": "เลือกธนาคาร",
+    "kind": "ชนิดบัญชี",
+    "kind_BANK_ACCOUNT": "มีเลขให้จ่าย",
+    "kindHint_BANK_ACCOUNT": "เลขบัญชี พร้อมเพย์ หรือ Biller ID — ลูกค้าพิมพ์เลขนี้จ่ายได้",
+    "kind_QR_ONLY": "QR อย่างเดียว",
+    "kindHint_QR_ONLY": "ร้านค้าที่ลูกค้าจ่ายได้ด้วยการสแกนเท่านั้น ไม่มีเลขให้พิมพ์",
+    "kind_PROMPTPAY": "พร้อมเพย์ / ร้านค้า",
+    "kind_BEMERCHANT": "BeMerchant (กรุงเทพ) — QR",
+    "qrOnlyNoteHint": "เลขร้านค้า (ถ้ามี) ใส่ไว้ที่นี่ได้ — ไม่ใช่เลขที่ลูกค้าจ่าย",
+    "qrNextStep": "บัญชีนี้เป็น QR อย่างเดียว — แนบรูป QR ให้ลูกค้าสแกนจ่าย"
   }
 }

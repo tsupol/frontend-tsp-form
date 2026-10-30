@@ -1431,5 +1431,9 @@
   "fund.not_found.payment": "ไม่พบรายการโอนนี้ — แนบ SMS/แก้บัญชีได้เฉพาะรายการโอนผ่านธนาคาร",
   "FUND.NOT_FOUND.PAYMENT": "ไม่พบรายการโอนนี้ — แนบ SMS/แก้บัญชีได้เฉพาะรายการโอนผ่านธนาคาร",
   "core.validation.sms_company_mismatch": "SMS นี้มาจากมือถือของบริษัทอื่น",
-  "CORE.VALIDATION.SMS_COMPANY_MISMATCH": "SMS นี้มาจากมือถือของบริษัทอื่น"
+  "CORE.VALIDATION.SMS_COMPANY_MISMATCH": "SMS นี้มาจากมือถือของบริษัทอื่น",
+  "core.validation.bank_code_required": "ต้องเลือกธนาคารจากรายการ",
+  "CORE.VALIDATION.BANK_CODE_REQUIRED": "ต้องเลือกธนาคารจากรายการ",
+  "core.validation.qr_only_has_number": "บัญชี QR อย่างเดียวต้องไม่มีเลขบัญชี — เลขร้านค้าใส่ในหมายเหตุได้",
+  "CORE.VALIDATION.QR_ONLY_HAS_NUMBER": "บัญชี QR อย่างเดียวต้องไม่มีเลขบัญชี — เลขร้านค้าใส่ในหมายเหตุได้"
 }

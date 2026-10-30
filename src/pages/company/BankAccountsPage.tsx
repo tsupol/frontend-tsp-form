@@ -18,7 +18,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  DataTable, DataTableColumnHeader, DataTableFooter, Button, Input, Select,
+  DataTable, DataTableColumnHeader, DataTableFooter, Button, Input, Select, RadioGroup,
   PopOver, MenuItem, MenuSeparator, Badge, Modal, Switch, MobileHeader, Tooltip,
   useSnackbarContext, FormErrorMessage,
   type ColumnDef, type SortingState,
@@ -38,6 +38,8 @@ import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { DateTime } from '../../components/DateTime';
 import { ActionDoneView } from '../contracts/ActionDoneView';
+import { BankLogo } from '../../components/BankLogo';
+import { useRefBanks } from '../../components/DealPartnerPayoutAccountField';
 
 type AccountLevel = 'branch' | 'company';
 
@@ -61,9 +63,18 @@ interface BankAccount {
   /** null = a company-level account (mig 1531). */
   branch_id: number | null;
   branch_name: string | null;
+  /** Thai name; from v_ref_banks once the bank has a code (BE response 10-30). */
   bank_name: string;
-  account_number: string;
+  /** Coming with BE's bank-code change; English screens use it when present. */
+  bank_name_en?: string | null;
+  /** null = typed in before the bank had to be picked from the list — "ข้อมูลไม่ครบ". */
+  bank_code: string | null;
+  account_kind: string;
+  /** null for a QR-only account: it has no number to pay to. */
+  account_number: string | null;
   account_name: string;
+  /** The kind wants a QR picture; with no qr_media the account shows "ยังไม่มีรูป QR". */
+  requires_qr_image: boolean;
   is_promptpay: boolean;
   promptpay_id: string | null;
   is_active: boolean;
@@ -85,10 +96,72 @@ interface FundCompany {
   name: string;
 }
 
+interface RefBankKind {
+  code: string;
+  name_th: string;
+  requires_account_number: boolean;
+  requires_qr_image: boolean;
+  sort_order: number;
+}
+
+// The owner's two kinds (BE response 2026-10-30): a number the customer can pay
+// to, or a QR to scan and nothing else. PROMPTPAY folds into the first and
+// BEMERCHANT into the second; BE turns both off and they leave the view by
+// themselves. Until then the picker skips them — an existing account of either
+// kind still shows its own name.
+const RETIRING_KINDS = new Set(['PROMPTPAY', 'BEMERCHANT']);
+
+function useRefBankKinds() {
+  return useQuery({
+    queryKey: ['ref-bank-kinds'],
+    queryFn: () => apiClient.get<RefBankKind[]>('/v_ref_bank_account_kinds?order=sort_order'),
+    staleTime: 30 * 60 * 1000,
+  });
+}
+
+type TFn = ReturnType<typeof useTranslation>['t'];
+
+/** Dashed when the bank has a pattern, plain otherwise, "QR" for a QR-only account. */
+function accountNumberText(a: BankAccount, t: TFn): string {
+  return a.account_number_display ?? a.account_number ?? t('bankAccountForm.qrOnlyShort');
+}
+
+/** Bank logo, bank, number and holder — the same two lines in every list here. */
+function AccountBankLine({ account, badges, showHolder = true }: {
+  account: BankAccount;
+  badges?: React.ReactNode;
+  showHolder?: boolean;
+}) {
+  const { t, i18n } = useTranslation();
+  const name = (i18n.language === 'en' && account.bank_name_en) || account.bank_name;
+  const qrMissing = account.requires_qr_image && !account.qr_media;
+  return (
+    <div className="flex items-center gap-2.5 min-w-0">
+      <BankLogo code={account.bank_code} size={28} />
+      <div className="min-w-0">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="font-medium text-sm truncate">{name}</span>
+          {!account.bank_code && (
+            <Tooltip content={t('bankAccountForm.incompleteHint')} placement="top">
+              <Badge color="warning" size="sm">{t('bankAccountForm.incomplete')}</Badge>
+            </Tooltip>
+          )}
+          {qrMissing && <Badge color="warning" size="sm">{t('bankAccountForm.qrMissing')}</Badge>}
+          {badges}
+        </div>
+        <div className="text-xs text-subtle tabular-nums mt-0.5">
+          {accountNumberText(account, t)}{showHolder && <> · {account.account_name}</>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface AccountForm {
   branch_id: string;
   company_id: string;
-  bank_name: string;
+  bank_code: string;
+  account_kind: string;
   account_number: string;
   account_name: string;
   promptpay_id: string;
@@ -149,10 +222,12 @@ function RowActions({ account, onEdit, onToggle, onSetDefault, onHistory }: {
 
 // ── Create / Edit Modal ──────────────────────────────────────────────────────
 
-function AccountModal({ open, onClose, account, level, branches, companies, canManageQr }: {
+function AccountModal({ open, onClose, account, level, branches, companies, canManageQr, onOpenAccount }: {
   open: boolean;
   onClose: () => void;
   account: BankAccount | null;
+  /** From the done view of a new QR-only account: open it to attach the picture. */
+  onOpenAccount?: (id: number) => void;
   /** Which kind a new account is; an edited one keeps its own. */
   level: AccountLevel;
   branches: Branch[];
@@ -160,25 +235,30 @@ function AccountModal({ open, onClose, account, level, branches, companies, canM
   companies: FundCompany[];
   canManageQr: boolean;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { addSnackbar } = useSnackbarContext();
   const [errorMessage, setErrorMessage] = useState('');
   const [isPending, setIsPending] = useState(false);
   const [view, setView] = useState<'form' | 'done'>('form');
-  const [saved, setSaved] = useState<{ form: AccountForm; isDefault: boolean } | null>(null);
+  const [saved, setSaved] = useState<{ form: AccountForm; isDefault: boolean; id: number | null; isQrOnly: boolean } | null>(null);
+  const { data: banks = [] } = useRefBanks();
+  const { data: kinds = [] } = useRefBankKinds();
+  const bankLabel = (b: { name_th: string; name_en?: string | null }) =>
+    (i18n.language === 'en' && b.name_en) || b.name_th;
   const [confirmClose, setConfirmClose] = useState(false);
   const isEdit = !!account;
   const isCompany = isEdit ? !!account?.is_company_account : level === 'company';
   // A company user creates for their own company; only a holding-level user picks.
   const ownCompanyId = user?.company_id ?? null;
 
-  const { register, handleSubmit, reset, control, formState: { errors, isDirty } } = useForm<AccountForm>({
+  const { register, handleSubmit, reset, control, watch, formState: { errors, isDirty } } = useForm<AccountForm>({
     defaultValues: {
       branch_id: '',
       company_id: '',
-      bank_name: '',
+      bank_code: '',
+      account_kind: 'BANK_ACCOUNT',
       account_number: '',
       account_name: '',
       promptpay_id: '',
@@ -200,8 +280,9 @@ function AccountModal({ open, onClose, account, level, branches, companies, canM
       reset({
         branch_id: acc.branch_id != null ? String(acc.branch_id) : '',
         company_id: String(acc.company_id),
-        bank_name: acc.bank_name,
-        account_number: acc.account_number,
+        bank_code: acc.bank_code ?? '',
+        account_kind: acc.account_kind,
+        account_number: acc.account_number ?? '',
         account_name: acc.account_name,
         promptpay_id: acc.promptpay_id ?? '',
         is_default: acc.is_default,
@@ -211,7 +292,8 @@ function AccountModal({ open, onClose, account, level, branches, companies, canM
       reset({
         branch_id: '',
         company_id: ownCompanyId != null ? String(ownCompanyId) : '',
-        bank_name: '',
+        bank_code: '',
+        account_kind: 'BANK_ACCOUNT',
         account_number: '',
         account_name: '',
         promptpay_id: '',
@@ -226,6 +308,28 @@ function AccountModal({ open, onClose, account, level, branches, companies, canM
     setSaved(null);
     setConfirmClose(false);
   }, [open, accountId, reset, ownCompanyId]);
+
+  const bankCode = watch('bank_code');
+  const kindCode = watch('account_kind');
+  const numberInput = watch('account_number');
+  const bank = banks.find(b => b.code === bankCode) ?? null;
+  const kind = kinds.find(k => k.code === kindCode) ?? null;
+  // A fund account is never shown to a customer, so it is always a numbered one.
+  const chooseKind = !isEdit && !isCompany;
+  const kindOptions = kinds.filter(k => !RETIRING_KINDS.has(k.code));
+  const isQrOnly = kind ? !kind.requires_account_number : false;
+  // Spaces and dashes are typed freely; only the digits are sent.
+  const digits = numberInput.replace(/\D/g, '');
+  // A warning, never a block (owner 10-30): some real numbers are longer than the
+  // bank list expects, and the server stops checking length once BE's change lands.
+  const lengthHint = bank?.enforces_length && bank.digits_min != null
+    ? bank.digits_min === bank.digits_max
+      ? t('bankAccountForm.digitsExact', { n: bank.digits_min })
+      : t('bankAccountForm.digitsRange', { min: bank.digits_min, max: bank.digits_max })
+    : null;
+  const lengthOff = !!lengthHint && digits.length > 0
+    && (digits.length < (bank?.digits_min ?? 0) || digits.length > (bank?.digits_max ?? Infinity));
+  const legacyNoBank = isEdit && !account?.bank_code;
 
   const forceClose = () => { setConfirmClose(false); onClose(); };
   const handleClose = () => {
@@ -319,12 +423,23 @@ function AccountModal({ open, onClose, account, level, branches, companies, canM
     setIsPending(true);
     setErrorMessage('');
 
+    // The bank is always picked from v_ref_banks and sent as its code; the name
+    // sent alongside is the list's own (BE writes it from the code anyway once
+    // its change lands). No dashed number is sent — BE builds it from the bank.
+    const chosenBank = banks.find(b => b.code === data.bank_code) ?? null;
+    const kindToSend = isCompany ? 'BANK_ACCOUNT' : data.account_kind;
+    const qrOnly = !isEdit && !isCompany && isQrOnly;
     const start = Date.now();
     try {
+      let newId: number | null = null;
       if (isEdit) {
+        // Only a bank actually picked is sent: an old account with no code keeps
+        // what it has until someone chooses its bank here.
+        const bankChanged = !!chosenBank && chosenBank.code !== account!.bank_code;
         await apiClient.rpc('fn_bank_account_update', {
           p_account_id: account!.id,
-          p_bank_name: data.bank_name,
+          p_bank_name: bankChanged ? chosenBank.name_th : null,
+          p_bank_code: bankChanged ? chosenBank.code : null,
           p_account_number: null, // immutable — never sent on update (409 ACCOUNT_NUMBER_IMMUTABLE); null keeps existing
           p_account_name: data.account_name,
           p_account_number_display: null,
@@ -335,31 +450,38 @@ function AccountModal({ open, onClose, account, level, branches, companies, canM
       } else if (isCompany) {
         // Company accounts have their own create call and permission
         // (BANK_ACCOUNT.COMPANY_MANAGE); the branch call still needs a branch.
-        await apiClient.rpc('fn_company_bank_account_create', {
+        const res = await apiClient.rpc<{ id: number }>('fn_company_bank_account_create', {
           p_company_id: Number(data.company_id),
-          p_bank_name: data.bank_name,
-          p_account_number: data.account_number,
+          p_bank_name: chosenBank?.name_th ?? '',
+          p_bank_code: data.bank_code,
+          p_account_kind: kindToSend,
+          p_account_number: digits,
           p_account_name: data.account_name,
           p_promptpay_id: data.promptpay_id || null,
           p_is_default: data.is_default,
           p_note: data.note || null,
         });
+        newId = res?.id ?? null;
       } else {
-        await apiClient.rpc('fn_bank_account_create', {
+        const res = await apiClient.rpc<{ id: number }>('fn_bank_account_create', {
           p_branch_id: Number(data.branch_id),
-          p_bank_name: data.bank_name,
-          p_account_number: data.account_number,
+          p_bank_name: chosenBank?.name_th ?? '',
+          p_bank_code: data.bank_code,
+          p_account_kind: kindToSend,
+          // A QR-only account has no number to pay to; its shop number goes in the note.
+          p_account_number: qrOnly ? null : digits,
           p_account_name: data.account_name,
-          p_promptpay_id: data.promptpay_id || null,
+          p_promptpay_id: qrOnly ? null : (data.promptpay_id || null),
           p_is_default: data.is_default,
           p_note: data.note || null,
           p_created_by: user.user_id,
         });
+        newId = res?.id ?? null;
       }
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
       // The fund money screens' account picker reads the same rows.
       queryClient.invalidateQueries({ queryKey: ['fund-bills', 'source-accounts'] });
-      setSaved({ form: data, isDefault: isEdit ? !!account?.is_default : data.is_default });
+      setSaved({ form: data, isDefault: isEdit ? !!account?.is_default : data.is_default, id: newId, isQrOnly: qrOnly });
       setView('done');
     } catch (err) {
       setErrorMessage(translateErr(err));
@@ -388,13 +510,41 @@ function AccountModal({ open, onClose, account, level, branches, companies, canM
             : isCompany ? t('companyBankAccount.created') : t('settings.bankAccounts.created')}
           contractCode={saved.form.account_name}
           detailRows={[
-            { label: t('settings.bankAccounts.bankName'), value: saved.form.bank_name },
-            { label: t('settings.bankAccounts.accountNumber'), value: isEdit ? (account?.account_number ?? '') : saved.form.account_number, emphasis: true },
+            {
+              label: t('settings.bankAccounts.bankName'),
+              value: (() => {
+                const b = banks.find(x => x.code === saved.form.bank_code);
+                return b
+                  ? <span className="inline-flex items-center gap-1.5"><BankLogo code={b.code} size={18} />{bankLabel(b)}</span>
+                  : (account?.bank_name ?? '');
+              })(),
+            },
+            {
+              label: t('settings.bankAccounts.accountNumber'),
+              value: saved.isQrOnly
+                ? t('bankAccountForm.qrOnlyShort')
+                : isEdit ? (account ? accountNumberText(account, t) : '') : saved.form.account_number.replace(/\D/g, ''),
+              emphasis: true,
+            },
             ...(isCompany
               ? [{ label: t('companyBankAccount.usual'), value: saved.isDefault ? t('common.yes') : t('common.no') }]
               : []),
           ]}
-          extras={isCompany && !isEdit ? (
+          extras={saved.isQrOnly ? (
+            // The picture is attached to an existing account, so it comes after saving.
+            <div className="alert alert-warning">
+              <div className="flex flex-col gap-2">
+                <span>{t('bankAccountForm.qrNextStep')}</span>
+                {saved.id != null && onOpenAccount && canManageQr && (
+                  <div>
+                    <Button size="sm" variant="outline" startIcon={<Upload size={14} />} onClick={() => onOpenAccount(saved.id!)}>
+                      {t('settings.bankAccounts.qr.upload')}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : isCompany && !isEdit ? (
             <div className="alert alert-info"><span>{t('companyBankAccount.createdHint')}</span></div>
           ) : undefined}
           onClose={forceClose}
@@ -446,34 +596,110 @@ function AccountModal({ open, onClose, account, level, branches, companies, canM
             )}
             <div className="flex flex-col">
               <label className="form-label">{t('settings.bankAccounts.bankName')}</label>
-              <Input {...register('bank_name', { required: t('common.required') })} className="w-full" />
-              <FormErrorMessage error={errors.bank_name} />
-            </div>
-            <div className="flex flex-col">
-              <label className="form-label">{t('settings.bankAccounts.accountNumber')}</label>
-              <Input
-                {...register('account_number', isEdit ? {} : { required: t('common.required') })}
-                className="w-full"
-                disabled={isEdit}
-              />
-              {isEdit ? (
-                <p className="text-xs text-subtle mt-1.5">{t('settings.bankAccounts.accountNumberImmutable')}</p>
-              ) : (
-                <FormErrorMessage error={errors.account_number} />
+              {legacyNoBank && (
+                <div className="alert alert-warning mb-2">
+                  <span>{t('bankAccountForm.legacyNoBank', { typed: account?.bank_name ?? '' })}</span>
+                </div>
               )}
+              <Controller
+                name="bank_code"
+                control={control}
+                rules={isEdit ? {} : { required: t('common.required') }}
+                render={({ field }) => (
+                  <Select
+                    value={field.value || null}
+                    onChange={(val) => field.onChange((val as string) ?? '')}
+                    placeholder={t('bankAccountForm.bankPlaceholder')}
+                    options={banks.map(b => ({ value: b.code, label: bankLabel(b), icon: <BankLogo code={b.code} size={20} /> }))}
+                    searchable
+                    showChevron
+                  />
+                )}
+              />
+              <FormErrorMessage error={errors.bank_code} />
             </div>
+            {chooseKind && (
+              <div className="flex flex-col gap-1.5">
+                <label className="form-label">{t('bankAccountForm.kind')}</label>
+                <Controller
+                  name="account_kind"
+                  control={control}
+                  render={({ field }) => (
+                    <RadioGroup
+                      name="account-kind"
+                      value={field.value}
+                      onChange={(v) => field.onChange(v as string)}
+                      className="flex flex-col gap-2"
+                      options={kindOptions.map(k => ({
+                        value: k.code,
+                        label: (
+                          <span className="min-w-0">
+                            <span className="text-sm">{t(`bankAccountForm.kind_${k.code}`, { defaultValue: k.name_th })}</span>
+                            <span className="block text-xs text-subtler">{t(`bankAccountForm.kindHint_${k.code}`, { defaultValue: '' })}</span>
+                          </span>
+                        ),
+                      }))}
+                    />
+                  )}
+                />
+              </div>
+            )}
+            {isEdit && !isCompany && account && (
+              <div className="flex flex-col">
+                <label className="form-label">{t('bankAccountForm.kind')}</label>
+                <div className="text-sm">
+                  {t(`bankAccountForm.kind_${account.account_kind}`, {
+                    defaultValue: kinds.find(k => k.code === account.account_kind)?.name_th ?? account.account_kind,
+                  })}
+                </div>
+              </div>
+            )}
+            {/* A QR-only account has no number; an edited one shows its number locked. */}
+            {isEdit ? account?.account_number != null && (
+              <div className="flex flex-col">
+                <label className="form-label">{t('settings.bankAccounts.accountNumber')}</label>
+                <Input value={accountNumberText(account, t)} className="w-full" disabled readOnly />
+                <p className="text-xs text-subtle mt-1.5">{t('settings.bankAccounts.accountNumberImmutable')}</p>
+              </div>
+            ) : !isQrOnly && (
+              <div className="flex flex-col">
+                <label className="form-label">{t('settings.bankAccounts.accountNumber')}</label>
+                <Input
+                  {...register('account_number', {
+                    validate: v => v.replace(/\D/g, '') !== '' || t('common.required'),
+                  })}
+                  className="w-full"
+                  inputMode="numeric"
+                  autoComplete="off"
+                />
+                {errors.account_number ? (
+                  <FormErrorMessage error={errors.account_number} />
+                ) : (
+                  <p className={`text-xs mt-1.5 ${lengthOff ? 'text-warning-fg' : 'text-subtle'}`}>
+                    {lengthHint
+                      ? t('bankAccountForm.digitsCounted', { hint: lengthHint, count: digits.length })
+                      : t('bankAccountForm.digitsOnly')}
+                  </p>
+                )}
+              </div>
+            )}
             <div className="flex flex-col">
               <label className="form-label">{t('settings.bankAccounts.accountName')}</label>
               <Input {...register('account_name', { required: t('common.required') })} className="w-full" />
               <FormErrorMessage error={errors.account_name} />
             </div>
-            <div className="flex flex-col">
-              <label className="form-label">{t('settings.bankAccounts.promptpayId')}</label>
-              <Input {...register('promptpay_id')} className="w-full" />
-            </div>
+            {!isQrOnly && (
+              <div className="flex flex-col">
+                <label className="form-label">{t('settings.bankAccounts.promptpayId')}</label>
+                <Input {...register('promptpay_id')} className="w-full" />
+              </div>
+            )}
             <div className="flex flex-col">
               <label className="form-label">{t('settings.bankAccounts.note')}</label>
               <Input {...register('note')} className="w-full" />
+              {isQrOnly && (
+                <p className="text-xs text-subtle mt-1.5">{t('bankAccountForm.qrOnlyNoteHint')}</p>
+              )}
             </div>
             {/* The payment QR is for customers; a fund account is never shown to one. */}
             {isEdit && !isCompany && (
@@ -525,7 +751,9 @@ function AccountModal({ open, onClose, account, level, branches, companies, canM
                             </Button>
                           )}
                         </div>
-                        <p className="text-xs text-subtle mt-1.5">{t('settings.bankAccounts.qr.hint')}</p>
+                        <p className={`text-xs mt-1.5 ${account?.requires_qr_image && !qrUrl ? 'text-warning-fg' : 'text-subtle'}`}>
+                          {account?.requires_qr_image && !qrUrl ? t('bankAccountForm.qrMissingHint') : t('settings.bankAccounts.qr.hint')}
+                        </p>
                       </>
                     ) : (
                       <p className="text-xs text-subtle">
@@ -565,7 +793,8 @@ function AccountModal({ open, onClose, account, level, branches, companies, canM
         <ModalErrorBand message={errorMessage} onDismiss={() => setErrorMessage('')} />
         <div className="modal-footer">
           <Button type="button" variant="ghost" onClick={handleClose}>{t('common.cancel')}</Button>
-          <Button type="submit" color="primary" disabled={isPending}>
+          {/* An edit with nothing changed has nothing to save. */}
+          <Button type="submit" color="primary" disabled={isPending || (isEdit && !isDirty)}>
             {isPending ? t('common.saving') : isEdit ? t('common.save') : t('common.create')}
           </Button>
         </div>
@@ -643,8 +872,7 @@ function AccountHistoryModal({ account, onClose }: { account: BankAccount | null
       <div className="modal-content">
         {shown && (
           <div className="px-3 py-2.5 rounded-md bg-surface border border-line mb-3">
-            <div className="font-medium text-sm">{shown.account_name}</div>
-            <div className="text-xs text-subtle tabular-nums">{shown.bank_name} · {shown.account_number_display ?? shown.account_number}</div>
+            <AccountBankLine account={shown} />
           </div>
         )}
         {isLoading ? (
@@ -721,14 +949,7 @@ function CompanyAccountsTab({ accounts, isLoading, isFetching, showCompany, onEd
     {
       id: 'bank',
       header: () => t('settings.bankAccounts.colBank'),
-      cell: ({ row }) => (
-        <div>
-          <div className="font-medium">{row.original.bank_name}</div>
-          <div className="text-xs text-subtle tabular-nums">
-            {row.original.account_number_display ?? row.original.account_number} · {row.original.account_name}
-          </div>
-        </div>
-      ),
+      cell: ({ row }) => <AccountBankLine account={row.original} />,
     },
     {
       id: 'note',
@@ -787,15 +1008,14 @@ function CompanyAccountsTab({ accounts, isLoading, isFetching, showCompany, onEd
             {accounts.map(account => (
               <div key={account.id} className="flex items-center gap-3 px-4 py-3">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm truncate">{account.bank_name}</span>
-                    {account.is_default && <Badge color="primary" size="sm">{t('companyBankAccount.usual')}</Badge>}
-                    {!account.is_active && <Badge color="default" size="sm">{t('common.inactive')}</Badge>}
-                  </div>
-                  <div className="text-xs text-subtle tabular-nums mt-0.5">
-                    {account.account_number_display ?? account.account_number} · {account.account_name}
-                  </div>
-                  {showCompany && <div className="text-xs text-subtler mt-0.5">{account.company_name}</div>}
+                  <AccountBankLine
+                    account={account}
+                    badges={<>
+                      {account.is_default && <Badge color="primary" size="sm">{t('companyBankAccount.usual')}</Badge>}
+                      {!account.is_active && <Badge color="default" size="sm">{t('common.inactive')}</Badge>}
+                    </>}
+                  />
+                  {showCompany && <div className="text-xs text-subtler mt-0.5 pl-[38px]">{account.company_name}</div>}
                 </div>
                 <RowActions account={account} onEdit={onEdit} onToggle={onToggle} onSetDefault={onSetDefault} onHistory={onHistory} />
               </div>
@@ -830,7 +1050,9 @@ export function BankAccountsPage() {
   // Keep the kind being created through the close transition.
   const lastCreateLevel = useRef<AccountLevel>('branch');
   if (createLevel) lastCreateLevel.current = createLevel;
-  const [editAccount, setEditAccount] = useState<BankAccount | null>(null);
+  // By id, so the done view of a new account can open it before the list has it.
+  const [editId, setEditId] = useState<number | null>(null);
+  const setEditAccount = (a: BankAccount | null) => setEditId(a?.id ?? null);
   const [historyAccount, setHistoryAccount] = useState<BankAccount | null>(null);
   const [qrPreview, setQrPreview] = useState<string | null>(null);
 
@@ -888,12 +1110,15 @@ export function BankAccountsPage() {
     queryFn: () => apiClient.get<Branch[]>('/v_branches?is_active=is.true&order=name'),
   });
 
-  // Resolve the edited account from the live query rows (not the frozen state
-  // snapshot) so a QR set/remove — which invalidates ['bank-accounts'] — is
-  // reflected in the open modal.
-  const liveEditAccount = editAccount
-    ? [...accounts, ...companyAccounts].find(a => a.id === editAccount.id) ?? editAccount
+  // Resolve the edited account from the live query rows so a QR set/remove —
+  // which invalidates ['bank-accounts'] — is reflected in the open modal. A
+  // just-created account opens as soon as the refetched list holds it.
+  const liveEditAccount = editId != null
+    ? [...accounts, ...companyAccounts].find(a => a.id === editId) ?? null
     : null;
+  // Hold the last one through the close transition.
+  const lastEditAccount = useRef<BankAccount | null>(null);
+  if (liveEditAccount) lastEditAccount.current = liveEditAccount;
 
   // Branch options come from the account rows themselves (not v_branches) so
   // branches that hold accounts but are now inactive still appear in the filter.
@@ -906,7 +1131,8 @@ export function BankAccountsPage() {
     const term = search.trim().toLowerCase();
     return (a.branch_name ?? '').toLowerCase().includes(term)
       || a.bank_name.toLowerCase().includes(term)
-      || a.account_number.includes(term)
+      || (a.bank_code ?? '').toLowerCase().includes(term)
+      || (a.account_number ?? '').includes(term)
       || a.account_name.toLowerCase().includes(term);
   });
 
@@ -999,12 +1225,7 @@ export function BankAccountsPage() {
     {
       id: 'bank',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('settings.bankAccounts.colBank')} />,
-      cell: ({ row }) => (
-        <div>
-          <div className="font-medium">{row.original.bank_name}</div>
-          <div className="text-xs text-subtle tabular-nums">{row.original.account_number} · {row.original.account_name}</div>
-        </div>
-      ),
+      cell: ({ row }) => <AccountBankLine account={row.original} />,
     },
     {
       id: 'promptpay',
@@ -1215,23 +1436,24 @@ export function BankAccountsPage() {
                     className="flex items-center gap-3 px-4 py-3"
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-sm truncate">{account.bank_name}</span>
-                        {account.qr_media && (
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); setQrPreview(account.qr_media!.paths.original); }}
-                            className="shrink-0 bg-transparent border-none p-0 cursor-pointer text-subtle"
-                            aria-label={t('settings.bankAccounts.qr.viewLarger')}
-                          >
-                            <QrCode size={14} />
-                          </button>
-                        )}
-                        {account.is_default && <Badge color="default" size="sm">{t('settings.bankAccounts.fallbackBadge')}</Badge>}
-                        {!account.is_active && <Badge color="default" size="sm">{t('common.inactive')}</Badge>}
-                      </div>
-                      <div className="text-xs text-subtle tabular-nums mt-0.5">{account.account_number} · {account.account_name}</div>
-                      <div className="text-xs text-subtler mt-0.5">{account.branch_name}</div>
+                      <AccountBankLine
+                        account={account}
+                        badges={<>
+                          {account.qr_media && (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setQrPreview(account.qr_media!.paths.original); }}
+                              className="shrink-0 bg-transparent border-none p-0 cursor-pointer text-subtle"
+                              aria-label={t('settings.bankAccounts.qr.viewLarger')}
+                            >
+                              <QrCode size={14} />
+                            </button>
+                          )}
+                          {account.is_default && <Badge color="default" size="sm">{t('settings.bankAccounts.fallbackBadge')}</Badge>}
+                          {!account.is_active && <Badge color="default" size="sm">{t('common.inactive')}</Badge>}
+                        </>}
+                      />
+                      <div className="text-xs text-subtler mt-0.5 pl-[38px]">{account.branch_name}</div>
                     </div>
                     <RowActions
                       account={account}
@@ -1270,12 +1492,13 @@ export function BankAccountsPage() {
         branches={branches}
         companies={fundCompanies}
         canManageQr={canManageChannels}
+        onOpenAccount={(id) => { setCreateLevel(null); setEditId(id); }}
       />
       <AccountModal
-        open={!!editAccount}
-        onClose={() => setEditAccount(null)}
-        account={liveEditAccount}
-        level={liveEditAccount?.is_company_account ? 'company' : 'branch'}
+        open={!!liveEditAccount}
+        onClose={() => setEditId(null)}
+        account={liveEditAccount ?? lastEditAccount.current}
+        level={(liveEditAccount ?? lastEditAccount.current)?.is_company_account ? 'company' : 'branch'}
         branches={branches}
         companies={fundCompanies}
         canManageQr={canManageChannels}

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Input, Select, Button, Tooltip } from 'tsp-form';
 import { Landmark, Pencil, Plus, Trash2, Undo2 } from 'lucide-react';
 import { apiClient } from '../lib/api';
+import { BankLogo } from './BankLogo';
 
 // ============================================================================
 // Deal partner payout account — work order §2 (§6b), migs 1217–1219.
@@ -37,6 +38,8 @@ export interface RefBank {
   code: string;
   name_th: string;
   short_name_th: string;
+  /** Coming with BE's bank-code change (response 2026-10-30); English screens use it when present. */
+  name_en?: string | null;
   digits_min: number | null;
   digits_max: number | null;
   enforces_length: boolean;
@@ -127,7 +130,7 @@ export function DealPartnerPayoutAccountField({
   const confirmEditor = () => { if (draft) onChange(draft); closeEditor(); };
 
   const bankOptions = useMemo(
-    () => banks.map(b => ({ value: b.code, label: b.name_th })),
+    () => banks.map(b => ({ value: b.code, label: b.name_th, icon: <BankLogo code={b.code} size={20} /> })),
     [banks],
   );
   const bankName = (code: string) => banks.find(b => b.code === code)?.name_th ?? code;
@@ -168,7 +171,9 @@ export function DealPartnerPayoutAccountField({
     </div>
   ) : (
     <div className="flex items-center gap-3 px-3 py-2.5 rounded-md bg-surface border border-line">
-      <Landmark size={16} className={`shrink-0 ${hasValue || hiddenAccount ? 'text-subtle' : 'text-subtler'}`} />
+      {hasValue
+        ? <BankLogo code={value.bank_code} size={24} />
+        : <Landmark size={16} className={`shrink-0 ${hiddenAccount ? 'text-subtle' : 'text-subtler'}`} />}
       <div className="flex-1 min-w-0">
         {hasValue ? (
           <>
