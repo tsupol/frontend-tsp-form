@@ -24,6 +24,7 @@ import { amendedDoneRows } from '../../lib/fundDayPay';
 import { useFundPayAttempt } from '../../hooks/useFundPayAttempt';
 import { fundPaySlipDoneRows, useFundPaySlip } from '../../hooks/useFundPaySlip';
 import { FundPaySlipFailedNotice, FundPaySlipField } from '../../components/FundPaySlip';
+import { SmsAttachInline } from '../../components/SmsLinkParts';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../../lib/format';
@@ -247,9 +248,10 @@ export function FundBillPayModal({ open, bill, onClose }: FundBillPayModalProps)
               ...amendedDoneRows(result.day_close_amended, t, i18n.language),
               ...fundPaySlipDoneRows(slip, t),
             ]}
-            extras={devices.length > 0 || slip.outcome?.kind === 'failed' || bill?.bill_purpose === 'COMMISSION_EXTRA' ? (
+            extras={(
               <div className="flex flex-col gap-3">
                 <FundPaySlipFailedNotice slip={slip} />
+                <SmsAttachInline paymentId={result.payment_id} />
                 {bill?.bill_purpose === 'COMMISSION_EXTRA' && (
                   <div className="alert alert-info"><span>{t('shopCommission.paidTranchesHint')}</span></div>
                 )}
@@ -268,7 +270,7 @@ export function FundBillPayModal({ open, bill, onClose }: FundBillPayModalProps)
                 </div>
                 )}
               </div>
-            ) : undefined}
+            )}
             onClose={forceClose}
           />
         )}

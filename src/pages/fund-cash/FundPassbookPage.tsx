@@ -15,21 +15,33 @@
 //
 // Each line opens the document behind it. A fund document opens in place (the
 // same window the money book uses), a customer bill goes to its page.
+//
+// Bank SMS (mig 1536, doc 155 §1b): each line can carry the bank's own SMS as
+// its slip — ✓ when the amounts agree, ⚠ with the difference when someone
+// attached it anyway. The bar above the lines is the backend's daily count of
+// lines without an SMS, flagged amounts and SMS not yet on any line. A transfer
+// recorded against the wrong account is moved with "แก้บัญชีของรายการ".
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  PageNav, PageNavPanel, DataTable, MobileHeader, Badge, Button, InputDateRangePicker,
+  PageNav, PageNavPanel, DataTable, MobileHeader, Badge, Button, InputDateRangePicker, Tooltip,
   createDateRangePresets, type ColumnDef,
 } from 'tsp-form';
-import { AlertTriangle, ArrowRightFromLine, ExternalLink, Keyboard, Landmark } from 'lucide-react';
+import {
+  AlertTriangle, ArrowLeftRight, ArrowRightFromLine, CheckCircle2, ExternalLink, Keyboard, Landmark, Link2,
+  MessageSquareText,
+} from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { useAuth } from '../../contexts/AuthContext';
+import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../../lib/format';
 import { FundBookLineDrillModal } from '../fund-book/FundBookLineDrillModal';
+import { PassbookSmsModal } from './PassbookSmsModal';
+import { FundPaymentSetAccountModal } from './FundPaymentSetAccountModal';
 import {
-  useFundAccountBalances, useFundCashPosition, useFundPassbook, type FundPassbookLine,
+  useFundAccountBalances, useFundCashPosition, useFundPassbook, useFundPassbookDayCheck, type FundPassbookLine,
 } from './useFundCash';
 
 function parseTypedDate(raw: string): Date | null {
@@ -71,6 +83,12 @@ export function FundPassbookPage() {
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(50);
   const [drillBillId, setDrillBillId] = useState<number | null>(null);
+  const [smsLine, setSmsLine] = useState<FundPassbookLine | null>(null);
+  const [fixLine, setFixLine] = useState<FundPassbookLine | null>(null);
+  const { hasPermission } = useMyPermissions();
+  const canLinkSms = hasPermission('SMS.LINK');
+  const canFixAccount = hasPermission('FUND.PAYMENT_ACCOUNT_FIX');
+  const canSeeInbox = hasPermission('SMS.VIEW');
 
   /**
    * Every passbook there is: each of the fund's own accounts (even one with no
@@ -115,6 +133,12 @@ export function FundPassbookPage() {
   const lines = useFundPassbook({
     companyId, accountKey, unassigned, dateFrom, dateTo, pageIndex, pageSize,
   });
+
+  const today = toLocalDateStr(new Date());
+  const dayCheck = useFundPassbookDayCheck(companyId, unassigned ? null : accountKey, today);
+  /** Narrow the passbook to one day, from the check bar. */
+  const showDay = (day: string) => { setDateFrom(day); setDateTo(day); setPresetKey(null); setPageIndex(0); };
+  const dayLinkCls = 'inline-flex items-center gap-1 text-primary-fg hover:underline bg-transparent border-none p-0 cursor-pointer';
 
   const rangePresets = useMemo(
     () => createDateRangePresets({
@@ -168,6 +192,38 @@ export function FundPassbookPage() {
     </div>
   );
 
+  /** The SMS cell: attached (✓ or ⚠ with the difference), or the way to attach one. */
+  const renderSms = (l: FundPassbookLine) => {
+    if (l.payment_id == null) return null;
+    const cls = 'text-sm bg-transparent border-none p-0 cursor-pointer inline-flex items-center gap-1 whitespace-nowrap hover:underline';
+    if (l.sms_link_id != null) {
+      return l.sms_amount_matches === false ? (
+        <button type="button" className={`${cls} text-warning-fg`} onClick={() => setSmsLine(l)}>
+          <AlertTriangle size={13} />
+          {l.sms_amount == null ? t('fundPassbook.smsUnreadable') : t('fundPassbook.smsDiff', { diff: fmtCurrency(l.sms_amount_diff) })}
+        </button>
+      ) : (
+        <button type="button" className={`${cls} text-success-fg`} onClick={() => setSmsLine(l)}>
+          <MessageSquareText size={13} />{t('fundPassbook.smsAttached')}
+        </button>
+      );
+    }
+    if (!canLinkSms) return <span className="text-subtler">—</span>;
+    return (
+      <button type="button" className={`${cls} text-primary-fg`} onClick={() => setSmsLine(l)}>
+        <Link2 size={13} />{t('fundPassbook.smsAttach')}
+      </button>
+    );
+  };
+
+  /** Only a transfer of a fund document can be moved to another account. */
+  const canFixLine = (l: FundPassbookLine) => canFixAccount && l.source === 'FUND_BILL' && l.payment_id != null;
+  const renderFix = (l: FundPassbookLine) => canFixLine(l) ? (
+    <Tooltip content={t('fundPassbook.setAccount.title')}>
+      <Button variant="ghost" size="sm" startIcon={<ArrowLeftRight size={14} />} onClick={() => setFixLine(l)} aria-label={t('fundPassbook.setAccount.title')} />
+    </Tooltip>
+  ) : null;
+
   const columns: ColumnDef<FundPassbookLine>[] = [
     {
       id: 'date',
@@ -205,6 +261,8 @@ export function FundPassbookPage() {
       ),
       className: 'w-36',
     },
+    { id: 'sms', header: () => t('fundPassbook.colSms'), cell: ({ row }) => renderSms(row.original), className: 'w-32' },
+    ...((canFixAccount ? [{ id: 'fix', header: () => '', cell: ({ row }) => renderFix(row.original), className: 'w-10' }] : []) as ColumnDef<FundPassbookLine>[]),
   ];
 
   const renderMobileLine = (l: FundPassbookLine) => (
@@ -221,6 +279,13 @@ export function FundPassbookPage() {
         <span className="flex-1" />
         <span>{t('fundPassbook.colBalance')} <span className="tabular-nums text-fg">{fmtCurrency(l.balance_after)}</span></span>
       </div>
+      {(l.payment_id != null) && (
+        <div className="mt-1 flex items-center gap-2">
+          {renderSms(l)}
+          <span className="flex-1" />
+          {renderFix(l)}
+        </div>
+      )}
     </div>
   );
 
@@ -343,6 +408,53 @@ export function FundPassbookPage() {
                 )}
               </div>
 
+              {/* "Is every line backed by the bank's SMS?" — today, then earlier days still open. */}
+              {!unassigned && accountKey && (
+                <div className="flex-none px-3 py-2 border-b border-line flex items-center gap-x-3 gap-y-1 flex-wrap text-sm">
+                  <span className="inline-flex items-center gap-1.5 font-medium">
+                    <MessageSquareText size={14} className="text-subtle" />{t('fundPassbook.dayCheck.today')}
+                  </span>
+                  {dayCheck.todayRow == null ? (
+                    <span className="text-subtle">{t('fundPassbook.dayCheck.nothingToday')}</span>
+                  ) : dayCheck.todayRow.is_clean ? (
+                    <span className="text-success-fg inline-flex items-center gap-1">
+                      <CheckCircle2 size={14} />{t('fundPassbook.dayCheck.clean', { count: dayCheck.todayRow.lines_total })}
+                    </span>
+                  ) : (
+                    <>
+                      {dayCheck.todayRow.lines_without_sms > 0 && (
+                        <button type="button" className={dayLinkCls} onClick={() => showDay(today)}>
+                          {t('fundPassbook.dayCheck.withoutSms', { count: dayCheck.todayRow.lines_without_sms })}
+                        </button>
+                      )}
+                      {dayCheck.todayRow.lines_sms_mismatch > 0 && (
+                        <button type="button" className={`${dayLinkCls} text-warning-fg`} onClick={() => showDay(today)}>
+                          <AlertTriangle size={13} />{t('fundPassbook.dayCheck.mismatch', { count: dayCheck.todayRow.lines_sms_mismatch })}
+                        </button>
+                      )}
+                      {dayCheck.todayRow.sms_unlinked > 0 && (canSeeInbox ? (
+                        <Link to="/admin/company/sms-relay?tab=inbox&linked=unlinked" className={dayLinkCls}>
+                          {t('fundPassbook.dayCheck.smsUnlinked', { count: dayCheck.todayRow.sms_unlinked })}
+                          <ExternalLink size={12} />
+                        </Link>
+                      ) : (
+                        <span className="text-subtle">{t('fundPassbook.dayCheck.smsUnlinked', { count: dayCheck.todayRow.sms_unlinked })}</span>
+                      ))}
+                    </>
+                  )}
+                  {dayCheck.earlierOpen.length > 0 && (
+                    <span className="inline-flex items-center gap-2 flex-wrap text-subtle">
+                      · {t('fundPassbook.dayCheck.earlierOpen')}
+                      {dayCheck.earlierOpen.slice(0, 6).map(d => (
+                        <button key={d.day} type="button" className={dayLinkCls} onClick={() => showDay(d.day)}>
+                          <DateTime value={d.day} showTime={false} />
+                        </button>
+                      ))}
+                    </span>
+                  )}
+                </div>
+              )}
+
               {isMobile ? (
                 <DataTable<FundPassbookLine>
                   data={lines.rows}
@@ -381,6 +493,8 @@ export function FundPassbookPage() {
             billId={drillBillId}
             onClose={() => setDrillBillId(null)}
           />
+          <PassbookSmsModal open={smsLine != null} line={smsLine} onClose={() => setSmsLine(null)} />
+          <FundPaymentSetAccountModal open={fixLine != null} line={fixLine} companyId={companyId} onClose={() => setFixLine(null)} />
         </>
       )}
     </PageNav>

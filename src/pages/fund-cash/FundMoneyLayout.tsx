@@ -16,7 +16,7 @@ import { type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  BookOpenText, CalendarClock, History, Landmark, PiggyBank, Wallet, type LucideIcon,
+  BookOpenText, CalendarClock, History, Landmark, MessageSquareText, PiggyBank, Wallet, type LucideIcon,
 } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useMyPermissions } from '../../hooks/useMyPermissions';
@@ -36,6 +36,7 @@ const FUND_MONEY_NAV: FundNavItem[] = [
   { type: 'link', path: '/admin/fund-book', labelKey: 'nav.fundBook', icon: Wallet },
   { type: 'group', labelKey: 'nav.groupFundSettings' },
   { type: 'link', path: '/admin/company/bank-accounts?tab=company', labelKey: 'nav.fundBankAccounts', icon: Landmark, anyOf: ['BANK_ACCOUNT.COMPANY_MANAGE'] },
+  { type: 'link', path: '/admin/company/sms-relay', labelKey: 'nav.smsRelay', icon: MessageSquareText, anyOf: ['SMS.VIEW', 'SMS.MANAGE'] },
 ];
 
 /** Who sees the fund's money at all (same rule as the daily money summary). */

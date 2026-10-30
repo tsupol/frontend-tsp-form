@@ -1,7 +1,11 @@
-// Link one of the company's bank accounts to an SMS phone — optional, it only
-// records which accounts this phone receives SMS for. Spec: UI_SUMMARY/154 §3.7.
-// Choices come from the existing v_bank_accounts of the phone's company;
-// accounts already linked to this phone are left out (the BE refuses a repeat).
+// Link one of the company's bank accounts to an SMS phone. Spec: UI_SUMMARY/154 §3.7.
+// Choices come from the existing v_bank_accounts of the phone's company, the
+// fund's own accounts first (what a phone normally receives SMS for).
+//
+// One phone = one account (mig 1536): every SMS then knows its account without
+// reading the text. A phone that already has one opens as "change account":
+// the old link is ended, then the new one made (the backend refuses a second
+// open link, SMS_SOURCE_ALREADY_LINKED, so the order matters).
 
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -36,7 +40,7 @@ export function SmsLinkAccountModal({ open, source: sourceProp, onClose, onLinke
   const [linked, setLinked] = useState<SmsBankAccountOption | null>(null);
 
   useEffect(() => {
-    if (open) { setView('form'); setAccountId(''); setBusy(false); setError(''); setLinked(null); }
+    if (open) { setView('form'); setAccountId(''); setBusy(false); setError(''); setLinked(null); unlinkedRef.current = null; }
   }, [open]);
 
   const companyId = source?.company_id;
@@ -48,10 +52,17 @@ export function SmsLinkAccountModal({ open, source: sourceProp, onClose, onLinke
     enabled: open && companyId != null,
   });
 
+  const current = source?.linked_accounts[0] ?? null;
+  const unlinkedRef = useRef<number | null>(null);
+  const isChange = current != null;
   const linkedIds = new Set((source?.linked_accounts ?? []).map(a => a.bank_account_id));
-  const options = accounts
+  // The same number can sit on a branch row and a fund row; say which is which.
+  const optionLabel = (a: SmsBankAccountOption) => `${accountLine(a)} · ${
+    a.is_company_account ? t('smsRelay.link.fundAccount') : (a.branch_name ?? t('smsRelay.link.branchAccount'))}`;
+  const options = [...accounts]
+    .sort((x, y) => Number(y.is_company_account) - Number(x.is_company_account) || x.id - y.id)
     .filter(a => !linkedIds.has(a.id))
-    .map(a => ({ value: String(a.id), label: accountLine(a) }));
+    .map(a => ({ value: String(a.id), label: optionLabel(a) }));
 
   const [confirmClose, setConfirmClose] = useState(false);
   const forceClose = () => { setConfirmClose(false); onClose(); };
@@ -66,6 +77,12 @@ export function SmsLinkAccountModal({ open, source: sourceProp, onClose, onLinke
     setBusy(true);
     setError('');
     try {
+      // A change ends the old link first; if the new link then fails the phone
+      // is left with none, and the error says so.
+      if (current && unlinkedRef.current !== current.link_id) {
+        await apiClient.rpc('fn_sms_source_unlink_account', { p_link_id: current.link_id });
+        unlinkedRef.current = current.link_id;   // a retry after a failed link skips this
+      }
       await apiClient.rpc('fn_sms_source_link_account', {
         p_source_id: source.source_id,
         p_bank_account_id: Number(accountId),
@@ -74,7 +91,9 @@ export function SmsLinkAccountModal({ open, source: sourceProp, onClose, onLinke
       setView('done');
       onLinked();
     } catch (err) {
-      setError(err instanceof ApiError ? translateApiError(err, t) : t('common.error'));
+      const msg = err instanceof ApiError ? translateApiError(err, t) : t('common.error');
+      setError(current ? `${msg} — ${t('smsRelay.link.changeHalfDone')}` : msg);
+      if (current) onLinked();
     } finally {
       setBusy(false);
     }
@@ -84,13 +103,13 @@ export function SmsLinkAccountModal({ open, source: sourceProp, onClose, onLinke
     <>
     <Modal open={open} onClose={handleClose} maxWidth="32rem" width="100%">
       <div className="modal-header">
-        <h2 className="modal-title">{t('smsRelay.link.title')}</h2>
+        <h2 className="modal-title">{isChange ? t('smsRelay.link.changeTitle') : t('smsRelay.link.title')}</h2>
         <button type="button" className="modal-close-btn" onClick={handleClose}>&times;</button>
       </div>
 
       {view === 'done' ? (
         <ActionDoneView
-          headline={t('smsRelay.link.done')}
+          headline={isChange ? t('smsRelay.link.changeDone') : t('smsRelay.link.done')}
           contractCode={source?.label ?? ''}
           detailRows={linked ? [
             { label: t('smsRelay.link.account'), value: accountLine(linked) },
@@ -102,6 +121,11 @@ export function SmsLinkAccountModal({ open, source: sourceProp, onClose, onLinke
         <>
           <div className="modal-content">
             <SourceTargetBox label={source?.label ?? null} purpose={source?.purpose ?? null} />
+            {current && (
+              <p className="text-sm text-subtle mt-3 mb-0">
+                {t('smsRelay.link.currentAccount')}: <span className="text-fg">{accountLine(current)}</span>
+              </p>
+            )}
             <div className="form-grid mt-4">
               <div className="flex flex-col">
                 <label className="form-label">{t('smsRelay.link.account')}</label>
@@ -128,7 +152,7 @@ export function SmsLinkAccountModal({ open, source: sourceProp, onClose, onLinke
           <div className="modal-footer">
             <Button variant="ghost" onClick={handleClose} disabled={busy}>{t('common.cancel')}</Button>
             <Button color="primary" onClick={submit} disabled={busy || !accountId} startIcon={<Link2 size={15} />}>
-              {t('smsRelay.link.submit')}
+              {isChange ? t('smsRelay.link.changeSubmit') : t('smsRelay.link.submit')}
             </Button>
           </div>
         </>

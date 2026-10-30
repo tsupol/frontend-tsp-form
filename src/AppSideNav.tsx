@@ -581,9 +581,16 @@ export const AppSideNav = () => {
             // The books are read-only for anyone who can see the daily money; the
             // three movement buttons on the page carry their own permissions.
             { key: 'fund-book', icon: <Wallet size="1rem" />, label: t('nav.fundBook'), path: '/admin/fund-book' },
-            ...(hasPermission('BANK_ACCOUNT.COMPANY_MANAGE') ? [
+            // Settings: the fund's own accounts, and the phones that forward the
+            // bank's SMS for them (also under Company — same page).
+            ...(hasPermission('BANK_ACCOUNT.COMPANY_MANAGE') || hasPermission('SMS.VIEW') || hasPermission('SMS.MANAGE') ? [
               { type: 'group' as const, key: 'grp-fund-settings', label: t('nav.groupFundSettings') },
-              { key: 'fund-bank-accounts', icon: <Landmark size="1rem" />, label: t('nav.fundBankAccounts'), path: '/admin/company/bank-accounts?tab=company' },
+              ...(hasPermission('BANK_ACCOUNT.COMPANY_MANAGE') ? [
+                { key: 'fund-bank-accounts', icon: <Landmark size="1rem" />, label: t('nav.fundBankAccounts'), path: '/admin/company/bank-accounts?tab=company' },
+              ] : []),
+              ...(hasPermission('SMS.VIEW') || hasPermission('SMS.MANAGE') ? [
+                { key: 'fund-sms-relay', icon: <MessageSquareText size="1rem" />, label: t('nav.smsRelay'), path: '/admin/company/sms-relay' },
+              ] : []),
             ] : []),
           ],
         }]

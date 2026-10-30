@@ -1417,5 +1417,19 @@
   "CORE.VALIDATION.COMPANY_ACCOUNT_CUSTOMER_CHANNEL": "บัญชีกองทุนใช้รับเงินลูกค้าไม่ได้ — ผูกได้เฉพาะช่อง \"ร้านนำส่ง\"",
   "CORE.STATE.BANK_ACCOUNT_LEVEL_IMMUTABLE": "ย้ายบัญชีระหว่างบัญชีสาขากับบัญชีกองทุนไม่ได้ — ให้สร้างบัญชีใหม่",
   "PARTNER.VALIDATION.SOURCE_ACCOUNT_REQUIRED": "กองทุนยังไม่มีบัญชีกองทุน (หรือยังไม่ได้ตั้งบัญชีประจำ) — สร้าง/เลือกบัญชีก่อนบันทึกรายการที่ผ่านธนาคาร",
-  "FUND.VALIDATION.CASH_TARGET_INVALID": "เป้าต้องไม่ติดลบ และมีทศนิยมได้ไม่เกิน 2 ตำแหน่ง"
+  "FUND.VALIDATION.CASH_TARGET_INVALID": "เป้าต้องไม่ติดลบ และมีทศนิยมได้ไม่เกิน 2 ตำแหน่ง",
+  "core.conflict.sms_source_already_linked": "มือถือเครื่องนี้ผูกบัญชีอยู่แล้ว (1 เครื่อง = 1 บัญชี) — ใช้ \"เปลี่ยนบัญชี\"",
+  "CORE.CONFLICT.SMS_SOURCE_ALREADY_LINKED": "มือถือเครื่องนี้ผูกบัญชีอยู่แล้ว (1 เครื่อง = 1 บัญชี) — ใช้ \"เปลี่ยนบัญชี\"",
+  "core.conflict.sms_already_linked": "SMS นี้ผูกกับรายการอื่นอยู่แล้ว",
+  "CORE.CONFLICT.SMS_ALREADY_LINKED": "SMS นี้ผูกกับรายการอื่นอยู่แล้ว",
+  "core.conflict.payment_already_linked": "รายการนี้มี SMS แนบอยู่แล้ว — เลิกแนบฉบับเดิมก่อน",
+  "CORE.CONFLICT.PAYMENT_ALREADY_LINKED": "รายการนี้มี SMS แนบอยู่แล้ว — เลิกแนบฉบับเดิมก่อน",
+  "core.not_found.sms_link": "ไม่พบการแนบนี้ (อาจถูกเลิกแนบไปแล้ว) — โหลดใหม่",
+  "CORE.NOT_FOUND.SMS_LINK": "ไม่พบการแนบนี้ (อาจถูกเลิกแนบไปแล้ว) — โหลดใหม่",
+  "core.not_found.sms_message": "ไม่พบ SMS นี้ (อาจถูกลบแล้ว)",
+  "CORE.NOT_FOUND.SMS_MESSAGE": "ไม่พบ SMS นี้ (อาจถูกลบแล้ว)",
+  "fund.not_found.payment": "ไม่พบรายการโอนนี้ — แนบ SMS/แก้บัญชีได้เฉพาะรายการโอนผ่านธนาคาร",
+  "FUND.NOT_FOUND.PAYMENT": "ไม่พบรายการโอนนี้ — แนบ SMS/แก้บัญชีได้เฉพาะรายการโอนผ่านธนาคาร",
+  "core.validation.sms_company_mismatch": "SMS นี้มาจากมือถือของบริษัทอื่น",
+  "CORE.VALIDATION.SMS_COMPANY_MISMATCH": "SMS นี้มาจากมือถือของบริษัทอื่น"
 }

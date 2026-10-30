@@ -20,8 +20,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, DataTable, MobileHeader, Modal, Select, Switch } from 'tsp-form';
 import {
   AlertTriangle, ArrowRightFromLine, BellOff, Inbox, Landmark, Link2, MessageSquareText,
-  Plus, RefreshCw, Smartphone, X,
+  Plus, RefreshCw, Search, Smartphone, X,
 } from 'lucide-react';
+import { SmsFindPaymentModal } from './SmsFindPaymentModal';
 import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { useAuth } from '../../contexts/AuthContext';
@@ -52,6 +53,10 @@ export function SmsRelayPage() {
     : tabParam === 'inbox' && canView ? 'inbox'
     : canView ? 'inbox' : 'manage';
   const filterSource = params.get('source') ?? '';
+  // ?linked=unlinked — only SMS not yet attached to any line (the passbook's check bar links here).
+  const unlinkedOnly = params.get('linked') === 'unlinked';
+  const canLink = hasPermission('SMS.LINK');
+  const [findMessage, setFindMessage] = useState<SmsMessage | null>(null);
 
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(50);
@@ -67,6 +72,12 @@ export function SmsRelayPage() {
     setParams(p, { replace: true });
     setPageIndex(0);
   };
+  const setUnlinkedOnly = (on: boolean) => {
+    const p = new URLSearchParams(params);
+    if (on) p.set('linked', 'unlinked'); else p.delete('linked');
+    setParams(p, { replace: true });
+    setPageIndex(0);
+  };
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editSource, setEditSource] = useState<SmsSource | null>(null);
@@ -77,9 +88,10 @@ export function SmsRelayPage() {
   // No realtime push for this list — a refresh button is the contract. Never
   // serve a cached list: someone is usually waiting for a message to land.
   const messages = useQuery({
-    queryKey: ['sms-relay', 'messages', filterSource, pageIndex, pageSize],
+    queryKey: ['sms-relay', 'messages', filterSource, unlinkedOnly, pageIndex, pageSize],
     queryFn: () => apiClient.getPaginated<SmsMessage>(
-      `/v_sms_messages?order=received_at.desc${filterSource ? `&source_id=eq.${filterSource}` : ''}`,
+      `/v_sms_messages?order=received_at.desc${filterSource ? `&source_id=eq.${filterSource}` : ''}`
+      + (unlinkedOnly ? '&link_id=is.null&is_duplicate=is.false' : ''),
       { page: pageIndex + 1, pageSize },
     ),
     enabled: canView,
@@ -183,23 +195,33 @@ export function SmsRelayPage() {
 
         {tab === 'inbox' && canView && (
           <>
-            {sourceOptions.length > 0 && (
-              <div className="flex-none" style={{ width: '20rem', maxWidth: '100%' }}>
-                <Select
-                  options={sourceOptions}
-                  value={filterSource || null}
-                  onChange={(v) => setFilterSource((v as string) ?? '')}
-                  placeholder={t('smsRelay.filterAllPhones')}
-                  size="sm"
-                  showChevron
-                  clearable
-                />
+            <div className="flex-none flex items-center gap-3 flex-wrap">
+              <div className="btn-group">
+                <Button size="sm" variant={!unlinkedOnly ? 'solid' : 'outline'} color={!unlinkedOnly ? 'primary' : 'default'} onClick={() => setUnlinkedOnly(false)}>
+                  {t('smsRelay.linkFilterAll')}
+                </Button>
+                <Button size="sm" variant={unlinkedOnly ? 'solid' : 'outline'} color={unlinkedOnly ? 'primary' : 'default'} onClick={() => setUnlinkedOnly(true)}>
+                  {t('smsRelay.linkFilterUnlinked')}
+                </Button>
               </div>
-            )}
+              {sourceOptions.length > 0 && (
+                <div style={{ width: '20rem', maxWidth: '100%' }}>
+                  <Select
+                    options={sourceOptions}
+                    value={filterSource || null}
+                    onChange={(v) => setFilterSource((v as string) ?? '')}
+                    placeholder={t('smsRelay.filterAllPhones')}
+                    size="sm"
+                    showChevron
+                    clearable
+                  />
+                </div>
+              )}
+            </div>
             <DataTable<SmsMessage>
               outlined
               data={messages.data?.data ?? []}
-              renderRow={(row) => <MessageRow m={row.original} />}
+              renderRow={(row) => <MessageRow m={row.original} onFind={canLink ? () => setFindMessage(row.original) : undefined} />}
               enablePagination
               pageIndex={pageIndex}
               pageSize={pageSize}
@@ -212,6 +234,7 @@ export function SmsRelayPage() {
                   <Inbox size={28} className="text-subtler" />
                   <p className="text-sm text-subtle">
                     {messages.isLoading ? t('common.loading')
+                      : unlinkedOnly ? t('smsRelay.noUnlinked')
                       : filterSource ? t('smsRelay.noMessagesForPhone') : t('smsRelay.noMessages')}
                   </p>
                   {!messages.isLoading && filterSource && (
@@ -296,6 +319,7 @@ export function SmsRelayPage() {
         onClose={() => setUnlinkTarget(null)}
         onUnlinked={refresh}
       />
+      <SmsFindPaymentModal open={findMessage !== null} message={findMessage} onClose={() => setFindMessage(null)} />
     </>
   );
 }
@@ -316,7 +340,7 @@ function TabButton({ active, onClick, label }: { active: boolean; onClick: () =>
 
 // ── Inbox row ────────────────────────────────────────────────────────────────
 
-function MessageRow({ m }: { m: SmsMessage }) {
+function MessageRow({ m, onFind }: { m: SmsMessage; onFind?: () => void }) {
   const { t } = useTranslation();
   return (
     <div className="px-4 py-3 flex flex-col gap-1.5 min-w-0">
@@ -324,8 +348,26 @@ function MessageRow({ m }: { m: SmsMessage }) {
         <div className="flex items-center gap-2 min-w-0 flex-wrap">
           <span className="text-sm font-medium break-words">{m.purpose}</span>
           {m.is_duplicate && <Badge size="xs" color="warning">{t('smsRelay.duplicate')}</Badge>}
+          {/* Is this SMS the slip of a line yet? A repeat of another SMS is never attached. */}
+          {!m.is_duplicate && (m.link_id != null ? (
+            <Badge size="xs" color={m.linked_amount_matches === false ? 'warning' : 'success'}>
+              <span className="inline-flex items-center gap-1">
+                {m.linked_amount_matches === false ? <AlertTriangle size={11} /> : <Link2 size={11} />}
+                {t('smsRelay.linkedTo', { doc: m.linked_doc_code ?? `#${m.linked_payment_id}` })}
+              </span>
+            </Badge>
+          ) : (
+            <Badge size="xs" color="default">{t('smsRelay.notLinked')}</Badge>
+          ))}
         </div>
-        <span className="text-xs text-subtle shrink-0"><DateTime value={m.received_at} showTime /></span>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs text-subtle"><DateTime value={m.received_at} showTime /></span>
+          {onFind && !m.is_duplicate && (
+            <Button size="sm" variant="outline" startIcon={<Search size={14} />} onClick={onFind}>
+              {t('smsRelay.findLine')}
+            </Button>
+          )}
+        </div>
       </div>
       <div className="text-xs text-subtle flex items-center gap-1.5 flex-wrap">
         <Smartphone size={12} className="shrink-0" />
@@ -409,7 +451,7 @@ function SourceRow({ s, busy, onEdit, onSetup, onLink, onUnlink, onToggle }: {
       </div>
       <div className="shrink-0 pt-0.5 flex items-center gap-2 flex-wrap justify-end" onClick={stop} onKeyDown={stop}>
         <Button size="sm" variant="outline" startIcon={<Link2 size={14} />} disabled={busy} onClick={onLink}>
-          {t('smsRelay.link.button')}
+          {s.linked_accounts.length > 0 ? t('smsRelay.link.changeButton') : t('smsRelay.link.button')}
         </Button>
         <Button size="sm" variant="outline" startIcon={<Smartphone size={14} />} onClick={onSetup}>
           {t('smsRelay.setup.title')}

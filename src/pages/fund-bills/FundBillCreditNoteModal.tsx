@@ -25,6 +25,7 @@ import { amendedDoneRows } from '../../lib/fundDayPay';
 import { useFundPayAttempt } from '../../hooks/useFundPayAttempt';
 import { fundPaySlipDoneRows, useFundPaySlip } from '../../hooks/useFundPaySlip';
 import { FundPaySlipFailedNotice, FundPaySlipField } from '../../components/FundPaySlip';
+import { SmsAttachInline } from '../../components/SmsLinkParts';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { fmtCurrency } from '../../lib/format';
 import { FundAccountField } from '../../components/FundAccountField';
@@ -218,6 +219,7 @@ export function FundBillCreditNoteModal({ open, bill, onClose }: FundBillCreditN
             extras={
               <div className="flex flex-col gap-3">
                 <FundPaySlipFailedNotice slip={slip} />
+                <SmsAttachInline paymentId={result.payment_id} />
                 <div className="alert alert-info">
                   <span>
                     {bill?.bill_purpose === 'COMMISSION_EXTRA'

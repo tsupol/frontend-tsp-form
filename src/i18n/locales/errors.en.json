@@ -1417,5 +1417,19 @@
   "CORE.VALIDATION.COMPANY_ACCOUNT_CUSTOMER_CHANNEL": "A fund account cannot take customer money — it fits the \"shop remittance\" channel only",
   "CORE.STATE.BANK_ACCOUNT_LEVEL_IMMUTABLE": "An account cannot move between branch and fund level — create a new account instead",
   "PARTNER.VALIDATION.SOURCE_ACCOUNT_REQUIRED": "The fund has no fund account (or none marked usual) — create or pick one before recording money that goes through a bank",
-  "FUND.VALIDATION.CASH_TARGET_INVALID": "The target cannot be negative and may have at most 2 decimals"
+  "FUND.VALIDATION.CASH_TARGET_INVALID": "The target cannot be negative and may have at most 2 decimals",
+  "core.conflict.sms_source_already_linked": "This phone is already linked to an account (one phone = one account) — use \"Change account\"",
+  "CORE.CONFLICT.SMS_SOURCE_ALREADY_LINKED": "This phone is already linked to an account (one phone = one account) — use \"Change account\"",
+  "core.conflict.sms_already_linked": "This SMS is already attached to another line",
+  "CORE.CONFLICT.SMS_ALREADY_LINKED": "This SMS is already attached to another line",
+  "core.conflict.payment_already_linked": "This line already has an SMS attached — remove that one first",
+  "CORE.CONFLICT.PAYMENT_ALREADY_LINKED": "This line already has an SMS attached — remove that one first",
+  "core.not_found.sms_link": "That attachment was not found (it may already be removed) — reload",
+  "CORE.NOT_FOUND.SMS_LINK": "That attachment was not found (it may already be removed) — reload",
+  "core.not_found.sms_message": "That SMS was not found (it may have been deleted)",
+  "CORE.NOT_FOUND.SMS_MESSAGE": "That SMS was not found (it may have been deleted)",
+  "fund.not_found.payment": "That transfer line was not found — only bank transfer lines can carry an SMS or change account",
+  "FUND.NOT_FOUND.PAYMENT": "That transfer line was not found — only bank transfer lines can carry an SMS or change account",
+  "core.validation.sms_company_mismatch": "The SMS came from another company's phone",
+  "CORE.VALIDATION.SMS_COMPANY_MISMATCH": "The SMS came from another company's phone"
 }

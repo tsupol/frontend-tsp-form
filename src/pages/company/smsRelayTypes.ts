@@ -52,6 +52,16 @@ export interface SmsMessage {
   /** Same text again within 2 minutes (two automations firing). */
   is_duplicate: boolean;
   dup_of_message_id: number | null;
+  /** The account of the phone it came from (one phone = one account, mig 1536). */
+  bank_account_id: number | null;
+  /** Set while this SMS is attached to a line as its slip. */
+  link_id: number | null;
+  linked_payment_table: string | null;
+  linked_payment_id: number | null;
+  linked_doc_code: string | null;
+  /** false = attached although the amounts differ. */
+  linked_amount_matches: boolean | null;
+  linked_at: string | null;
 }
 
 /** Returned identically by fn_sms_source_create, fn_sms_source_get_setup and
@@ -83,6 +93,8 @@ export interface SmsBankAccountOption {
   account_number: string | null;
   account_number_display: string | null;
   branch_name: string | null;
+  /** The fund's own account (branch_id null) — what a phone should normally be linked to. */
+  is_company_account: boolean;
 }
 
 /** "Bank · name · number" for a linked account or a link option. */

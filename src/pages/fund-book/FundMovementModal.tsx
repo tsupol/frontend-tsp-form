@@ -30,6 +30,7 @@ import { amendedDoneRows } from '../../lib/fundDayPay';
 import { useFundPayAttempt } from '../../hooks/useFundPayAttempt';
 import { fundPaySlipDoneRows, useFundPaySlip } from '../../hooks/useFundPaySlip';
 import { FundPaySlipFailedNotice, FundPaySlipField } from '../../components/FundPaySlip';
+import { SmsAttachInline } from '../../components/SmsLinkParts';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../../lib/format';
@@ -411,7 +412,12 @@ export function FundMovementModal({
               ...amendedDoneRows(result.day_close_amended, t, i18n.language),
               ...fundPaySlipDoneRows(slip, t),
             ]}
-            extras={slip.outcome?.kind === 'failed' ? <FundPaySlipFailedNotice slip={slip} /> : undefined}
+            extras={(
+              <div className="flex flex-col gap-3">
+                {slip.outcome?.kind === 'failed' && <FundPaySlipFailedNotice slip={slip} />}
+                <SmsAttachInline paymentId={result.payment_id} />
+              </div>
+            )}
             onClose={forceClose}
           />
         )}

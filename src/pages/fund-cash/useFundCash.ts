@@ -17,6 +17,7 @@
 
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../lib/api';
+import type { SmsPaymentTable } from '../../lib/smsLink';
 
 export type CashTargetStatus = 'ABOVE' | 'BELOW' | 'NO_TARGET';
 
@@ -90,6 +91,29 @@ export interface FundPassbookLine {
   reference: string | null;
   submission_code: string | null;
   transfer_at: string | null;
+  /** Which payment table the line is — sent back to the SMS RPCs (mig 1536). */
+  payment_table: SmsPaymentTable;
+  /** The attached bank SMS; all null while none is attached. */
+  sms_link_id: number | null;
+  sms_message_id: number | null;
+  sms_received_at: string | null;
+  sms_text: string | null;
+  sms_amount: number | null;
+  /** false = attached although the amounts differ (⚠ with sms_amount_diff). */
+  sms_amount_matches: boolean | null;
+  sms_amount_diff: number | null;
+}
+
+/** "Is every line backed by an SMS?" — one row per account per day (mig 1536). */
+export interface FundPassbookDayCheck {
+  account_key: string;
+  day: string;
+  lines_total: number;
+  lines_without_sms: number;
+  lines_sms_mismatch: number;
+  sms_total: number;
+  sms_unlinked: number;
+  is_clean: boolean;
 }
 
 export interface CashTargetLogRow {
@@ -163,6 +187,28 @@ export function useFundPassbook({
     placeholderData: keepPreviousData,
   });
   return { ...query, rows: query.data?.data ?? [], totalCount: query.data?.totalCount ?? 0 };
+}
+
+/**
+ * One account's SMS check for today plus the recent days that are not yet
+ * clean — the counts are the backend's, the screen only shows them.
+ */
+export function useFundPassbookDayCheck(companyId: number | null, accountKey: string | null, today: string) {
+  const key = accountKey ? encodeURIComponent(accountKey) : '';
+  const query = useQuery({
+    queryKey: ['fund-book', 'passbook-day-check', companyId, accountKey, today],
+    queryFn: () => apiClient.get<FundPassbookDayCheck[]>(
+      `/v_fund_passbook_day_check?company_id=eq.${companyId}&account_key=eq.${key}`
+      + `&or=(day.eq.${today},is_clean.is.false)&order=day.desc&limit=15`,
+    ),
+    enabled: companyId != null && !!accountKey,
+  });
+  const rows = query.data ?? [];
+  return {
+    ...query,
+    todayRow: rows.find(r => r.day === today) ?? null,
+    earlierOpen: rows.filter(r => r.day !== today && !r.is_clean),
+  };
 }
 
 /** Who set the target, when, from what to what. */
