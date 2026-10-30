@@ -6,8 +6,9 @@
 // statement will only ever find the first one there.
 //
 // The date is the day of the real transfer, not today by necessity, and the
-// backend refuses a future one. Source account and reference are optional
-// because a transfer made outside the system may have neither on hand.
+// backend refuses a future one. The source account is one of the fund's own
+// company accounts and is always sent (mig 1531); the reference stays optional
+// because a transfer made outside the system may not have one on hand.
 //
 // The success view lists the devices that just became holding property: that
 // is the part of this action nobody can undo casually, so it is shown rather
@@ -15,7 +16,7 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Button, Input, InputDatePicker, Select, TextArea } from 'tsp-form';
+import { Modal, Button, Input, InputDatePicker, TextArea } from 'tsp-form';
 import { Keyboard, Smartphone } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { FundDayClosedHint, FundPayErrorBand } from '../../components/FundDayPayGuard';
@@ -26,7 +27,9 @@ import { FundPaySlipFailedNotice, FundPaySlipField } from '../../components/Fund
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../../lib/format';
-import { useFundBillInvalidate, useFundSourceAccounts } from './useFundBills';
+import { FundAccountField } from '../../components/FundAccountField';
+import { useFundAccountChoice } from '../../hooks/useFundAccountChoice';
+import { useFundBillInvalidate } from './useFundBills';
 import type { FundBill, FundBillPayResult } from './fundBillTypes';
 import { fundBillShownTotal } from './fundBillTypes';
 
@@ -51,14 +54,14 @@ interface FundBillPayModalProps {
 export function FundBillPayModal({ open, bill, onClose }: FundBillPayModalProps) {
   const { t, i18n } = useTranslation();
   const invalidate = useFundBillInvalidate();
-  const accounts = useFundSourceAccounts(bill?.company_id ?? null);
+  const account = useFundAccountChoice(bill?.company_id ?? null);
+  const { reset: resetAccount } = account;
 
   const today = toLocalDateStr(new Date());
 
   const [view, setView] = useState<'form' | 'done'>('form');
   const [paidDate, setPaidDate] = useState(today);
   const [typing, setTyping] = useState(false);
-  const [accountId, setAccountId] = useState<string>('');
   const [reference, setReference] = useState('');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
@@ -74,7 +77,7 @@ export function FundBillPayModal({ open, bill, onClose }: FundBillPayModalProps)
     setView('form');
     setPaidDate(toLocalDateStr(new Date()));
     setTyping(false);
-    setAccountId('');
+    resetAccount();
     setReference('');
     setNote('');
     setSaving(false);
@@ -82,11 +85,11 @@ export function FundBillPayModal({ open, bill, onClose }: FundBillPayModalProps)
     resetSlip();
     setResult(null);
     setConfirmClose(false);
-  }, [open, resetAttempt, resetSlip]);
+  }, [open, resetAttempt, resetSlip, resetAccount]);
 
-  const dirty = paidDate !== today || !!accountId || !!reference.trim() || !!note.trim() || slip.files.length > 0;
+  const dirty = paidDate !== today || account.changed || !!reference.trim() || !!note.trim() || slip.files.length > 0;
   const futureDate = !!paidDate && paidDate > today;
-  const canSubmit = !!paidDate && !futureDate;
+  const canSubmit = !!paidDate && !futureDate && !!account.accountId;
 
   const forceClose = () => { setConfirmClose(false); onClose(); };
   const handleClose = () => {
@@ -94,11 +97,6 @@ export function FundBillPayModal({ open, bill, onClose }: FundBillPayModalProps)
     if (dirty) { setConfirmClose(true); return; }
     forceClose();
   };
-
-  const accountOptions = accounts.map(a => ({
-    value: String(a.id),
-    label: `${a.bank_name} · ${a.account_number_display ?? a.account_number ?? ''}`,
-  }));
 
   const handlePay = async (amend = false) => {
     if (!bill || !canSubmit) return;
@@ -108,7 +106,7 @@ export function FundBillPayModal({ open, bill, onClose }: FundBillPayModalProps)
       const res = await apiClient.rpc<FundBillPayResult>('fn_fund_bill_pay', {
         p_bill_id: bill.bill_id,
         p_paid_date: paidDate,
-        p_source_bank_account_id: accountId ? Number(accountId) : null,
+        p_source_bank_account_id: Number(account.accountId),
         p_reference: reference.trim() || null,
         p_note: note.trim() || null,
         ...attempt.amendParams(amend),
@@ -189,16 +187,7 @@ export function FundBillPayModal({ open, bill, onClose }: FundBillPayModalProps)
                   <FundDayClosedHint companyId={bill?.company_id} date={paidDate} enabled={open && !futureDate} />
                 </div>
 
-                <div className="flex flex-col">
-                  <label className="form-label">{t('fundBill.sourceAccount')}</label>
-                  <Select
-                    options={accountOptions}
-                    value={accountId || null}
-                    onChange={v => setAccountId((v as string) ?? '')}
-                    placeholder={t('fundBill.sourceAccountPlaceholder')}
-                    clearable
-                  />
-                </div>
+                <FundAccountField choice={account} label={t('fundBill.sourceAccount')} disabled={saving} />
 
                 <div className="flex flex-col">
                   <label className="form-label">{t('fundBill.reference')}</label>

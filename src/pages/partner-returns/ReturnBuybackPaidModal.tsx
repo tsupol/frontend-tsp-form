@@ -11,7 +11,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Modal, Button, Input, InputDatePicker, Select, TextArea } from 'tsp-form';
+import { Modal, Button, Input, InputDatePicker, TextArea } from 'tsp-form';
 import { ExternalLink, Info, Keyboard } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { FundDayClosedHint, FundPayErrorBand } from '../../components/FundDayPayGuard';
@@ -23,7 +23,8 @@ import { DateTime } from '../../components/DateTime';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../../lib/format';
 import { usePartnerReturnInvalidate } from './usePartnerReturns';
-import { useFundSourceAccounts } from '../fund-bills/useFundBills';
+import { FundAccountField } from '../../components/FundAccountField';
+import { useFundAccountChoice } from '../../hooks/useFundAccountChoice';
 import type {
   PartnerReturnActionsResponse,
   PartnerReturnDetail,
@@ -61,9 +62,10 @@ export function ReturnBuybackPaidModal({ open, detail, actions, onClose }: Props
   const [typing, setTyping] = useState(false);
   const [reference, setReference] = useState('');
   const [note, setNote] = useState('');
-  // Which fund account received the shop's transfer (mig 1281, optional). Left
-  // blank, the row lands under "ไม่ระบุบัญชี" on the daily money summary (148).
-  const [accountId, setAccountId] = useState('');
+  // Which of the fund's own accounts received the shop's transfer — always
+  // named since mig 1531, so the line lands in that account's passbook (155).
+  const account = useFundAccountChoice(detail?.company_id ?? null);
+  const { reset: resetAccount } = account;
   const [saving, setSaving] = useState(false);
   const attempt = useFundPayAttempt();
   const slip = useFundPaySlip();
@@ -79,17 +81,17 @@ export function ReturnBuybackPaidModal({ open, detail, actions, onClose }: Props
     setTyping(false);
     setReference('');
     setNote('');
-    setAccountId('');
+    resetAccount();
     setSaving(false);
     resetAttempt();
     resetSlip();
     setResult(null);
     setConfirmClose(false);
-  }, [open, resetAttempt, resetSlip]);
+  }, [open, resetAttempt, resetSlip, resetAccount]);
 
-  const dirty = paidDate !== today || !!reference.trim() || !!note.trim() || !!accountId || slip.files.length > 0;
+  const dirty = paidDate !== today || !!reference.trim() || !!note.trim() || account.changed || slip.files.length > 0;
   const futureDate = !!paidDate && paidDate > today;
-  const canSubmit = !!paidDate && !futureDate;
+  const canSubmit = !!paidDate && !futureDate && !!account.accountId;
 
   const forceClose = () => { setConfirmClose(false); onClose(); };
   const handleClose = () => {
@@ -99,12 +101,6 @@ export function ReturnBuybackPaidModal({ open, detail, actions, onClose }: Props
   };
 
   const amount = (actions?.buyback_amount ?? 0) + (actions?.buyback_fee ?? 0);
-
-  const accounts = useFundSourceAccounts(detail?.company_id ?? null);
-  const accountOptions = accounts.map(a => ({
-    value: String(a.id),
-    label: `${a.bank_name} · ${a.account_number_display ?? a.account_number ?? ''}`,
-  }));
 
   const handleSave = async (amend = false) => {
     if (!detail || !canSubmit) return;
@@ -116,7 +112,7 @@ export function ReturnBuybackPaidModal({ open, detail, actions, onClose }: Props
         p_paid_date: paidDate,
         p_reference: reference.trim() || null,
         p_note: note.trim() || null,
-        p_bank_account_id: accountId ? Number(accountId) : null,
+        p_bank_account_id: Number(account.accountId),
         ...attempt.amendParams(amend),
       });
       setResult(res);
@@ -210,17 +206,7 @@ export function ReturnBuybackPaidModal({ open, detail, actions, onClose }: Props
                   />
                 </div>
 
-                <div className="flex flex-col">
-                  <label className="form-label">{t('partnerReturn.bankAccount')}</label>
-                  <Select
-                    options={accountOptions}
-                    value={accountId || null}
-                    onChange={v => setAccountId((v as string) ?? '')}
-                    placeholder={t('partnerReturn.bankAccountPlaceholder')}
-                    clearable
-                  />
-                  <span className="text-xs text-subtle mt-1">{t('partnerReturn.bankAccountHint')}</span>
-                </div>
+                <FundAccountField choice={account} label={t('fundAccount.intoAccount')} disabled={saving} />
 
                 <FundPaySlipField
                   slip={slip}

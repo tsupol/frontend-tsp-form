@@ -1,5 +1,20 @@
+// Bank accounts, at two levels.
+//
+//   branch   — the accounts a branch takes customer money into (doc 116). Which
+//              one customers see is set per channel, on the channels tab.
+//   company  — a fund company's own accounts (mig 1531, doc 116 §2e): what it
+//              pays shops from, takes capital in and out through, spends from,
+//              and what a shop pays the fund back into. Not tied to a branch,
+//              never offered to customers. One of them is the usual account the
+//              fund money screens pick in advance.
+//
+// The two are rows of the same view told apart by `branch_id` (null = company),
+// so each tab filters on it: unfiltered, a company row would land in the branch
+// list with no branch name.
+
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -10,7 +25,7 @@ import {
 } from 'tsp-form';
 import {
   Plus, MoreHorizontal, Pencil, ShieldCheck, ShieldOff, Star,
-  XCircle, CheckCircle, ArrowRightFromLine, QrCode, Upload, Trash2, RefreshCw,
+  XCircle, CheckCircle, ArrowRightFromLine, QrCode, Upload, Trash2, RefreshCw, History,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { BeMediaError, uploadBankAccountQr } from '../../lib/beMedia';
@@ -19,6 +34,12 @@ import { useAuth } from '../../contexts/AuthContext';
 import { MediaLightbox } from '../../components/MediaLightbox';
 import { BankChannelConfig } from './BankChannelConfig';
 import { translateApiError } from '../../lib/apiErrors';
+import { useMyPermissions } from '../../hooks/useMyPermissions';
+import { ModalErrorBand } from '../../components/ModalErrorBand';
+import { DateTime } from '../../components/DateTime';
+import { ActionDoneView } from '../contracts/ActionDoneView';
+
+type AccountLevel = 'branch' | 'company';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -36,8 +57,10 @@ interface BankAccount {
   id: number;
   holding_id: number;
   company_id: number;
-  branch_id: number;
-  branch_name: string;
+  company_name: string | null;
+  /** null = a company-level account (mig 1531). */
+  branch_id: number | null;
+  branch_name: string | null;
   bank_name: string;
   account_number: string;
   account_name: string;
@@ -47,6 +70,8 @@ interface BankAccount {
   is_default: boolean;
   note: string | null;
   qr_media: QrMedia | null;
+  account_number_display: string | null;
+  is_company_account: boolean;
 }
 
 interface Branch {
@@ -55,8 +80,14 @@ interface Branch {
   company_id: number;
 }
 
+interface FundCompany {
+  id: number;
+  name: string;
+}
+
 interface AccountForm {
   branch_id: string;
+  company_id: string;
   bank_name: string;
   account_number: string;
   account_name: string;
@@ -67,11 +98,12 @@ interface AccountForm {
 
 // ── Row Actions ──────────────────────────────────────────────────────────────
 
-function RowActions({ account, onEdit, onToggle, onSetDefault }: {
+function RowActions({ account, onEdit, onToggle, onSetDefault, onHistory }: {
   account: BankAccount;
   onEdit: (a: BankAccount) => void;
   onToggle: (a: BankAccount) => void;
   onSetDefault: (a: BankAccount) => void;
+  onHistory: (a: BankAccount) => void;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -97,8 +129,13 @@ function RowActions({ account, onEdit, onToggle, onSetDefault }: {
       <div className="py-1 min-w-[160px]">
         <MenuItem icon={<Pencil size={14} />} label={t('common.edit')} onClick={() => { setOpen(false); onEdit(account); }} />
         {!account.is_default && account.is_active && (
-          <MenuItem icon={<Star size={14} />} label={t('settings.bankAccounts.setFallback')} onClick={() => { setOpen(false); onSetDefault(account); }} />
+          <MenuItem
+            icon={<Star size={14} />}
+            label={account.is_company_account ? t('companyBankAccount.setUsual') : t('settings.bankAccounts.setFallback')}
+            onClick={() => { setOpen(false); onSetDefault(account); }}
+          />
         )}
+        <MenuItem icon={<History size={14} />} label={t('companyBankAccount.history')} onClick={() => { setOpen(false); onHistory(account); }} />
         <MenuSeparator />
         <MenuItem
           icon={account.is_active ? <ShieldOff size={14} /> : <ShieldCheck size={14} />}
@@ -112,11 +149,15 @@ function RowActions({ account, onEdit, onToggle, onSetDefault }: {
 
 // ── Create / Edit Modal ──────────────────────────────────────────────────────
 
-function AccountModal({ open, onClose, account, branches, canManageQr }: {
+function AccountModal({ open, onClose, account, level, branches, companies, canManageQr }: {
   open: boolean;
   onClose: () => void;
   account: BankAccount | null;
+  /** Which kind a new account is; an edited one keeps its own. */
+  level: AccountLevel;
   branches: Branch[];
+  /** Fund companies a holding-level user may pick from; a company user has one. */
+  companies: FundCompany[];
   canManageQr: boolean;
 }) {
   const { t } = useTranslation();
@@ -124,13 +165,19 @@ function AccountModal({ open, onClose, account, branches, canManageQr }: {
   const { user } = useAuth();
   const { addSnackbar } = useSnackbarContext();
   const [errorMessage, setErrorMessage] = useState('');
-  const [errorKey, setErrorKey] = useState(0);
   const [isPending, setIsPending] = useState(false);
+  const [view, setView] = useState<'form' | 'done'>('form');
+  const [saved, setSaved] = useState<{ form: AccountForm; isDefault: boolean } | null>(null);
+  const [confirmClose, setConfirmClose] = useState(false);
   const isEdit = !!account;
+  const isCompany = isEdit ? !!account?.is_company_account : level === 'company';
+  // A company user creates for their own company; only a holding-level user picks.
+  const ownCompanyId = user?.company_id ?? null;
 
-  const { register, handleSubmit, reset, control, formState: { errors } } = useForm<AccountForm>({
+  const { register, handleSubmit, reset, control, formState: { errors, isDirty } } = useForm<AccountForm>({
     defaultValues: {
       branch_id: '',
+      company_id: '',
       bank_name: '',
       account_number: '',
       account_name: '',
@@ -151,7 +198,8 @@ function AccountModal({ open, onClose, account, branches, canManageQr }: {
     const acc = accountRef.current;
     if (acc) {
       reset({
-        branch_id: String(acc.branch_id),
+        branch_id: acc.branch_id != null ? String(acc.branch_id) : '',
+        company_id: String(acc.company_id),
         bank_name: acc.bank_name,
         account_number: acc.account_number,
         account_name: acc.account_name,
@@ -162,6 +210,7 @@ function AccountModal({ open, onClose, account, branches, canManageQr }: {
     } else {
       reset({
         branch_id: '',
+        company_id: ownCompanyId != null ? String(ownCompanyId) : '',
         bank_name: '',
         account_number: '',
         account_name: '',
@@ -173,7 +222,17 @@ function AccountModal({ open, onClose, account, branches, canManageQr }: {
     setErrorMessage('');
     setQrBusy(false);
     setConfirmRemoveQr(false);
-  }, [open, accountId, reset]);
+    setView('form');
+    setSaved(null);
+    setConfirmClose(false);
+  }, [open, accountId, reset, ownCompanyId]);
+
+  const forceClose = () => { setConfirmClose(false); onClose(); };
+  const handleClose = () => {
+    if (view === 'done') { forceClose(); return; }
+    if (isDirty) { setConfirmClose(true); return; }
+    forceClose();
+  };
 
   // ── Payment QR (edit-only) ─────────────────────────────────────────────
   const qrFileRef = useRef<HTMLInputElement>(null);
@@ -231,7 +290,6 @@ function AccountModal({ open, onClose, account, branches, canManageQr }: {
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
     } catch (err) {
       setErrorMessage(translateErr(err));
-      setErrorKey(k => k + 1);
     } finally {
       setQrBusy(false);
     }
@@ -251,7 +309,6 @@ function AccountModal({ open, onClose, account, branches, canManageQr }: {
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
     } catch (err) {
       setErrorMessage(translateErr(err));
-      setErrorKey(k => k + 1);
     } finally {
       setQrBusy(false);
     }
@@ -275,9 +332,17 @@ function AccountModal({ open, onClose, account, branches, canManageQr }: {
           p_note: data.note || null,
           p_updated_by: user.user_id,
         });
-        addSnackbar({
-          message: <div className="alert alert-success"><CheckCircle size={16} /><span className="alert-description">{t('settings.bankAccounts.updated')}</span></div>,
-          type: 'success',
+      } else if (isCompany) {
+        // Company accounts have their own create call and permission
+        // (BANK_ACCOUNT.COMPANY_MANAGE); the branch call still needs a branch.
+        await apiClient.rpc('fn_company_bank_account_create', {
+          p_company_id: Number(data.company_id),
+          p_bank_name: data.bank_name,
+          p_account_number: data.account_number,
+          p_account_name: data.account_name,
+          p_promptpay_id: data.promptpay_id || null,
+          p_is_default: data.is_default,
+          p_note: data.note || null,
         });
       } else {
         await apiClient.rpc('fn_bank_account_create', {
@@ -290,16 +355,14 @@ function AccountModal({ open, onClose, account, branches, canManageQr }: {
           p_note: data.note || null,
           p_created_by: user.user_id,
         });
-        addSnackbar({
-          message: <div className="alert alert-success"><CheckCircle size={16} /><span className="alert-description">{t('settings.bankAccounts.created')}</span></div>,
-          type: 'success',
-        });
       }
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
-      onClose();
+      // The fund money screens' account picker reads the same rows.
+      queryClient.invalidateQueries({ queryKey: ['fund-bills', 'source-accounts'] });
+      setSaved({ form: data, isDefault: isEdit ? !!account?.is_default : data.is_default });
+      setView('done');
     } catch (err) {
       setErrorMessage(translateErr(err));
-      setErrorKey(k => k + 1);
     } finally {
       const elapsed = Date.now() - start;
       if (elapsed < 300) await new Promise(r => setTimeout(r, 300 - elapsed));
@@ -308,20 +371,61 @@ function AccountModal({ open, onClose, account, branches, canManageQr }: {
   };
 
   return (
-    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
-      <form className="flex flex-col overflow-hidden" onSubmit={handleSubmit(onSubmit)}>
-        <div className="modal-header">
-          <h2 className="modal-title">{isEdit ? t('settings.bankAccounts.editAccount') : t('settings.bankAccounts.addAccount')}</h2>
-        </div>
+    <>
+    <Modal open={open} onClose={handleClose} maxWidth="28rem" width="100%">
+      <div className="modal-header">
+        <h2 className="modal-title">
+          {isEdit
+            ? t('settings.bankAccounts.editAccount')
+            : isCompany ? t('companyBankAccount.add') : t('settings.bankAccounts.addAccount')}
+        </h2>
+        <button type="button" className="modal-close-btn" onClick={handleClose}>&times;</button>
+      </div>
+      {view === 'done' && saved ? (
+        <ActionDoneView
+          headline={isEdit
+            ? t('settings.bankAccounts.updated')
+            : isCompany ? t('companyBankAccount.created') : t('settings.bankAccounts.created')}
+          contractCode={saved.form.account_name}
+          detailRows={[
+            { label: t('settings.bankAccounts.bankName'), value: saved.form.bank_name },
+            { label: t('settings.bankAccounts.accountNumber'), value: isEdit ? (account?.account_number ?? '') : saved.form.account_number, emphasis: true },
+            ...(isCompany
+              ? [{ label: t('companyBankAccount.usual'), value: saved.isDefault ? t('common.yes') : t('common.no') }]
+              : []),
+          ]}
+          extras={isCompany && !isEdit ? (
+            <div className="alert alert-info"><span>{t('companyBankAccount.createdHint')}</span></div>
+          ) : undefined}
+          onClose={forceClose}
+        />
+      ) : (
+      <form className="flex flex-col flex-1 min-h-0 overflow-hidden" onSubmit={handleSubmit(onSubmit)}>
         <div className="modal-content">
-          {errorMessage && (
-            <div key={errorKey} className="alert alert-danger mb-4 animate-pop-in">
-              <XCircle size={18} />
-              <div><div className="alert-description">{errorMessage}</div></div>
-            </div>
+          {isCompany && !isEdit && (
+            <div className="alert alert-info mb-4"><span>{t('companyBankAccount.formHint')}</span></div>
           )}
           <div className="form-grid">
-            {!isEdit && (
+            {!isEdit && isCompany && ownCompanyId == null && (
+              <div className="flex flex-col">
+                <label className="form-label">{t('companyBankAccount.company')}</label>
+                <Controller
+                  name="company_id"
+                  control={control}
+                  rules={{ required: t('common.required') }}
+                  render={({ field }) => (
+                    <Select
+                      value={field.value || null}
+                      onChange={(val) => field.onChange((val as string) ?? '')}
+                      placeholder={t('companyBankAccount.company')}
+                      options={companies.map(c => ({ label: c.name, value: String(c.id) }))}
+                    />
+                  )}
+                />
+                <FormErrorMessage error={errors.company_id} />
+              </div>
+            )}
+            {!isEdit && !isCompany && (
               <div className="flex flex-col">
                 <label className="form-label">{t('settings.bankAccounts.branch')}</label>
                 <Controller
@@ -371,7 +475,8 @@ function AccountModal({ open, onClose, account, branches, canManageQr }: {
               <label className="form-label">{t('settings.bankAccounts.note')}</label>
               <Input {...register('note')} className="w-full" />
             </div>
-            {isEdit && (
+            {/* The payment QR is for customers; a fund account is never shown to one. */}
+            {isEdit && !isCompany && (
               <div className="flex flex-col">
                 <label className="form-label">{t('settings.bankAccounts.qr.label')}</label>
                 <div className="flex items-center gap-3 rounded-md border border-line bg-surface p-3">
@@ -440,7 +545,9 @@ function AccountModal({ open, onClose, account, branches, canManageQr }: {
             )}
             {!isEdit && (
               <div className="flex flex-col">
-                <label className="form-label">{t('settings.bankAccounts.isFallback')}</label>
+                <label className="form-label">
+                  {isCompany ? t('companyBankAccount.usual') : t('settings.bankAccounts.isFallback')}
+                </label>
                 <Controller
                   name="is_default"
                   control={control}
@@ -448,18 +555,22 @@ function AccountModal({ open, onClose, account, branches, canManageQr }: {
                     <Switch checked={field.value} onChange={(e) => field.onChange((e.target as HTMLInputElement).checked)} />
                   )}
                 />
-                <p className="text-xs text-subtle mt-1">{t('settings.bankAccounts.fallbackHint')}</p>
+                <p className="text-xs text-subtle mt-1">
+                  {isCompany ? t('companyBankAccount.usualHint') : t('settings.bankAccounts.fallbackHint')}
+                </p>
               </div>
             )}
           </div>
         </div>
+        <ModalErrorBand message={errorMessage} onDismiss={() => setErrorMessage('')} />
         <div className="modal-footer">
-          <Button type="button" onClick={onClose}>{t('common.cancel')}</Button>
+          <Button type="button" variant="ghost" onClick={handleClose}>{t('common.cancel')}</Button>
           <Button type="submit" color="primary" disabled={isPending}>
             {isPending ? t('common.saving') : isEdit ? t('common.save') : t('common.create')}
           </Button>
         </div>
       </form>
+      )}
 
       <Modal open={confirmRemoveQr} onClose={() => setConfirmRemoveQr(false)} maxWidth="24rem" width="100%">
         <div className="modal-header"><h2 className="modal-title">{t('settings.bankAccounts.qr.removeTitle')}</h2></div>
@@ -477,14 +588,233 @@ function AccountModal({ open, onClose, account, branches, canManageQr }: {
         alt={t('settings.bankAccounts.qr.label')}
       />
     </Modal>
+
+    <Modal open={confirmClose} onClose={() => setConfirmClose(false)} maxWidth="24rem" width="100%" ariaLabel={t('common.unsavedChanges')}>
+      <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
+      <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={() => setConfirmClose(false)}>{t('common.cancel')}</Button>
+        <Button color="danger" onClick={forceClose}>{t('common.discard')}</Button>
+      </div>
+    </Modal>
+    </>
+  );
+}
+
+// ── History ──────────────────────────────────────────────────────────────────
+
+interface BankAccountLogRow {
+  id: number;
+  action: string;
+  old_values: Record<string, unknown> | null;
+  new_values: Record<string, unknown> | null;
+  created_at: string;
+  created_by_username: string | null;
+}
+
+/** Bookkeeping keys the log carries that say nothing to the person reading it. */
+const LOG_HIDDEN_KEYS = new Set(['mig', 'copied_from', 'level', 'company_id', 'branch_id', 'account_kind', 'updated_at', 'updated_by', 'created_by', 'holding_id']);
+
+function logValue(v: unknown, t: ReturnType<typeof useTranslation>['t']): string {
+  if (v === null || v === undefined || v === '') return '—';
+  if (typeof v === 'boolean') return v ? t('common.yes') : t('common.no');
+  return String(v);
+}
+
+function AccountHistoryModal({ account, onClose }: { account: BankAccount | null; onClose: () => void }) {
+  const { t } = useTranslation();
+  // Hold the last account through the close transition.
+  const last = useRef(account);
+  if (account) last.current = account;
+  const shown = account ?? last.current;
+
+  const { data: rows = [], isLoading } = useQuery({
+    queryKey: ['bank-accounts', 'log', shown?.id],
+    queryFn: () => apiClient.get<BankAccountLogRow[]>(`/v_bank_account_log?bank_account_id=eq.${shown!.id}&order=id.desc`),
+    enabled: !!account,
+  });
+
+  return (
+    <Modal open={!!account} onClose={onClose} maxWidth="32rem" width="100%" ariaLabel={t('companyBankAccount.history')}>
+      <div className="modal-header">
+        <h2 className="modal-title">{t('companyBankAccount.history')}</h2>
+        <button type="button" className="modal-close-btn" onClick={onClose}>&times;</button>
+      </div>
+      <div className="modal-content">
+        {shown && (
+          <div className="px-3 py-2.5 rounded-md bg-surface border border-line mb-3">
+            <div className="font-medium text-sm">{shown.account_name}</div>
+            <div className="text-xs text-subtle tabular-nums">{shown.bank_name} · {shown.account_number_display ?? shown.account_number}</div>
+          </div>
+        )}
+        {isLoading ? (
+          <div className="py-6 text-center text-subtle text-sm">{t('common.loading')}</div>
+        ) : rows.length === 0 ? (
+          <div className="py-6 text-center text-subtle text-sm">{t('companyBankAccount.historyEmpty')}</div>
+        ) : (
+          <div className="flex flex-col divide-y divide-line border-y border-line">
+            {rows.map(r => {
+              const keys = Object.keys({ ...(r.old_values ?? {}), ...(r.new_values ?? {}) })
+                .filter(k => !LOG_HIDDEN_KEYS.has(k))
+                // A new account lists what it was made with (blanks left out); a
+                // change lists only what differs. Missing and null are the same.
+                .filter(k => r.action === 'CREATE'
+                  ? r.new_values?.[k] != null
+                  : JSON.stringify(r.old_values?.[k] ?? null) !== JSON.stringify(r.new_values?.[k] ?? null));
+              return (
+                <div key={r.id} className="py-2.5">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Badge size="sm" color={r.action === 'CREATE' ? 'success' : 'default'}>
+                      {t(`companyBankAccount.logAction_${r.action}`, { defaultValue: r.action })}
+                    </Badge>
+                    <span className="text-xs text-subtle">{r.created_by_username ?? ''}</span>
+                    <span className="flex-1" />
+                    <span className="text-xs text-subtle"><DateTime value={r.created_at} showTime /></span>
+                  </div>
+                  {keys.length > 0 && (
+                    <div className="mt-1 flex flex-col gap-0.5">
+                      {keys.map(k => (
+                        <div key={k} className="text-xs">
+                          <span className="text-subtle">{t(`companyBankAccount.logField_${k}`, { defaultValue: k })}: </span>
+                          {r.action === 'CREATE'
+                            ? logValue(r.new_values?.[k], t)
+                            : <>{logValue(r.old_values?.[k], t)} → {logValue(r.new_values?.[k], t)}</>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      <div className="modal-footer">
+        <Button color="primary" onClick={onClose}>{t('common.close')}</Button>
+      </div>
+    </Modal>
+  );
+}
+
+
+// ── Company accounts tab ─────────────────────────────────────────────────────
+
+function CompanyAccountsTab({ accounts, isLoading, isFetching, showCompany, onEdit, onToggle, onSetDefault, onHistory }: {
+  accounts: BankAccount[];
+  isLoading: boolean;
+  isFetching: boolean;
+  /** A holding-level user sees every fund company's accounts, so name the company. */
+  showCompany: boolean;
+  onEdit: (a: BankAccount) => void;
+  onToggle: (a: BankAccount) => void;
+  onSetDefault: (a: BankAccount) => void;
+  onHistory: (a: BankAccount) => void;
+}) {
+  const { t } = useTranslation();
+
+  const columns: ColumnDef<BankAccount>[] = [
+    ...(showCompany ? [{
+      id: 'company',
+      header: () => t('companyBankAccount.company'),
+      cell: ({ row }: { row: { original: BankAccount } }) => <span className="font-medium">{row.original.company_name}</span>,
+    } as ColumnDef<BankAccount>] : []),
+    {
+      id: 'bank',
+      header: () => t('settings.bankAccounts.colBank'),
+      cell: ({ row }) => (
+        <div>
+          <div className="font-medium">{row.original.bank_name}</div>
+          <div className="text-xs text-subtle tabular-nums">
+            {row.original.account_number_display ?? row.original.account_number} · {row.original.account_name}
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: 'note',
+      header: () => t('settings.bankAccounts.note'),
+      cell: ({ row }) => row.original.note
+        ? <span className="text-sm text-subtle line-clamp-2">{row.original.note}</span>
+        : <span className="text-subtler">—</span>,
+    },
+    {
+      id: 'status',
+      header: () => t('settings.bankAccounts.colStatus'),
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1.5">
+          {row.original.is_default && (
+            <Tooltip content={t('companyBankAccount.usualHint')} placement="top">
+              <Badge color="primary" size="sm">{t('companyBankAccount.usual')}</Badge>
+            </Tooltip>
+          )}
+          <Badge color={row.original.is_active ? 'success' : 'default'} size="sm">
+            {row.original.is_active ? t('common.active') : t('common.inactive')}
+          </Badge>
+        </div>
+      ),
+    },
+    {
+      id: 'actions',
+      header: () => null,
+      cell: ({ row }) => (
+        <RowActions account={row.original} onEdit={onEdit} onToggle={onToggle} onSetDefault={onSetDefault} onHistory={onHistory} />
+      ),
+      className: 'w-10',
+    },
+  ];
+
+  return (
+    <>
+      <p className="flex-none text-sm text-subtle pb-4">{t('companyBankAccount.tabHint')}</p>
+      <DataTable<BankAccount>
+        outlined
+        data={accounts}
+        columns={columns}
+        className={`flex-1 min-h-0 hidden md:flex ${isFetching ? 'opacity-60' : ''} transition-opacity`}
+        noResults={
+          <div className="p-8 text-center text-subtle">
+            {isLoading ? t('common.loading') : t('companyBankAccount.empty')}
+          </div>
+        }
+      />
+      <div className={`flex-1 min-h-0 overflow-auto better-scroll pb-8 md:hidden ${isFetching ? 'opacity-60' : ''} transition-opacity`}>
+        {accounts.length === 0 ? (
+          <div className="p-8 text-center text-subtle">
+            {isLoading ? t('common.loading') : t('companyBankAccount.empty')}
+          </div>
+        ) : (
+          <div className="flex flex-col divide-y divide-line border-b border-line">
+            {accounts.map(account => (
+              <div key={account.id} className="flex items-center gap-3 px-4 py-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-sm truncate">{account.bank_name}</span>
+                    {account.is_default && <Badge color="primary" size="sm">{t('companyBankAccount.usual')}</Badge>}
+                    {!account.is_active && <Badge color="default" size="sm">{t('common.inactive')}</Badge>}
+                  </div>
+                  <div className="text-xs text-subtle tabular-nums mt-0.5">
+                    {account.account_number_display ?? account.account_number} · {account.account_name}
+                  </div>
+                  {showCompany && <div className="text-xs text-subtler mt-0.5">{account.company_name}</div>}
+                </div>
+                <RowActions account={account} onEdit={onEdit} onToggle={onToggle} onSetDefault={onSetDefault} onHistory={onHistory} />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 
 // ── Main Page ────────────────────────────────────────────────────────────────
 
+type PageTab = 'accounts' | 'company' | 'channels';
+
 export function BankAccountsPage() {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, isFundCompany } = useAuth();
+  const { hasPermission } = useMyPermissions();
   const queryClient = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
 
@@ -496,8 +826,12 @@ export function BankAccountsPage() {
   const [filterBranch, setFilterBranch] = useState<string>('');
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  const [createOpen, setCreateOpen] = useState(false);
+  const [createLevel, setCreateLevel] = useState<AccountLevel | null>(null);
+  // Keep the kind being created through the close transition.
+  const lastCreateLevel = useRef<AccountLevel>('branch');
+  if (createLevel) lastCreateLevel.current = createLevel;
   const [editAccount, setEditAccount] = useState<BankAccount | null>(null);
+  const [historyAccount, setHistoryAccount] = useState<BankAccount | null>(null);
   const [qrPreview, setQrPreview] = useState<string | null>(null);
 
   // Channel config (STORE_FRONT / INSTALLMENT slot accounts) is a company-level
@@ -506,11 +840,47 @@ export function BankAccountsPage() {
     || user?.role_code === 'COMPANY_ACCOUNTANT'
     || user?.role_code === 'HOLDING_ADMIN'
     || user?.role_code === 'SYSTEM_DEV';
-  const [tab, setTab] = useState<'accounts' | 'channels'>('accounts');
+  // Company accounts exist only for a fund company (an operating one is refused
+  // with COMPANY_ACCOUNT_NOT_ALLOWED), and only BANK_ACCOUNT.COMPANY_MANAGE may
+  // keep them. A holding-level user has no company of its own and picks one.
+  const canCompanyAccounts = hasPermission('BANK_ACCOUNT.COMPANY_MANAGE')
+    && (isFundCompany || user?.company_id == null);
 
+  // The tab lives in the address so the fund money screens can link straight
+  // to the company accounts ("no account yet — create one").
+  const [params, setParams] = useSearchParams();
+  const requestedTab = params.get('tab') as PageTab | null;
+  const tab: PageTab = requestedTab === 'company' && canCompanyAccounts
+    ? 'company'
+    : requestedTab === 'channels' && canManageChannels ? 'channels' : 'accounts';
+  const setTab = (next: PageTab) => {
+    const p = new URLSearchParams(params);
+    if (next === 'accounts') p.delete('tab'); else p.set('tab', next);
+    setParams(p);
+  };
+  const tabs: PageTab[] = [
+    'accounts',
+    ...(canCompanyAccounts ? ['company' as const] : []),
+    ...(canManageChannels ? ['channels' as const] : []),
+  ];
+
+  // Branch rows only: a company row has no branch and belongs on its own tab.
   const { data: accounts = [], isFetching, isLoading } = useQuery({
-    queryKey: ['bank-accounts'],
-    queryFn: () => apiClient.get<BankAccount[]>('/v_bank_accounts?order=branch_name,bank_name'),
+    queryKey: ['bank-accounts', 'branch'],
+    queryFn: () => apiClient.get<BankAccount[]>('/v_bank_accounts?branch_id=not.is.null&order=branch_name,bank_name'),
+  });
+
+  const companyQuery = useQuery({
+    queryKey: ['bank-accounts', 'company'],
+    queryFn: () => apiClient.get<BankAccount[]>('/v_bank_accounts?branch_id=is.null&order=company_name,is_default.desc,id'),
+    enabled: canCompanyAccounts,
+  });
+  const companyAccounts = companyQuery.data ?? [];
+
+  const { data: fundCompanies = [] } = useQuery({
+    queryKey: ['fund-companies'],
+    queryFn: () => apiClient.get<FundCompany[]>('/v_companies?company_type=eq.FINANCIER&select=id,name&order=name'),
+    enabled: canCompanyAccounts && user?.company_id == null,
   });
 
   const { data: branches = [] } = useQuery({
@@ -522,19 +892,19 @@ export function BankAccountsPage() {
   // snapshot) so a QR set/remove — which invalidates ['bank-accounts'] — is
   // reflected in the open modal.
   const liveEditAccount = editAccount
-    ? accounts.find(a => a.id === editAccount.id) ?? editAccount
+    ? [...accounts, ...companyAccounts].find(a => a.id === editAccount.id) ?? editAccount
     : null;
 
   // Branch options come from the account rows themselves (not v_branches) so
   // branches that hold accounts but are now inactive still appear in the filter.
-  const branchOptions = [...new Map(accounts.map(a => [a.branch_id, a.branch_name]))]
+  const branchOptions = [...new Map(accounts.map(a => [a.branch_id, a.branch_name ?? '']))]
     .map(([id, name]) => ({ value: String(id), label: name }));
 
   const filtered = accounts.filter(a => {
     if (filterBranch && String(a.branch_id) !== filterBranch) return false;
     if (!search.trim()) return true;
     const term = search.trim().toLowerCase();
-    return a.branch_name.toLowerCase().includes(term)
+    return (a.branch_name ?? '').toLowerCase().includes(term)
       || a.bank_name.toLowerCase().includes(term)
       || a.account_number.includes(term)
       || a.account_name.toLowerCase().includes(term);
@@ -550,6 +920,11 @@ export function BankAccountsPage() {
       setSearch(value);
       setPageIndex(0);
     }, 300);
+  };
+
+  const invalidateAccounts = () => {
+    queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
+    queryClient.invalidateQueries({ queryKey: ['fund-bills', 'source-accounts'] });
   };
 
   const handleToggle = async (account: BankAccount) => {
@@ -571,7 +946,7 @@ export function BankAccountsPage() {
         ),
         type: 'success',
       });
-      queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
+      invalidateAccounts();
     } catch (err) {
       const msg = err instanceof ApiError
         ? translateApiError(err, t) || err.message
@@ -595,12 +970,14 @@ export function BankAccountsPage() {
         message: (
           <div className="alert alert-success">
             <CheckCircle size={16} />
-            <span className="alert-description">{t('settings.bankAccounts.fallbackSet')}</span>
+            <span className="alert-description">
+              {account.is_company_account ? t('companyBankAccount.usualSet') : t('settings.bankAccounts.fallbackSet')}
+            </span>
           </div>
         ),
         type: 'success',
       });
-      queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
+      invalidateAccounts();
     } catch (err) {
       const msg = err instanceof ApiError
         ? translateApiError(err, t) || err.message
@@ -634,7 +1011,7 @@ export function BankAccountsPage() {
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('settings.bankAccounts.colPromptpay')} />,
       cell: ({ row }) => row.original.promptpay_id
         ? <span className="tabular-nums text-sm">{row.original.promptpay_id}</span>
-        : <span className="opacity-30">—</span>,
+        : <span className="text-subtler">—</span>,
     },
     {
       id: 'qr',
@@ -656,7 +1033,7 @@ export function BankAccountsPage() {
             </button>
           </Tooltip>
         )
-        : <span className="opacity-30">—</span>,
+        : <span className="text-subtler">—</span>,
       enableSorting: false,
     },
     {
@@ -684,12 +1061,16 @@ export function BankAccountsPage() {
           onEdit={setEditAccount}
           onToggle={handleToggle}
           onSetDefault={handleSetDefault}
+          onHistory={setHistoryAccount}
         />
       ),
       enableSorting: false,
       className: 'w-10',
     },
   ];
+
+  const addLabel = tab === 'company' ? t('companyBankAccount.add') : t('settings.bankAccounts.addAccount');
+  const openCreate = () => setCreateLevel(tab === 'company' ? 'company' : 'branch');
 
   return (
     <>
@@ -706,14 +1087,16 @@ export function BankAccountsPage() {
         <div className="mobile-header-title mobile-header-title-truncate">
           {t('settings.bankAccounts.title')}
         </div>
-        <div className="mobile-header-end">
-          <button
-            className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-primary-fg"
-            onClick={() => setCreateOpen(true)}
-            aria-label={t('settings.bankAccounts.addAccount')}
-          >
-            <Plus size={20} />
-          </button>
+        <div className="mobile-header-end w-nav">
+          {tab !== 'channels' && (
+            <button
+              className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-primary-fg"
+              onClick={openCreate}
+              aria-label={addLabel}
+            >
+              <Plus size={20} />
+            </button>
+          )}
         </div>
       </MobileHeader>
 
@@ -722,19 +1105,20 @@ export function BankAccountsPage() {
         <div className="flex items-center justify-between mb-4 flex-none max-md:hidden">
           <div>
             <h1 className="heading-2">{t('settings.bankAccounts.title')}</h1>
-            <p className="text-sm text-subtle mt-1">{t('settings.bankAccounts.description')}</p>
+            <p className="text-sm text-subtle mt-1">
+              {tab === 'company' ? t('companyBankAccount.description') : t('settings.bankAccounts.description')}
+            </p>
           </div>
-          {tab === 'accounts' && (
-            <Button color="primary" startIcon={<Plus size={16} />} onClick={() => setCreateOpen(true)}>
-              {t('settings.bankAccounts.addAccount')}
+          {tab !== 'channels' && (
+            <Button color="primary" startIcon={<Plus size={16} />} onClick={openCreate}>
+              {addLabel}
             </Button>
           )}
         </div>
 
-        {/* Tabs — only when the user can manage channels */}
-        {canManageChannels && (
+        {tabs.length > 1 && (
           <div className="flex-none flex items-center gap-1 border-b border-line mb-4">
-            {(['accounts', 'channels'] as const).map((tk) => (
+            {tabs.map((tk) => (
               <button
                 key={tk}
                 type="button"
@@ -744,8 +1128,8 @@ export function BankAccountsPage() {
                 }`}
               >
                 {tk === 'accounts'
-                  ? t('settings.bankAccounts.tabAccounts', { defaultValue: 'Accounts' })
-                  : t('settings.bankAccounts.tabChannels', { defaultValue: 'Channel accounts' })}
+                  ? t('settings.bankAccounts.tabAccounts')
+                  : tk === 'company' ? t('companyBankAccount.tab') : t('settings.bankAccounts.tabChannels')}
               </button>
             ))}
           </div>
@@ -753,6 +1137,17 @@ export function BankAccountsPage() {
 
         {tab === 'channels' ? (
           <BankChannelConfig />
+        ) : tab === 'company' ? (
+          <CompanyAccountsTab
+            accounts={companyAccounts}
+            isLoading={companyQuery.isLoading}
+            isFetching={companyQuery.isFetching}
+            showCompany={user?.company_id == null}
+            onEdit={setEditAccount}
+            onToggle={handleToggle}
+            onSetDefault={handleSetDefault}
+            onHistory={setHistoryAccount}
+          />
         ) : (
         <>
         {/* Filter bar */}
@@ -813,7 +1208,7 @@ export function BankAccountsPage() {
                 {isLoading ? t('common.loading') : t('settings.bankAccounts.empty')}
               </div>
             ) : (
-              <div className="flex flex-col divide-y divide-line">
+              <div className="flex flex-col divide-y divide-line border-b border-line">
                 {paginated.map((account) => (
                   <div
                     key={account.id}
@@ -836,13 +1231,14 @@ export function BankAccountsPage() {
                         {!account.is_active && <Badge color="default" size="sm">{t('common.inactive')}</Badge>}
                       </div>
                       <div className="text-xs text-subtle tabular-nums mt-0.5">{account.account_number} · {account.account_name}</div>
-                      <div className="text-xs text-fg/40 mt-0.5">{account.branch_name}</div>
+                      <div className="text-xs text-subtler mt-0.5">{account.branch_name}</div>
                     </div>
                     <RowActions
                       account={account}
                       onEdit={setEditAccount}
                       onToggle={handleToggle}
                       onSetDefault={handleSetDefault}
+                      onHistory={setHistoryAccount}
                     />
                   </div>
                 ))}
@@ -867,19 +1263,24 @@ export function BankAccountsPage() {
 
       {/* Modals */}
       <AccountModal
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
+        open={createLevel != null}
+        onClose={() => setCreateLevel(null)}
         account={null}
+        level={createLevel ?? lastCreateLevel.current}
         branches={branches}
+        companies={fundCompanies}
         canManageQr={canManageChannels}
       />
       <AccountModal
         open={!!editAccount}
         onClose={() => setEditAccount(null)}
         account={liveEditAccount}
+        level={liveEditAccount?.is_company_account ? 'company' : 'branch'}
         branches={branches}
+        companies={fundCompanies}
         canManageQr={canManageChannels}
       />
+      <AccountHistoryModal account={historyAccount} onClose={() => setHistoryAccount(null)} />
 
       <MediaLightbox
         open={!!qrPreview}

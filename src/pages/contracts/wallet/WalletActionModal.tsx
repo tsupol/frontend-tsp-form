@@ -101,7 +101,7 @@ export function WalletActionForm({
     queryKey: ['bank-accounts', holdingId],
     queryFn: () =>
       apiClient.get<BankAccount[]>(
-        `/v_bank_accounts?holding_id=eq.${holdingId}&is_active=eq.true&order=is_default.desc,bank_name.asc`,
+        `/v_bank_accounts?holding_id=eq.${holdingId}&branch_id=not.is.null&is_active=eq.true&order=is_default.desc,bank_name.asc`,
       ),
     // DEPOSIT receives into the resolved branch account (handled by the
     // BranchPaymentAccountField); only CASHOUT needs the full pay-out list.

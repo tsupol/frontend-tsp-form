@@ -63,6 +63,9 @@ import { PartnerBalancePage } from './pages/partner-settlements/PartnerBalancePa
 import { FundDayMoneyPage } from './pages/fund-day/FundDayMoneyPage';
 import { FundDayReconPage } from './pages/fund-day/FundDayReconPage';
 import { FundBookPage } from './pages/fund-book/FundBookPage';
+import { FundMoneyLayout } from './pages/fund-cash/FundMoneyLayout';
+import { FundCashPositionPage } from './pages/fund-cash/FundCashPositionPage';
+import { FundPassbookPage } from './pages/fund-cash/FundPassbookPage';
 import { FundClawbackPage } from './pages/fund-clawback/FundClawbackPage';
 import { PartnerReturnsPage } from './pages/partner-returns/PartnerReturnsPage';
 import { PartnerReturnWarehousePage } from './pages/partner-returns/PartnerReturnWarehousePage';
@@ -1170,6 +1173,29 @@ function App() {
           </ProtectedRoute>
         }
       />
+      {/* A fund company's bank money (UI_SUMMARY/155): the position against its
+          target, and one passbook per account. The account is a query param so
+          the position page can open a passbook straight from its row. */}
+      <Route
+        path="/admin/fund-cash"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <FundMoneyLayout><FundCashPositionPage /></FundMoneyLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/fund-passbook"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <FundMoneyLayout><FundPassbookPage /></FundMoneyLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
       {/* A fund company's own money, one day at a time (UI_SUMMARY/148): what the
           system knows was received and paid, and the counted figures the finance
           desk writes back after matching the bank statement by hand. The day is
@@ -1179,7 +1205,7 @@ function App() {
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <FundDayMoneyPage />
+              <FundMoneyLayout><FundDayMoneyPage /></FundMoneyLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
@@ -1189,7 +1215,7 @@ function App() {
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <FundDayReconPage />
+              <FundMoneyLayout><FundDayReconPage /></FundMoneyLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
@@ -1201,7 +1227,7 @@ function App() {
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <FundBookPage />
+              <FundMoneyLayout><FundBookPage /></FundMoneyLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

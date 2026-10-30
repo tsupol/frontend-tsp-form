@@ -34,7 +34,8 @@ import { ActionDoneView } from '../contracts/ActionDoneView';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../../lib/format';
 import { useFundBookInvalidate, useFundExpenseCategories } from './useFundBook';
-import { useFundSourceAccounts } from '../fund-bills/useFundBills';
+import { FundAccountField } from '../../components/FundAccountField';
+import { useFundAccountChoice } from '../../hooks/useFundAccountChoice';
 import type {
   FundBook,
   FundMovementConfirmResult,
@@ -69,7 +70,8 @@ export function FundMovementModal({
   const { t, i18n } = useTranslation();
   const invalidate = useFundBookInvalidate();
   const categories = useFundExpenseCategories(open && purpose === 'EXPENSE' ? companyId : null);
-  const accounts = useFundSourceAccounts(open ? companyId : null);
+  const account = useFundAccountChoice(open ? companyId : null);
+  const { reset: resetAccount } = account;
 
   const today = toLocalDateStr(new Date());
 
@@ -84,7 +86,6 @@ export function FundMovementModal({
   const [paidDate, setPaidDate] = useState(today);
   const [typing, setTyping] = useState(false);
   const [method, setMethod] = useState('TRANSFER');
-  const [accountId, setAccountId] = useState('');
   const [reference, setReference] = useState('');
   const [payeeName, setPayeeName] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -108,7 +109,7 @@ export function FundMovementModal({
     setPaidDate(toLocalDateStr(new Date()));
     setTyping(false);
     setMethod('TRANSFER');
-    setAccountId('');
+    resetAccount();
     setReference('');
     setPayeeName('');
     setCategoryId('');
@@ -120,7 +121,7 @@ export function FundMovementModal({
     setResult(null);
     setConfirmClose(false);
     createdRef.current = null;
-  }, [open, purpose, resetAttempt, resetSlip]);
+  }, [open, purpose, resetAttempt, resetSlip, resetAccount]);
 
   const isExpense = purpose === 'EXPENSE';
   const isWithdraw = purpose === 'CAPITAL_OUT';
@@ -131,18 +132,23 @@ export function FundMovementModal({
     [books, ownerType, isExpense],
   );
 
+  /** Cash never touches a bank, so it names no account (doc 149 §4). */
+  const throughBank = method === 'TRANSFER';
+
   const amountValue = Number(amount);
   const futureDate = !!paidDate && paidDate > today;
   /** A withdrawal above what the book holds is refused, so say so before submit. */
   const overCeiling = isWithdraw && !!book && amountValue > book.can_withdraw;
 
   const dirty = !!amount || !!reference.trim() || !!payeeName.trim()
-    || !!receiptNo.trim() || !!note.trim() || !!categoryId || paidDate !== today || slip.files.length > 0;
+    || !!receiptNo.trim() || !!note.trim() || !!categoryId || paidDate !== today || slip.files.length > 0
+    || account.changed;
 
   const canSubmit = amountValue > 0
     && !futureDate
     && !overCeiling
-    && (!isExpense || payeeName.trim().length > 0);
+    && (!isExpense || payeeName.trim().length > 0)
+    && (!throughBank || !!account.accountId);
 
   const forceClose = () => { setConfirmClose(false); onClose(); };
   const handleClose = () => {
@@ -150,11 +156,6 @@ export function FundMovementModal({
     if (dirty) { setConfirmClose(true); return; }
     forceClose();
   };
-
-  const accountOptions = accounts.map(a => ({
-    value: String(a.id),
-    label: `${a.bank_name} · ${a.account_number_display ?? a.account_number ?? ''}`,
-  }));
 
   const categoryOptions = categories.map(c => ({ value: String(c.id), label: c.name_th }));
 
@@ -198,7 +199,7 @@ export function FundMovementModal({
         p_bill_id: created.bill_id,
         p_paid_date: paidDate,
         p_method: method,
-        p_bank_account_id: accountId ? Number(accountId) : null,
+        p_bank_account_id: throughBank ? Number(account.accountId) : null,
         p_reference: reference.trim() || null,
         p_note: note.trim() || null,
         ...attempt.amendParams(amend),
@@ -354,16 +355,13 @@ export function FundMovementModal({
                   />
                 </div>
 
-                <div className="flex flex-col">
-                  <label className="form-label">{t('fundBook.bankAccount')}</label>
-                  <Select
-                    options={accountOptions}
-                    value={accountId || null}
-                    onChange={v => setAccountId((v as string) ?? '')}
-                    placeholder={t('fundBook.bankAccountPlaceholder')}
-                    clearable
+                {throughBank && (
+                  <FundAccountField
+                    choice={account}
+                    label={purpose === 'CAPITAL_IN' ? t('fundAccount.intoAccount') : t('fundAccount.fromAccount')}
+                    disabled={saving}
                   />
-                </div>
+                )}
 
                 <div className="flex flex-col">
                   <label className="form-label">{t('fundBook.reference')}</label>

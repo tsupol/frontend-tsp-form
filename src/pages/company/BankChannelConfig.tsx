@@ -1,18 +1,31 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Modal, Select, Badge, useSnackbarContext } from 'tsp-form';
-import { Pencil, Landmark, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Button, Modal, Select, Badge } from 'tsp-form';
+import { Pencil, Landmark, Clock, ExternalLink } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { translateApiError } from '../../lib/apiErrors';
+import { ModalErrorBand } from '../../components/ModalErrorBand';
+import { ActionDoneView } from '../contracts/ActionDoneView';
 
 // One row per (branch × channel) in the caller's company — v_bank_account_channel_config.
+//
+// The account level depends on the channel (mig 1531, doc 116 §2e):
+//   STORE_FRONT / INSTALLMENT  — customers pay in, so a branch account.
+//   PARTNER_REMIT ("ร้านนำส่ง") — the shop pays the fund back, so one of the
+//                                  fund's own company accounts.
+// The wrong level is refused (CHANNEL_ACCOUNT_LEVEL_MISMATCH), so the picker
+// only ever offers the right one.
+type Channel = 'STORE_FRONT' | 'INSTALLMENT' | 'PARTNER_REMIT';
+
 interface ChannelConfigRow {
   branch_id: number;
   branch_code: string;
   branch_name: string;
-  channel: 'STORE_FRONT' | 'INSTALLMENT';
+  company_id: number;
+  channel: Channel;
   channel_name_th: string;
   configured_account_id: number | null;
   effective_account_id: number | null;
@@ -40,8 +53,6 @@ function channelLabel(t: ReturnType<typeof useTranslation>['t'], channel: string
 
 export function BankChannelConfig() {
   const { t } = useTranslation();
-  const queryClient = useQueryClient();
-  const { addSnackbar } = useSnackbarContext();
   const [editRow, setEditRow] = useState<ChannelConfigRow | null>(null);
 
   const { data: rows = [], isLoading } = useQuery({
@@ -77,7 +88,7 @@ export function BankChannelConfig() {
                 {b.channels.map((c) => (
                   <div key={c.channel} className="flex items-center gap-3 px-4 py-3">
                     <div className="w-24 shrink-0">
-                      <Badge size="sm" color={c.channel === 'INSTALLMENT' ? 'info' : 'default'}>
+                      <Badge size="sm" color={c.channel === 'INSTALLMENT' ? 'info' : c.channel === 'PARTNER_REMIT' ? 'warning' : 'default'}>
                         {channelLabel(t, c.channel)}
                       </Badge>
                     </div>
@@ -120,49 +131,64 @@ export function BankChannelConfig() {
         open={!!editRow}
         row={editRow}
         onClose={() => setEditRow(null)}
-        onSaved={() => {
-          setEditRow(null);
-          queryClient.invalidateQueries({ queryKey: ['bank-channel-config'] });
-          addSnackbar({
-            message: <div className="alert alert-success"><CheckCircle size={16} /><span>{t('bankChannel.saved', { defaultValue: 'Channel account updated' })}</span></div>,
-          });
-        }}
       />
     </div>
   );
 }
 
 function SetChannelAccountModal({
-  open, row, onClose, onSaved,
+  open, row: rowProp, onClose,
 }: {
   open: boolean;
   row: ChannelConfigRow | null;
   onClose: () => void;
-  onSaved: () => void;
 }) {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  // Hold the last row through the close transition.
+  const lastRow = useRef(rowProp);
+  if (rowProp) lastRow.current = rowProp;
+  const row = rowProp ?? lastRow.current;
+
   const [accountId, setAccountId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [view, setView] = useState<'form' | 'done'>('form');
+  const [confirmClose, setConfirmClose] = useState(false);
 
-  const { data: accounts = [] } = useQuery({
-    queryKey: ['bank-accounts-for-branch', row?.branch_id],
-    queryFn: () => apiClient.get<PickableAccount[]>(`/v_bank_accounts?branch_id=eq.${row!.branch_id}&is_active=eq.true&order=bank_name`),
+  const isRemit = row?.channel === 'PARTNER_REMIT';
+  const { data: accounts = [], isLoading } = useQuery({
+    queryKey: ['bank-accounts-for-channel', isRemit ? `company-${row?.company_id}` : `branch-${row?.branch_id}`],
+    queryFn: () => apiClient.get<PickableAccount[]>(isRemit
+      ? `/v_bank_accounts?company_id=eq.${row!.company_id}&branch_id=is.null&is_active=eq.true&order=is_default.desc,id`
+      : `/v_bank_accounts?branch_id=eq.${row!.branch_id}&is_active=eq.true&order=bank_name`),
     enabled: open && !!row,
   });
 
+  const initial = rowProp?.configured_account_id != null ? String(rowProp.configured_account_id) : null;
   // Reset the picker to the row's configured account whenever reopened.
   useEffect(() => {
-    if (open && row) {
-      setAccountId(row.configured_account_id != null ? String(row.configured_account_id) : null);
-      setError('');
-    }
-  }, [open, row]);
+    if (!open) return;
+    setAccountId(initial);
+    setError('');
+    setView('form');
+    setConfirmClose(false);
+  }, [open, initial]);
 
   const options = accounts.map(a => ({
     value: String(a.id),
     label: `${a.bank_name} · ${a.account_number_display ?? a.account_number} · ${a.account_name}`,
   }));
+  const picked = accounts.find(a => String(a.id) === accountId) ?? null;
+
+  const dirty = accountId !== initial;
+  const forceClose = () => { setConfirmClose(false); onClose(); };
+  const handleClose = () => {
+    if (saving) return;
+    if (view === 'done') { forceClose(); return; }
+    if (dirty) { setConfirmClose(true); return; }
+    forceClose();
+  };
 
   const handleSave = async () => {
     if (!row || !accountId) return;
@@ -174,7 +200,8 @@ function SetChannelAccountModal({
         p_channel: row.channel,
         p_account_id: Number(accountId),
       });
-      onSaved();
+      queryClient.invalidateQueries({ queryKey: ['bank-channel-config'] });
+      setView('done');
     } catch (err) {
       if (err instanceof ApiError) {
         const tr = translateApiError(err, t);
@@ -188,45 +215,86 @@ function SetChannelAccountModal({
   };
 
   return (
-    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
-      <div className="modal-header">
-        <h2 className="modal-title">{t('bankChannel.editTitle', { defaultValue: 'Set channel account' })}</h2>
-        <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
-      </div>
-      <div className="modal-content">
-        {error && (
-          <div className="alert alert-danger mb-4 animate-pop-in"><XCircle size={16} /><span>{error}</span></div>
-        )}
-        {row && (
-          <div className="px-3 py-2.5 rounded-md bg-surface border border-line mb-4 flex items-center gap-2">
-            <Landmark size={16} className="text-subtle shrink-0" />
-            <div className="min-w-0">
-              <div className="text-sm font-medium">{row.branch_name}</div>
-              <div className="text-xs text-subtle">{t(`bankChannel.channel_${row.channel}`, { defaultValue: row.channel })}</div>
-            </div>
-          </div>
-        )}
-        <div className="form-grid">
-          <div className="flex flex-col">
-            <label className="form-label">{t('bankChannel.account', { defaultValue: 'Account' })} *</label>
-            <Select
-              options={options}
-              value={accountId}
-              onChange={(v) => setAccountId((v as string) || null)}
-              placeholder={t('bankChannel.accountPlaceholder', { defaultValue: 'Pick an account' })}
-              size="sm"
-              searchable
-              showChevron
-            />
-          </div>
+    <>
+      <Modal open={open} onClose={handleClose} maxWidth="28rem" width="100%">
+        <div className="modal-header">
+          <h2 className="modal-title">{t('bankChannel.editTitle', { defaultValue: 'Set channel account' })}</h2>
+          <button type="button" className="modal-close-btn" onClick={handleClose} aria-label="Close">&times;</button>
         </div>
-      </div>
-      <div className="modal-footer">
-        <Button variant="ghost" onClick={onClose} disabled={saving}>{t('common.cancel')}</Button>
-        <Button color="primary" onClick={handleSave} disabled={!accountId || saving}>
-          {saving ? t('common.saving') : t('common.save')}
-        </Button>
-      </div>
-    </Modal>
+        {view === 'done' ? (
+          <ActionDoneView
+            headline={t('bankChannel.saved', { defaultValue: 'Channel account updated' })}
+            contractCode={row ? `${row.branch_name} · ${channelLabel(t, row.channel)}` : ''}
+            detailRows={picked ? [
+              { label: t('bankChannel.account', { defaultValue: 'Account' }), value: `${picked.bank_name} · ${picked.account_number_display ?? picked.account_number}`, emphasis: true },
+              { label: t('settings.bankAccounts.accountName'), value: picked.account_name },
+            ] : []}
+            onClose={forceClose}
+          />
+        ) : (
+          <>
+            <div className="modal-content">
+              {row && (
+                <div className="px-3 py-2.5 rounded-md bg-surface border border-line mb-4 flex items-center gap-2">
+                  <Landmark size={16} className="text-subtle shrink-0" />
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium">{row.branch_name}</div>
+                    <div className="text-xs text-subtle">{channelLabel(t, row.channel)}</div>
+                  </div>
+                </div>
+              )}
+              {isRemit && (
+                <div className="alert alert-info mb-4"><span>{t('bankChannel.remitHint')}</span></div>
+              )}
+              <div className="form-grid">
+                <div className="flex flex-col">
+                  <label className="form-label">{t('bankChannel.account', { defaultValue: 'Account' })} *</label>
+                  {isRemit && !isLoading && accounts.length === 0 ? (
+                    <div className="alert alert-warning">
+                      <div className="flex flex-col gap-1">
+                        <span>{t('fundAccount.noneYet')}</span>
+                        <Link
+                          to="/admin/company/bank-accounts?tab=company"
+                          onClick={forceClose}
+                          className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1"
+                        >
+                          {t('fundAccount.createLink')}
+                          <ExternalLink size={12} />
+                        </Link>
+                      </div>
+                    </div>
+                  ) : (
+                    <Select
+                      options={options}
+                      value={accountId}
+                      onChange={(v) => setAccountId((v as string) || null)}
+                      placeholder={t('bankChannel.accountPlaceholder', { defaultValue: 'Pick an account' })}
+                      searchable
+                      showChevron
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+            <ModalErrorBand message={error} onDismiss={() => setError('')} />
+            <div className="modal-footer">
+              <Button variant="ghost" onClick={handleClose} disabled={saving}>{t('common.cancel')}</Button>
+              <Button color="primary" onClick={handleSave} disabled={!accountId || saving}>
+                {saving ? t('common.saving') : t('common.save')}
+              </Button>
+            </div>
+          </>
+        )}
+      </Modal>
+
+      <Modal open={confirmClose} onClose={() => setConfirmClose(false)} maxWidth="24rem" width="100%" ariaLabel={t('common.unsavedChanges')}>
+        <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
+        <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
+        <div className="modal-footer">
+          <Button variant="ghost" onClick={() => setConfirmClose(false)}>{t('common.cancel')}</Button>
+          <Button color="danger" onClick={forceClose}>{t('common.discard')}</Button>
+        </div>
+      </Modal>
+    </>
   );
 }

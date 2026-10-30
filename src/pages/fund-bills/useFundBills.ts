@@ -291,7 +291,8 @@ export function useFundBillDeviceTransfers(billId: number | null) {
   return { ...query, rows: query.data ?? [] };
 }
 
-/** Source accounts of the fund company that issued the document. */
+/** A fund company's own bank account — the only kind a fund money movement may
+ *  name (mig 1531, doc 149 §4). */
 export interface FundSourceAccount {
   id: number;
   bank_name: string;
@@ -301,16 +302,23 @@ export interface FundSourceAccount {
   is_default: boolean;
 }
 
+/**
+ * The fund's company-level accounts, the usual one first.
+ *
+ * `branch_id=is.null` is the whole point: a shop's instalment account sits in
+ * the same company and used to be offered here, and the backend now refuses it
+ * (`SOURCE_ACCOUNT_INVALID`, required_level COMPANY).
+ */
 export function useFundSourceAccounts(companyId: number | null) {
   const query = useQuery({
     queryKey: ['fund-bills', 'source-accounts', companyId],
     queryFn: () => apiClient.get<FundSourceAccount[]>(
-      `/v_bank_accounts?company_id=eq.${companyId}&is_active=eq.true&order=is_default.desc,bank_name`,
+      `/v_bank_accounts?company_id=eq.${companyId}&branch_id=is.null&is_active=eq.true&order=is_default.desc,id`,
     ),
     enabled: companyId != null,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 1000,
   });
-  return query.data ?? [];
+  return { accounts: query.data ?? [], isLoading: query.isLoading };
 }
 
 /**

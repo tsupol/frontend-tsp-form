@@ -10,7 +10,7 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Button, Input, InputDatePicker, RadioGroup, Select, TextArea } from 'tsp-form';
+import { Modal, Button, Input, InputDatePicker, RadioGroup, TextArea } from 'tsp-form';
 import { Keyboard } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { FundDayClosedHint, FundPayErrorBand } from '../../components/FundDayPayGuard';
@@ -21,7 +21,8 @@ import { FundPaySlipFailedNotice, FundPaySlipField } from '../../components/Fund
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../../lib/format';
-import { useFundSourceAccounts } from '../fund-bills/useFundBills';
+import { FundAccountField } from '../../components/FundAccountField';
+import { useFundAccountChoice } from '../../hooks/useFundAccountChoice';
 import { useFundClawbackInvalidate } from './useFundClawback';
 import type { FundClawbackCollectResult } from './fundClawbackTypes';
 import type { FundBill } from '../fund-bills/fundBillTypes';
@@ -48,7 +49,8 @@ interface FundClawbackCollectModalProps {
 export function FundClawbackCollectModal({ open, bill, onClose }: FundClawbackCollectModalProps) {
   const { t, i18n } = useTranslation();
   const invalidate = useFundClawbackInvalidate();
-  const accounts = useFundSourceAccounts(open ? (bill?.company_id ?? null) : null);
+  const account = useFundAccountChoice(open ? (bill?.company_id ?? null) : null);
+  const { reset: resetAccount } = account;
 
   const today = toLocalDateStr(new Date());
 
@@ -56,7 +58,6 @@ export function FundClawbackCollectModal({ open, bill, onClose }: FundClawbackCo
   const [paidDate, setPaidDate] = useState(today);
   const [typing, setTyping] = useState(false);
   const [method, setMethod] = useState('TRANSFER');
-  const [accountId, setAccountId] = useState('');
   const [reference, setReference] = useState('');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
@@ -77,7 +78,7 @@ export function FundClawbackCollectModal({ open, bill, onClose }: FundClawbackCo
     setPaidDate(toLocalDateStr(new Date()));
     setTyping(false);
     setMethod('TRANSFER');
-    setAccountId('');
+    resetAccount();
     setReference('');
     setNote('');
     setSaving(false);
@@ -85,11 +86,13 @@ export function FundClawbackCollectModal({ open, bill, onClose }: FundClawbackCo
     resetSlip();
     setResult(null);
     setConfirmClose(false);
-  }, [open, resetAttempt, resetSlip]);
+  }, [open, resetAttempt, resetSlip, resetAccount]);
 
   const futureDate = !!paidDate && paidDate > today;
-  const dirty = paidDate !== today || !!accountId || !!reference.trim() || !!note.trim() || slip.files.length > 0;
-  const canSubmit = !!paidDate && !futureDate;
+  /** Cash never touches a bank, so it names no account (doc 149 §4). */
+  const throughBank = method === 'TRANSFER';
+  const dirty = paidDate !== today || account.changed || !!reference.trim() || !!note.trim() || slip.files.length > 0;
+  const canSubmit = !!paidDate && !futureDate && (!throughBank || !!account.accountId);
 
   const forceClose = () => { setConfirmClose(false); onClose(); };
   const handleClose = () => {
@@ -97,11 +100,6 @@ export function FundClawbackCollectModal({ open, bill, onClose }: FundClawbackCo
     if (dirty) { setConfirmClose(true); return; }
     forceClose();
   };
-
-  const accountOptions = accounts.map(a => ({
-    value: String(a.id),
-    label: `${a.bank_name} · ${a.account_number_display ?? a.account_number ?? ''}`,
-  }));
 
   const handleSubmit = async (amend = false) => {
     if (!shown || !canSubmit) return;
@@ -112,7 +110,7 @@ export function FundClawbackCollectModal({ open, bill, onClose }: FundClawbackCo
         p_bill_id: shown.bill_id,
         p_paid_date: paidDate,
         p_method: method,
-        p_bank_account_id: accountId ? Number(accountId) : null,
+        p_bank_account_id: throughBank ? Number(account.accountId) : null,
         p_reference: reference.trim() || null,
         p_note: note.trim() || null,
         ...attempt.amendParams(amend),
@@ -194,16 +192,9 @@ export function FundClawbackCollectModal({ open, bill, onClose }: FundClawbackCo
                   />
                 </div>
 
-                <div className="flex flex-col">
-                  <label className="form-label">{t('fundClawback.bankAccount')}</label>
-                  <Select
-                    options={accountOptions}
-                    value={accountId || null}
-                    onChange={v => setAccountId((v as string) ?? '')}
-                    placeholder={t('fundClawback.bankAccountPlaceholder')}
-                    clearable
-                  />
-                </div>
+                {throughBank && (
+                  <FundAccountField choice={account} label={t('fundAccount.intoAccount')} disabled={saving} />
+                )}
 
                 <div className="flex flex-col">
                   <label className="form-label">{t('fundClawback.reference')}</label>

@@ -133,7 +133,7 @@ export function PaymentListPage() {
     queryFn: () => apiClient.get<BankAccountOption[]>(
       branchId
         ? `/v_bank_accounts?is_active=is.true&branch_id=eq.${branchId}&order=is_default.desc,bank_name`
-        : '/v_bank_accounts?is_active=is.true&order=bank_name',
+        : '/v_bank_accounts?is_active=is.true&branch_id=not.is.null&order=bank_name',
     ),
     staleTime: 5 * 60 * 1000,
   });

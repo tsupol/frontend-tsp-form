@@ -9,8 +9,13 @@
 // return to the shop at their old cost, and both money books go back to where
 // they were. The one thing that does not come back is the finance tick — it has
 // to be done again — which is why the success view says it.
+//
+// A document whose money went through a bank gets its reversal through a bank
+// too, so the reversal names one of the fund's company accounts (mig 1531) —
+// the one the original used, when it is still there. A document that never
+// touched a bank (the company's own internal row only) names none.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Button, Input, TextArea } from 'tsp-form';
 import { Smartphone } from 'lucide-react';
@@ -22,7 +27,9 @@ import { fundPaySlipDoneRows, useFundPaySlip } from '../../hooks/useFundPaySlip'
 import { FundPaySlipFailedNotice, FundPaySlipField } from '../../components/FundPaySlip';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { fmtCurrency } from '../../lib/format';
-import { useFundBillInvalidate } from './useFundBills';
+import { FundAccountField } from '../../components/FundAccountField';
+import { useFundAccountChoice } from '../../hooks/useFundAccountChoice';
+import { useFundBillInvalidate, useFundBillPayments } from './useFundBills';
 import type { FundBill, FundBillCreditNoteResult } from './fundBillTypes';
 import { fundBillShownTotal } from './fundBillTypes';
 
@@ -46,6 +53,14 @@ export function FundBillCreditNoteModal({ open, bill, onClose }: FundBillCreditN
   const { reset: resetSlip } = slip;
   const [result, setResult] = useState<FundBillCreditNoteResult | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
+  const account = useFundAccountChoice(open ? (bill?.company_id ?? null) : null);
+  const { reset: resetAccount, setAccountId, accounts } = account;
+  const payments = useFundBillPayments(open ? (bill?.bill_id ?? null) : null);
+
+  /** The original's own movement through a bank — the one being reversed. */
+  const bankPayment = payments.rows.find(p => !p.is_reversal && p.held_by !== 'NONE' && p.method !== 'INTERNAL') ?? null;
+  const throughBank = bankPayment != null;
+  const seededRef = useRef(false);
 
   useEffect(() => {
     if (!open) return;
@@ -57,10 +72,23 @@ export function FundBillCreditNoteModal({ open, bill, onClose }: FundBillCreditN
     resetSlip();
     setResult(null);
     setConfirmClose(false);
-  }, [open, resetAttempt, resetSlip]);
+    resetAccount();
+    seededRef.current = false;
+  }, [open, resetAttempt, resetSlip, resetAccount]);
 
-  const dirty = !!reasonCode.trim() || !!note.trim() || slip.files.length > 0;
-  const canSubmit = reasonCode.trim().length >= 3;
+  // Start from the account the original went through, once, if it is still one
+  // of the fund's active accounts; otherwise the usual account stays picked.
+  const originalAccountId = bankPayment?.bank_account_id ?? null;
+  useEffect(() => {
+    if (!open || seededRef.current || originalAccountId == null || accounts.length === 0) return;
+    seededRef.current = true;
+    if (accounts.some(a => a.id === originalAccountId)) setAccountId(String(originalAccountId));
+  }, [open, originalAccountId, accounts, setAccountId]);
+
+  const dirty = !!reasonCode.trim() || !!note.trim() || slip.files.length > 0 || (account.changed && String(originalAccountId) !== account.accountId);
+  const canSubmit = reasonCode.trim().length >= 3
+    && !payments.isLoading
+    && (!throughBank || !!account.accountId);
 
   const forceClose = () => { setConfirmClose(false); onClose(); };
   const handleClose = () => {
@@ -78,7 +106,7 @@ export function FundBillCreditNoteModal({ open, bill, onClose }: FundBillCreditN
         p_bill_id: bill.bill_id,
         p_reason_code: reasonCode.trim(),
         p_note: note.trim() || null,
-        p_bank_account_id: null,
+        p_bank_account_id: throughBank ? Number(account.accountId) : null,
         ...attempt.amendParams(amend),
       });
       setResult(res);
@@ -140,6 +168,14 @@ export function FundBillCreditNoteModal({ open, bill, onClose }: FundBillCreditN
                     placeholder={t('fundBill.creditNoteReasonPlaceholder')}
                   />
                 </div>
+
+                {throughBank && (
+                  <FundAccountField
+                    choice={account}
+                    label={bankPayment?.flow === 'OUT' ? t('fundAccount.intoAccount') : t('fundAccount.fromAccount')}
+                    disabled={saving}
+                  />
+                )}
 
                 <FundPaySlipField
                   slip={slip}

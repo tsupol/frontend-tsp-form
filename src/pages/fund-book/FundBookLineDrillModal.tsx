@@ -135,7 +135,7 @@ export function FundBookLineDrillModal({ open, billId, onClose }: FundBookLineDr
           ) : (
             groups.map(group => (
               <div key={group.owner} className="rounded-md border border-line overflow-hidden">
-                <div className="px-3 py-2 bg-surface flex items-center gap-2">
+                <div className="px-3 py-2 bg-surface-shallow flex items-center gap-2">
                   {group.owner === 'COMPANY'
                     ? <Building2 size={14} className="text-subtle shrink-0" />
                     : <Wallet size={14} className="text-subtle shrink-0" />}
@@ -184,7 +184,7 @@ export function FundBookLineDrillModal({ open, billId, onClose }: FundBookLineDr
            *  transfer, and the company's share never left on its own. */}
           {lines.rows.length > 0 && (
             <div className="rounded-md border border-line overflow-hidden">
-              <div className="px-3 py-2 bg-surface flex items-center gap-2">
+              <div className="px-3 py-2 bg-surface-shallow flex items-center gap-2">
                 <span className="text-sm font-medium">{t('fundBill.documentTotal')}</span>
                 <span className="flex-1" />
                 <span className="text-sm font-semibold tabular-nums">{fmtCurrency(documentNet)}</span>

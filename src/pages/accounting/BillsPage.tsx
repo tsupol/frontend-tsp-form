@@ -447,7 +447,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
   // Bank accounts for transfer
   const { data: bankAccounts } = useQuery({
     queryKey: ['bank-accounts-active'],
-    queryFn: () => apiClient.get<BankAccount[]>('/v_bank_accounts?is_active=is.true&order=bank_name'),
+    queryFn: () => apiClient.get<BankAccount[]>('/v_bank_accounts?is_active=is.true&branch_id=not.is.null&order=bank_name'),
     staleTime: 5 * 60 * 1000,
   });
   const bankOptions = (bankAccounts ?? []).map(b => ({

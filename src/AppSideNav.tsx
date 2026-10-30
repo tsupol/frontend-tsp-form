@@ -60,8 +60,8 @@ import {
   UserX,
   Hourglass,
   KeySquare,
-  // Fund company — daily money summary + reconciliation history
-  CalendarClock, History,
+  // Fund company — cash position, passbook, daily money summary + reconciliation history
+  CalendarClock, History, PiggyBank, BookOpenText,
   // Bank SMS phones
   MessageSquareText,
 } from 'lucide-react';
@@ -556,26 +556,36 @@ export const AppSideNav = () => {
         children: dealPartnerChildren,
       }];
     })(),
+    // The fund's money (doc 155 menu, owner 10-30): looking at money, from the
+    // overall position down to the lines, then settings. Same items and order
+    // as the section's own sub-nav (FundMoneyLayout).
     ...(canSeeFundDayMoney
       ? [{
-          key: 'fund-day-money',
-          // Fund days with activity still to close (always 0 while the
-          // holding's day-close switch is off).
-          ...iconWithCount(<CalendarClock size="1rem" />, fundDayUnclosedCount),
-          label: t('nav.fundDayMoney'),
-          path: '/admin/fund-day-money',
-        }, {
-          key: 'fund-day-recon',
-          icon: <History size="1rem" />,
-          label: t('nav.fundDayRecon'),
-          path: '/admin/fund-day-recon',
-        }, {
-          // The books are read-only for anyone who can see the daily money; the
-          // three movement buttons on the page carry their own permissions.
-          key: 'fund-book',
-          icon: <Wallet size="1rem" />,
-          label: t('nav.fundBook'),
-          path: '/admin/fund-book',
+          key: 'fund-money',
+          ...iconWithCount(<PiggyBank size="1rem" />, fundDayUnclosedCount),
+          label: t('nav.fundMoney'),
+          path: '/admin/fund-cash',
+          children: [
+            { type: 'group' as const, key: 'grp-fund-view', label: t('nav.groupFundView') },
+            { key: 'fund-cash', icon: <PiggyBank size="1rem" />, label: t('nav.fundCash'), path: '/admin/fund-cash' },
+            { key: 'fund-passbook', icon: <BookOpenText size="1rem" />, label: t('nav.fundPassbook'), path: '/admin/fund-passbook' },
+            {
+              key: 'fund-day-money',
+              // Fund days with activity still to close (always 0 while the
+              // holding's day-close switch is off).
+              ...iconWithCount(<CalendarClock size="1rem" />, fundDayUnclosedCount),
+              label: t('nav.fundDayMoney'),
+              path: '/admin/fund-day-money',
+            },
+            { key: 'fund-day-recon', icon: <History size="1rem" />, label: t('nav.fundDayRecon'), path: '/admin/fund-day-recon' },
+            // The books are read-only for anyone who can see the daily money; the
+            // three movement buttons on the page carry their own permissions.
+            { key: 'fund-book', icon: <Wallet size="1rem" />, label: t('nav.fundBook'), path: '/admin/fund-book' },
+            ...(hasPermission('BANK_ACCOUNT.COMPANY_MANAGE') ? [
+              { type: 'group' as const, key: 'grp-fund-settings', label: t('nav.groupFundSettings') },
+              { key: 'fund-bank-accounts', icon: <Landmark size="1rem" />, label: t('nav.fundBankAccounts'), path: '/admin/company/bank-accounts?tab=company' },
+            ] : []),
+          ],
         }]
       : []),
     {
