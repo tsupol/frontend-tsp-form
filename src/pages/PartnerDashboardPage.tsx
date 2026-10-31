@@ -199,9 +199,11 @@ export function PartnerDashboardPage() {
               error={actionsQuery.error}
               empty={actions.length === 0}
               emptyText={t('partnerDashboard.noActions')}
+              hidden={Math.max(0, actions.length - CARD_ROWS)}
+              moreTo="/admin/contracts/search"
               t={t}
             >
-              {actions.map(a => (
+              {actions.slice(0, CARD_ROWS).map(a => (
                 <li key={`${a.action_type}-${a.contract_id}`}>
                   <Link
                     // A device bound but its handover sheet not yet signed (mig 1544:
@@ -221,11 +223,14 @@ export function PartnerDashboardPage() {
                         {a.customer_name && <> · {a.customer_name}</>}
                       </span>
                     </span>
-                    {a.deadline && (
-                      <span className="text-xs text-subtle whitespace-nowrap tabular-nums">
-                        <DateTime value={a.deadline} showTime={false} />
-                      </span>
-                    )}
+                    <span className="flex items-center gap-2 shrink-0">
+                      {a.deadline && (
+                        <span className="text-xs text-subtle whitespace-nowrap tabular-nums">
+                          <DateTime value={a.deadline} showTime={false} />
+                        </span>
+                      )}
+                      <ChevronRight size={16} className="text-subtle shrink-0" />
+                    </span>
                   </Link>
                 </li>
               ))}
@@ -237,9 +242,11 @@ export function PartnerDashboardPage() {
               error={casesQuery.error}
               empty={cases.length === 0}
               emptyText={t('partnerDashboard.noCases')}
+              hidden={Math.max(0, cases.length - CARD_ROWS)}
+              moreTo="/admin/contracts/pending-approval"
               t={t}
             >
-              {cases.map(c => {
+              {cases.slice(0, CARD_ROWS).map(c => {
                 const returned = c.outcome === 'RETURNED';
                 const to = returned
                   ? `/admin/contracts/approval-returned/${c.contract_id}`
@@ -393,12 +400,20 @@ function CountTile({ icon, title, count, emptyText, to, quietTone }: {
   return <div className={cls}>{body}</div>;
 }
 
-function ListCard({ title, loading, error, empty, emptyText, children, t }: {
+// A dashboard to-do card shows a short list; the full list lives on the page that
+// owns it. The footer appears only when rows are hidden, and says how many.
+const CARD_ROWS = 5;
+
+function ListCard({ title, loading, error, empty, emptyText, hidden = 0, moreTo, children, t }: {
   title: string;
   loading: boolean;
   error: unknown;
   empty: boolean;
   emptyText: string;
+  /** Rows beyond CARD_ROWS that the card is not showing. */
+  hidden?: number;
+  /** Where the full list is. */
+  moreTo?: string;
   children: React.ReactNode;
   t: (k: string, o?: Record<string, unknown>) => string;
 }) {
@@ -414,7 +429,14 @@ function ListCard({ title, loading, error, empty, emptyText, children, t }: {
           <CheckCircle2 size={16} className="text-success" />{emptyText}
         </div>
       ) : (
-        <ul className="divide-y divide-line border-t border-line m-0 p-0 list-none">{children}</ul>
+        <>
+          <ul className="divide-y divide-line border-t border-line m-0 p-0 list-none">{children}</ul>
+          {hidden > 0 && moreTo && (
+            <Link to={moreTo} className="mt-2 inline-flex items-center gap-1 text-sm text-primary-fg hover:underline">
+              {t('partnerDashboard.moreRows', { count: hidden })}<ChevronRight size={14} />
+            </Link>
+          )}
+        </>
       )}
     </div>
   );

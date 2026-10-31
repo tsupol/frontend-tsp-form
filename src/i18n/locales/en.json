@@ -10686,6 +10686,8 @@
     "action_PENDING_SIGN": "Awaiting signature",
     "casesTitle": "Credit requests needing the shop",
     "noCases": "No requests waiting on the shop",
+    "moreRows_one": "See {{count}} more",
+    "moreRows_other": "See {{count}} more",
     "caseInForce": "Approved · open the contract",
     "caseReturned": "Sent back to fix",
     "usableUntil": "usable until",

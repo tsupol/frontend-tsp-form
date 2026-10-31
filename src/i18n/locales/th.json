@@ -10668,6 +10668,8 @@
     "action_PENDING_SIGN": "รอเซ็น",
     "casesTitle": "คำขออนุมัติที่ร้านต้องจัดการ",
     "noCases": "ไม่มีคำขอที่รอร้าน",
+    "moreRows_one": "ดูอีก {{count}} รายการ",
+    "moreRows_other": "ดูอีก {{count}} รายการ",
     "caseInForce": "อนุมัติแล้ว · เปิดสัญญาได้",
     "caseReturned": "ส่งกลับให้แก้",
     "usableUntil": "ใช้ได้ถึง",
