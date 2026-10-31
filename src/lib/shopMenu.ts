@@ -24,6 +24,8 @@ export const SHOP_ALLOWED_PATHS = new Set<string>([
   '/admin',
   // Contracts — the FIN1 wizard + the shop's own contract lists
   '/admin/contracts/search',
+  // Everything the shop still has to act on, in one list (the dashboard card in full).
+  '/admin/contracts/todo',
   '/admin/contracts/draft',
   // The shop's own credit-approval requests (NOTICE 2026-09-17) — reads the
   // same shop view the per-contract approval card already uses.

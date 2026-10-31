@@ -87,6 +87,7 @@ import { PartnerCommissionPage } from './pages/partner-settlement/PartnerCommiss
 import { FinanceShopCommissionPage, MyShopCommissionPage } from './pages/shop-commission/ShopCommissionPage';
 import { ShopReturnsPage } from './pages/partner-return/ShopReturnsPage';
 import { PendingPairingPage } from './pages/contracts/PendingPairingPage';
+import { ShopTodoPage } from './pages/contracts/ShopTodoPage';
 import { DepositedDevicesPage } from './pages/contracts/DepositedDevicesPage';
 import { LoanersOutPage } from './pages/contracts/LoanersOutPage';
 import { PausedContractsPage } from './pages/contracts/PausedContractsPage';
@@ -855,6 +856,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <ContractsLayout><ShopReturnsPage /></ContractsLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/contracts/todo/:contractId?"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <ContractsLayout><ShopTodoPage /></ContractsLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

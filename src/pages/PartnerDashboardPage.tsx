@@ -42,6 +42,7 @@ import { MonthPicker } from '../components/MonthPicker';
 import { MonthOpenedView, monthStartIso, useDayPoints, useMonthTotals, type MonthlyRow } from '../components/ContractsOpenedChart';
 import { translateApiError } from '../lib/apiErrors';
 import type { PartnerCase } from './partner-cases/partnerCaseTypes';
+import { SHOP_TODO_PATH, shopTodoRowPath } from './contracts/ShopTodoPage';
 
 /** v_partner_my_rank_today — always exactly one row, the shop's own. */
 interface MyRankToday {
@@ -107,6 +108,7 @@ export function PartnerDashboardPage() {
     retry: false,
   });
   const cases = casesQuery.data ?? [];
+  const hiddenCases = cases.slice(CARD_ROWS);
 
   const [month, setMonth] = useState<Date>(() => {
     const now = new Date();
@@ -199,16 +201,15 @@ export function PartnerDashboardPage() {
               error={actionsQuery.error}
               empty={actions.length === 0}
               emptyText={t('partnerDashboard.noActions')}
-              hidden={Math.max(0, actions.length - CARD_ROWS)}
-              moreTo="/admin/contracts/search"
+              more={[{ count: Math.max(0, actions.length - CARD_ROWS), to: SHOP_TODO_PATH, label: t('partnerDashboard.moreRows', { count: Math.max(0, actions.length - CARD_ROWS) }) }]}
               t={t}
             >
               {actions.slice(0, CARD_ROWS).map(a => (
                 <li key={`${a.action_type}-${a.contract_id}`}>
                   <Link
-                    // A device bound but its handover sheet not yet signed (mig 1544:
-                    // the signed BIND addendum IS the handover) opens on the signing tab.
-                    to={`/admin/contracts/search/${a.contract_id}${a.action_type === 'PENDING_DELIVERY' ? '?tab=signing' : ''}`}
+                    // Opens the row on งานรอทำ, the full list, so the rest of the work
+                    // stays beside the contract.
+                    to={shopTodoRowPath(a)}
                     className="py-2 flex items-start justify-between gap-3 text-sm no-underline text-current hover:text-primary-fg"
                   >
                     <span className="min-w-0 flex flex-col gap-0.5">
@@ -242,15 +243,19 @@ export function PartnerDashboardPage() {
               error={casesQuery.error}
               empty={cases.length === 0}
               emptyText={t('partnerDashboard.noCases')}
-              hidden={Math.max(0, cases.length - CARD_ROWS)}
-              moreTo="/admin/contracts/pending-approval"
+              more={[
+                { count: hiddenCases.filter(c => c.outcome === 'RETURNED').length, to: '/admin/contracts/approval-returned', label: t('partnerDashboard.moreReturned', { count: hiddenCases.filter(c => c.outcome === 'RETURNED').length }) },
+                { count: hiddenCases.filter(c => c.outcome !== 'RETURNED').length, to: '/admin/contracts/pending-payment', label: t('partnerDashboard.moreInForce', { count: hiddenCases.filter(c => c.outcome !== 'RETURNED').length }) },
+              ]}
               t={t}
             >
               {cases.slice(0, CARD_ROWS).map(c => {
                 const returned = c.outcome === 'RETURNED';
+                // Each opens on the stage page that lists it: รออนุมัติ holds only
+                // requests still waiting, so neither of these is there.
                 const to = returned
                   ? `/admin/contracts/approval-returned/${c.contract_id}`
-                  : `/admin/contracts/pending-approval/${c.contract_id}`;
+                  : `/admin/contracts/pending-payment/${c.contract_id}`;
                 return (
                   <li key={c.case_id}>
                     <Link to={to} className="py-2 flex items-start justify-between gap-3 text-sm no-underline text-current hover:text-primary-fg">
@@ -404,16 +409,18 @@ function CountTile({ icon, title, count, emptyText, to, quietTone }: {
 // owns it. The footer appears only when rows are hidden, and says how many.
 const CARD_ROWS = 5;
 
-function ListCard({ title, loading, error, empty, emptyText, hidden = 0, moreTo, children, t }: {
+/** A footer link of a ListCard: `count` hidden rows live in full on the page at `to`. */
+interface MoreLink { count: number; to: string; label: string }
+
+function ListCard({ title, loading, error, empty, emptyText, more = [], children, t }: {
   title: string;
   loading: boolean;
   error: unknown;
   empty: boolean;
   emptyText: string;
-  /** Rows beyond CARD_ROWS that the card is not showing. */
-  hidden?: number;
-  /** Where the full list is. */
-  moreTo?: string;
+  /** Where the rows beyond CARD_ROWS are, one link per page that holds some
+   *  of them. A card whose rows belong to several stages gets several. */
+  more?: MoreLink[];
   children: React.ReactNode;
   t: (k: string, o?: Record<string, unknown>) => string;
 }) {
@@ -431,10 +438,14 @@ function ListCard({ title, loading, error, empty, emptyText, hidden = 0, moreTo,
       ) : (
         <>
           <ul className="divide-y divide-line border-t border-line m-0 p-0 list-none">{children}</ul>
-          {hidden > 0 && moreTo && (
-            <Link to={moreTo} className="mt-2 inline-flex items-center gap-1 text-sm text-primary-fg hover:underline">
-              {t('partnerDashboard.moreRows', { count: hidden })}<ChevronRight size={14} />
-            </Link>
+          {more.some(m => m.count > 0) && (
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+              {more.filter(m => m.count > 0).map(m => (
+                <Link key={m.to} to={m.to} className="inline-flex items-center gap-1 text-sm text-primary-fg hover:underline">
+                  {m.label}<ChevronRight size={14} />
+                </Link>
+              ))}
+            </div>
           )}
         </>
       )}

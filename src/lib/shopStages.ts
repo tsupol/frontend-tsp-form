@@ -1,6 +1,6 @@
 import {
   Search, FilePlus, FileEdit, ClipboardCheck, Undo2, CreditCard,
-  PackageCheck, Hourglass, Banknote, Percent, PackageOpen, Layers, type LucideIcon,
+  PackageCheck, Hourglass, Banknote, Percent, PackageOpen, Layers, ListTodo, type LucideIcon,
 } from 'lucide-react';
 
 // The deal-partner shop's contract menu, in the order a shop works: one entry
@@ -35,6 +35,10 @@ export const SHOP_STAGE_GROUP_LABEL: Record<ShopStageGroup, string> = {
 export const SHOP_STAGES: ShopStage[] = [
   // Every contract at any stage — first, above the stages themselves.
   { key: 'contract-search', path: '/admin/contracts/search', labelKey: 'nav.shopContractSearch', icon: Search },
+  // Every contract that needs a hand, across the stages below — the full list
+  // behind the dashboard card "สัญญาที่ต้องทำต่อ". No badge: the counters RPC
+  // has no key for it yet.
+  { key: 'shop-todo', path: '/admin/contracts/todo', labelKey: 'nav.shopTodo', icon: ListTodo },
 
   { key: 'new-contract', path: '/admin/contracts/new', labelKey: 'nav.shopNewContract', icon: FilePlus, accent: true },
   { key: 'draft-contracts', path: '/admin/contracts/draft', labelKey: 'nav.draftContracts', icon: FileEdit, count: 'draft' },
