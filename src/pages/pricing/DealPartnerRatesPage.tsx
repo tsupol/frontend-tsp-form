@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -7,7 +8,7 @@ import {
   Button, Select, Modal, Badge, TextArea, MaskedInput, FormErrorMessage,
   type ColumnDef, type SortingState,
 } from 'tsp-form';
-import { ArrowRightFromLine, Pencil, Undo2, ChevronsRight, Receipt, ShieldCheck, Undo, Landmark } from 'lucide-react';
+import { ArrowRightFromLine, Pencil, Undo2, ChevronsRight, Receipt, ShieldCheck, Undo, Landmark, ExternalLink } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { translateApiError } from '../../lib/apiErrors';
@@ -16,10 +17,6 @@ import { ActionDoneView } from '../contracts/ActionDoneView';
 import {
   ClawbackTiersEditor, validateClawbackTiers, renumberTiers, type ClawbackTier,
 } from '../../components/ClawbackTiersEditor';
-import {
-  DealPartnerPayoutAccountField, useRefBanks, validatePayoutAccount,
-  payoutAccountDigits, EMPTY_PAYOUT_VALUE, type DealPartnerPayoutValue,
-} from '../../components/DealPartnerPayoutAccountField';
 import { DealPartnerCompanySection } from '../../components/DealPartnerCompanySection';
 import { BankAccountInline } from '../../components/BankAccountLine';
 import { planTranchesLabel, type PlanTranche } from '../shop-commission/shopCommissionTypes';
@@ -636,10 +633,6 @@ function BranchConfigModal({ open, onClose, config, warehouses, onSaved, planSav
   const [tiers, setTiers] = useState<ClawbackTier[]>([]);
   const [seededTiers, setSeededTiers] = useState<ClawbackTier[]>([]);
   const [seededByBranch, setSeededByBranch] = useState(true);
-  const [payout, setPayout] = useState<DealPartnerPayoutValue>(EMPTY_PAYOUT_VALUE);
-  const [payoutCleared, setPayoutCleared] = useState(false);
-  const [payoutEditing, setPayoutEditing] = useState(false);
-  const { data: banks = [] } = useRefBanks();
 
   const { handleSubmit, control, formState: { errors, isDirty }, reset, watch, setValue } = useForm<ConfigFormData>({
     defaultValues: EMPTY_CONFIG_FORM,
@@ -662,16 +655,6 @@ function BranchConfigModal({ open, onClose, config, warehouses, onSaved, planSav
       setSeededTiers(seedTiers);
       setClawbackByBranch(seedByBranch);
       setSeededByBranch(seedByBranch);
-      // The account number is write-only for a viewer without the permission
-      // (the DB nulls it), so an empty form here means "not shown", never
-      // "cleared" — which is why clearing needs its own explicit flag.
-      setPayout({
-        bank_code: config?.payout_bank_code ?? '',
-        account_no: config?.payout_account_no ?? '',
-        account_name: config?.payout_account_name ?? '',
-      });
-      setPayoutCleared(false);
-      setPayoutEditing(false);
       setView('form');
       setResult(null);
       setErrorMessage('');
@@ -718,11 +701,6 @@ function BranchConfigModal({ open, onClose, config, warehouses, onSaved, planSav
 
   const tiersErrorKey = validateClawbackTiers(tiers);
   const tiersIncomplete = tiers.some(tier => Number.isNaN(tier.pct));
-  const payoutErrorKey = payoutCleared ? null : validatePayoutAccount(payout, banks);
-  const payoutDirty = payoutCleared
-    || payout.bank_code !== (config?.payout_bank_code ?? '')
-    || payout.account_no !== (config?.payout_account_no ?? '')
-    || payout.account_name !== (config?.payout_account_name ?? '');
   const clawbackDirty = !tiersEqual(tiers, seededTiers) || clawbackByBranch !== seededByBranch;
 
   // "Same as the holding default" is the question the user actually asks here,
@@ -745,12 +723,6 @@ function BranchConfigModal({ open, onClose, config, warehouses, onSaved, planSav
     setErrorMessage('');
     try {
       const retId = data.return_to_branch_id ? parseInt(data.return_to_branch_id) : null;
-      // The three payout params are all-or-none: once any one of them is sent,
-      // an omitted sibling reads as empty (not "keep current") and the DB
-      // answers INCOMPLETE. Omitting all three is the only "don't touch" form.
-      const hasPayoutInput = payout.bank_code !== ''
-        || payoutAccountDigits(payout.account_no) !== ''
-        || payout.account_name.trim() !== '';
       const saved = await apiClient.rpc<BranchConfigRow>('fn_deal_partner_branch_config_set', {
         p_branch_id: config.branch_id,
         // On a plan the shop % is not shown, so it is left as it is (NULL = keep).
@@ -765,15 +737,8 @@ function BranchConfigModal({ open, onClose, config, warehouses, onSaved, planSav
         p_clawback_by_branch: clawbackByBranch,
         p_clawback_check_days: parseInt(data.clawback_check_days),
         p_clawback_tiers: renumberTiers(tiers),
-        ...(payoutCleared
-          ? { p_clear_payout_account: true }
-          : hasPayoutInput
-            ? {
-                p_payout_bank_code: payout.bank_code,
-                p_payout_account_no: payout.account_no,
-                p_payout_account_name: payout.account_name.trim(),
-              }
-            : {}),
+        // The payout account is not sent from here: it has one home, the
+        // บัญชีรับเงินจากกองทุน tab (omitting all three p_payout_* = keep).
         p_note: data.note.trim(),
       });
       setResult(saved);
@@ -788,7 +753,7 @@ function BranchConfigModal({ open, onClose, config, warehouses, onSaved, planSav
 
   const handleClose = () => {
     if (view === 'done') { forceClose(); return; }
-    if (isDirty || clawbackDirty || payoutDirty) { setConfirmCloseOpen(true); return; }
+    if (isDirty || clawbackDirty) { setConfirmCloseOpen(true); return; }
     forceClose();
   };
   const forceClose = () => {
@@ -1062,18 +1027,29 @@ function BranchConfigModal({ open, onClose, config, warehouses, onSaved, planSav
                 <ClawbackTiersEditor value={tiers} onChange={setTiers} />
               </div>
 
-              {/* Payout account — where the holding transfers this shop's
-                  money. The field carries its own heading, so this is only the
-                  separator that sets it apart from the clawback block above. */}
-              <div className="border-t border-line pt-1" />
-              <DealPartnerPayoutAccountField
-                value={payout}
-                onChange={setPayout}
-                hasExistingAccount={config?.has_payout_account ?? false}
-                cleared={payoutCleared}
-                onClearedChange={setPayoutCleared}
-                onEditingChange={setPayoutEditing}
-              />
+              {/* Payout account — where the fund transfers this shop's money.
+                  Set on its own tab (one number, one home — owner 10-31); this
+                  only says whether the shop has one and where to change it. */}
+              <div className="border-t border-line pt-3 flex items-start gap-3">
+                <Landmark size={16} className={`shrink-0 mt-0.5 ${config?.has_payout_account ? 'text-subtle' : 'text-warning-fg'}`} />
+                <div className="flex-1 min-w-0 flex flex-col gap-1">
+                  <div className="text-sm font-medium">{t('dealPartnerRate.payoutSection')}</div>
+                  <div className={`text-sm ${config?.has_payout_account ? '' : 'text-warning-fg'}`}>
+                    {config?.has_payout_account
+                      ? (config.payout_bank_code || config.payout_bank_name
+                          ? <BankAccountInline account={{ bank_code: config.payout_bank_code, bank_name: config.payout_bank_name, account_number: config.payout_account_no }} size={16} />
+                          : t('dealPartnerRate.payoutHidden'))
+                      : t('dealPartnerRate.payoutMissing')}
+                  </div>
+                  <Link
+                    to="/admin/company/bank-accounts?tab=partner-payout"
+                    className="text-xs text-primary-fg hover:underline inline-flex items-center gap-1 self-start"
+                  >
+                    {t('dealPartnerRate.payoutEditElsewhere')}
+                    <ExternalLink size={12} />
+                  </Link>
+                </div>
+              </div>
 
               <div className="flex flex-col">
                 <label className="form-label">{t('dealPartnerRate.note')}</label>
@@ -1090,7 +1066,7 @@ function BranchConfigModal({ open, onClose, config, warehouses, onSaved, planSav
           <ModalErrorBand message={errorMessage} onDismiss={() => setErrorMessage('')} />
           <div className="modal-footer">
             <Button variant="outline" onClick={handleClose} type="button">{t('common.cancel')}</Button>
-            <Button color="primary" type="submit" disabled={isSaving || outOfRange || feeOutOfRange || grtOutOfRange || tiersErrorKey !== null || tiersIncomplete || payoutErrorKey !== null || payoutEditing}>
+            <Button color="primary" type="submit" disabled={isSaving || outOfRange || feeOutOfRange || grtOutOfRange || tiersErrorKey !== null || tiersIncomplete}>
               {isSaving ? t('pricing.saving') : t('common.save')}
             </Button>
           </div>

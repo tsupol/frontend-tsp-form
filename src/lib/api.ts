@@ -167,6 +167,37 @@ async function tryRefreshToken(): Promise<boolean> {
 }
 
 // ============================================================================
+// Read-only viewer (COMPANY_VIEWER mig 1551 / HOLDING_VIEWER)
+// ============================================================================
+
+// The DB runs every request of a viewer session in a read-only transaction, so
+// a write never lands — it dies as HTTP 500 (SYSTEM.INTERNAL.UNEXPECTED when the
+// RPC wraps its errors, raw 25006 when it does not). Two things follow here:
+// whichever of the two shapes comes back is given the one message the screen
+// should show: "this account can only view". Writes are not refused up front:
+// many RPCs are reads (counters, reports, available_actions) and the backend's
+// allowlist is the only honest list of what a viewer may call.
+let readOnlyViewer = false;
+export function setReadOnlyViewer(on: boolean) { readOnlyViewer = on; }
+export const READ_ONLY_VIEWER_CODE = 'AUTH.READ_ONLY_VIEWER';
+
+function readOnlyViewerError(): ApiError {
+  return new ApiError({
+    code: READ_ONLY_VIEWER_CODE,
+    message: 'This account can only view',
+    messageKey: READ_ONLY_VIEWER_CODE,
+    httpStatus: 403,
+  });
+}
+
+/** A viewer's write that reached the DB and died there — either shape. */
+function isReadOnlyTxnError(code: string, message: string, httpStatus?: number): boolean {
+  if (!readOnlyViewer) return false;
+  if (code === '25006' || /read-only transaction/i.test(message)) return true;
+  return httpStatus === 500 && code === 'SYSTEM.INTERNAL.UNEXPECTED';
+}
+
+// ============================================================================
 // Response Handling
 // ============================================================================
 
@@ -179,6 +210,7 @@ function makeV2ApiError(err: V2Error['error'], httpStatus?: number): ApiError {
   // calling screen could show the real error — production users then believed their
   // password had changed and got locked out. Only genuine session/token codes redirect.
   const auth = isAuthError(err.code, err.message);
+  if (isReadOnlyTxnError(err.code, err.message, status)) return readOnlyViewerError();
 
   return new ApiError({
     code: err.code,
@@ -267,6 +299,8 @@ export class ApiClient {
     // auth error it is, or the user stays on a page where every read silently
     // fails (seen 2026-10-02: a section spinning forever after sign-in elsewhere).
     const auth = !isPermissionDenied && (status === 401 || isAuthError(pgInnerCode, pgInnerCode || pgMessage));
+
+    if (isReadOnlyTxnError(pgCode || pgInnerCode, pgMessage, status)) return readOnlyViewerError();
 
     const errorCode = isPermissionDenied ? 'PERMISSION_DENIED' : (pgInnerCode || pgMessage || `HTTP_${status}`);
     const errorMessage = isPermissionDenied

@@ -16,7 +16,7 @@ export function ContractsLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const activePath = contractMenuActivePath(location.pathname, location.search);
-  const { savingContractsCount, draftContractsCount, pendingPairingCount, pendingPaymentCount, depositOverdueCount, pausedContractsCount, partnerCasesPendingCount } = useNavCounts();
+  const { savingContractsCount, draftContractsCount, pendingPairingCount, pendingPaymentCount, depositOverdueCount, pausedContractsCount, partnerCasesPendingCount, partnerActionRequiredCount, partnerCasesReturnedCount, partnerSettlementsAwaitingCloseCount } = useNavCounts();
 
   type NavRow =
     | { group: string }
@@ -38,8 +38,8 @@ export function ContractsLayout({ children }: { children: ReactNode }) {
   // Deal-partner shops get their own list, in the order a shop works, under
   // two headings (dual-nav rule — AppSideNav builds from the same list). Only
   // stages with a backend counter carry a badge (BE asked us not to count the
-  // shop views on every menu open).
-  const shopCounts = { draft: draftContractsCount, pendingApproval: partnerCasesPendingCount, pendingPayment: pendingPaymentCount };
+  // shop views on every menu open); mig 1550 added the three the shop acts on.
+  const shopCounts = { todo: partnerActionRequiredCount, draft: draftContractsCount, pendingApproval: partnerCasesPendingCount, returned: partnerCasesReturnedCount, pendingPayment: pendingPaymentCount, settlementClose: partnerSettlementsAwaitingCloseCount };
   const shopItems: NavRow[] = [];
   let shopGroup: string | undefined;
   for (const s of SHOP_STAGES) {

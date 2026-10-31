@@ -18,7 +18,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Button, Input, TextArea } from 'tsp-form';
-import { Smartphone } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { FundPayErrorBand } from '../../components/FundDayPayGuard';
 import { amendedDoneRows } from '../../lib/fundDayPay';
@@ -27,6 +26,7 @@ import { fundPaySlipDoneRows, useFundPaySlip } from '../../hooks/useFundPaySlip'
 import { FundPaySlipFailedNotice, FundPaySlipField } from '../../components/FundPaySlip';
 import { SmsAttachInline } from '../../components/SmsLinkParts';
 import { ActionDoneView } from '../contracts/ActionDoneView';
+import { FundBillDeviceList } from './FundBillDeviceList';
 import { fmtCurrency } from '../../lib/format';
 import { FundAccountField } from '../../components/FundAccountField';
 import { useFundAccountChoice } from '../../hooks/useFundAccountChoice';
@@ -227,20 +227,7 @@ export function FundBillCreditNoteModal({ open, bill, onClose }: FundBillCreditN
                       : t('fundBill.creditNoteRecheckHint')}
                   </span>
                 </div>
-                {devices.length > 0 && (
-                  <div className="rounded-md border border-line overflow-hidden">
-                    <div className="px-3 py-2 bg-surface text-sm font-medium flex items-center gap-2">
-                      <Smartphone size={14} className="text-subtle" />
-                      {t('fundBill.devicesReturnedToShop', { count: devices.length })}
-                    </div>
-                    {devices.map(d => (
-                      <div key={d.transfer_id} className="px-3 py-2 border-t border-line flex items-center justify-between text-sm">
-                        <span className="text-subtle">#{d.asset_id}</span>
-                        <span className="tabular-nums">{fmtCurrency(d.cost_basis)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <FundBillDeviceList devices={devices} direction="to_shop" />
               </div>
             }
             onClose={forceClose}

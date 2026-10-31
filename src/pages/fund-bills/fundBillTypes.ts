@@ -284,13 +284,30 @@ export interface FundBillActionsResponse {
   actions: FundBillAction[];
 }
 
-/** What `fn_fund_bill_pay` reports back about the devices it moved. */
+/**
+ * What `fn_fund_bill_pay` / `fn_fund_bill_credit_note` report back about the
+ * devices they moved. Everything after `cost_basis` arrived with mig 1554
+ * (doc 149 §4); results logged before it carry only the ids, so each is optional.
+ */
 export interface FundBillPaidDevice {
   settlement_id: number;
   contract_id: number;
   asset_id: number;
   transfer_id: number;
   cost_basis: number;
+  settlement_code?: string | null;
+  contract_code_display?: string | null;
+  asset_code_display?: string | null;
+  asset_code?: string | null;
+  product_display_name?: string | null;
+  /** The device's main identifier — IMEI for phones, serial otherwise. */
+  asset_identifier?: string | null;
+  serial_no?: string | null;
+  imei?: string | null;
+  owner_to_type?: string | null;
+  owner_to_id?: number | null;
+  /** New owner's name (holding on pay, the shop on a credit note). */
+  owner_to_name?: string | null;
 }
 
 export interface FundBillCreateResult {

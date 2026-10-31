@@ -159,7 +159,7 @@ function ProfileCard() {
 
   const orgFields: Array<{ label: string; value: string | number | null | undefined }> = [
     { label: t('user.username'), value: profile?.username ?? user?.username },
-    { label: t('user.role'), value: getRoleLabel(t, profile?.role_code ?? user?.role_code) },
+    { label: t('user.role'), value: getRoleLabel(t, profile?.role_code ?? user?.actual_role_code ?? user?.role_code) },
     { label: t('user.branch', { defaultValue: 'Branch' }), value: user?.branch_name ?? profile?.branch_id },
     { label: t('user.company', { defaultValue: 'Company' }), value: user?.company_name ?? profile?.company_id },
     { label: t('user.holdingId'), value: profile?.holding_id ?? user?.holding_id },

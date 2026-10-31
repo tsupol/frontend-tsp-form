@@ -42,6 +42,7 @@ import { BankLogo } from '../../components/BankLogo';
 import { BankAccountLine } from '../../components/BankAccountLine';
 import { accountNumberText } from '../../lib/bankAccount';
 import { useRefBanks } from '../../components/DealPartnerPayoutAccountField';
+import { PartnerPayoutAccountsTab } from './PartnerPayoutAccountsTab';
 
 type AccountLevel = 'branch' | 'company';
 
@@ -77,8 +78,6 @@ interface BankAccount {
   account_name: string;
   /** The kind wants a QR picture; with no qr_media the account shows "ยังไม่มีรูป QR". */
   requires_qr_image: boolean;
-  is_promptpay: boolean;
-  promptpay_id: string | null;
   is_active: boolean;
   is_default: boolean;
   note: string | null;
@@ -106,11 +105,11 @@ interface RefBankKind {
   sort_order: number;
 }
 
-// The owner's two kinds (BE response 2026-10-30): a number the customer can pay
-// to, or a QR to scan and nothing else. PROMPTPAY folds into the first and
-// BEMERCHANT into the second; BE turns both off and they leave the view by
-// themselves. Until then the picker skips them — an existing account of either
-// kind still shows its own name.
+// The owner's two kinds (mig 1553): a number the customer can pay to, or a QR
+// to scan and nothing else. PromptPay is not a kind any more but a destination
+// (`bank_code = PROMPTPAY` in v_ref_banks) with the PromptPay number in the
+// number field; BeMerchant is BBL + QR_ONLY. The old kinds are off in the view;
+// the filter stays as a belt for a stale cache.
 const RETIRING_KINDS = new Set(['PROMPTPAY', 'BEMERCHANT']);
 
 function useRefBankKinds() {
@@ -155,7 +154,6 @@ interface AccountForm {
   account_kind: string;
   account_number: string;
   account_name: string;
-  promptpay_id: string;
   is_default: boolean;
   note: string;
 }
@@ -252,7 +250,6 @@ function AccountModal({ open, onClose, account, level, branches, companies, canM
       account_kind: 'BANK_ACCOUNT',
       account_number: '',
       account_name: '',
-      promptpay_id: '',
       is_default: false,
       note: '',
     },
@@ -275,7 +272,6 @@ function AccountModal({ open, onClose, account, level, branches, companies, canM
         account_kind: acc.account_kind,
         account_number: acc.account_number ?? '',
         account_name: acc.account_name,
-        promptpay_id: acc.promptpay_id ?? '',
         is_default: acc.is_default,
         note: acc.note ?? '',
       });
@@ -287,7 +283,6 @@ function AccountModal({ open, onClose, account, level, branches, companies, canM
         account_kind: 'BANK_ACCOUNT',
         account_number: '',
         account_name: '',
-        promptpay_id: '',
         is_default: false,
         note: '',
       });
@@ -306,9 +301,16 @@ function AccountModal({ open, onClose, account, level, branches, companies, canM
   const bank = banks.find(b => b.code === bankCode) ?? null;
   const kind = kinds.find(k => k.code === kindCode) ?? null;
   // A fund account is never shown to a customer, so it is always a numbered one.
-  const chooseKind = !isEdit && !isCompany;
+  // An existing numbered branch account may still become QR-only (BE clears the
+  // number itself — the one exception to the immutable number); the other way
+  // round would need a number, which cannot be added, so a QR-only account stays.
+  const chooseKind = !isCompany && (!isEdit || account?.account_kind === 'BANK_ACCOUNT');
   const kindOptions = kinds.filter(k => !RETIRING_KINDS.has(k.code));
   const isQrOnly = kind ? !kind.requires_account_number : false;
+  const switchingToQr = isEdit && isQrOnly && account?.account_kind !== kindCode;
+  // A fund company's account must be a real bank (mig 1553) — PromptPay is for
+  // customers paying a branch. Everyone else picks from the whole list.
+  const bankOptions = isCompany ? banks.filter(b => b.is_bank !== false) : banks;
   // Spaces and dashes are typed freely; only the digits are sent.
   const digits = numberInput.replace(/\D/g, '');
   // A warning, never a block (owner 10-30): some real numbers are longer than the
@@ -419,7 +421,7 @@ function AccountModal({ open, onClose, account, level, branches, companies, canM
     // its change lands). No dashed number is sent — BE builds it from the bank.
     const chosenBank = banks.find(b => b.code === data.bank_code) ?? null;
     const kindToSend = isCompany ? 'BANK_ACCOUNT' : data.account_kind;
-    const qrOnly = !isEdit && !isCompany && isQrOnly;
+    const qrOnly = !isCompany && isQrOnly;
     const start = Date.now();
     try {
       let newId: number | null = null;
@@ -434,7 +436,8 @@ function AccountModal({ open, onClose, account, level, branches, companies, canM
           p_account_number: null, // immutable — never sent on update (409 ACCOUNT_NUMBER_IMMUTABLE); null keeps existing
           p_account_name: data.account_name,
           p_account_number_display: null,
-          p_promptpay_id: data.promptpay_id || null,
+          // Only a real change is sent; "QR_ONLY" makes BE clear the number.
+          p_account_kind: data.account_kind !== account!.account_kind ? data.account_kind : null,
           p_note: data.note || null,
           p_updated_by: user.user_id,
         });
@@ -448,7 +451,6 @@ function AccountModal({ open, onClose, account, level, branches, companies, canM
           p_account_kind: kindToSend,
           p_account_number: digits,
           p_account_name: data.account_name,
-          p_promptpay_id: data.promptpay_id || null,
           p_is_default: data.is_default,
           p_note: data.note || null,
         });
@@ -462,7 +464,6 @@ function AccountModal({ open, onClose, account, level, branches, companies, canM
           // A QR-only account has no number to pay to; its shop number goes in the note.
           p_account_number: qrOnly ? null : digits,
           p_account_name: data.account_name,
-          p_promptpay_id: qrOnly ? null : (data.promptpay_id || null),
           p_is_default: data.is_default,
           p_note: data.note || null,
           p_created_by: user.user_id,
@@ -601,7 +602,7 @@ function AccountModal({ open, onClose, account, level, branches, companies, canM
                     value={field.value || null}
                     onChange={(val) => field.onChange((val as string) ?? '')}
                     placeholder={t('bankAccountForm.bankPlaceholder')}
-                    options={banks.map(b => ({ value: b.code, label: bankLabel(b), icon: <BankLogo code={b.code} size={20} /> }))}
+                    options={bankOptions.map(b => ({ value: b.code, label: bankLabel(b), icon: <BankLogo code={b.code} size={20} /> }))}
                     searchable
                     showChevron
                   />
@@ -635,7 +636,7 @@ function AccountModal({ open, onClose, account, level, branches, companies, canM
                 />
               </div>
             )}
-            {isEdit && !isCompany && account && (
+            {isEdit && !isCompany && !chooseKind && account && (
               <div className="flex flex-col">
                 <label className="form-label">{t('bankAccountForm.kind')}</label>
                 <div className="text-sm">
@@ -650,7 +651,9 @@ function AccountModal({ open, onClose, account, level, branches, companies, canM
               <div className="flex flex-col">
                 <label className="form-label">{t('settings.bankAccounts.accountNumber')}</label>
                 <Input value={accountNumberText(account, t)} className="w-full" disabled readOnly />
-                <p className="text-xs text-subtle mt-1.5">{t('settings.bankAccounts.accountNumberImmutable')}</p>
+                <p className={`text-xs mt-1.5 ${switchingToQr ? 'text-warning-fg' : 'text-subtle'}`}>
+                  {switchingToQr ? t('bankAccountForm.switchToQrClearsNumber') : t('settings.bankAccounts.accountNumberImmutable')}
+                </p>
               </div>
             ) : !isQrOnly && (
               <div className="flex flex-col">
@@ -679,12 +682,6 @@ function AccountModal({ open, onClose, account, level, branches, companies, canM
               <Input {...register('account_name', { required: t('common.required') })} className="w-full" />
               <FormErrorMessage error={errors.account_name} />
             </div>
-            {!isQrOnly && (
-              <div className="flex flex-col">
-                <label className="form-label">{t('settings.bankAccounts.promptpayId')}</label>
-                <Input {...register('promptpay_id')} className="w-full" />
-              </div>
-            )}
             <div className="flex flex-col">
               <label className="form-label">{t('settings.bankAccounts.note')}</label>
               <Input {...register('note')} className="w-full" />
@@ -1020,7 +1017,7 @@ function CompanyAccountsTab({ accounts, isLoading, isFetching, showCompany, onEd
 
 // ── Main Page ────────────────────────────────────────────────────────────────
 
-type PageTab = 'accounts' | 'company' | 'channels';
+type PageTab = 'accounts' | 'company' | 'partner-payout' | 'channels';
 
 export function BankAccountsPage() {
   const { t } = useTranslation();
@@ -1058,6 +1055,10 @@ export function BankAccountsPage() {
   // keep them. A holding-level user has no company of its own and picks one.
   const canCompanyAccounts = hasPermission('BANK_ACCOUNT.COMPANY_MANAGE')
     && (isFundCompany || user?.company_id == null);
+  // The shops' own accounts the fund pays INTO (IMPLEMENT 2026-10-31
+  // partner_payout_account_tab) — a fund-side setting, same gate as the
+  // deal-partner terms menu. The RPC decides who may write.
+  const canPartnerPayout = isFundCompany;
 
   // The tab lives in the address so the fund money screens can link straight
   // to the company accounts ("no account yet — create one").
@@ -1065,6 +1066,7 @@ export function BankAccountsPage() {
   const requestedTab = params.get('tab') as PageTab | null;
   const tab: PageTab = requestedTab === 'company' && canCompanyAccounts
     ? 'company'
+    : requestedTab === 'partner-payout' && canPartnerPayout ? 'partner-payout'
     : requestedTab === 'channels' && canManageChannels ? 'channels' : 'accounts';
   const setTab = (next: PageTab) => {
     const p = new URLSearchParams(params);
@@ -1074,8 +1076,11 @@ export function BankAccountsPage() {
   const tabs: PageTab[] = [
     'accounts',
     ...(canCompanyAccounts ? ['company' as const] : []),
+    ...(canPartnerPayout ? ['partner-payout' as const] : []),
     ...(canManageChannels ? ['channels' as const] : []),
   ];
+  // Tabs whose rows are made elsewhere: no "add" button.
+  const noAdd = tab === 'channels' || tab === 'partner-payout';
 
   // Branch rows only: a company row has no branch and belongs on its own tab.
   const { data: accounts = [], isFetching, isLoading } = useQuery({
@@ -1219,13 +1224,6 @@ export function BankAccountsPage() {
       cell: ({ row }) => <AccountBankLine account={row.original} />,
     },
     {
-      id: 'promptpay',
-      header: ({ column }) => <DataTableColumnHeader column={column} title={t('settings.bankAccounts.colPromptpay')} />,
-      cell: ({ row }) => row.original.promptpay_id
-        ? <span className="tabular-nums text-sm">{row.original.promptpay_id}</span>
-        : <span className="text-subtler">—</span>,
-    },
-    {
       id: 'qr',
       header: ({ column }) => <DataTableColumnHeader column={column} title={t('settings.bankAccounts.colQr')} />,
       cell: ({ row }) => row.original.qr_media
@@ -1300,7 +1298,7 @@ export function BankAccountsPage() {
           {t('settings.bankAccounts.title')}
         </div>
         <div className="mobile-header-end w-nav">
-          {tab !== 'channels' && (
+          {!noAdd && (
             <button
               className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-primary-fg"
               onClick={openCreate}
@@ -1318,10 +1316,12 @@ export function BankAccountsPage() {
           <div>
             <h1 className="heading-2">{t('settings.bankAccounts.title')}</h1>
             <p className="text-sm text-subtle mt-1">
-              {tab === 'company' ? t('companyBankAccount.description') : t('settings.bankAccounts.description')}
+              {tab === 'company' ? t('companyBankAccount.description')
+                : tab === 'partner-payout' ? t('partnerPayout.description')
+                : t('settings.bankAccounts.description')}
             </p>
           </div>
-          {tab !== 'channels' && (
+          {!noAdd && (
             <Button color="primary" startIcon={<Plus size={16} />} onClick={openCreate}>
               {addLabel}
             </Button>
@@ -1341,7 +1341,9 @@ export function BankAccountsPage() {
               >
                 {tk === 'accounts'
                   ? t('settings.bankAccounts.tabAccounts')
-                  : tk === 'company' ? t('companyBankAccount.tab') : t('settings.bankAccounts.tabChannels')}
+                  : tk === 'company' ? t('companyBankAccount.tab')
+                  : tk === 'partner-payout' ? t('partnerPayout.tab')
+                  : t('settings.bankAccounts.tabChannels')}
               </button>
             ))}
           </div>
@@ -1349,6 +1351,8 @@ export function BankAccountsPage() {
 
         {tab === 'channels' ? (
           <BankChannelConfig />
+        ) : tab === 'partner-payout' ? (
+          <PartnerPayoutAccountsTab showCompany={user?.company_id == null} />
         ) : tab === 'company' ? (
           <CompanyAccountsTab
             accounts={companyAccounts}

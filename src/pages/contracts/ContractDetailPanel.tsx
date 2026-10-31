@@ -189,6 +189,9 @@ interface ContractDetail {
   shipped_at: string | null;
   shipping_method: string | null;
   tracking_number: string | null;
+  /** When the device-receipt paper (BIND addendum) was sealed — null = not handed over yet (mig 1549). Not `shipped_at`, which is the box. */
+  handed_over_at: string | null;
+  handover_signing_id: number | null;
   source: string | null;
   last_note: string | null;
   created_by: number | null;
@@ -1057,6 +1060,33 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
               <div>
                 <div className="text-xs text-subtle">IMEI / SN</div>
                 <div className="text-sm font-mono">{contract.device_identifier}</div>
+              </div>
+            )}
+            {/* Handover = the customer signed the device-receipt paper (mig 1549
+                cache). Not the box's tracking number, not the box checklist. */}
+            {contract.device_id != null && (
+              <div className="col-span-2">
+                <div className="text-xs text-subtle">{t('contract.deviceHandover')}</div>
+                {contract.handed_over_at ? (
+                  <div className="text-sm flex items-center gap-2 flex-wrap">
+                    <span className="inline-flex items-center gap-1 text-success-fg">
+                      <CheckCircle size={13} />
+                      {t('contract.handedOverAt')} <DateTime value={contract.handed_over_at} showTime />
+                    </span>
+                    {contract.handover_signing_id != null && (
+                      <button
+                        type="button"
+                        onClick={onNavigateSigning}
+                        className="text-sm text-primary-fg hover:underline bg-transparent border-none p-0 cursor-pointer inline-flex items-center gap-1"
+                      >
+                        {t('contract.viewHandoverPaper')}
+                        <ExternalLink size={12} />
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-sm text-warning-fg">{t('contract.handoverNotSigned')}</div>
+                )}
               </div>
             )}
           </div>

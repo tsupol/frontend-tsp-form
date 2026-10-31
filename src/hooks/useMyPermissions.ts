@@ -1,6 +1,14 @@
 import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
+
+// A read-only viewer's v_my_permissions is a copy of the admin's (mig 1551 —
+// that is how it sees the same columns), so it says "may write" for every
+// action the DB will then refuse. Permission codes that gate what is SHOWN
+// keep answering; the rest answer false, which hides the write buttons bound
+// to them (the work order: don't trust v_my_permissions for the guard).
+const VIEW_PERMISSION = /(^|\.)(VIEW|READ|SEE|SHOW|LIST)(_|$)|_VIEW$|\.VIEW_|REVEAL|DEAL_PARTNER_RATE$|PAYOUT_APPROVE$/;
 
 interface MyPermission {
   permission_code: string;
@@ -23,21 +31,24 @@ interface MyPermission {
 // four, while v_my_permissions returns all four. Gating those buttons on
 // `can()` therefore hides them from exactly the people meant to press them.
 export function useMyPermissions() {
+  const { isReadOnlyViewer } = useAuth();
   const { data, isLoading } = useQuery({
     queryKey: ['my-permissions'],
     queryFn: () => apiClient.get<MyPermission[]>('/v_my_permissions'),
     staleTime: 5 * 60_000,
   });
 
-  const hasPermission = useCallback(
-    (code: string) => (data ?? []).some(p => p.permission_code === code),
-    [data],
+  const holds = useCallback(
+    (code: string) => (data ?? []).some(p => p.permission_code === code)
+      && (!isReadOnlyViewer || VIEW_PERMISSION.test(code)),
+    [data, isReadOnlyViewer],
   );
+  const hasPermission = holds;
 
   /** True when the caller holds every one of `codes`. */
   const hasEvery = useCallback(
-    (...codes: string[]) => codes.every(code => (data ?? []).some(p => p.permission_code === code)),
-    [data],
+    (...codes: string[]) => codes.every(holds),
+    [holds],
   );
 
   return {

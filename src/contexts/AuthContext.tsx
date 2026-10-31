@@ -1,13 +1,19 @@
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { authService } from '../lib/auth';
-import { apiClient, setAuthErrorHandler, setTokenRefresher } from '../lib/api';
+import { apiClient, setAuthErrorHandler, setTokenRefresher, setReadOnlyViewer } from '../lib/api';
 import { queryClient } from '../lib/queryClient';
 import type { BranchType, UserInfo } from '../lib/auth';
 
 interface LoginResult {
   needsHoldingSelect: boolean;
 }
+
+/** Read-only viewer role → the admin role whose screens it gets. */
+const READ_ONLY_VIEWER_OF: Record<string, string> = {
+  COMPANY_VIEWER: 'COMPANY_ADMIN',
+  HOLDING_VIEWER: 'HOLDING_ADMIN',
+};
 
 interface Capability {
   code: string;
@@ -51,6 +57,14 @@ interface AuthContextType {
    * an ordinary sales branch, so nothing else tells them apart.
    */
   isFundWarehouse: boolean;
+  /**
+   * COMPANY_VIEWER (mig 1551) / HOLDING_VIEWER: a read-only twin of the admin
+   * role. The session sees everything the admin sees — the DB makes every
+   * request a read-only transaction, so any write dies there with 25006 / a
+   * 500. `user.role_code` is already the admin's for them (one gate for both),
+   * so this flag is the only thing that says "hide the write buttons".
+   */
+  isReadOnlyViewer: boolean;
   can: (code: string) => boolean;
   login: (username: string, password: string) => Promise<LoginResult>;
   logout: () => Promise<void>;
@@ -318,10 +332,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await fetchCapabilities();
   }, [scheduleRefresh, fetchCapabilities]);
 
+  // A viewer role is the admin role for every visibility check in the app
+  // (UI_FEEDBACK/2026-11-01_IMPLEMENT_company_viewer_role_1551.md asks for
+  // exactly that: "menus and pages = COMPANY_ADMIN in every respect"), so the
+  // mapping is done once here instead of at the ~50 role checks. The real role
+  // stays on `actual_role_code` for the user menu / profile.
+  const viewUser = useMemo(() => {
+    if (!user) return null;
+    const mirrored = READ_ONLY_VIEWER_OF[user.role_code];
+    return mirrored ? { ...user, role_code: mirrored, actual_role_code: user.role_code } : user;
+  }, [user]);
+  const isReadOnlyViewer = !!user && user.role_code in READ_ONLY_VIEWER_OF;
+  useEffect(() => { setReadOnlyViewer(isReadOnlyViewer); }, [isReadOnlyViewer]);
+
   return (
     <AuthContext.Provider
       value={{
-        user,
+        user: viewUser,
+        isReadOnlyViewer,
         isAuthenticated: !!user && !authService.isTokenExpired(),
         isLoading,
         needsHoldingSelect,

@@ -110,7 +110,7 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
 
   const displayName = user?.nickname || user?.firstname || user?.username || 'User';
   const initials = displayName.slice(0, 2).toUpperCase();
-  const roleName = user?.role_code ? getRoleLabel(t, user.role_code) : '';
+  const roleName = user?.role_code ? getRoleLabel(t, user.actual_role_code ?? user.role_code) : '';
   const subtitle = user?.branch_name ? `${roleName} · ${user.branch_name}` : roleName;
 
   return (
@@ -284,6 +284,9 @@ export const AppSideNav = () => {
     draftContractsCount,
     pendingPaymentCount,
     partnerCasesPendingCount,
+    partnerActionRequiredCount,
+    partnerCasesReturnedCount,
+    partnerSettlementsAwaitingCloseCount,
     depositOverdueCount,
     pausedContractsCount,
     unreadChatCount,
@@ -341,7 +344,7 @@ export const AppSideNav = () => {
 
   // A deal-partner shop's contract menu: its own list, in the order a shop
   // works, under two headings. ContractsLayout builds from the same list.
-  const shopCounts = { draft: draftContractsCount, pendingApproval: partnerCasesPendingCount, pendingPayment: pendingPaymentCount };
+  const shopCounts = { todo: partnerActionRequiredCount, draft: draftContractsCount, pendingApproval: partnerCasesPendingCount, returned: partnerCasesReturnedCount, pendingPayment: pendingPaymentCount, settlementClose: partnerSettlementsAwaitingCloseCount };
   const shopContractChildren: SideMenuItemData[] = [];
   let shopGroup: string | undefined;
   for (const s of SHOP_STAGES) {
@@ -583,10 +586,15 @@ export const AppSideNav = () => {
             { key: 'fund-book', icon: <Wallet size="1rem" />, label: t('nav.fundBook'), path: '/admin/fund-book' },
             // Settings: the fund's own accounts, and the phones that forward the
             // bank's SMS for them (also under Company — same page).
-            ...(hasPermission('BANK_ACCOUNT.COMPANY_MANAGE') || hasPermission('SMS.VIEW') || hasPermission('SMS.MANAGE') ? [
+            ...(hasPermission('BANK_ACCOUNT.COMPANY_MANAGE') || hasPermission('SMS.VIEW') || hasPermission('SMS.MANAGE') || isFundCompany ? [
               { type: 'group' as const, key: 'grp-fund-settings', label: t('nav.groupFundSettings') },
               ...(hasPermission('BANK_ACCOUNT.COMPANY_MANAGE') ? [
                 { key: 'fund-bank-accounts', icon: <Landmark size="1rem" />, label: t('nav.fundBankAccounts'), path: '/admin/company/bank-accounts?tab=company' },
+              ] : []),
+              // The shops' accounts the fund pays into — the other direction
+              // from the fund's own accounts above; one tab on the same page.
+              ...(isFundCompany ? [
+                { key: 'fund-partner-payout-accounts', icon: <Store size="1rem" />, label: t('nav.fundPartnerPayoutAccounts'), path: '/admin/company/bank-accounts?tab=partner-payout' },
               ] : []),
               ...(hasPermission('SMS.VIEW') || hasPermission('SMS.MANAGE') ? [
                 { key: 'fund-sms-relay', icon: <MessageSquareText size="1rem" />, label: t('nav.smsRelay'), path: '/admin/company/sms-relay' },

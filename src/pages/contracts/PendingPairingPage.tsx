@@ -63,14 +63,15 @@ export function PendingPairingPage() {
 
   useEffect(() => { setPageIndex(0); }, [actionType, filterBranchId]);
 
-  // When deep-linked with a contract id, fetch its current device/shipping
+  // When deep-linked with a contract id, fetch its current device/handover
   // state to pick the correct tab. A 1st-hand contract that just activated
-  // lands here with device_id IS NULL → bind tab. Once bound but not shipped
-  // → delivery tab.
+  // lands here with device_id IS NULL → bind tab. Once bound but the receipt
+  // paper not yet signed → delivery tab. `handed_over_at` (mig 1549) is the
+  // signing cache; `shipped_at` is the box and must not decide this.
   const { data: deepLinkContract } = useQuery({
     queryKey: ['pending-pairing', 'deep-link', selectedId],
-    queryFn: () => apiClient.get<{ device_id: number | null; shipped_at: string | null }[]>(
-      `/v_contract_detail?id=eq.${selectedId}&select=device_id,shipped_at&limit=1`,
+    queryFn: () => apiClient.get<{ device_id: number | null; handed_over_at: string | null }[]>(
+      `/v_contract_detail?id=eq.${selectedId}&select=device_id,handed_over_at&limit=1`,
     ).then(rows => rows[0] ?? null),
     enabled: selectedId != null,
     staleTime: 30 * 1000,

@@ -186,8 +186,16 @@ const MY_CASE_TAB_FILTER: Record<PartnerMyCaseTab, string[]> = {
   IN_FORCE: ['is_latest=eq.true', 'outcome=eq.IN_FORCE', 'order=approved_at.desc'],
   EXPIRED: ['is_latest=eq.true', 'outcome=eq.EXPIRED', 'order=approved_at.desc'],
   RETURNED: ['is_latest=eq.true', 'outcome=eq.RETURNED', 'order=returned_at.desc'],
-  // The shop's "act again" list: sent back to fix, or approved and left to lapse.
-  RETURNED_OR_EXPIRED: ['is_latest=eq.true', 'outcome=in.(RETURNED,EXPIRED)', 'order=updated_at.desc'],
+  // The shop's "act again" list: sent back to fix, or approved and left to lapse
+  // — only while the contract is still open and not yet active, so the list
+  // equals the menu badge `partner_cases_returned` (mig 1550). A request that
+  // was resubmitted or whose contract closed is history, not work.
+  RETURNED_OR_EXPIRED: [
+    'is_latest=eq.true', 'outcome=in.(RETURNED,EXPIRED)',
+    'contract_activated_at=is.null',
+    'contract_state=in.(DRAFT,PENDING_APPROVAL,APPROVED,PENDING_PAYMENT_AND_SIGN,PENDING_SIGN,PENDING_PAYMENT)',
+    'order=updated_at.desc',
+  ],
   ALL: ['order=submitted_at.desc'],
 };
 

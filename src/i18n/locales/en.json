@@ -1818,6 +1818,7 @@
     "dataTypeBoolean": "Boolean"
   },
   "auth": {
+    "readOnlyBanner": "View-only mode — this account can see everything but cannot save, approve or delete",
     "login": "Login",
     "logout": "Logout",
     "username": "Username",
@@ -3380,6 +3381,10 @@
     "daysEarly": "{{days}} days early",
     "daysShort": "d",
     "deliveryNotRecorded": "Not yet recorded",
+    "deviceHandover": "Device handover",
+    "handedOverAt": "Handed over",
+    "handoverNotSigned": "Device-receipt paper not signed yet",
+    "viewHandoverPaper": "View receipt paper",
     "deliveryPhotos": "Proof of Delivery",
     "deliverySaved": "Delivery info saved",
     "deposit_chip": "Device deposited",
@@ -4305,7 +4310,8 @@
     "warehouseGroupNone": "none of {{total}} branches",
     "warehouseGroupHasPartner": "has deal partner",
     "payoutAdd": "Add account",
-    "payoutHidden": "Account set · details not visible to you"
+    "payoutHidden": "Account set · details not visible to you",
+    "payoutEditElsewhere": "Edit under Bank accounts → Shop payout accounts"
   },
   "deposit": {
     "chip_all": "All",
@@ -5114,6 +5120,7 @@
     "creditNoteWarningCommission": "This does not change the document. A new document is issued against it that runs the other way, and the commission steps on it go back to \"ready to bundle\".",
     "devices": "Devices",
     "devicesMovedToHolding": "{{count}} device(s) now owned by holding",
+    "devicesNowOwnedBy": "{{count}} device(s) now owned by {{owner}}",
     "devicesReturnedToShop": "{{count}} device(s) back with the shop",
     "documentCount": "{{count}} document(s)",
     "documentTotal": "Document total",
@@ -6227,7 +6234,8 @@
     "groupFundSettings": "Settings",
     "fundCash": "Cash position",
     "fundPassbook": "Bank passbook",
-    "fundBankAccounts": "Fund bank accounts"
+    "fundBankAccounts": "Fund bank accounts",
+    "fundPartnerPayoutAccounts": "Shop payout accounts"
   },
   "nnfApp": {
     "title": "NNF App",
@@ -8711,6 +8719,7 @@
     "COMPANY_REPO": "Company Repossession",
     "HOLDING_ADMIN": "Holding Admin",
     "HOLDING_VIEWER": "Holding Viewer",
+    "COMPANY_VIEWER": "Company Viewer",
     "SYSTEM_DEV": "System Developer"
   },
   "sale": {
@@ -10412,6 +10421,23 @@
     "fromAccount": "Paid from account",
     "intoAccount": "Received into account"
   },
+  "partnerPayout": {
+    "tab": "Shop payout accounts",
+    "description": "Each deal-partner shop's own bank account the fund transfers to (device money + commission on a fund bill) — not the fund's accounts that shops remit into",
+    "tabHint": "A shop without this account cannot enter a payout round — click a shop's row to set or change it",
+    "colShop": "Shop",
+    "colAccount": "Account",
+    "statusSet": "Set",
+    "statusMissing": "Not set",
+    "empty": "No deal-partner shops",
+    "editTitle": "Shop payout account",
+    "targetHint": "This shop's account the fund will transfer to",
+    "hiddenHint": "This shop already has an account, but you may not see its details — saving replaces it",
+    "saved": "Payout account saved",
+    "removed": "Payout account removed",
+    "removedHint": "Until a new account is set, this shop's bills cannot enter a payout round",
+    "removeConfirm": "Remove this shop's payout account?"
+  },
   "companyBankAccount": {
     "tab": "Fund accounts",
     "description": "The fund's own accounts — pay shops, take money back from shops, capital in/out, expenses. Not tied to a branch and never offered to customers",
@@ -10639,6 +10665,7 @@
     "kind_PROMPTPAY": "PromptPay / shop",
     "kind_BEMERCHANT": "BeMerchant (Bangkok Bank) — QR",
     "qrOnlyNoteHint": "The shop’s merchant number, if any, can go here — it isn’t a number customers pay to",
+    "switchToQrClearsNumber": "Switching to QR-only removes this number — customers will pay by scanning the QR instead",
     "qrNextStep": "This account is QR only — attach the QR picture customers will scan"
   },
   "hint": {

@@ -5,6 +5,8 @@
 // UOBT and LHBANK, not the set's CIMB / UOB / LHB. An account with no bank code
 // (typed in before the bank had to be picked from the list) or a bank the set
 // doesn't have gets a plain building in a grey circle, so rows still line up.
+// PROMPTPAY (mig 1553: a destination in v_ref_banks, not a bank) has its own
+// mark in public/banks/PROMPTPAY.svg.
 
 import { Landmark } from 'lucide-react';
 
@@ -18,10 +20,10 @@ export function BankLogo({ code, size = 20, className = '' }: {
   size?: number;
   className?: string;
 }) {
-  if (code && LOGO_CODES.has(code)) {
+  if (code && (LOGO_CODES.has(code) || code === 'PROMPTPAY')) {
     return (
       <img
-        src={`/banks/${code}.png`}
+        src={code === 'PROMPTPAY' ? '/banks/PROMPTPAY.svg' : `/banks/${code}.png`}
         width={size}
         height={size}
         alt=""

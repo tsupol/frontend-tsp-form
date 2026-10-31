@@ -60,7 +60,15 @@ export interface MeProfileResponse {
 export interface UserInfo {
   user_id: number;
   username: string;
+  /**
+   * The role every screen gates on. For a read-only viewer this is the admin
+   * role it mirrors (COMPANY_VIEWER → COMPANY_ADMIN, HOLDING_VIEWER →
+   * HOLDING_ADMIN) so menus and pages are the admin's; the real role is in
+   * `actual_role_code` and `useAuth().isReadOnlyViewer`. See AuthContext.
+   */
   role_code: string;
+  /** The role the backend actually gave this session — set only when it differs from `role_code`. */
+  actual_role_code?: string;
   holding_id: number | null;
   company_id: number | null;
   branch_id: number | null;

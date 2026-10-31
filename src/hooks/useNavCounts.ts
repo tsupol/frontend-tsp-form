@@ -167,6 +167,12 @@ export function useNavCounts() {
     // — not `pending_approvals`, which counts branches with staff approvals waiting.
     // UI_FEEDBACK/2026-10-15_DELIVERY_partner_case_counter_and_notifications.md §1.
     partnerCasesPendingCount: n('partner_cases_pending'),
+    // The shop's three work lists (mig 1550) — keys only a shop session gets;
+    // staff read undefined → 0 → no badge, which is what BE intends.
+    // UI_FEEDBACK/2026-10-31_DONE_partner_todo_counter_1550.md
+    partnerActionRequiredCount: n('partner_action_required'),
+    partnerCasesReturnedCount: n('partner_cases_returned'),
+    partnerSettlementsAwaitingCloseCount: n('partner_settlements_awaiting_close'),
     pendingSlips: n('payment_submissions_slips'),
     pendingSlipBranches,
     unclosedCount,

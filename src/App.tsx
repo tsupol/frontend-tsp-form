@@ -1,5 +1,6 @@
 import { Route, Routes, Navigate, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { Eye } from 'lucide-react';
 import { AppSideNav } from './AppSideNav';
 import { useAuth } from './contexts/AuthContext';
 import type { ReactNode } from 'react';
@@ -182,12 +183,21 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
 }
 
 function AdminLayout({ children }: { children: ReactNode }) {
-  const { needsHoldingSelect } = useAuth();
+  const { needsHoldingSelect, isReadOnlyViewer } = useAuth();
+  const { t } = useTranslation();
   if (needsHoldingSelect) return null;
   return (
     <div className="flex h-dvh">
       <AppSideNav />
       <div className="flex-grow w-full better-scroll">
+        {/* A read-only viewer (COMPANY_VIEWER / HOLDING_VIEWER) sees the
+            admin's screens; this strip is what tells them nothing will save. */}
+        {isReadOnlyViewer && (
+          <div className="sticky top-0 z-20 flex items-center gap-2 px-4 py-1.5 text-xs bg-info-soft border-b border-info-border text-info-fg">
+            <Eye size={14} className="shrink-0" />
+            <span>{t('auth.readOnlyBanner')}</span>
+          </div>
+        )}
         {children}
       </div>
       {/* Floating chat — fixed-position, so it sits outside the scroll pane and

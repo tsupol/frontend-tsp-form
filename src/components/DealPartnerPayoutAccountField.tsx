@@ -44,6 +44,11 @@ export interface RefBank {
   digits_max: number | null;
   enforces_length: boolean;
   sort_order: number;
+  /** false = PROMPTPAY, a destination that is not a bank (mig 1553); a fund company account must be a real bank. */
+  is_bank?: boolean;
+  /** e.g. `XXX-X-XXXXX-X` — BE builds the dashed number from it; the form need not. */
+  display_pattern?: string | null;
+  short_name_en?: string | null;
 }
 
 export interface DealPartnerPayoutValue {

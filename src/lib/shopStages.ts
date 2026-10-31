@@ -11,7 +11,7 @@ import {
 //
 // Which pages a shop may reach at all is still decided by shopMenu.ts.
 export type ShopStageGroup = 'money';
-export type ShopStageCount = 'draft' | 'pendingApproval' | 'pendingPayment';
+export type ShopStageCount = 'todo' | 'draft' | 'pendingApproval' | 'returned' | 'pendingPayment' | 'settlementClose';
 
 export interface ShopStage {
   key: string;
@@ -36,19 +36,19 @@ export const SHOP_STAGES: ShopStage[] = [
   // Every contract at any stage — first, above the stages themselves.
   { key: 'contract-search', path: '/admin/contracts/search', labelKey: 'nav.shopContractSearch', icon: Search },
   // Every contract that needs a hand, across the stages below — the full list
-  // behind the dashboard card "สัญญาที่ต้องทำต่อ". No badge: the counters RPC
-  // has no key for it yet.
-  { key: 'shop-todo', path: '/admin/contracts/todo', labelKey: 'nav.shopTodo', icon: ListTodo },
+  // behind the dashboard card "สัญญาที่ต้องทำต่อ". Badge = the same view's row
+  // count (mig 1550 `partner_action_required`).
+  { key: 'shop-todo', path: '/admin/contracts/todo', labelKey: 'nav.shopTodo', icon: ListTodo, count: 'todo' },
 
   { key: 'new-contract', path: '/admin/contracts/new', labelKey: 'nav.shopNewContract', icon: FilePlus, accent: true },
   { key: 'draft-contracts', path: '/admin/contracts/draft', labelKey: 'nav.draftContracts', icon: FileEdit, count: 'draft' },
   { key: 'pending-approval', path: '/admin/contracts/pending-approval', labelKey: 'nav.pendingApproval', icon: ClipboardCheck, count: 'pendingApproval' },
-  { key: 'approval-returned', path: '/admin/contracts/approval-returned', labelKey: 'nav.approvalReturned', icon: Undo2 },
+  { key: 'approval-returned', path: '/admin/contracts/approval-returned', labelKey: 'nav.approvalReturned', icon: Undo2, count: 'returned' },
   { key: 'pending-payment', path: '/admin/contracts/pending-payment', labelKey: 'nav.pendingPayment', icon: CreditCard, count: 'pendingPayment' },
   // No bind / hand-over stage: a shop's device is bound when the contract goes
   // active, and the hand-over photos are part of close-out, the next stage.
 
-  { key: 'settlement-close', path: '/admin/contracts/settlement-close', labelKey: 'nav.settlementClose', icon: PackageCheck, group: 'money' },
+  { key: 'settlement-close', path: '/admin/contracts/settlement-close', labelKey: 'nav.settlementClose', icon: PackageCheck, group: 'money', count: 'settlementClose' },
   { key: 'settlement-payment', path: '/admin/contracts/settlement-payment', labelKey: 'nav.settlementPayment', icon: Hourglass, group: 'money' },
   { key: 'partner-payouts', path: '/admin/contracts/partner-payouts', labelKey: 'nav.partnerPayoutsShop', icon: Banknote, group: 'money' },
   { key: 'partner-commission', path: '/admin/contracts/partner-commission', labelKey: 'nav.partnerCommission', icon: Percent, group: 'money' },
