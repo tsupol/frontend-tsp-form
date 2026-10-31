@@ -2,8 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { PageNav, PageNavPanel, MobileHeader, Badge, Select, DataTableFooter } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, Link2, Truck } from 'lucide-react';
+import { PageNav, PageNavPanel, MobileHeader, Badge, Select, DataTable } from 'tsp-form';
+import { ArrowLeft, ArrowRightFromLine, Link2, PenLine } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { defaultScopeFor, scopeQuery } from '../../lib/scope';
@@ -53,8 +53,11 @@ export function PendingPairingPage() {
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(15);
 
+  // A row on the handover tab opens the contract on its signing tab: since mig
+  // 1544 the signed handover sheet (BIND addendum) is what "handed over" means,
+  // so the pending one is signed there — not recorded in the shipping window.
   const setSelectedId = (id: number | null) => {
-    if (id) navigate(`/admin/contracts/pending-pairing/${id}`, { replace: true });
+    if (id) navigate(`/admin/contracts/pending-pairing/${id}${actionType === 'PENDING_DELIVERY' ? '?tab=signing' : ''}`, { replace: true });
     else navigate('/admin/contracts/pending-pairing', { replace: true });
   };
 
@@ -112,7 +115,6 @@ export function PendingPairingPage() {
 
   const list = listData?.data ?? [];
   const totalCount = listData?.totalCount ?? 0;
-  const totalPages = Math.ceil(totalCount / pageSize);
 
   // Per-tab counts. Honors the active branch filter so the badges match what
   // the user would see if they switched tabs.
@@ -139,7 +141,7 @@ export function PendingPairingPage() {
 
   const tabOptions: { value: PairingActionType; label: string; icon: typeof Link2 }[] = [
     { value: 'PENDING_DEVICE_BIND', label: t('contract.pendingPairing.tab_bind'), icon: Link2 },
-    { value: 'PENDING_DELIVERY', label: t('contract.pendingPairing.tab_delivery'), icon: Truck },
+    { value: 'PENDING_DELIVERY', label: t('contract.pendingPairing.tab_delivery'), icon: PenLine },
   ];
 
   const selectedRow = list.find(c => c.contract_id === selectedId) ?? null;
@@ -150,7 +152,7 @@ export function PendingPairingPage() {
   if (isDealPartner) return <Navigate to="/admin/contracts/settlement-close" replace />;
 
   return (
-    <PageNav panels={['list', 'detail']} className="h-dvh">
+    <PageNav panels={['list', 'detail']} className="h-dvh overflow-hidden">
       {({ isMobile, isRoot, goTo, goBack }) => (
         <>
           {isMobile && (
@@ -223,61 +225,53 @@ export function PendingPairingPage() {
               )}
 
               {/* List */}
-              <div className={`data-table-content better-scroll ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
-                {list.length === 0 ? (
+              <DataTable<PairingRow>
+                data={list}
+                getRowProps={row => ({ 'data-state': row.original.contract_id === selectedId ? 'selected' : undefined })}
+                enableKeyboardNav={!isMobile}
+                onRowActivate={row => setSelectedId(row.original.contract_id)}
+                renderRow={row => {
+                  const r = row.original;
+                  return (
+                    <button
+                      type="button"
+                      className="w-full text-left px-4 py-2.5 flex items-center gap-3 transition-colors cursor-pointer bg-transparent border-none text-current"
+                      onClick={() => { setSelectedId(r.contract_id); if (isMobile) goTo('detail'); }}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-medium text-sm truncate">{r.contract_code_display ?? r.contract_code}</span>
+                        </div>
+                        <div className="text-xs text-subtle truncate mt-0.5">
+                          {r.customer_name ?? t('contract.noCustomer')}
+                        </div>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-subtle">
+                          <span>{r.branch_name}</span>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        {r.deadline && (
+                          <div className="text-xs text-subtle"><DateTime value={r.deadline} showTime={false} /></div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                }}
+                enablePagination
+                pageIndex={pageIndex}
+                pageSize={pageSize}
+                pageSizeOptions={[15, 25, 50]}
+                rowCount={totalCount}
+                onPageChange={({ pageIndex: pi, pageSize: ps }) => { setPageIndex(pi); setPageSize(ps); }}
+                className={`flex-1 min-h-0 panel-datatable ${isFetching ? 'opacity-60' : ''} transition-opacity`}
+                noResults={
                   <div className="p-8 text-center text-subtler">
                     {actionType === 'PENDING_DEVICE_BIND'
                       ? t('contract.pendingPairing.empty_bind')
                       : t('contract.pendingPairing.empty_delivery')}
                   </div>
-                ) : (
-                  <div className="flex flex-col">
-                    {list.map(row => {
-                      const isSelected = row.contract_id === selectedId;
-                      return (
-                        <button
-                          key={row.contract_id}
-                          className={`w-full text-left px-4 py-2.5 border-b border-line flex items-center gap-3 transition-colors cursor-pointer ${
-                            isSelected ? 'bg-primary-soft' : 'hover:bg-surface-hover'
-                          }`}
-                          onClick={() => { setSelectedId(row.contract_id); if (isMobile) goTo('detail'); }}
-                        >
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="font-medium text-sm truncate">{row.contract_code_display ?? row.contract_code}</span>
-                            </div>
-                            <div className="text-xs text-subtle truncate mt-0.5">
-                              {row.customer_name ?? t('contract.noCustomer')}
-                            </div>
-                            <div className="flex items-center gap-3 mt-1 text-xs text-subtle">
-                              <span>{row.branch_name}</span>
-                            </div>
-                          </div>
-                          <div className="text-right shrink-0">
-                            {row.deadline && (
-                              <div className="text-xs text-subtle"><DateTime value={row.deadline} showTime={false} /></div>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {totalCount > 0 && (
-                <div className="flex-none border-t border-line px-2 py-2">
-                  <DataTableFooter
-                    currentPage={pageIndex + 1}
-                    totalPages={totalPages || 1}
-                    onPageChange={(p) => setPageIndex(p - 1)}
-                    pageSize={pageSize}
-                    pageSizeOptions={[15, 25, 50]}
-                    onPageSizeChange={(ps) => { setPageSize(ps); setPageIndex(0); }}
-                    totalRows={totalCount}
-                  />
-                </div>
-              )}
+                }
+              />
             </PageNavPanel>
 
             <ContractDetailSlot isMobile={isMobile} hasSelection={selectedId != null} emptyIcon={Link2}>

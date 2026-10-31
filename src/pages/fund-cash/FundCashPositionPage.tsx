@@ -31,6 +31,7 @@ import { useFundBookOverview } from '../fund-book/useFundBook';
 import { FundMovementModal } from '../fund-book/FundMovementModal';
 import type { FundMovementPurpose } from '../fund-book/fundBookTypes';
 import { FundCashTargetModal } from './FundCashTargetModal';
+import { FundSmsBalanceCard } from './FundSmsBalanceCard';
 import { useCashTargetLog, useFundCashPosition } from './useFundCash';
 
 export function FundCashPositionPage() {
@@ -166,6 +167,9 @@ export function FundCashPositionPage() {
                       )}
                     </div>
 
+                    {/* What the bank's own SMS says the accounts hold, against the figure above. */}
+                    <FundSmsBalanceCard companyId={companyId} />
+
                     {position.unassigned_total !== 0 && (
                       <div className="alert alert-warning">
                         <div className="flex flex-col gap-1">
@@ -199,14 +203,18 @@ export function FundCashPositionPage() {
                         <Link
                           key={a.bank_account_id}
                           to={`/admin/fund-passbook?account=${encodeURIComponent(a.account_key)}`}
-                          className="px-4 py-3 border-t border-line flex items-center gap-3 hover:bg-surface-hover transition-colors"
+                          // A closed account is listed only while it still holds money (mig 1540) — faded, flagged.
+                          className={`px-4 py-3 border-t border-line flex items-center gap-3 hover:bg-surface-hover transition-colors ${a.is_active === false ? 'opacity-60' : ''}`}
                         >
                           {/* all of them are the fund's own accounts — no "where" */}
                           <BankAccountLine
                             className="flex-1"
                             showWhere={false}
                             account={{ ...a, ...bankOf(a) }}
-                            badges={a.is_default && <Badge color="primary" size="sm">{t('fundAccount.usual')}</Badge>}
+                            badges={<>
+                              {a.is_default && <Badge color="primary" size="sm">{t('fundAccount.usual')}</Badge>}
+                              {a.is_active === false && <Badge color="danger" size="sm">{t('common.inactive')}</Badge>}
+                            </>}
                             detail={<>
                               {t('fundCash.lineCount', { count: a.line_count })}
                               {a.last_date && <> · <DateTime value={a.last_date} showTime={false} /></>}

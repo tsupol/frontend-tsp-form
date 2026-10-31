@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Badge, Button, Input, Modal, TextArea, Tooltip, useSnackbarContext, resizeToVariants } from 'tsp-form';
-import { Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, Download, Pause, Play, Square, Ban, Settings2, AlertTriangle, CalendarClock, Repeat, MessageSquare, ShieldAlert } from 'lucide-react';
+import { Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, Download, Pause, Play, Square, Ban, Settings2, AlertTriangle, CalendarClock, UserCheck, MessageSquare, ShieldAlert } from 'lucide-react';
 import { GenerateContractPdfModal } from './GenerateContractPdfModal';
 import type { BeMediaContractDoc } from '../../lib/beMedia';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -42,7 +42,8 @@ import { ContractAddonModal } from './ContractAddonModal';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { CustomerPickerModal } from './CustomerPickerModal';
 import { AddToBlacklistModal, LiftBlacklistModal } from '../customers/BlacklistModals';
-import { SwapPrimaryCustomerModal } from './SwapPrimaryCustomerModal';
+import { SetPrimaryCustomerModal, type SetPrimaryTarget } from './SetPrimaryCustomerModal';
+import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { ContractPhoneSyncPanel } from './ContractPhoneSyncPanel';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { MediaLightbox, MediaThumbButton } from '../../components/MediaLightbox';
@@ -549,7 +550,6 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
             customerId={contract.customer_id}
             customerName={contract.customer_name}
             contractCode={contract.code_display ?? contract.code}
-            contractState={contract.state}
             t={t}
             onRequestDetachCustomer={() => setRequestedAction('detach_customer')}
             onGoToSigning={() => handleTabChange('signing')}
@@ -731,6 +731,8 @@ export type ManageAction = 'pause' | 'resume' | 'terminate' | 'void';
 interface ManageActionRow {
   action_code: string;
   is_available: boolean;
+  /** Legacy actions (no required_permission) come back true; absent on older servers. */
+  is_permitted?: boolean;
   blocking_reason: string | null;
   // The backend ships the facts behind the reason — the amount still to clear,
   // the hours left in a window — and the sentence needs them to say anything
@@ -1558,12 +1560,11 @@ function PartyBlacklistControl({ party, customerName, onAdd, onLift }: {
   ) : null;
 }
 
-function CustomersTab({ contractId, customerId, customerName, contractCode, contractState, t, onRequestDetachCustomer, onGoToSigning }: {
+function CustomersTab({ contractId, customerId, customerName, contractCode, t, onRequestDetachCustomer, onGoToSigning }: {
   contractId: number;
   customerId: number | null;
   customerName: string | null;
   contractCode: string;
-  contractState: string;
   t: ReturnType<typeof useTranslation>['t'];
   onRequestDetachCustomer: () => void;
   onGoToSigning: () => void;
@@ -1572,7 +1573,24 @@ function CustomersTab({ contractId, customerId, customerName, contractCode, cont
   const { addSnackbar } = useSnackbarContext();
   const [pickerMode, setPickerMode] = useState<'attach' | 'co_lessee' | null>(null);
   const [removeTarget, setRemoveTarget] = useState<ContractCustomer | null>(null);
-  const [swapOpen, setSwapOpen] = useState(false);
+  const [setPrimaryTarget, setSetPrimaryTarget] = useState<SetPrimaryTarget | null>(null);
+
+  // Which customer actions the backend allows here (mig 1546): SET_PRIMARY_CUSTOMER
+  // on a co-lessee row, DETACH_CUSTOMER only on a draft. Same cache as the footer.
+  const { data: actionsResp } = useQuery({
+    queryKey: ['contract-actions', contractId],
+    queryFn: () => apiClient.rpc<{ actions: ManageActionRow[] }>('fn_contract_available_actions', {
+      p_contract_id: contractId,
+    }),
+    staleTime: 30 * 1000,
+  });
+  const capOf = (code: string) => (actionsResp?.actions ?? []).find(a => a.action_code === code);
+  const setPrimaryCap = capOf('SET_PRIMARY_CUSTOMER');
+  const canSetPrimary = !!setPrimaryCap && setPrimaryCap.is_permitted !== false;
+  const detachCap = capOf('DETACH_CUSTOMER');
+  // Until the capability answers, no detach button: the old state-only guess let
+  // it show on ACTIVE and die with CONTRACT.STATE.DETACH_CUSTOMER_NOT_DRAFT.
+  const canDetach = !!detachCap && detachCap.is_available && detachCap.is_permitted !== false;
   const [blacklistAdd, setBlacklistAdd] = useState<{ id: number; full_name: string } | null>(null);
   const [blacklistLift, setBlacklistLift] = useState<{ blacklistId: number; customerName: string } | null>(null);
 
@@ -1714,16 +1732,39 @@ function CustomersTab({ contractId, customerId, customerName, contractCode, cont
               <DateTime value={c.created_at} />
             </div>
           </div>
-          <Tooltip content={t('contract.removeCoLessee', { defaultValue: 'Remove co-lessee' })} placement="top">
-            <Button
-              size="sm"
-              variant="outline"
-              color="danger"
-              className="btn-icon-sm"
-              startIcon={<Trash2 size={14} />}
-              onClick={() => setRemoveTarget(c)}
-            />
-          </Tooltip>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {canSetPrimary && (() => {
+              // Blocked (e.g. not ACTIVE) stays visible with the reason, like the footer.
+              const blocked = !setPrimaryCap!.is_available;
+              const tip = blocked ? blockingReasonText(setPrimaryCap!, t) : t('contract.setPrimary.button');
+              return (
+                <Tooltip content={tip} placement="top">
+                  <span className="inline-flex">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      startIcon={<UserCheck size={14} />}
+                      disabled={blocked}
+                      onClick={() => setSetPrimaryTarget({ customer_id: c.customer_id, customer_name: c.customer_name })}
+                      data-action="set-primary-customer"
+                    >
+                      {t('contract.setPrimary.button')}
+                    </Button>
+                  </span>
+                </Tooltip>
+              );
+            })()}
+            <Tooltip content={t('contract.removeCoLessee', { defaultValue: 'Remove lessee' })} placement="top">
+              <Button
+                size="sm"
+                variant="outline"
+                color="danger"
+                className="btn-icon-sm"
+                startIcon={<Trash2 size={14} />}
+                onClick={() => setRemoveTarget(c)}
+              />
+            </Tooltip>
+          </div>
         </div>
         {login && (
           <div className="mt-3 pt-3 border-t border-line">
@@ -1766,16 +1807,20 @@ function CustomersTab({ contractId, customerId, customerName, contractCode, cont
               />
             </div>
           </div>
-          <Tooltip content={t('contract.detachCustomer', { defaultValue: 'Detach customer' })} placement="top">
-            <Button
-              size="sm"
-              variant="outline"
-              color="danger"
-              className="btn-icon-sm"
-              startIcon={<UserMinus size={14} />}
-              onClick={onRequestDetachCustomer}
-            />
-          </Tooltip>
+          {/* Draft only (backend decides). On an active contract the way out is:
+              make a co-lessee primary, then remove the former one. */}
+          {canDetach && (
+            <Tooltip content={t('contract.detachCustomer', { defaultValue: 'Detach customer' })} placement="top">
+              <Button
+                size="sm"
+                variant="outline"
+                color="danger"
+                className="btn-icon-sm"
+                startIcon={<UserMinus size={14} />}
+                onClick={onRequestDetachCustomer}
+              />
+            </Tooltip>
+          )}
         </div>
         {idCardMedia.length > 0 && (
           <div className="mt-2 pt-2 border-t border-line">
@@ -1803,7 +1848,10 @@ function CustomersTab({ contractId, customerId, customerName, contractCode, cont
           <div className="text-xs font-semibold uppercase tracking-wider text-subtle">
             {t('contract.primaryCustomer', { defaultValue: 'Primary customer' })}
           </div>
-          {customerId == null ? (
+          {/* The old "เปลี่ยนผู้เช่า" document flow (SWAP_PRIMARY_CUSTOMER) is hidden
+              since mig 1546 — owner 10-31: add as co-lessee, sign the addendum,
+              then "ตั้งให้เป็นผู้เช่าหลัก" on that row. RPC and modal file kept. */}
+          {customerId == null && (
             <Button
               size="sm"
               variant="outline"
@@ -1811,15 +1859,6 @@ function CustomersTab({ contractId, customerId, customerName, contractCode, cont
               onClick={() => setPickerMode('attach')}
             >
               {t('contract.attachCustomer', { defaultValue: 'Attach customer' })}
-            </Button>
-          ) : contractState === 'ACTIVE' && (
-            <Button
-              size="sm"
-              variant="outline"
-              startIcon={<Repeat size={14} />}
-              onClick={() => setSwapOpen(true)}
-            >
-              {t('contract.swapPrimary', { defaultValue: 'Change lessee' })}
             </Button>
           )}
         </div>
@@ -1916,13 +1955,12 @@ function CustomersTab({ contractId, customerId, customerName, contractCode, cont
         t={t}
       />
 
-      <SwapPrimaryCustomerModal
-        open={swapOpen}
-        onClose={() => setSwapOpen(false)}
+      <SetPrimaryCustomerModal
+        target={setPrimaryTarget}
+        onClose={() => setSetPrimaryTarget(null)}
         contractId={contractId}
         contractCode={contractCode}
-        currentCustomerId={customerId}
-        currentCustomerName={customerName}
+        currentPrimaryName={customerName ?? primaryDetail?.full_name ?? null}
         onGoToSigning={onGoToSigning}
       />
     </div>
@@ -1977,15 +2015,9 @@ function RemoveCoLesseeModal({ target, contractId, onClose, onSuccess, t }: {
           <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
         </div>
         <div className="modal-content">
-          {error && (
-            <div className="alert alert-danger mb-3">
-              <XCircle size={16} />
-              <span>{error}</span>
-            </div>
-          )}
           <p className="text-sm mb-4">
             {t('contract.removeCoLesseeConfirm', {
-              defaultValue: 'Remove {{name}} as co-lessee?',
+              defaultValue: 'Remove {{name}} from this contract?',
               name: target?.customer_name ?? '',
             })}
           </p>
@@ -1997,6 +2029,7 @@ function RemoveCoLesseeModal({ target, contractId, onClose, onSuccess, t }: {
             <BranchPinInput value={pin} onChange={setPin} required />
           </div>
         </div>
+        <ModalErrorBand message={error} onDismiss={() => setError('')} />
         <div className="modal-footer">
           <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button

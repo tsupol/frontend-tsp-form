@@ -31,6 +31,8 @@ export interface FundCashAccount {
   balance: number;
   last_date: string | null;
   line_count: number;
+  /** false = closed account that still holds money (mig 1540) — shown faded, never dropped. */
+  is_active: boolean;
 }
 
 export interface FundCashPosition {
@@ -45,7 +47,92 @@ export interface FundCashPosition {
   over_target: number | null;
   target_status: CashTargetStatus;
   company_account_count: number;
+  inactive_with_balance_count: number;
   accounts: FundCashAccount[];
+}
+
+// ── "ระบบ vs SMS ธนาคาร" (doc 155 §2b · mig 1540) ─────────────────────────────
+// The fund's own balance per account against the balance the bank's latest
+// readable SMS reports. A comparison only — nothing here writes the passbook.
+
+export type SmsCheckStatus = 'MATCH' | 'MISMATCH' | 'NO_PHONE' | 'NO_SMS';
+
+export interface FundSmsBalanceCheck {
+  company_id: number;
+  bank_account_id: number;
+  account_key: string;
+  is_active: boolean;
+  is_default: boolean;
+  bank_code: string | null;
+  bank_name: string | null;
+  account_number: string | null;
+  account_name: string | null;
+  system_balance: number;
+  system_last_date: string | null;
+  line_count: number;
+  sms_source_id: number | null;
+  sms_source_label: string | null;
+  phone_count: number;
+  sms_message_id: number | null;
+  /** null = no figure at all — never show it as 0. */
+  sms_balance: number | null;
+  sms_bank_time: string | null;
+  sms_age_minutes: number | null;
+  /** SMS after the one read that could not be parsed — the SMS figure may be stale. */
+  unparsed_after_count: number;
+  /** Places where consecutive SMS balances do not chain (an SMS is missing). */
+  sms_gap_count: number;
+  /** system − SMS; null while there is no SMS figure. */
+  diff: number | null;
+  check_status: SmsCheckStatus;
+  /** Closed account still holding money — record the transfer out first. */
+  inactive_with_balance: boolean;
+}
+
+export interface FundSmsBalanceSummary {
+  company_id: number;
+  accounts_total: number;
+  accounts_with_sms: number;
+  mismatch_count: number;
+  no_phone_count: number;
+  no_sms_count: number;
+  inactive_with_balance_count: number;
+  unparsed_after_count: number;
+  sms_gap_count: number;
+  /** Always equals company_accounts_total of v_fund_cash_position. */
+  system_total: number;
+  /** Set only when every account has an SMS figure (`is_complete`). */
+  sms_total: number | null;
+  /** The sum over the accounts that do have one — never shown as the total. */
+  sms_total_partial: number | null;
+  is_complete: boolean;
+  /** null = cannot compare yet (not every account has an SMS figure). */
+  is_match: boolean | null;
+  sms_latest_time: string | null;
+  sms_oldest_time: string | null;
+}
+
+export function useFundSmsBalanceSummary(companyId: number | null) {
+  const query = useQuery({
+    queryKey: ['fund-book', 'sms-balance-summary', companyId],
+    queryFn: () => apiClient.get<FundSmsBalanceSummary[]>(`/v_fund_sms_balance_summary?company_id=eq.${companyId}`)
+      .then(rows => rows[0] ?? null),
+    enabled: companyId != null,
+    retry: false,
+  });
+  return { ...query, summary: query.data ?? null };
+}
+
+export function useFundSmsBalanceCheck(companyId: number | null, enabled: boolean) {
+  const query = useQuery({
+    queryKey: ['fund-book', 'sms-balance-check', companyId],
+    queryFn: () => apiClient.get<FundSmsBalanceCheck[]>(
+      `/v_fund_sms_balance_check?company_id=eq.${companyId}&order=is_active.desc,is_default.desc,bank_account_id`,
+    ),
+    enabled: companyId != null && enabled,
+    retry: false,
+  });
+  return { ...query, rows: query.data ?? [] };
 }
 
 export interface FundAccountBalance {

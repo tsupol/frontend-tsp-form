@@ -204,7 +204,9 @@ export function PartnerDashboardPage() {
               {actions.map(a => (
                 <li key={`${a.action_type}-${a.contract_id}`}>
                   <Link
-                    to={`/admin/contracts/search/${a.contract_id}`}
+                    // A device bound but its handover sheet not yet signed (mig 1544:
+                    // the signed BIND addendum IS the handover) opens on the signing tab.
+                    to={`/admin/contracts/search/${a.contract_id}${a.action_type === 'PENDING_DELIVERY' ? '?tab=signing' : ''}`}
                     className="py-2 flex items-start justify-between gap-3 text-sm no-underline text-current hover:text-primary-fg"
                   >
                     <span className="min-w-0 flex flex-col gap-0.5">

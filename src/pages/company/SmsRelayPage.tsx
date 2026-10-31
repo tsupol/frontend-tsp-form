@@ -21,10 +21,10 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Badge, Button, DataTable, MobileHeader, Modal, Select, Switch } from 'tsp-form';
+import { Badge, Button, DataTable, MobileHeader, Modal, Select, Switch, Tooltip } from 'tsp-form';
 import {
   AlertTriangle, ArrowRightFromLine, BellOff, Inbox, Link2, MessageSquareText,
-  Plus, RefreshCw, Search, Smartphone, X,
+  Plus, RefreshCw, Search, Smartphone, Trash2, X,
 } from 'lucide-react';
 import { SmsFindPaymentModal } from './SmsFindPaymentModal';
 import { SmsParseBadge, SmsParsedSummary } from '../../components/SmsLinkParts';
@@ -65,6 +65,8 @@ export function SmsRelayPage() {
   const flaggedOnly = params.get('parse') === 'flagged';
   const canLink = hasPermission('SMS.LINK');
   const [findMessage, setFindMessage] = useState<SmsMessage | null>(null);
+  // Delete (mig 1542): SMS.MANAGE only — a test message or one that reached the wrong phone.
+  const [deleteMessage, setDeleteMessage] = useState<SmsMessage | null>(null);
 
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(50);
@@ -251,7 +253,13 @@ export function SmsRelayPage() {
             <DataTable<SmsMessage>
               outlined
               data={messages.data?.data ?? []}
-              renderRow={(row) => <MessageRow m={row.original} onFind={canLink ? () => setFindMessage(row.original) : undefined} />}
+              renderRow={(row) => (
+                <MessageRow
+                  m={row.original}
+                  onFind={canLink ? () => setFindMessage(row.original) : undefined}
+                  onDelete={canManage ? () => setDeleteMessage(row.original) : undefined}
+                />
+              )}
               enablePagination
               pageIndex={pageIndex}
               pageSize={pageSize}
@@ -351,6 +359,11 @@ export function SmsRelayPage() {
         onUnlinked={refresh}
       />
       <SmsFindPaymentModal open={findMessage !== null} message={findMessage} onClose={() => setFindMessage(null)} />
+      <DeleteMessageConfirm
+        message={deleteMessage}
+        onClose={() => setDeleteMessage(null)}
+        onDeleted={refresh}
+      />
     </>
   );
 }
@@ -373,8 +386,10 @@ function TabButton({ active, onClick, label, count }: { active: boolean; onClick
 
 // ── Inbox row ────────────────────────────────────────────────────────────────
 
-function MessageRow({ m, onFind }: { m: SmsMessage; onFind?: () => void }) {
+function MessageRow({ m, onFind, onDelete }: { m: SmsMessage; onFind?: () => void; onDelete?: () => void }) {
   const { t } = useTranslation();
+  // Still the slip of a line → the backend answers 409; the row already knows, so the button waits.
+  const linked = m.link_id != null;
   return (
     <div className="px-4 py-3 flex flex-col gap-1.5 min-w-0">
       <div className="flex items-start justify-between gap-3">
@@ -400,6 +415,22 @@ function MessageRow({ m, onFind }: { m: SmsMessage; onFind?: () => void }) {
             <Button size="sm" variant="outline" startIcon={<Search size={14} />} onClick={onFind}>
               {t('smsRelay.findLine')}
             </Button>
+          )}
+          {onDelete && (
+            <Tooltip content={linked ? t('smsRelay.delete.linkedHint') : t('smsRelay.delete.button')}>
+              {/* a disabled button swallows hover, so the tooltip hangs on a wrapper */}
+              <span className="inline-flex">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  startIcon={<Trash2 size={14} className={linked ? undefined : 'text-danger'} />}
+                  disabled={linked}
+                  onClick={onDelete}
+                  aria-label={t('smsRelay.delete.button')}
+                  data-action="sms-delete"
+                />
+              </span>
+            </Tooltip>
           )}
         </div>
       </div>
@@ -500,6 +531,90 @@ function SourceRow({ s, busy, onEdit, onSetup, onLink, onUnlink, onToggle }: {
         <Switch size="sm" checked={s.is_active} disabled={busy} onChange={onToggle} aria-label={t('smsRelay.activeSwitch')} />
       </div>
     </div>
+  );
+}
+
+// ── Delete message confirm (mig 1542) ────────────────────────────────────────
+// No reason field, no undo. 404 = already gone → the list is refreshed and the
+// window says so; 409 (still attached) is translated from the error catalog.
+
+function DeleteMessageConfirm({ message: messageProp, onClose, onDeleted }: {
+  message: SmsMessage | null;
+  onClose: () => void;
+  onDeleted: () => void;
+}) {
+  const { t } = useTranslation();
+  const last = useRef(messageProp);
+  if (messageProp) last.current = messageProp;
+  const message = messageProp ?? last.current;
+
+  const [view, setView] = useState<'form' | 'done'>('form');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [gone, setGone] = useState(false);
+
+  const open = messageProp !== null;
+  useEffect(() => {
+    if (open) { setView('form'); setBusy(false); setError(''); setGone(false); }
+  }, [open]);
+
+  const close = () => { if (busy) return; onClose(); };
+
+  const submit = async () => {
+    if (!message) return;
+    setBusy(true);
+    setError('');
+    try {
+      await apiClient.rpc('fn_sms_message_delete', { p_message_id: message.message_id });
+      setView('done');
+      onDeleted();
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'CORE.NOT_FOUND.SMS_MESSAGE') {
+        // Deleted elsewhere already — the list no longer has it either way.
+        setGone(true);
+        setView('done');
+        onDeleted();
+      } else {
+        setError(err instanceof ApiError ? translateApiError(err, t) : t('common.error'));
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={close} maxWidth="28rem" width="100%">
+      <div className="modal-header">
+        <h2 className="modal-title">{t('smsRelay.delete.title')}</h2>
+        <button type="button" className="modal-close-btn" onClick={close}>&times;</button>
+      </div>
+      {view === 'done' ? (
+        <ActionDoneView
+          headline={gone ? t('smsRelay.delete.gone') : t('smsRelay.delete.done')}
+          tone={gone ? 'neutral' : 'success'}
+          contractCode={message?.source_label ?? ''}
+          detailRows={message ? [
+            { label: t('smsRelay.sender'), value: message.sender || '—' },
+            { label: t('smsRelay.delete.receivedAt'), value: <DateTime value={message.received_at} showTime /> },
+          ] : []}
+          onClose={onClose}
+        />
+      ) : (
+        <>
+          <div className="modal-content">
+            <SourceTargetBox label={message?.source_label ?? null} purpose={message?.purpose ?? null} />
+            {/* the text as received — so the person sees what they are about to delete */}
+            <p className="text-sm whitespace-pre-wrap break-words rounded-md bg-surface border border-line px-3 py-2 mt-3">{message?.sms_text}</p>
+            <p className="text-sm text-subtle mt-3">{t('smsRelay.delete.body')}</p>
+          </div>
+          <ModalErrorBand message={error} onDismiss={() => setError('')} />
+          <div className="modal-footer">
+            <Button variant="ghost" onClick={close} disabled={busy}>{t('common.cancel')}</Button>
+            <Button color="danger" onClick={submit} disabled={busy}>{t('smsRelay.delete.submit')}</Button>
+          </div>
+        </>
+      )}
+    </Modal>
   );
 }
 
