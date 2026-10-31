@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
-  Button, Input, MaskedInput, MobileHeader, Modal, PageNav, PageNavPanel, Select, Badge,
+  Button, Input, MaskedInput, MobileHeader, Modal, PageNav, PageNavPanel, PopOver, Select, Badge,
   type SelectItem,
 } from 'tsp-form';
-import { ArrowRightFromLine, Calculator, Pencil, ShieldCheck, Table2, XCircle, AlertTriangle } from 'lucide-react';
+import {
+  ArrowRightFromLine, Calculator, ChevronDown, Download, FileSpreadsheet, FileText, Loader2, Pencil, ShieldCheck,
+  Table2, XCircle, AlertTriangle,
+} from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { fmtCurrency } from '../../lib/format';
@@ -14,6 +17,7 @@ import { useMyCommercialModels } from '../../hooks/useMyCommercialModels';
 import { useFormSnapshot } from '../../hooks/useFormSnapshot';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
+import { downloadFinanceRatesPdf, downloadFinanceRatesXlsx } from './financeRatesExport';
 
 // ============================================================================
 // เรทไฟแนนซ์ (FIN1) — DELIVERY 2026-09-07_finance_rates_page.
@@ -61,7 +65,7 @@ interface SheetRow {
   cells: SheetCell[];
 }
 
-interface SheetModel {
+export interface SheetModel {
   model_id: number;
   model_name: string;
   /** Catalogue name, brand + family + model (mig 1453) — what people read. */
@@ -87,14 +91,14 @@ interface SheetModel {
   uplift_out_of_range?: boolean;
 }
 
-interface SheetFamily {
+export interface SheetFamily {
   family_id: number;
   family_name: string;
   brand_name: string;
   models: SheetModel[];
 }
 
-interface RateSheet {
+export interface RateSheet {
   sheet: {
     down_percents: number[];
     terms: number[];
@@ -431,9 +435,12 @@ function RetailPriceModal({ open, model, onClose, onSaved }: {
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export function FinanceRatesPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const { isHoldingCompany } = useMyCommercialModels();
+  const [exportOpen, setExportOpen] = useState<'desktop' | 'mobile' | null>(null);
+  const [exporting, setExporting] = useState<'xlsx' | 'pdf' | null>(null);
+  const [exportError, setExportError] = useState('');
 
   // One combobox picks either a whole brand ("b:5") or a family ("f:178") —
   // typing "appl" surfaces the Apple brand row plus every Apple family.
@@ -575,6 +582,57 @@ export function FinanceRatesPage() {
     return ids;
   }, [sheetData]);
 
+  // Export what is on screen: the picked brand or family, base prices only.
+  const runExport = async (kind: 'xlsx' | 'pdf') => {
+    setExportOpen(null);
+    if (!sheetData || sheetData.families.length === 0) return;
+    setExporting(kind);
+    setExportError('');
+    const now = new Date();
+    const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    const fam = familyByValue.get(pick);
+    const scopeLabel = fam
+      ? `${fam.brand_name} · ${fam.family_name}`
+      : (brands.get(Number(pick.slice(2)))?.name ?? sheetData.families[0]?.brand_name ?? '');
+    const meta = { scopeLabel, generatedAt: now, lang: i18n.language };
+    const filename = `finance-rates_${pick.replace(':', '')}_${stamp}`;
+    try {
+      if (kind === 'xlsx') await downloadFinanceRatesXlsx(sheetData, meta, t, filename);
+      else await downloadFinanceRatesPdf(sheetData, meta, t, filename);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : t('common.error'));
+    } finally {
+      setExporting(null);
+    }
+  };
+
+  const exportDisabled = !sheetData || sheetData.families.length === 0 || !!exporting;
+
+  const exportMenu = (where: 'desktop' | 'mobile', trigger: ReactNode) => (
+    <PopOver
+      isOpen={exportOpen === where}
+      onClose={() => setExportOpen(null)}
+      placement="bottom"
+      align="end"
+      maxWidth="240px"
+      trigger={trigger}
+    >
+      <div className="flex flex-col py-1 min-w-[12rem]">
+        {(['xlsx', 'pdf'] as const).map(kind => (
+          <button
+            key={kind}
+            type="button"
+            onClick={() => runExport(kind)}
+            className="flex items-center gap-2 px-3 py-2 text-sm text-left bg-transparent border-none cursor-pointer hover:bg-surface-hover"
+          >
+            {kind === 'xlsx' ? <FileSpreadsheet size={15} /> : <FileText size={15} />}
+            {kind === 'xlsx' ? t('financeRates.export.excel') : t('financeRates.export.pdf')}
+          </button>
+        ))}
+      </div>
+    </PopOver>
+  );
+
   const { data: editableModelIds } = useQuery({
     queryKey: ['fin1-sheet-can-edit-retail', sheetModelIds],
     queryFn: async () => {
@@ -614,12 +672,35 @@ export function FinanceRatesPage() {
               <div className="mobile-header-title mobile-header-title-truncate">
                 {t('financeRates.title')}
               </div>
-              <div className="mobile-header-end w-nav" />
+              <div className="mobile-header-end w-nav">
+                {exportMenu('mobile', (
+                  <button
+                    className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current disabled:opacity-40"
+                    aria-label={t('financeRates.export.label')}
+                    onClick={() => setExportOpen(o => (o === 'mobile' ? null : 'mobile'))}
+                    disabled={exportDisabled}
+                  >
+                    {exporting ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+                  </button>
+                ))}
+              </div>
             </MobileHeader>
           )}
           {!isMobile && (
-            <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
+            <div className="flex-none px-4 py-2.5 border-b border-line flex items-center justify-between gap-4">
               <h1 className="heading-2">{t('financeRates.title')}</h1>
+              {exportMenu('desktop', (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  startIcon={exporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                  endIcon={<ChevronDown size={14} />}
+                  onClick={() => setExportOpen(o => (o === 'desktop' ? null : 'desktop'))}
+                  disabled={exportDisabled}
+                >
+                  {exporting ? t('financeRates.export.working') : t('financeRates.export.label')}
+                </Button>
+              ))}
             </div>
           )}
 
@@ -649,10 +730,10 @@ export function FinanceRatesPage() {
                 </div>
               ) : (
                 <div className={`max-w-5xl p-4 flex flex-col gap-4 ${isFetching ? 'opacity-60' : ''} transition-opacity`}>
-                  {sheetError && (
+                  {(sheetError || exportError) && (
                     <div className="alert alert-danger">
                       <XCircle size={16} />
-                      <span>{translateApiError(sheetError, t)}</span>
+                      <span>{sheetError ? translateApiError(sheetError, t) : exportError}</span>
                     </div>
                   )}
                   {isHoldingCompany && (sheetData?.models_without_price ?? 0) > 0 && (

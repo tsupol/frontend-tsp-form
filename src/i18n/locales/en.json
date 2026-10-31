@@ -4929,7 +4929,25 @@
     "newPrice": "New retail price",
     "note": "Note (optional)",
     "priceSaved": "Retail price saved",
-    "upliftOutOfRange": "Above this model's limit (+{{max}}) — preview only"
+    "upliftOutOfRange": "Above this model's limit (+{{max}}) — preview only",
+    "export": {
+      "label": "Export",
+      "working": "Exporting…",
+      "excel": "Excel (.xlsx)",
+      "pdf": "PDF (A4)",
+      "scope": "Brand/family: {{scope}}",
+      "asOf": "As of {{when}}",
+      "brand": "Brand",
+      "family": "Family",
+      "model": "Model",
+      "downPct": "Down %",
+      "downAmount": "Down payment",
+      "installment": "Installment",
+      "lastInstallment": "Last installment",
+      "multiplier": "Multiplier",
+      "pctPerMonth": "%/month",
+      "note": "Note"
+    }
   },
   "financierForm": {
     "title": "Financier Form (RICH)",

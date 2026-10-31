@@ -22,10 +22,21 @@ export interface XlsxColumn {
   format?: string;
 }
 
+/**
+ * A run of adjacent columns sharing one merged heading above their own
+ * labels ("10 งวด" over ค่างวด | งวดสุดท้าย). Groups cover the columns in
+ * order; a `label: null` group marks standalone columns, whose label then
+ * spans both header rows.
+ */
+export interface XlsxHeaderGroup {
+  label: string | null;
+  span: number;
+}
+
 // A cell is either a typed value object or `null` for an empty cell (the lib
 // accepts `null` as a whole-cell blank).
 type Cell =
-  | { type: typeof String; value: string }
+  | ({ type: typeof String; value: string } & Record<string, unknown>)
   | { type: typeof Number; value: number }
   | { type: typeof Date; value: Date }
   | { type: typeof Boolean; value: boolean }
@@ -50,6 +61,10 @@ function toCell(raw: unknown, kind: XlsxCellType): Cell {
   }
 }
 
+const HEADER_FILL = '#E7E6E6';
+const HEADER_RULE = '#A6A6A6';
+const GROUP_FILLS = ['#DDEBF7', '#E2EFDA'];
+
 /**
  * Build a typed .xlsx from rows + column defs and trigger a browser download.
  * Columns are written in the given order (already the intended sheet layout).
@@ -60,9 +75,41 @@ export async function downloadXlsx(
   rows: Record<string, unknown>[],
   columns: XlsxColumn[],
   filename: string,
-  options?: { titleRows?: string[] },
+  options?: { titleRows?: string[]; headerGroups?: XlsxHeaderGroup[] },
 ): Promise<void> {
-  const headerRow = columns.map(c => ({ type: String, value: c.label, fontWeight: 'bold' as const }));
+  // Header cells: light grey fill, bold, wrapped (a long Thai label is never
+  // clipped by a narrow column), a darker rule under the last header row.
+  // Grouped columns alternate two pale tints over the whole group — merged
+  // heading and its sub-labels — so the eye sees where one group ends.
+  const headCell = (value: string, fill: string, extra: Record<string, unknown> = {}) => ({
+    type: String, value, fontWeight: 'bold' as const, wrap: true, alignVertical: 'center' as const,
+    backgroundColor: fill, ...extra,
+  });
+  const ruled = { bottomBorderColor: HEADER_RULE, bottomBorderStyle: 'thin' };
+  const groups = options?.headerGroups;
+  const headerRows: Cell[][] = [];
+  if (groups && groups.length > 0) {
+    const top: Cell[] = [];
+    const sub: Cell[] = [];
+    let i = 0;
+    let tint = 0;
+    for (const g of groups) {
+      if (g.label == null) {
+        for (let k = 0; k < g.span; k++, i++) {
+          top.push(headCell(columns[i].label, HEADER_FILL, { rowSpan: 2, ...ruled }));
+          sub.push(null);
+        }
+      } else {
+        const fill = GROUP_FILLS[tint++ % GROUP_FILLS.length];
+        top.push(headCell(g.label, fill, { columnSpan: g.span, align: 'center' }));
+        for (let k = 1; k < g.span; k++) top.push(null);
+        for (let k = 0; k < g.span; k++, i++) sub.push(headCell(columns[i].label, fill, ruled));
+      }
+    }
+    headerRows.push(top, sub);
+  } else {
+    headerRows.push(columns.map(c => headCell(c.label, HEADER_FILL, ruled)));
+  }
   const dataRows = rows.map(row => columns.map(c => {
     const cell = toCell(row[c.key], c.type ?? 'text');
     return cell && c.format ? { ...cell, format: c.format } : cell;
@@ -75,7 +122,7 @@ export async function downloadXlsx(
     ]),
     columns.map(() => null),
   ];
-  const sheetData = [...titleBlock, headerRow, ...dataRows];
+  const sheetData = [...titleBlock, ...headerRows, ...dataRows];
 
   const colWidths = columns.map(c => (c.width != null ? { width: c.width } : {}));
 
@@ -85,8 +132,9 @@ export async function downloadXlsx(
   const blob = await writeExcelFile(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     sheetData as any,
+    // Title block + header rows stay on screen while the data scrolls.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    { columns: colWidths as any, dateFormat: 'yyyy-mm-dd' },
+    { columns: colWidths as any, dateFormat: 'yyyy-mm-dd', stickyRowsCount: titleBlock.length + headerRows.length },
   ).toBlob();
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

@@ -4925,7 +4925,25 @@
     "newPrice": "ราคาขายปลีกใหม่",
     "note": "หมายเหตุ (ไม่บังคับ)",
     "priceSaved": "บันทึกราคาแล้ว",
-    "upliftOutOfRange": "เกินเพดานของรุ่นนี้ (+{{max}}) — ดูเป็นตัวอย่างเท่านั้น"
+    "upliftOutOfRange": "เกินเพดานของรุ่นนี้ (+{{max}}) — ดูเป็นตัวอย่างเท่านั้น",
+    "export": {
+      "label": "Export",
+      "working": "กำลัง export…",
+      "excel": "Excel (.xlsx)",
+      "pdf": "PDF (A4)",
+      "scope": "แบรนด์/family: {{scope}}",
+      "asOf": "ข้อมูล ณ {{when}}",
+      "brand": "แบรนด์",
+      "family": "Family",
+      "model": "รุ่น",
+      "downPct": "ดาวน์ %",
+      "downAmount": "เงินดาวน์",
+      "installment": "ค่างวด",
+      "lastInstallment": "งวดสุดท้าย",
+      "multiplier": "ตัวคูณ",
+      "pctPerMonth": "%/เดือน",
+      "note": "หมายเหตุ"
+    }
   },
   "financierForm": {
     "title": "กรอกฟอร์ม RICH",
