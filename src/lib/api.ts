@@ -186,6 +186,7 @@ function readOnlyViewerError(): ApiError {
     code: READ_ONLY_VIEWER_CODE,
     message: 'This account can only view',
     messageKey: READ_ONLY_VIEWER_CODE,
+    isAuthError: false,
     httpStatus: 403,
   });
 }
