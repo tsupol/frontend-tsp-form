@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -9,7 +9,7 @@ import {
 } from 'tsp-form';
 import {
   ArrowRightFromLine, ArrowLeft, Plus, Trash2, XCircle, CheckCircle, Ban, Printer,
-  Wrench, ChevronDown, Copy, Search, X, Download, Loader2, ExternalLink, Pencil,
+  Wrench, ChevronDown, Copy, Search, X, Download, Loader2, ExternalLink, Pencil, ArrowLeftRight,
 } from 'lucide-react';
 import { FilterBar } from '../../components/FilterBar';
 import { apiClient, ApiError } from '../../lib/api';
@@ -21,8 +21,9 @@ import { fmtCurrency } from '../../lib/format';
 import { printWithMarker } from '../../lib/printDoc';
 import { useBillPdfDownload } from '../../hooks/useBillPdfDownload';
 import { buildBillActionToast, hasBill, type StandardBillResponse } from '../../lib/billActionToast';
-import { type Branch, type BillRow, type BillDetail, type BillPayment, type BillLineItem, todayISO } from './accountingTypes';
+import { type Branch, type BillRow, type BillDetail, type BillPayment, type BillLineItem, type BillLineRetypeOption, todayISO } from './accountingTypes';
 import { CorrectLineModal } from './CorrectLineModal';
+import { RetypeLineModal, useChargeTypeLabel, type RetypeTarget } from './RetypeLineModal';
 import { CreditNoteReverseModal } from './CreditNoteReverseModal';
 import { CancelClosedDayModal } from './CancelClosedDayModal';
 import { WaiveLateFeeModal } from './WaiveLateFeeModal';
@@ -447,6 +448,25 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
     queryFn: () => apiClient.get<BillDetail[]>(`/v_bill_detail?bill_id=eq.${billId}`),
   });
 
+  // เปลี่ยนประเภท (mig 1547): which lines may change charge type and to what.
+  // One row per line x target; a line with no rows gets no button. The view
+  // only holds PAID bills, so an OPEN bill simply comes back empty.
+  const { data: retypeRows } = useQuery({
+    queryKey: ['accounting', 'bill-retype-options', billId],
+    queryFn: () => apiClient.get<BillLineRetypeOption[]>(
+      `/v_bill_line_retype_options?bill_id=eq.${billId}&order=line_id,target_sort_order`),
+  });
+  const retypeByLine = useMemo(() => {
+    const m = new Map<number, BillLineRetypeOption[]>();
+    for (const r of retypeRows ?? []) {
+      const arr = m.get(r.line_id);
+      if (arr) arr.push(r); else m.set(r.line_id, [r]);
+    }
+    return m;
+  }, [retypeRows]);
+  const chargeTypeLabel = useChargeTypeLabel(retypeRows);
+  const [retypeTarget, setRetypeTarget] = useState<RetypeTarget | null>(null);
+
   // Available actions (drives button visibility — replaces local isOpen heuristic)
   const { isAvailable: isActionAvailable, data: actionsData } = useBillActions(billId);
   const allActions = actionsData?.actions ?? [];
@@ -605,6 +625,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
   // keys, which the `['accounting']` sweep in onBillChanged never reaches.
   const invalidateAfterBillChange = () => {
     queryClient.invalidateQueries({ queryKey: ['accounting', 'bill-detail', billId] });
+    queryClient.invalidateQueries({ queryKey: ['accounting', 'bill-retype-options', billId] });
     queryClient.invalidateQueries({ queryKey: ['bill-actions', billId] });
     const contractId = detail.contract_id;
     if (contractId) {
@@ -833,6 +854,13 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
           <div className="flex flex-col">
             {lines.map((line) => {
               const lineCorrectable = canCorrectLines && line.amount_correctable === true;
+              // เปลี่ยนประเภท — the view decides which lines and which targets;
+              // same BILL.CORRECT_LINE permission as แก้ยอด. Blocked (day
+              // closed) → the button stays, greyed, with the reason on hover.
+              const retypeRowsForLine = retypeByLine.get(line.line_id);
+              const retypeOffered = !isCancelled && canCorrectLine && !!retypeRowsForLine?.length;
+              const retypeNow = retypeRowsForLine?.[0]?.can_retype_now === true;
+              const retypeBlock = retypeRowsForLine?.[0]?.blocking_reason ?? null;
               return (
                 <div key={line.line_id} className="flex flex-col gap-1 py-2 border-b border-line last:border-b-0">
                   {/* Top row: type badge · qty · amount · owner · correct */}
@@ -861,6 +889,35 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
                           onClick={() => setCorrectLine(line)}
                           aria-label={t('accounting.bills.correctLine.title')}
                         />
+                      </Tooltip>
+                    )}
+                    {retypeOffered && retypeRowsForLine && (
+                      <Tooltip
+                        placement="left"
+                        content={retypeNow || !retypeBlock
+                          ? t('accounting.bills.retype.title')
+                          : (
+                            <div className="flex flex-col gap-0.5">
+                              <div className="font-medium">{t('accounting.bills.retype.title')}</div>
+                              <div className="text-xs opacity-90">
+                                {t(`SALE.STATE.${retypeBlock}`, { ns: 'apiErrors', defaultValue: retypeBlock })}
+                              </div>
+                            </div>
+                          )}
+                      >
+                        <span className="inline-flex">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="btn-icon-sm shrink-0"
+                            startIcon={<ArrowLeftRight size={14} />}
+                            disabled={!retypeNow}
+                            data-action="RETYPE_LINE"
+                            data-blocked-reason={retypeNow ? undefined : retypeBlock ?? undefined}
+                            onClick={() => setRetypeTarget({ lineId: line.line_id, options: retypeRowsForLine })}
+                            aria-label={t('accounting.bills.retype.title')}
+                          />
+                        </span>
                       </Tooltip>
                     )}
                   </div>
@@ -1136,6 +1193,32 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
         onCorrected={() => {
           invalidateAfterBillChange();
           onBillChanged();
+        }}
+      />
+
+      {/* ── เปลี่ยนประเภทรายการ (mig 1547) ── */}
+      <RetypeLineModal
+        target={retypeTarget}
+        onClose={() => setRetypeTarget(null)}
+        onRetyped={(res) => {
+          // The RPC hands back the refreshed v_bill_detail row — use it instead
+          // of a second GET, then re-read the option rows (the line may now go
+          // back the other way) and what the change touched on the contract.
+          if (res.bill_detail) {
+            queryClient.setQueryData(['accounting', 'bill-detail', billId], [res.bill_detail]);
+          }
+          invalidateAfterBillChange();
+          onBillChanged(
+            <div className="alert alert-success">
+              <CheckCircle size={16} />
+              <span className="alert-description">
+                {t('accounting.bills.retype.snackbar', {
+                  from: chargeTypeLabel(res.line.old_charge_type),
+                  to: chargeTypeLabel(res.line.new_charge_type),
+                })}
+              </span>
+            </div>,
+          );
         }}
       />
 

@@ -516,6 +516,20 @@
         "ASSET_DISPOSAL": "Asset Disposal",
         "STOCK_LOSS": "Stock Loss",
         "WRITE_OFF": "Asset Write-off"
+      },
+      "retype": {
+        "title": "Change type",
+        "doneTitle": "Type changed",
+        "newType": "New type",
+        "newTypePlaceholder": "Choose the type it should have been",
+        "unchanged": "Amount {{amount}}, payments and the day-close figure stay as they are",
+        "reason": "Reason",
+        "reasonPlaceholder": "e.g. keyed as service charge, was onsite delivery",
+        "confirm": "Confirm change",
+        "description": "Description",
+        "amount": "Amount",
+        "billTotal": "Bill total",
+        "snackbar": "Changed {{from}} → {{to}}"
       }
     },
     "daily": {
@@ -8796,7 +8810,9 @@
       "SERVICE_CHARGE": "Service charge",
       "SHIPPING_FEE": "Shipping fee",
       "ONSITE_DELIVERY_FEE": "Onsite delivery fee",
-      "REPAIR": "Repair fee"
+      "REPAIR": "Repair fee",
+      "COMPANY_CHARGE": "Company charge",
+      "HOLDING_CHARGE": "Holding charge"
     },
     "col": {
       "day": "Day",

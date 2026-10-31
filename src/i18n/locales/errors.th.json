@@ -1145,7 +1145,7 @@
   "partner.validation.fin1_only": "การขออนุมัติสินเชื่อใช้ได้เฉพาะสัญญา FIN1",
   "partner.validation.reason_required": "กรุณาเลือกเหตุผล และระบุข้อความสำหรับ \"อื่น ๆ\"",
   "partner.validation.reason_code_invalid": "เหตุผลส่งกลับไม่ถูกต้อง",
-  "partner.state.case_open": "สัญญานี้มีคำขออนุมัติค้างอยู่ ต้องถอนคำขอก่อนแก้ไข",
+  "partner.state.case_open": "มีใบขออนุมัติร้านค้างเปิดอยู่ — ถอนใบขออนุมัติก่อน",
   "partner.state.no_open_case": "ไม่มีคำขอที่ทำรายการนี้ได้ กรุณารีเฟรชหน้า",
   "partner.state.action_not_allowed": "คำขออยู่ในสถานะที่ทำรายการนี้ไม่ได้",
   "partner.state.open_bill_must_be_voided": "ต้องยกเลิกบิลเปิดสัญญาก่อน",
@@ -1373,7 +1373,6 @@
   "PARTNER.VALIDATION.ADJUST_NOTE_REQUIRED": "แก้ตัวเลขแล้วต้องเขียนบันทึกถึงร้าน",
   "PARTNER.VALIDATION.ADJUST_PRICE_NEW": "ราคาเครื่องมือหนึ่งมาจากตารางราคา แก้รายเคสไม่ได้",
   "PARTNER.STATE.NO_ADJUSTMENT": "ใบอนุมัตินี้ไม่มีการแก้ไขให้รับทราบ",
-  "partner.state.case_open": "มีใบขออนุมัติร้านค้างเปิดอยู่ — ถอนใบขออนุมัติก่อน",
   "PARTNER.STATE.CASE_OPEN": "มีใบขออนุมัติร้านค้างเปิดอยู่ — ถอนใบขออนุมัติก่อน",
   "PARTNER.STATE.ALREADY_ACKNOWLEDGED": "รับทราบการแก้ไขไปแล้ว",
   "CONTRACT.STATE.PARTNER_ADJUST_NOT_ACKNOWLEDGED": "ฝ่ายสินเชื่ออนุมัติพร้อมแก้ไข — กดรับทราบที่การ์ด “ขออนุมัติสินเชื่อ” ของสัญญาก่อน",
@@ -1447,5 +1446,8 @@
   "core.validation.bank_code_required": "ต้องเลือกธนาคารจากรายการ",
   "CORE.VALIDATION.BANK_CODE_REQUIRED": "ต้องเลือกธนาคารจากรายการ",
   "core.validation.qr_only_has_number": "บัญชี QR อย่างเดียวต้องไม่มีเลขบัญชี — เลขร้านค้าใส่ในหมายเหตุได้",
-  "CORE.VALIDATION.QR_ONLY_HAS_NUMBER": "บัญชี QR อย่างเดียวต้องไม่มีเลขบัญชี — เลขร้านค้าใส่ในหมายเหตุได้"
+  "CORE.VALIDATION.QR_ONLY_HAS_NUMBER": "บัญชี QR อย่างเดียวต้องไม่มีเลขบัญชี — เลขร้านค้าใส่ในหมายเหตุได้",
+  "SALE.VALIDATION.LINE_NOT_RETYPEABLE": "รายการนี้เปลี่ยนประเภทไม่ได้ (ไม่ใช่รายการ manual / ผูกสต็อก / ไม่มีประเภทอื่นให้เปลี่ยน)",
+  "SALE.VALIDATION.CHARGE_TYPE_UNCHANGED": "รายการเป็นประเภทนี้อยู่แล้ว",
+  "SALE.VALIDATION.RETYPE_TARGET_NOT_ALLOWED": "เปลี่ยนเป็น {{new_charge_type}} ไม่ได้ — เลือกได้เฉพาะประเภทที่ให้เลือก"
 }

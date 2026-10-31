@@ -516,6 +516,20 @@
         "ASSET_DISPOSAL": "จำหน่ายสินทรัพย์",
         "STOCK_LOSS": "สูญเสียสินค้า",
         "WRITE_OFF": "ตัดบัญชีสินทรัพย์"
+      },
+      "retype": {
+        "title": "เปลี่ยนประเภท",
+        "doneTitle": "เปลี่ยนประเภทแล้ว",
+        "newType": "ประเภทใหม่",
+        "newTypePlaceholder": "เลือกประเภทที่ถูกต้อง",
+        "unchanged": "ยอด {{amount}} การชำระ และยอดปิดวันไม่เปลี่ยน",
+        "reason": "เหตุผล",
+        "reasonPlaceholder": "เช่น คีย์เป็นค่าบริการ ที่จริงคือค่าจัดส่งถึงที่",
+        "confirm": "ยืนยันเปลี่ยนประเภท",
+        "description": "รายละเอียด",
+        "amount": "ยอด",
+        "billTotal": "ยอดบิล",
+        "snackbar": "เปลี่ยน {{from}} → {{to}} แล้ว"
       }
     },
     "daily": {
@@ -8784,7 +8798,9 @@
       "SERVICE_CHARGE": "ค่าบริการ",
       "SHIPPING_FEE": "ค่าจัดส่ง",
       "ONSITE_DELIVERY_FEE": "ค่าจัดส่งถึงที่",
-      "REPAIR": "ค่าซ่อม"
+      "REPAIR": "ค่าซ่อม",
+      "COMPANY_CHARGE": "ค่าใช้จ่ายพิเศษ (บริษัท)",
+      "HOLDING_CHARGE": "ค่าใช้จ่ายพิเศษ (holding)"
     },
     "col": {
       "day": "วันที่",

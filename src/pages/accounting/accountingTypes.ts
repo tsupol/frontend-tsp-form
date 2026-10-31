@@ -738,6 +738,64 @@ export interface BillLineItem {
   product_display_name?: string | null;
 }
 
+// v_bill_line_retype_options row (mig 1547) — one row per PAID-bill line x
+// charge type it may be changed to. A line with no rows cannot be retyped.
+export interface BillLineRetypeOption {
+  line_id: number;
+  bill_id: number;
+  bill_code_display: string;
+  bill_purpose: string;
+  bill_type: string;
+  bill_date: string;
+  bill_status: string;
+  branch_id: number;
+  company_id: number | null;
+  holding_id: number;
+  contract_id: number | null;
+  current_charge_type: string;
+  current_description: string;
+  amount: number;
+  quantity: number;
+  owner_type: string;
+  bucket: string;
+  target_charge_type: string;
+  target_name_th: string | null;
+  target_name_en: string | null;
+  target_sort_order: number;
+  // true = PAID + today open + the bill's day open. When false, blocking_reason
+  // is BILL_NOT_PAID · DAY_ALREADY_CLOSED · CANNOT_VOID_AFTER_DAY_CLOSE
+  // (bare, without the SALE.STATE. prefix the RPC error codes carry).
+  can_retype_now: boolean;
+  blocking_reason: string | null;
+}
+
+// fn_bill_line_retype response (mig 1547). preview=true carries the same shape
+// with nothing written.
+export interface BillLineRetypeResult {
+  applied: boolean;
+  preview: boolean;
+  line: {
+    line_id: number;
+    bill_id: number;
+    bill_code: string;
+    bill_purpose: string;
+    old_charge_type: string;
+    new_charge_type: string;
+    old_description: string;
+    new_description: string;
+    amount: number;
+    quantity: number;
+    owner_type: string;
+    bucket: string;
+  };
+  bill: { total_amount: number; paid_amount: number; status: string; unchanged: boolean };
+  day_close: { bill_date: string; bucket: string; unchanged: boolean };
+  contract_ledger: Record<string, unknown> | null;
+  correction_log_id?: number;
+  options: { charge_type: string; sort_order: number }[];
+  bill_detail?: BillDetail;
+}
+
 export interface BillPayment {
   id: number;
   method: string;

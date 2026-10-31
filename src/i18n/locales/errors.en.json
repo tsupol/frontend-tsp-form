@@ -1445,5 +1445,8 @@
   "core.validation.bank_code_required": "Pick the bank from the list",
   "CORE.VALIDATION.BANK_CODE_REQUIRED": "Pick the bank from the list",
   "core.validation.qr_only_has_number": "A QR-only account has no account number — put the shop’s number in the note",
-  "CORE.VALIDATION.QR_ONLY_HAS_NUMBER": "A QR-only account has no account number — put the shop’s number in the note"
+  "CORE.VALIDATION.QR_ONLY_HAS_NUMBER": "A QR-only account has no account number — put the shop’s number in the note",
+  "SALE.VALIDATION.LINE_NOT_RETYPEABLE": "This line cannot change type (not a manual line, tied to stock, or no other type to change to)",
+  "SALE.VALIDATION.CHARGE_TYPE_UNCHANGED": "The line already has this type",
+  "SALE.VALIDATION.RETYPE_TARGET_NOT_ALLOWED": "This line cannot become {{new_charge_type}} — pick one of the types offered"
 }

@@ -92,6 +92,11 @@ export function prepareErrorParams(
   if (typeof params.reason === 'string' && /^(IMEI_FORMAT|IMEI_LUHN_FAIL|APPLE_SERIAL_FORMAT|SERIAL_FORMAT)$/.test(params.reason)) {
     params.reason_label = t(`identifierFormat.${params.reason}`, { defaultValue: params.reason });
   }
+  // mig 1547 RETYPE_TARGET_NOT_ALLOWED names the charge type that was asked
+  // for; show it the way the bill screen labels charge types, not as a code.
+  if (typeof params.new_charge_type === 'string') {
+    params.new_charge_type = t(`serviceFee.svcType.${params.new_charge_type}`, { defaultValue: params.new_charge_type });
+  }
   if (typeof params.existing_bucket === 'string') {
     params.existing_bucket = getBucketLabel(params.existing_bucket, t as (k: string) => string);
   }

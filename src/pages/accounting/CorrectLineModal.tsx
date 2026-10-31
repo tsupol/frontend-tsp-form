@@ -4,6 +4,7 @@ import { Modal, Button, MaskedInput, Input, Badge, RadioGroup } from 'tsp-form';
 import { XCircle, CheckCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { BranchPinInput } from '../../components/BranchPinInput';
+import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { fmtCurrency } from '../../lib/format';
 import type { BillLineItem, BillPayment } from './accountingTypes';
 import { translateApiError } from '../../lib/apiErrors';
@@ -146,13 +147,6 @@ export function CorrectLineModal({ line, payments, billTotal, onClose, onCorrect
           <>
             <div className="modal-content">
               <div className="form-grid">
-                {error && (
-                  <div className="alert alert-danger">
-                    <XCircle size={18} />
-                    <div><div className="alert-description">{error}</div></div>
-                  </div>
-                )}
-
                 {/* Target line */}
                 <div className="px-3 py-2.5 rounded-md bg-surface border border-line">
                   <div className="font-medium text-sm truncate">{line.description}</div>
@@ -245,6 +239,7 @@ export function CorrectLineModal({ line, payments, billTotal, onClose, onCorrect
                 <BranchPinInput value={pin} onChange={setPin} label={t('accounting.bills.pin')} required />
               </div>
             </div>
+            <ModalErrorBand message={error} onDismiss={() => setError('')} />
             <div className="modal-footer">
               <Button onClick={handleClose} disabled={busy}>{t('common.cancel')}</Button>
               <Button color="primary" onClick={handleSubmit} disabled={!canSubmit}>
