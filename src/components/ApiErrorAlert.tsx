@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { XCircle, ExternalLink } from 'lucide-react';
 import { ApiError } from '../lib/api';
 import { translateApiError } from '../lib/apiErrors';
@@ -50,16 +50,21 @@ export function ApiErrorAlert({
  * the button that caused it however far the form is scrolled. Keeps the
  * conflict link.
  */
-export function ApiErrorBand({ error, onDismiss }: { error: unknown; onDismiss?: () => void }) {
+export function ApiErrorBand({ error, onDismiss, onNavigate }: {
+  error: unknown;
+  onDismiss?: () => void;
+  /** Runs when the conflict link is followed in this tab — pass the modal's close,
+   *  or the asset page opens underneath a modal that stays on top of it. */
+  onNavigate?: () => void;
+}) {
   const { t } = useTranslation();
   if (!error) return null;
   const message = typeof error === 'string' ? error : translateApiError(error, t);
-  return <ModalErrorBand message={message} onDismiss={onDismiss} action={<ConflictAssetLink error={error} />} />;
+  return <ModalErrorBand message={message} onDismiss={onDismiss} action={<ConflictAssetLink error={error} onNavigate={onNavigate} />} />;
 }
 
-function ConflictAssetLink({ error }: { error: unknown }) {
+function ConflictAssetLink({ error, onNavigate }: { error: unknown; onNavigate?: () => void }) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
 
   const params = error instanceof ApiError ? error.messageParams : undefined;
   const conflictAssetId = params?.existing_asset_id;
@@ -69,15 +74,15 @@ function ConflictAssetLink({ error }: { error: unknown }) {
   if (!canLink) return null;
 
   return (
-    <button
-      type="button"
-      onClick={() => navigate(`/admin/inventory/assets/${conflictAssetId}`)}
-      className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer self-start"
+    <Link
+      to={`/admin/inventory/assets/${conflictAssetId}`}
+      onClick={(e) => { if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey) onNavigate?.(); }}
+      className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 self-start"
     >
       {t('inventory.viewConflictingAsset', {
         code: typeof conflictAssetCode === 'string' ? conflictAssetCode : '',
       })}
       <ExternalLink size={12} />
-    </button>
+    </Link>
   );
 }

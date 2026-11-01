@@ -1,13 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Modal, Button, Input, Select, MaskedInput, LabeledCheckbox, InputDatePicker, FormErrorMessage } from 'tsp-form';
-import { XCircle, CheckCircle, Search, Package, Keyboard, ExternalLink, RotateCcw, AlertTriangle } from 'lucide-react';
+import { XCircle, Search, Package, Keyboard, ExternalLink, AlertTriangle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
-import { translateApiError } from '../../lib/apiErrors';
 import { makeDatePickerFormat, toLocalDateStr, fmtCurrency } from '../../lib/format';
 import { ImeiInput } from '../../components/ImeiInput';
+import { ApiErrorBand } from '../../components/ApiErrorAlert';
+import { ActionDoneView } from '../contracts/ActionDoneView';
 import { ColorSwatch } from '../../components/ColorAutocomplete';
 import { SerialInput } from '../../components/SerialInput';
 import { identifierFormatReason, isAppleBrand } from '../../lib/validators';
@@ -104,10 +104,10 @@ export function RegisterAssetModal({
   const [costOverride, setCostOverride] = useState('');
   const [retailOverride, setRetailOverride] = useState('');
   const [externalRef, setExternalRef] = useState('');
-  const [error, setError] = useState('');
-  // When the register RPC rejects with INV.CONFLICT.IDENTIFIER_CONFLICT, the BE
-  // sends the existing asset's id/code so we can link straight to it.
-  const [conflictAssetId, setConflictAssetId] = useState<number | null>(null);
+  // The ApiError itself (not its text): `ApiErrorBand` translates it and, on
+  // INV.CONFLICT.IDENTIFIER_CONFLICT, links to the existing asset from its params.
+  const [error, setError] = useState<unknown>(null);
+  const [confirmClose, setConfirmClose] = useState(false);
 
   // INTERNAL (own shops), EXTERNAL (company-owned consignment) and DEAL_PARTNER
   // (shops that own their devices) all register here. Warehouse branches don't.
@@ -132,9 +132,18 @@ export function RegisterAssetModal({
     }
   }, [open, branchId, eligibleBranches]);
 
+  // Dirty-close guard: anything the user changed from the blank form the open
+  // effect below resets to. (A snapshot taken on open misses a reopen where every
+  // field was already blank: no re-render, so the baseline lands on the first
+  // keystroke.) The branch preselect isn't the user's input, so it stays out.
+  const isDirty = keyword !== '' || modelId !== null || variantId !== null
+    || condition !== 'NEW' || !hasBox || battery !== '' || warranty !== ''
+    || imei !== '' || serial !== '' || costOverride !== '' || retailOverride !== ''
+    || externalRef !== '';
+
   useEffect(() => {
     if (open) {
-      setView('form'); setResult(null);
+      setView('form'); setResult(null); setConfirmClose(false);
       setBranchId(null); setKeyword(''); setDebounced('');
       setModelId(null); setModelBrand(null); setVariantId(null);
       setCondition('NEW'); setHasBox(true);
@@ -142,7 +151,7 @@ export function RegisterAssetModal({
       setImei(''); setSerial('');
       setCostOverride(''); setRetailOverride('');
       setExternalRef('');
-      setError(''); setConflictAssetId(null);
+      setError(null);
     }
   }, [open]);
 
@@ -257,24 +266,26 @@ export function RegisterAssetModal({
       onRegistered();
     },
     onError: (err) => {
-      setConflictAssetId(null);
       if (err instanceof ApiError) {
         // Identifier conflict: the BE ships the existing asset's id/code/branch/
         // bucket as params. Resolve the bucket to its label so the message reads
-        // like the stock screens, and stash the id so we can link to it.
+        // like the stock screens; the band links to the asset from the id.
         const p = err.messageParams;
         if (p && (err.code === 'INV.CONFLICT.IDENTIFIER_CONFLICT' || err.messageKey === 'inv.conflict.identifier_conflict')) {
           const bucket = p.existing_bucket as string | undefined;
           if (bucket) err.messageParams = { ...p, existing_bucket_label: getBucketLabel(bucket, t) };
-          const id = Number(p.existing_asset_id);
-          if (Number.isFinite(id) && id > 0) setConflictAssetId(id);
         }
-        setError(translateApiError(err, t));
-      } else {
-        setError(String(err));
       }
+      setError(err);
     },
   });
+
+  const forceClose = () => { setConfirmClose(false); onClose(); };
+  const handleClose = () => {
+    if (mutation.isPending) return;
+    if (view === 'done' || !isDirty) { forceClose(); return; }
+    setConfirmClose(true);
+  };
 
   const noEligible = eligibleBranches.length === 0;
 
@@ -287,62 +298,43 @@ export function RegisterAssetModal({
   }, [result?.from_branch_id, branches]);
 
   return (
-    <Modal open={open} onClose={onClose} maxWidth="34rem" width="100%">
+    <>
+    <Modal open={open} onClose={handleClose} maxWidth="34rem" width="100%">
       <div className="modal-header">
         <h2 className="modal-title">{t('asset.registerTitle', { defaultValue: 'Register asset' })}</h2>
-        <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+        <button type="button" className="modal-close-btn" onClick={handleClose} aria-label="Close">&times;</button>
       </div>
 
       {view === 'done' && result ? (
-        <>
-          <div className="modal-content">
-            <div className="flex flex-col items-center gap-2 py-6">
-              {result.re_registered ? (
-                <RotateCcw size={40} className="text-success" />
-              ) : (
-                <CheckCircle size={40} className="text-success" />
-              )}
-              <p className="text-sm text-subtle text-center">
-                {result.re_registered
-                  ? t('asset.reRegisterDone', { defaultValue: 'Device returned to stock' })
-                  : t('asset.registerDone', { defaultValue: 'Asset registered' })}
-              </p>
-              <Link
-                to={`/admin/inventory/assets/${result.asset_id}`}
-                className="text-lg font-semibold font-mono text-primary-fg hover:underline"
-                onClick={onClose}
-              >
-                {result.code_display ?? result.asset_code}
-              </Link>
-              {result.re_registered && (
-                <p className="text-xs text-subtle text-center max-w-xs">
-                  {fromBranchName
-                    ? t('asset.reRegisterFromBranch', {
-                        branch: fromBranchName,
-                        defaultValue: 'This device was previously transferred out of {{branch}}. It is now in this branch’s stock.',
-                      })
-                    : t('asset.reRegisterGeneric', {
-                        defaultValue: 'This device had been transferred out. It is now back in this branch’s stock.',
-                      })}
-                  {result.final_cost != null && (
-                    <> {' · '}{t('asset.reRegisterCost', { cost: fmtCurrency(result.final_cost), defaultValue: 'Cost {{cost}}' })}</>
-                  )}
-                </p>
-              )}
-              <Link
-                to={`/admin/inventory/assets/${result.asset_id}`}
-                className="inline-flex items-center gap-1 text-sm text-primary-fg hover:underline"
-                onClick={onClose}
-              >
-                <ExternalLink size={14} />
-                {t('asset.registerViewAsset', { defaultValue: 'Open asset' })}
-              </Link>
-            </div>
-          </div>
-          <div className="modal-footer">
-            <Button color="primary" onClick={onClose}>{t('common.done', { defaultValue: 'Done' })}</Button>
-          </div>
-        </>
+        <ActionDoneView
+          headline={result.re_registered
+            ? t('asset.reRegisterDone', { defaultValue: 'Device returned to stock' })
+            : t('asset.registerDone', { defaultValue: 'Asset registered' })}
+          contractCode={result.code_display ?? result.asset_code}
+          contractLink={{ to: `/admin/inventory/assets/${result.asset_id}`, onNavigate: onClose }}
+          detailRows={result.re_registered && result.final_cost != null
+            ? [{ label: t('asset.reRegisterCostLabel', { defaultValue: 'Cost' }), value: fmtCurrency(result.final_cost) }]
+            : undefined}
+          extras={result.re_registered ? (
+            <p className="text-xs text-subtle">
+              {fromBranchName
+                ? t('asset.reRegisterFromBranch', {
+                    branch: fromBranchName,
+                    defaultValue: 'This device was previously transferred out of {{branch}}. It is now in this branch’s stock.',
+                  })
+                : t('asset.reRegisterGeneric', {
+                    defaultValue: 'This device had been transferred out. It is now back in this branch’s stock.',
+                  })}
+            </p>
+          ) : undefined}
+          secondaryAction={{
+            label: t('asset.registerViewAsset', { defaultValue: 'Open asset' }),
+            to: `/admin/inventory/assets/${result.asset_id}`,
+            onClick: onClose,
+            endIcon: <ExternalLink size={14} />,
+          }}
+          onClose={onClose}
+        />
       ) : (
         <>
           <div className="modal-content">
@@ -355,25 +347,6 @@ export function RegisterAssetModal({
               </div>
             ) : (
               <>
-                {error && (
-                  <div className="alert alert-danger mb-4 animate-pop-in">
-                    <XCircle size={16} />
-                    <div className="flex flex-col gap-1 min-w-0">
-                      <span>{error}</span>
-                      {conflictAssetId != null && (
-                        <Link
-                          to={`/admin/inventory/assets/${conflictAssetId}`}
-                          className="inline-flex items-center gap-1 text-primary-fg hover:underline font-medium"
-                          onClick={onClose}
-                        >
-                          <ExternalLink size={13} />
-                          {t('asset.registerViewExisting', { defaultValue: 'View existing asset' })}
-                        </Link>
-                      )}
-                    </div>
-                  </div>
-                )}
-
                 {precheckProblems.length > 0 && !error && (
                   <div className="alert alert-warning mb-4">
                     <AlertTriangle size={16} />
@@ -412,7 +385,6 @@ export function RegisterAssetModal({
                       value={branchId}
                       onChange={(v) => setBranchId((v as string) || null)}
                       placeholder={t('asset.registerBranchPlaceholder', { defaultValue: 'Select branch' })}
-                      size="sm"
                       searchable
                       showChevron
                     />
@@ -425,8 +397,7 @@ export function RegisterAssetModal({
                       value={keyword}
                       onChange={(e) => setKeyword(e.target.value)}
                       placeholder={t('asset.registerProductSearch', { defaultValue: 'Search model or brand...' })}
-                      size="sm"
-                      startIcon={<Search size={14} />}
+                      startIcon={<Search size={16} />}
                       // Hint rides inside the field, right-aligned, so the model
                       // list below can't shift as the user types.
                       endIcon={isBelowSearchMin(keyword)
@@ -491,7 +462,6 @@ export function RegisterAssetModal({
                         options={conditionOptions}
                         value={condition}
                         onChange={(v) => setCondition(v as string)}
-                        size="sm"
                         showChevron
                       />
                     </div>
@@ -532,7 +502,6 @@ export function RegisterAssetModal({
                         dateFormat={makeDatePickerFormat(i18n.language)}
                         locale={i18n.language}
                         calendar="gregorian"
-                        size="sm"
                         endIcon={<Keyboard size={16} />}
                         onEndIconClick={() => setTypingWarranty(w => !w)}
                         typingMode={typingWarranty}
@@ -557,12 +526,12 @@ export function RegisterAssetModal({
                   {/* Identifiers — at least one required; backend enforces IMEI for iPhone models */}
                   <div className="flex flex-col">
                     <label className="form-label">{t('asset.registerImei', { defaultValue: 'IMEI' })}</label>
-                    <ImeiInput value={imei} onChange={setImei} size="sm" className="w-full" placeholder="15 digits" error={!!imeiError} />
+                    <ImeiInput value={imei} onChange={setImei} className="w-full" placeholder="15 digits" error={!!imeiError} />
                     <FormErrorMessage error={imeiError ? { message: t(`identifierFormat.${imeiError}`) } : undefined} />
                   </div>
                   <div className="flex flex-col">
                     <label className="form-label">{t('asset.registerSerial', { defaultValue: 'Serial number' })}</label>
-                    <SerialInput value={serial} onChange={setSerial} size="sm" className="w-full" error={!!serialError} />
+                    <SerialInput value={serial} onChange={setSerial} className="w-full" error={!!serialError} />
                     <FormErrorMessage error={serialError ? { message: t(`identifierFormat.${serialError}`) } : undefined} />
                     <div className="text-xs text-subtle mt-1">{t('asset.registerIdHint', { defaultValue: 'Enter at least one identifier (IMEI or serial).' })}</div>
                   </div>
@@ -586,7 +555,6 @@ export function RegisterAssetModal({
                     <Input
                       value={externalRef}
                       onChange={(e) => setExternalRef(e.target.value)}
-                      size="sm"
                       className="w-full"
                       placeholder={t('asset.registerExternalRefPlaceholder', { defaultValue: 'e.g. supplier invoice no.' })}
                     />
@@ -596,9 +564,11 @@ export function RegisterAssetModal({
             )}
           </div>
 
+          <ApiErrorBand error={error} onDismiss={() => setError(null)} onNavigate={onClose} />
+
           {!noEligible && (
             <div className="modal-footer">
-              <Button variant="ghost" onClick={onClose} disabled={mutation.isPending}>{t('common.cancel')}</Button>
+              <Button variant="ghost" onClick={handleClose} disabled={mutation.isPending}>{t('common.cancel')}</Button>
               <Button
                 color="primary"
                 startIcon={<Package size={16} />}
@@ -612,5 +582,15 @@ export function RegisterAssetModal({
         </>
       )}
     </Modal>
+
+    <Modal open={confirmClose} onClose={() => setConfirmClose(false)} maxWidth="24rem" width="100%">
+      <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
+      <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={() => setConfirmClose(false)}>{t('common.cancel')}</Button>
+        <Button color="danger" onClick={forceClose}>{t('common.discard')}</Button>
+      </div>
+    </Modal>
+    </>
   );
 }

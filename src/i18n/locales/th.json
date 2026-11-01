@@ -966,7 +966,7 @@
     "reRegisterDone": "รับเครื่องกลับเข้าสต๊อกแล้ว",
     "reRegisterFromBranch": "เครื่องนี้เคยโอนกรรมสิทธิ์ออกไปจากสาขา {{branch}} ตอนนี้อยู่ในสต๊อกสาขานี้แล้ว",
     "reRegisterGeneric": "เครื่องนี้เคยโอนกรรมสิทธิ์ออกไปแล้ว ตอนนี้กลับเข้าสต๊อกสาขานี้แล้ว",
-    "reRegisterCost": "ต้นทุน {{cost}}",
+    "reRegisterCostLabel": "ต้นทุน",
     "registerViewAsset": "เปิดหน้าเครื่อง",
     "registerViewExisting": "ดูเครื่องที่มีอยู่",
     "registerNoBranch": "คุณไม่มีสาขาที่ลงทะเบียนเครื่องเข้าสต็อกได้",
