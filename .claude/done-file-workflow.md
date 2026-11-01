@@ -1,8 +1,9 @@
 # DONE-file workflow — answering BE work orders
 
 BE (DB) sends work orders as `UI_FEEDBACK/` NOTICE/MESSAGE/DELIVERY docs in the
-nnf repo. Every completed work order gets a short DONE file back in the same
-folder. This doc is the loop: how to track the work, when to draft, and what
+nnf repo. Completed work orders are answered with **one short DONE file per
+send** in the same folder — one line per work order, not one file each
+(Ton 2026-11-02: eleven per-order files mostly retold BE its own work orders). This doc is the loop: how to track the work, when to draft, and what
 ships. **This flow IS the standing permission for DONE files** — a DONE that
 answers a BE work order may be committed to nnf on the "ส่ง BE" trigger without
 a separate propose-in-chat cycle. NOTICEs raising *new* issues are unchanged:
@@ -15,19 +16,20 @@ propose first, get a yes, then file.
 2. **During work** → append every test run to the log as it happens: user
    account, entities touched, values changed, reset yes/no, result. Append-only;
    never reorder. Retests just add entries.
-3. **Ton says "done"** → generate the DONE draft into `outbox/` under its final
-   filename (`YYYY-MM-DD_DONE_<topic>.md`). Sources: git commits since the
-   log's start hash (what was built) + the log's *latest green* run per item
-   (how it was tested). Show the draft in chat.
+3. **Ton says "done"** → generate ONE draft into `outbox/` covering every work
+   order that has a test log, under its final filename
+   (`YYYY-MM-DD_DONE_batch.md`; add a suffix if one of that name already exists
+   in nnf). Sources: git commits since each log's start hash (what was built) +
+   each log's *latest green* run (how it was tested). Show the draft in chat.
 4. **Ton corrects something** → fix, retest (log grows), then **rewrite the
    draft from scratch** against current reality. Never patch sentences, never
    narrate iterations — the draft is a snapshot of now, not a history.
-5. **Ton says "ส่ง BE"** (or "deploy and respond") → for each draft in outbox:
-   quick re-verify of its claims against current DEV (values still match? no
-   new mig landed on top — the mig-1192 lesson). Clean drafts: copy to
-   `D:\dev\nnf\UI_FEEDBACK\`, commit, push. A stale draft is held back with a
-   one-line reason; the rest still ship. Then delete the shipped drafts, their
-   test logs, and the review screenshots — all scaffolding.
+5. **Ton says "ส่ง BE"** (or "deploy and respond") → quick re-verify of each
+   line's claim against current DEV (values still match? no new mig landed on
+   top — the mig-1192 lesson). A stale or unfinished line is dropped from the
+   file and reported to Ton with a one-line reason; the rest still ship. Copy
+   the file to `D:\dev\nnf\UI_FEEDBACK\`, commit, push. Then delete the draft,
+   the shipped lines' test logs, and the review screenshots — all scaffolding.
 6. **Hand Ton the paste block.** End the ส่ง-BE report with a copy-paste-ready
    block — one `UI_FEEDBACK/<filename>.md` path per line for every doc just
    shipped, nothing else in the block — so Ton can paste it straight into the
@@ -39,24 +41,36 @@ past test. A claim in a DONE file is a claim about DEV today.
 
 ## What a DONE file contains — and nothing else
 
-Answer exactly what BE asks (their own words: ทำอะไร · ทดสอบด้วย user ไหนบน
-DEV · ติดอะไรฝั่ง BE ไหม), plus findings BE needs to act on. 5–15 lines, Thai,
-matching the house style of existing `UI_FEEDBACK/*_DONE_*.md` files:
+BE uses a DONE for three things only: is it live (they check the deployed
+bundle themselves), which DEV user tested it and did it pass, and what they
+must act on. They wrote the work order, so **never retell what was built** —
+no "ที่ทำ" section. Thai, one file per send:
 
 ```markdown
-# DONE — <what, one line>
+# DONE — <วันที่> · <N> ใบ
 
-> YYYY-MM-DD · FE · ตอบ `UI_FEEDBACK/<work-order-file>.md`
+> YYYY-MM-DD · FE · deploy แล้ว nnfui.czynet.dev `main-<hash>.js`
 
-## ที่ทำ
-- behavior shipped, in terms of the shared API surface (RPC/view names, params)
+| ใบงาน | ทดสอบ (DEV) |
+|---|---|
+| `<work-order-file>.md` | `<user>` ✅ |
+| `<work-order-file>.md` | `<user>` ✅ · ข้อมูลที่ทิ้งไว้: <one phrase> |
 
-## ทดสอบ (DEV)
-- `mcp_*` user · what was exercised · error paths hit · data reset ✅
-
-## ติดฝั่ง BE ไหม
-- ไม่ติด  ← write explicitly when nothing blocks
+## ต้องให้ BE ทำ / ตอบ
+- `<work-order-file>.md`: <what FE needs and why — one or two lines>
 ```
+
+- One table row per work order. Add a short phrase only for something BE must
+  know: data left on DEV, a check that could not run and why ("ไม่มีเครื่อง
+  in_mdm บน DEV"), "รอ owner เปิดดู".
+- The "ต้องให้ BE" section lists only items that need BE. If none, write
+  `- ไม่มี` and nothing else.
+- **Full evidence only where the work order explicitly asks for it** (e.g. "ใบ
+  DONE ขอให้แนบ: bundle · ผล 5 บัญชี"). Put it under its own `## <work-order>`
+  heading after the table, as short as the ask allows.
+- Before asking BE for anything, check that no existing view/RPC already gives
+  it (2026-11-02: a DONE asked BE to add `account_number_display` to a view
+  while `v_fund_shop_payout_accounts` already returned it).
 
 **Never expose FE internals.** No FE file paths, component names, hook names,
 commit hashes, i18n keys, screenshot references, or iteration history. RPC and
