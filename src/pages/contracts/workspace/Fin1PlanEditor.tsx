@@ -283,6 +283,21 @@ export function Fin1PlanEditor({
   const usedMin = policy?.used_retail_min ?? null;
   const usedMax = policy?.used_retail_max ?? null;
   const usedStep = policy?.used_price_rounding_unit ?? 100;
+  // The used price while it is being typed; null = the box shows the price.
+  const [priceTyping, setPriceTyping] = useState<string | null>(null);
+  // The server's rule for p_price: a multiple of the unit inside the range.
+  const snapUsedPrice = (v: number) => {
+    const lo = usedMin ?? 0;
+    const hi = usedMax ?? v;
+    return Math.min(hi, Math.max(lo, Math.round(v / usedStep) * usedStep));
+  };
+  const commitTypedPrice = () => {
+    if (priceTyping == null) return;
+    const n = priceTyping === '' ? NaN : parseFloat(priceTyping);
+    setPriceTyping(null);
+    if (!Number.isFinite(n)) return; // blank or junk: keep the price as it was
+    setPriceStr(String(snapUsedPrice(n)));
+  };
   const commissionPolicy = policy?.commission?.adjustable ? policy.commission : null;
   const adjustable = commissionPolicy != null;
 
@@ -584,15 +599,30 @@ export function Fin1PlanEditor({
           be entered in the first place. */}
       {isUsedRange && usedMin != null && usedMax != null && (
         <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap items-baseline gap-x-2">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <label className="form-label mb-0">{t('fin1Plan.usedPriceLabel')}</label>
-            {priceNum != null && <span className={BIG_NUM}>{fmtCurrency(priceNum)}</span>}
+            {/* Typed as well as dragged (owner #16, 2026-11-01). The box
+                holds the keystrokes; the price commits on blur / Enter,
+                rounded to the unit and clamped to the range — so a
+                half-typed "134" never reaches the preview as a rejected
+                price, and the slider thumb follows the committed figure. */}
+            <div className="w-36">
+              <MaskedInput
+                mask="number"
+                decimalScale={0}
+                size="sm"
+                className="w-full fin1-amount-input"
+                value={priceTyping ?? priceStr}
+                onChange={(raw) => setPriceTyping(raw)}
+                onBlur={commitTypedPrice}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commitTypedPrice(); } }}
+              />
+            </div>
+            <span className="text-sm text-subtle">{t('fin1Plan.baht')}</span>
           </div>
           <Slider
             value={priceNum ?? usedMin}
-            onChange={(v) => setPriceStr(String(
-              Math.min(usedMax, Math.max(usedMin, Math.round(v / usedStep) * usedStep)),
-            ))}
+            onChange={(v) => { setPriceTyping(null); setPriceStr(String(snapUsedPrice(v))); }}
             min={usedMin}
             max={usedMax}
             step={usedStep}
@@ -601,6 +631,9 @@ export function Fin1PlanEditor({
             <span>{fmtCurrency(usedMin)}</span>
             <span>{fmtCurrency(usedMax)}</span>
           </div>
+          <span className="text-xs text-subtle tabular-nums">
+            {t('fin1Plan.usedPriceTypedHint', { min: fmtCurrency(usedMin), max: fmtCurrency(usedMax), unit: fmtCurrency(usedStep) })}
+          </span>
         </div>
       )}
 

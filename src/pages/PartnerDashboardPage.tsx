@@ -29,7 +29,7 @@ import { Link } from 'react-router-dom';
 import { Badge, MobileHeader } from 'tsp-form';
 import {
   ArrowRightFromLine, CheckCircle2, ChevronRight, ClipboardCheck, FileEdit, FileText, ListChecks,
-  Smartphone, Trophy, Undo2,
+  Percent, Smartphone, Trophy, Undo2,
 } from 'lucide-react';
 import { apiClient } from '../lib/api';
 import { fmtCurrency } from '../lib/format';
@@ -57,7 +57,16 @@ interface MyRankToday {
   rank_by_financed: number;
   total_shops: number;
   shops_with_contracts_today: number;
+  /** mig 1569: opening-day commission of the contracts opened today (the
+   *  same set as opened_contracts), and the instalment tranches released
+   *  today on multi-tranche plans — usually 0. Both count the moment a
+   *  contract opens, not when the fund pays. */
+  commission_total: number;
+  commission_tranche_total: number;
 }
+
+/** The shop's own commission report — where the card's number is itemised. */
+const MY_COMMISSION_PATH = '/admin/contracts/my-commission';
 
 /** v_partner_branch_action_required — one row per contract needing a hand. */
 interface ActionRow {
@@ -159,10 +168,14 @@ export function PartnerDashboardPage() {
           )}
         </div>
 
-        {/* ① accounts · ③ rank — side by side on a wide screen */}
+        {/* ① accounts · ③ rank + today's commission (mig 1569, same read as
+            the rank) — side by side on a wide screen */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <PartnerRemitAccounts />
-          <RankCard rank={rank} loading={rankQuery.isLoading} error={rankQuery.error} t={t} />
+          <div className="flex flex-col gap-4">
+            <RankCard rank={rank} loading={rankQuery.isLoading} error={rankQuery.error} t={t} />
+            <CommissionCard rank={rank} loading={rankQuery.isLoading} error={rankQuery.error} t={t} />
+          </div>
         </div>
 
         {/* ② work waiting */}
@@ -308,6 +321,8 @@ export function PartnerDashboardPage() {
               hasData={monthHasData}
               points={monthPoints}
               totals={monthTotals}
+              // This page is the shop's own, so the commission is real here.
+              showCommission
               t={t}
             />
           )}
@@ -366,6 +381,45 @@ function RankCard({ rank, loading, error, t }: {
       )}
       <div className="text-xs text-subtle">{t('partnerDashboard.rankHint')}</div>
     </div>
+  );
+}
+
+/** What the shop earned on the contracts it opened today (mig 1569). Opens the
+ *  commission report, where the figure is itemised per contract. */
+function CommissionCard({ rank, loading, error, t }: {
+  rank: MyRankToday | null;
+  loading: boolean;
+  error: unknown;
+  t: (k: string, o?: Record<string, unknown>) => string;
+}) {
+  const total = Number(rank?.commission_total) || 0;
+  const tranche = Number(rank?.commission_tranche_total) || 0;
+  return (
+    <Link
+      to={MY_COMMISSION_PATH}
+      className="border border-line bg-surface rounded-lg p-4 flex flex-col gap-2 no-underline text-current hover:shadow-sm transition-shadow"
+    >
+      <div className="flex items-center gap-2">
+        <Percent size={18} className={total > 0 ? 'text-success' : 'text-subtle'} />
+        <h3 className="text-sm font-semibold m-0 flex-1">{t('partnerDashboard.commissionTitle')}</h3>
+        <ChevronRight size={16} className="text-subtle" />
+      </div>
+      {error ? (
+        <div className="alert alert-danger"><span>{translateApiError(error, t)}</span></div>
+      ) : loading || !rank ? (
+        <div className="text-2xl font-semibold text-subtle">—</div>
+      ) : total === 0 ? (
+        <div className="text-base font-medium text-subtle">{t('partnerDashboard.commissionNone')}</div>
+      ) : (
+        <div className="text-2xl font-semibold tabular-nums">฿{fmtCurrency(total)}</div>
+      )}
+      {tranche > 0 && (
+        <div className="text-xs text-success-fg tabular-nums">
+          {t('partnerDashboard.commissionTranche', { amount: fmtCurrency(tranche) })}
+        </div>
+      )}
+      <div className="text-xs text-subtle">{t('partnerDashboard.commissionHint')}</div>
+    </Link>
   );
 }
 

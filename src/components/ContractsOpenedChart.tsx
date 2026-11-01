@@ -36,6 +36,9 @@ export interface MonthlyRow {
   down_total: number;
   financed_total: number;
   down_pct: number | null;
+  /** Opening-day commission of the contracts opened that day (mig 1569).
+   *  Meaningful for a deal-partner shop only; an internal branch gets 0. */
+  commission_total?: number | null;
 }
 
 export interface DayPoint {
@@ -45,6 +48,7 @@ export interface DayPoint {
   agreed: number;
   down: number;
   financed: number;     // agreed − down
+  commission: number;
 }
 
 /** ฿ axis abbreviation: 1_600_000 → "1.6M", 12_000 → "12K". */
@@ -70,11 +74,13 @@ export function useDayPoints(rows: MonthlyRow[]): DayPoint[] {
       const agreed = Number(r.agreed_total) || 0;
       const down = Number(r.down_total) || 0;
       const financed = Number(r.financed_total) || 0;
+      const commission = Number(r.commission_total) || 0;
       if (existing) {
         existing.contracts += r.opened_contracts;
         existing.agreed += agreed;
         existing.down += down;
         existing.financed += financed;
+        existing.commission += commission;
       } else {
         byDay.set(r.day, {
           day: r.day,
@@ -83,6 +89,7 @@ export function useDayPoints(rows: MonthlyRow[]): DayPoint[] {
           agreed,
           down,
           financed,
+          commission,
         });
       }
     }
@@ -115,18 +122,22 @@ export function useMonthTotals(points: DayPoint[]) {
       acc.contracts += p.contracts;
       acc.agreed += p.agreed;
       acc.down += p.down;
+      acc.commission += p.commission;
       return acc;
     },
-    { contracts: 0, agreed: 0, down: 0 },
+    { contracts: 0, agreed: 0, down: 0, commission: 0 },
   ), [points]);
 }
 
 /** The bars themselves. Caller owns the height — wrap in a sized container.
  *  `branchRowsByDay` (all-branches view only) turns the hover into the
- *  per-branch table; without it the hover keeps the single-day summary. */
-export function ContractsOpenedChart({ points, branchRowsByDay }: {
+ *  per-branch table; without it the hover keeps the single-day summary.
+ *  `showCommission` adds the day's commission to that summary (a shop's own
+ *  dashboard — never on an internal branch, where it is always 0). */
+export function ContractsOpenedChart({ points, branchRowsByDay, showCommission }: {
   points: DayPoint[];
   branchRowsByDay?: Map<string, MonthlyRow[]>;
+  showCommission?: boolean;
 }) {
   // Touch screens: the card opens on a tap (click trigger) instead of hover —
   // the browser's made-up mouse events after a tap are not reliable — and a
@@ -173,7 +184,7 @@ export function ContractsOpenedChart({ points, branchRowsByDay }: {
           trigger={isTouch ? 'click' : 'hover'}
           active={touchHidden ? false : undefined}
           wrapperStyle={{ zIndex: 20 }}
-          content={<ChartTooltip branchRowsByDay={branchRowsByDay} />}
+          content={<ChartTooltip branchRowsByDay={branchRowsByDay} showCommission={showCommission} />}
         />
         {/* Stacked: down (bottom) + financed (top). Two distinct hues from the
             chart palette — the old pair was one primary blue and a color-mix of
@@ -207,16 +218,21 @@ export function ChartLegend({ downLabel, financedLabel }: { downLabel: string; f
 }
 
 interface TooltipPayloadItem { payload: DayPoint }
-function ChartTooltip({ active, payload, branchRowsByDay }: {
+function ChartTooltip({ active, payload, branchRowsByDay, showCommission }: {
   active?: boolean;
   payload?: TooltipPayloadItem[];
   branchRowsByDay?: Map<string, MonthlyRow[]>;
+  showCommission?: boolean;
 }) {
   if (!active || !payload || payload.length === 0) return null;
   const p = payload[0].payload;
   return (
     <div className="rounded-md border border-line bg-surface shadow-md px-3 py-2 text-xs">
-      <DayBreakdown point={p} branchRows={branchRowsByDay ? (branchRowsByDay.get(p.day) ?? []) : undefined} />
+      <DayBreakdown
+        point={p}
+        branchRows={branchRowsByDay ? (branchRowsByDay.get(p.day) ?? []) : undefined}
+        showCommission={showCommission}
+      />
     </div>
   );
 }
@@ -227,11 +243,13 @@ export interface DayHoliday { company_name: string; description: string }
  *  `branchRows` given (all-branches view) → day totals + per-branch table;
  *  omitted (one branch picked, or a branch user) → the single-day summary.
  *  Day totals are the sum of the RPC's rows, so they equal the bar height. */
-export function DayBreakdown({ point, branchRows, holidays, showCompany }: {
+export function DayBreakdown({ point, branchRows, holidays, showCompany, showCommission }: {
   point: DayPoint;
   branchRows?: MonthlyRow[];
   holidays?: DayHoliday[];
   showCompany?: boolean;
+  /** A shop's own view: the day's commission under the down / financed lines. */
+  showCommission?: boolean;
 }) {
   const { t } = useTranslation();
   const holidayLines = holidays && holidays.length > 0 && (
@@ -251,6 +269,9 @@ export function DayBreakdown({ point, branchRows, holidays, showCompany }: {
         <TipLine label={t('contractsOpened.sumAgreed')} value={`฿${fmtCurrency(point.agreed)}`} strong />
         <TipLine label={t('contractsOpened.legendDown')} value={`฿${fmtCurrency(point.down)}`} dot={COLOR_DOWN} />
         <TipLine label={t('contractsOpened.legendFinanced')} value={`฿${fmtCurrency(point.financed)}`} dot={COLOR_FINANCED} />
+        {showCommission && (
+          <TipLine label={t('contractsOpened.tipCommission')} value={`฿${fmtCurrency(point.commission)}`} />
+        )}
       </div>
     );
   }
@@ -312,12 +333,16 @@ function TipLine({ label, value, strong, dot }: { label: string; value: string; 
 // page, over a compact totals strip. Shorter chart than the full report page
 // (this sits in a card among other sections, not on its own screen). Used by
 // the branch dashboard's ranking card and the deal-partner shop dashboard.
-export function MonthOpenedView({ loading, fetching, hasData, points, totals, t }: {
+export function MonthOpenedView({ loading, fetching, hasData, points, totals, showCommission, t }: {
   loading: boolean;
   fetching: boolean;
   hasData: boolean;
   points: DayPoint[];
-  totals: { contracts: number; agreed: number; down: number };
+  totals: { contracts: number; agreed: number; down: number; commission: number };
+  /** Deal-partner shop only (mig 1569): a fourth total, ค่าคอม, and the
+   *  day's commission in the bar hover. An internal branch always gets 0
+   *  from the RPC, so its dashboard leaves this off rather than show 0. */
+  showCommission?: boolean;
   t: (key: string, opts?: Record<string, unknown>) => string;
 }) {
   if (loading) {
@@ -337,13 +362,16 @@ export function MonthOpenedView({ loading, fetching, hasData, points, totals, t 
         <MonthTotalCell label={t('contractsOpened.sumContracts')} value={String(totals.contracts)} />
         <MonthTotalCell label={t('contractsOpened.sumAgreed')} value={`฿${fmtCurrency(totals.agreed)}`} />
         <MonthTotalCell label={t('contractsOpened.sumDown')} value={`฿${fmtCurrency(totals.down)}`} />
+        {showCommission && (
+          <MonthTotalCell label={t('contractsOpened.sumCommission')} value={`฿${fmtCurrency(totals.commission)}`} />
+        )}
       </div>
       <ChartLegend
         downLabel={t('contractsOpened.legendDown')}
         financedLabel={t('contractsOpened.legendFinanced')}
       />
       <div className="h-[260px]">
-        <ContractsOpenedChart points={points} />
+        <ContractsOpenedChart points={points} showCommission={showCommission} />
       </div>
     </div>
   );
