@@ -769,10 +769,11 @@ export function AssetsPage() {
               <div className="flex items-center gap-2 w-full">
                 <div className="flex-1 min-w-0">
                   <SearchInput
+                    scan
                     value={search}
                     onChange={setSearch}
                     onDebouncedChange={setDebouncedSearch}
-                    placeholder={t('asset.search')}
+                    placeholder={t('asset.searchByIdentifier')}
                     size="sm"
                     className="w-full"
                   />

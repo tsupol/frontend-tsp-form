@@ -931,6 +931,7 @@
     "allFamilies": "ทุกตระกูล",
     "selectToView": "เลือกสินทรัพย์เพื่อดูรายละเอียด",
     "search": "ค้นหารหัส, serial, IMEI...",
+    "searchByIdentifier": "รหัส / Serial / IMEI",
     "legacyCode": "รหัสเดิม",
     "box": "กล่อง",
     "hasBox": "มีกล่อง",

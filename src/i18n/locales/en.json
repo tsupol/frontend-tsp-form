@@ -931,6 +931,7 @@
     "allFamilies": "All families",
     "selectToView": "Select an asset to view details",
     "search": "Search code, serial, IMEI...",
+    "searchByIdentifier": "Code / Serial / IMEI",
     "legacyCode": "Legacy code",
     "box": "Box",
     "hasBox": "Has box",
