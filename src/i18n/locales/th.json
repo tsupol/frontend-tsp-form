@@ -1733,7 +1733,13 @@
     "errorPickImage": "เลือกรูปก่อน",
     "captureScanHint": "สแกน QR ด้วยมือถือเพื่อเปิดกล้อง — รูปจะเข้าช่องนี้อัตโนมัติ",
     "captureCount_one": "อัปโหลดแล้ว {{count}} / {{max}}",
-    "captureCount_other": "อัปโหลดแล้ว {{count}} / {{max}}"
+    "captureCount_other": "อัปโหลดแล้ว {{count}} / {{max}}",
+    "addCount_one": "เพิ่ม {{count}} รูป",
+    "addCount_other": "เพิ่ม {{count}} รูป",
+    "addRoom": "ใส่ได้อีก {{room}} รูปในช่องนี้",
+    "uploadingProgress": "กำลังอัปโหลด {{done}}/{{total}}",
+    "discardStaged_one": "ยังไม่ได้อัปโหลด {{count}} รูป ทิ้งรูปที่เลือกไว้?",
+    "discardStaged_other": "ยังไม่ได้อัปโหลด {{count}} รูป ทิ้งรูปที่เลือกไว้?"
   },
   "assetSales": {
     "title": "ประวัติการขาย",

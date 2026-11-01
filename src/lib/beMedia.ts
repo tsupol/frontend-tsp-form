@@ -97,7 +97,8 @@ export async function beMediaUpload(opts: BeMediaUploadOpts): Promise<BeMediaUpl
 // spec's size labels.
 export interface BeMediaUploadFromImageOpts {
   type: string;
-  image: UploadedImage;
+  // Only the bytes are read, so a file resized by hand (resizeToVariants) fits too.
+  image: Partial<UploadedImage>;
   params: Record<string, string | number>;
   // Defaults to the type's sizes in UPLOAD_SPECS when omitted.
   sizes?: readonly string[];

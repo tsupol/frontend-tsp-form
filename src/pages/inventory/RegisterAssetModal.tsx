@@ -8,6 +8,7 @@ import { makeDatePickerFormat, toLocalDateStr, fmtCurrency } from '../../lib/for
 import { ImeiInput } from '../../components/ImeiInput';
 import { ApiErrorBand } from '../../components/ApiErrorAlert';
 import { ActionDoneView } from '../contracts/ActionDoneView';
+import { AssetEvidenceTab } from './AssetEvidenceTab';
 import { ColorSwatch } from '../../components/ColorAutocomplete';
 import { SerialInput } from '../../components/SerialInput';
 import { identifierFormatReason, isAppleBrand } from '../../lib/validators';
@@ -315,18 +316,29 @@ export function RegisterAssetModal({
           detailRows={result.re_registered && result.final_cost != null
             ? [{ label: t('asset.reRegisterCostLabel', { defaultValue: 'Cost' }), value: fmtCurrency(result.final_cost) }]
             : undefined}
-          extras={result.re_registered ? (
-            <p className="text-xs text-subtle">
-              {fromBranchName
-                ? t('asset.reRegisterFromBranch', {
-                    branch: fromBranchName,
-                    defaultValue: 'This device was previously transferred out of {{branch}}. It is now in this branch’s stock.',
-                  })
-                : t('asset.reRegisterGeneric', {
-                    defaultValue: 'This device had been transferred out. It is now back in this branch’s stock.',
-                  })}
-            </p>
-          ) : undefined}
+          extras={
+            <>
+              {result.re_registered && (
+                <p className="text-xs text-subtle mb-3">
+                  {fromBranchName
+                    ? t('asset.reRegisterFromBranch', {
+                        branch: fromBranchName,
+                        defaultValue: 'This device was previously transferred out of {{branch}}. It is now in this branch’s stock.',
+                      })
+                    : t('asset.reRegisterGeneric', {
+                        defaultValue: 'This device had been transferred out. It is now back in this branch’s stock.',
+                      })}
+                </p>
+              )}
+              {/* Collateral photos straight away, in this window — shops don't
+                  want to hop to the asset page right after registering. Same
+                  album as the asset's รูปหลักประกัน tab. */}
+              <div className="border-t border-line pt-3">
+                <div className="text-sm font-semibold mb-2">{t('assetEvidence.title')}</div>
+                <AssetEvidenceTab assetId={result.asset_id} assetCode={result.code_display ?? result.asset_code} embedded />
+              </div>
+            </>
+          }
           secondaryAction={{
             label: t('asset.registerViewAsset', { defaultValue: 'Open asset' }),
             to: `/admin/inventory/assets/${result.asset_id}`,

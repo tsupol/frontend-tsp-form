@@ -1733,7 +1733,13 @@
     "errorPickImage": "Pick an image first",
     "captureScanHint": "Scan the QR with a phone to open the camera — photos land in this slot automatically.",
     "captureCount_one": "{{count}} / {{max}} uploaded",
-    "captureCount_other": "{{count}} / {{max}} uploaded"
+    "captureCount_other": "{{count}} / {{max}} uploaded",
+    "addCount_one": "Add {{count}} photo",
+    "addCount_other": "Add {{count}} photos",
+    "addRoom": "{{room}} more photos fit in this slot",
+    "uploadingProgress": "Uploading {{done}}/{{total}}",
+    "discardStaged_one": "{{count}} photo not uploaded yet. Discard it?",
+    "discardStaged_other": "{{count}} photos not uploaded yet. Discard them?"
   },
   "assetSales": {
     "title": "Asset sales",

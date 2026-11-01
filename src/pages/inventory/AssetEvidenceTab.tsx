@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Modal, Button, PopOver, MenuItem, MenuSeparator, Select, Badge } from 'tsp-form';
+import { Modal, Button, PopOver, MenuItem, MenuSeparator, Select, Badge, resizeToVariants } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
 import { DndContext, DragOverlay, pointerWithin, useDroppable, type DragStartEvent, type DragOverEvent, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, rectSortingStrategy, arrayMove } from '@dnd-kit/sortable';
@@ -13,6 +13,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
 import {
   beMediaUploadFromImage,
+  beMediaDelete,
   ASSET_EVIDENCE_TYPE,
   ASSET_EVIDENCE_RESIZE,
 } from '../../lib/beMedia';
@@ -22,6 +23,8 @@ import { MediaLightboxKeyGallery } from '../../components/MediaLightbox';
 import { useMobileCaptureSession } from '../contracts/workspace/useMobileCaptureSession';
 import { translateApiError } from '../../lib/apiErrors';
 import { SingleImageUploader } from '../../components/SingleImageUploader';
+import { MultiImageUploader, type StagedImageItem } from '../../components/MultiImageUploader';
+import { ModalErrorBand } from '../../components/ModalErrorBand';
 
 // ============================================================================
 // Asset evidence album — the "รูปหลักประกัน" tab (DELIVERY 2026-09-04, mig 1141).
@@ -88,9 +91,11 @@ function translateErr(err: unknown, t: ReturnType<typeof useTranslation>['t']): 
   return err instanceof Error ? err.message : String(err);
 }
 
-export function AssetEvidenceTab({ assetId, assetCode }: {
+export function AssetEvidenceTab({ assetId, assetCode, embedded = false }: {
   assetId: number;
   assetCode: string;
+  /** Inside another scroller (the register window's done view): no own scroll or padding. */
+  embedded?: boolean;
 }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -310,7 +315,7 @@ export function AssetEvidenceTab({ assetId, assetCode }: {
   const lightboxKeys = (lightboxSlot?.photos ?? []).map(p => normalizeKey(fullKey(p)));
 
   return (
-    <div className="flex-1 min-h-0 overflow-auto better-scroll px-4 py-3">
+    <div className={embedded ? '' : 'flex-1 min-h-0 overflow-auto better-scroll px-4 py-3'}>
       {error && (
         <div className="alert alert-danger mb-3">
           <XCircle size={16} />
@@ -329,7 +334,7 @@ export function AssetEvidenceTab({ assetId, assetCode }: {
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        <div className="flex flex-col gap-4 pb-6">
+        <div className={`flex flex-col gap-4 ${embedded ? '' : 'pb-6'}`}>
           {slots.map(slot => (
             <SlotSection
               key={slot.slot}
@@ -357,6 +362,7 @@ export function AssetEvidenceTab({ assetId, assetCode }: {
         onClose={() => setAddSlot(null)}
         assetId={assetId}
         slot={addData}
+        onChanged={refresh}
         onAdded={() => { setAddSlot(null); refresh(); }}
       />
 
@@ -622,7 +628,7 @@ function PhotoDragGhost({ photo }: { photo: EvidencePhoto }) {
 async function uploadEvidenceImage(
   assetId: number,
   slot: string,
-  image: UploadedImage,
+  image: Partial<UploadedImage>,
 ): Promise<{ lg: string; sm?: string; contentType: string; fileSize: number | null; fileName: string | null }> {
   const results = await beMediaUploadFromImage({
     type: ASSET_EVIDENCE_TYPE,
@@ -641,83 +647,137 @@ async function uploadEvidenceImage(
 }
 
 // ── Add modal ────────────────────────────────────────────────────────────────
+// Several photos per trip (iPad: multi-select from the photo picker, or drop a
+// stack). Staged locally, then uploaded ONE AT A TIME on Add — be-media mints
+// the leaf idx per request and parallel calls have collided on other albums.
+// Each photo that lands leaves the staged list, so a failure part-way keeps the
+// ones already attached and leaves only the rest staged for a retry.
 
-function AddEvidenceModal({ open, onClose, assetId, slot, onAdded }: {
+async function uploadEvidenceFile(assetId: number, slot: string, file: File) {
+  const variants = await resizeToVariants(file, ASSET_EVIDENCE_RESIZE);
+  return uploadEvidenceImage(assetId, slot, { variants, originalFile: file });
+}
+
+function AddEvidenceModal({ open, onClose, assetId, slot, onChanged, onAdded }: {
   open: boolean;
   onClose: () => void;
   assetId: number;
   slot: EvidenceSlot | null;
+  /** A photo landed (refresh the album) — fires per photo, also on a partial batch. */
+  onChanged: () => void;
+  /** Every staged photo landed. */
   onAdded: () => void;
 }) {
   const { t } = useTranslation();
-  const [picked, setPicked] = useState<UploadedImage | null>(null);
+  const [staged, setStaged] = useState<StagedImageItem[]>([]);
   const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(0);
+  // Photos this window already attached — `slot` is the snapshot taken when it
+  // opened, so its photo_count doesn't move until the parent reopens it.
+  const [addedCount, setAddedCount] = useState(0);
+  const [confirmClose, setConfirmClose] = useState(false);
 
   useEffect(() => {
-    if (open) { setPicked(null); setError(''); }
+    if (open) { setStaged([]); setError(''); setBusy(false); setProgress(0); setAddedCount(0); setConfirmClose(false); }
   }, [open]);
 
-  const save = useMutation({
-    mutationFn: async () => {
-      if (!picked || !slot) throw new Error(t('assetEvidence.errorPickImage'));
-      const up = await uploadEvidenceImage(assetId, slot.slot, picked);
-      await apiClient.rpc('fn_asset_evidence_attach', {
-        p_asset_id: assetId,
-        p_slot: slot.slot,
-        p_storage_keys: up.sm ? { lg: up.lg, sm: up.sm } : { lg: up.lg },
-        p_caption: null,
-      });
-    },
-    onSuccess: () => onAdded(),
-    onError: (err) => setError(translateErr(err, t)),
-  });
+  const room = slot ? Math.max(0, slot.max_shots - slot.photo_count - addedCount) : 0;
 
-  const previewUrl = picked?.variants?.sm?.preview ?? picked?.variants?.lg?.preview ?? picked?.preview ?? null;
+  const save = async () => {
+    if (!slot || staged.length === 0) return;
+    setBusy(true);
+    setError('');
+    setProgress(0);
+    let done = 0;
+    try {
+      for (const item of staged) {
+        const up = await uploadEvidenceFile(assetId, slot.slot, item.file);
+        try {
+          await apiClient.rpc('fn_asset_evidence_attach', {
+            p_asset_id: assetId,
+            p_slot: slot.slot,
+            p_storage_keys: up.sm ? { lg: up.lg, sm: up.sm } : { lg: up.lg },
+            p_caption: null,
+          });
+        } catch (err) {
+          // Don't leave this photo's objects behind when the attach failed.
+          beMediaDelete(up.sm ? [up.lg, up.sm] : [up.lg]).catch(() => {});
+          throw err;
+        }
+        done++;
+        setProgress(done);
+        setAddedCount(c => c + 1);
+        setStaged(prev => prev.filter(x => x.id !== item.id));
+        onChanged();
+      }
+      onAdded();
+    } catch (err) {
+      setError(translateErr(err, t));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleClose = () => {
+    if (busy) return;
+    if (staged.length > 0) { setConfirmClose(true); return; }
+    onClose();
+  };
+
+  const total = progress + staged.length;
 
   return (
-    <Modal open={open} onClose={onClose} maxWidth="32rem" width="100%">
+    <>
+    <Modal open={open} onClose={handleClose} maxWidth="32rem" width="100%">
       <div className="modal-header">
         <h2 className="modal-title">
           {t('assetEvidence.addPhoto')}
           {slot ? ` — ${slot.label_th}` : ''}
         </h2>
-        <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+        <button type="button" className="modal-close-btn" onClick={handleClose} aria-label="Close">&times;</button>
       </div>
       <div className="modal-content">
-        {error && (
-          <div className="alert alert-danger mb-4"><XCircle size={16} /><span>{error}</span></div>
-        )}
-        <div className="flex flex-col">
-          {previewUrl ? (
-            <div className="relative rounded-md border border-line overflow-hidden bg-surface">
-              <img src={previewUrl} alt="" className="w-full h-48 object-contain" />
-              <button
-                type="button"
-                onClick={() => setPicked(null)}
-                className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 hover:bg-black/80 text-danger flex items-center justify-center cursor-pointer"
-                aria-label={t('common.remove', { defaultValue: 'Remove' })}
-              >
-                <X size={14} />
-              </button>
-            </div>
-          ) : (
-            <SingleImageUploader
-              previewUrl={null}
-              onRemove={() => {}}
-              sizes={ASSET_EVIDENCE_RESIZE}
-              onUpload={(imgs) => imgs[0] && setPicked(imgs[0])}
-              disabled={save.isPending}
-            />
-          )}
+        <MultiImageUploader
+          items={staged}
+          max={room}
+          disabled={busy}
+          busyLabel={busy ? t('assetEvidence.uploadingProgress', { done: progress, total }) : undefined}
+          onAdd={(files) => {
+            setError('');
+            setStaged(prev => [...prev, ...files.map(file => ({
+              kind: 'staged' as const,
+              id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              file,
+            }))]);
+          }}
+          onRemove={(item) => setStaged(prev => prev.filter(x => x.id !== item.id))}
+          onError={setError}
+        />
+        <div className="text-xs text-subtle mt-2">
+          {t('assetEvidence.addRoom', { room: Math.max(0, room - staged.length) })}
         </div>
       </div>
+      <ModalErrorBand message={error} onDismiss={() => setError('')} />
       <div className="modal-footer">
-        <Button onClick={onClose} disabled={save.isPending}>{t('common.cancel')}</Button>
-        <Button color="primary" disabled={!picked || save.isPending} onClick={() => save.mutate()}>
-          {save.isPending ? t('common.loading') : t('common.add', { defaultValue: 'Add' })}
+        <Button onClick={handleClose} disabled={busy}>{t('common.cancel')}</Button>
+        <Button color="primary" disabled={staged.length === 0 || busy} onClick={() => { void save(); }}>
+          {busy
+            ? t('assetEvidence.uploadingProgress', { done: progress, total })
+            : t('assetEvidence.addCount', { count: staged.length })}
         </Button>
       </div>
     </Modal>
+
+    <ConfirmDialog
+      open={confirmClose}
+      onClose={() => setConfirmClose(false)}
+      onConfirm={() => { setConfirmClose(false); onClose(); }}
+      title={t('common.unsavedChanges')}
+      message={t('assetEvidence.discardStaged', { count: staged.length })}
+      confirmLabel={t('common.discard')}
+    />
+    </>
   );
 }
 
