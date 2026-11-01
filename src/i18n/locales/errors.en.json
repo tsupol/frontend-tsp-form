@@ -1126,6 +1126,8 @@
   "CONTRACT.VALIDATION.ASSET_OWNED_BY_PARTNER_basic": "This device belongs to a deal-partner shop — only that shop’s contracts can use it",
   "PRICING.VALIDATION.FIN1_USED_PRICE": "That price is outside the range for this model, or is not a round hundred",
   "PRICING.VALIDATION.FIN1_USED_PRICE_basic": "That price is outside the range for this model, or is not a round hundred",
+  "PRICING.VALIDATION.FIN1_BRANCH_CONFIG": "Branch setting not accepted: the down range must be inside the band, and the used minimum price above 0 in whole hundreds",
+  "PRICING.VALIDATION.FIN1_BRANCH_CONFIG_basic": "Branch setting not accepted: the down range must be inside the band, and the used minimum price above 0 in whole hundreds",
   "PRICING.VALIDATION.FIN1_USED_RANGE_NOT_SET": "This model has no second-hand price range yet — set it on the model’s pricing page before using a second-hand device",
   "PRICING.VALIDATION.FIN1_PRICE_NOT_ALLOWED_NEW": "A new device uses the model’s list price — only a contract pointed at a second-hand device can set its own price",
   "CONTRACT.VALIDATION.DEVICE_NOT_TARGET": "A shop contract can only bind the device it pointed to ({{target_asset_code}}), not {{asset_code}}",

@@ -4839,7 +4839,13 @@
     "downResetDefault": "Holding default",
     "downLoading": "Loading range…",
     "searchPlaceholder": "Search branch name or code",
-    "pricebookAlwaysOn": "PRICEBOOK (retail / cash) is always on and cannot be turned off"
+    "pricebookAlwaysOn": "PRICEBOOK (retail / cash) is always on and cannot be turned off",
+    "usedMin": "Used down to",
+    "usedMinHint": "On: a used device can be priced below the price table's minimum, down to this price. Off: the table's minimum applies (the price you set is kept).",
+    "usedMinSwitch": "Allow used prices below the price table",
+    "usedMinPrice": "Used minimum price",
+    "usedMinInvalid": "Must be above 0 and in whole hundreds",
+    "usedMinSaved": "Used minimum price updated"
   },
   "fin1PriceTable": {
     "title": "Finance price table",

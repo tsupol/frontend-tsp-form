@@ -1126,6 +1126,8 @@
   "CONTRACT.VALIDATION.ASSET_OWNED_BY_PARTNER_basic": "เครื่องนี้เป็นของร้าน deal partner ใช้ได้เฉพาะสัญญาของร้านนั้น",
   "PRICING.VALIDATION.FIN1_USED_PRICE": "ราคานี้อยู่นอกกรอบของรุ่น หรือไม่ลงหลักร้อย",
   "PRICING.VALIDATION.FIN1_USED_PRICE_basic": "ราคานี้อยู่นอกกรอบของรุ่น หรือไม่ลงหลักร้อย",
+  "PRICING.VALIDATION.FIN1_BRANCH_CONFIG": "ค่าตั้งของสาขาไม่ผ่านเงื่อนไข — ช่วงดาวน์ต้องอยู่ในกรอบ และราคาต่ำสุดมือสองต้องมากกว่า 0 และลงหลักร้อย",
+  "PRICING.VALIDATION.FIN1_BRANCH_CONFIG_basic": "ค่าตั้งของสาขาไม่ผ่านเงื่อนไข — ช่วงดาวน์ต้องอยู่ในกรอบ และราคาต่ำสุดมือสองต้องมากกว่า 0 และลงหลักร้อย",
   "PRICING.VALIDATION.FIN1_USED_RANGE_NOT_SET": "รุ่นนี้ยังไม่ได้ตั้งกรอบราคามือสอง — ตั้งที่หน้าราคาตั้งของรุ่นก่อนใช้เครื่องมือสอง",
   "PRICING.VALIDATION.FIN1_PRICE_NOT_ALLOWED_NEW": "เครื่องมือหนึ่งใช้ราคาตั้งของรุ่น — ตั้งราคาเองได้เฉพาะสัญญาที่ชี้เครื่องมือสอง",
   "CONTRACT.VALIDATION.DEVICE_NOT_TARGET": "สัญญาของร้านผูกได้เฉพาะเครื่องที่ชี้ไว้ ({{target_asset_code}}) ไม่ใช่ {{asset_code}}",

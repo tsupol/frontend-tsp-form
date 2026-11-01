@@ -13,6 +13,13 @@
 // on toggle-on and disappear on toggle-off.
 //   GET  api.v_fin1_branch_configs        → min/max + the holding band to stay inside
 //   POST /rpc/fn_fin1_branch_config_set { p_branch_id, p_min_down_percent?, p_max_down_percent? }
+//
+// Used-device price floor (ANSWER 2026-11-02 mig 1582): same view + RPC carry
+// allow_used_below_min + used_min_price. On = a used device may be priced down
+// to used_min_price even under the price table's min; off = the table's min.
+// Omitted params stay as they are, so each editor sends only its own fields.
+// The plan screens never read these: they read policy.used_retail_min, which
+// the DB already resolves from them.
 // Permission is the SAME as the FIN1 switch itself (BRANCH.UPDATE on that
 // branch) — no separate grant, so anyone who can flip FIN1 can set its range.
 //
@@ -29,7 +36,7 @@ import {
   Switch, MobileHeader, Button, MaskedInput, Select, Badge, Tooltip,
   DataTableFooter, useSnackbarContext,
 } from 'tsp-form';
-import { ArrowRightFromLine, Wallet, CheckCircle, XCircle, ChevronsRight, Percent } from 'lucide-react';
+import { ArrowRightFromLine, Wallet, CheckCircle, XCircle, ChevronsRight, Percent, Smartphone } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { useAuth } from '../../contexts/AuthContext';
@@ -77,6 +84,8 @@ interface Fin1BranchConfig {
   holding_max_down: number;
   branch_min_down_default: number;
   branch_max_down_default: number;
+  allow_used_below_min: boolean;
+  used_min_price: number | null;
 }
 
 const MODELS: ('FIN1' | 'FIN2')[] = ['FIN1', 'FIN2'];
@@ -214,6 +223,109 @@ function DownRangeEditor({ config, onSaved }: {
       )}
       {!dirty && !errorText && isDefault && (
         <span className="text-xs text-subtler min-w-0">{t('financeModels.downResetDefault')}</span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * How far a used device's price may go below the price table's min, for one
+ * branch (mig 1582). Same inline shape as the down range beside it: a switch
+ * and a price, Save only once something changed. Turning the switch off keeps
+ * the price, so turning it back on restores it; the box stays visible, dimmed.
+ */
+function UsedMinEditor({ config, onSaved }: {
+  config: Fin1BranchConfig;
+  onSaved: () => void;
+}) {
+  const { t } = useTranslation();
+  const { addSnackbar } = useSnackbarContext();
+  const savedPrice = config.used_min_price == null ? '' : String(Number(config.used_min_price));
+  const [allow, setAllow] = useState(config.allow_used_below_min);
+  const [price, setPrice] = useState(savedPrice);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    setAllow(config.allow_used_below_min);
+    setPrice(savedPrice);
+  }, [config.allow_used_below_min, savedPrice]);
+
+  const vPrice = price === '' ? NaN : Number(price);
+  // The DB's rule (fin1_branch_config_used_min_ck): above 0, whole hundreds.
+  const priceBad = !Number.isNaN(vPrice) && (vPrice <= 0 || vPrice % 100 !== 0);
+  const priceMissing = allow && Number.isNaN(vPrice);
+  const invalid = priceBad || priceMissing;
+  const dirty = allow !== config.allow_used_below_min || price !== savedPrice;
+
+  const save = async () => {
+    setIsSaving(true);
+    try {
+      await apiClient.rpc('fn_fin1_branch_config_set', {
+        p_branch_id: config.branch_id,
+        p_allow_used_below_min: allow,
+        ...(Number.isNaN(vPrice) ? {} : { p_used_min_price: vPrice }),
+      });
+      onSaved();
+      addSnackbar({
+        message: (
+          <div className="alert alert-success">
+            <CheckCircle size={16} />
+            <span>{t('financeModels.usedMinSaved')}</span>
+          </div>
+        ),
+      });
+    } catch (err) {
+      let msg = t('common.error');
+      if (err instanceof ApiError) msg = translateApiError(err, t) || err.message;
+      addSnackbar({
+        message: (
+          <div className="alert alert-danger">
+            <XCircle size={16} />
+            <span>{msg}</span>
+          </div>
+        ),
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap min-w-0">
+      <Tooltip content={t('financeModels.usedMinHint')}>
+        <span className="text-xs text-subtle flex items-center gap-1 shrink-0 cursor-default">
+          <Smartphone size={12} />{t('financeModels.usedMin')}
+        </span>
+      </Tooltip>
+      <Switch
+        size="sm"
+        checked={allow}
+        disabled={isSaving}
+        onChange={(e) => setAllow(e.target.checked)}
+        aria-label={t('financeModels.usedMinSwitch')}
+      />
+      <div className="w-28 shrink-0">
+        <MaskedInput
+          mask="number"
+          decimalScale={0}
+          size="sm"
+          value={price}
+          onChange={(raw) => setPrice(raw)}
+          disabled={!allow || isSaving}
+          error={allow && invalid}
+          suffix="฿"
+          aria-label={t('financeModels.usedMinPrice')}
+        />
+      </div>
+
+      {dirty && (
+        <Button size="sm" color="primary" disabled={invalid || isSaving} onClick={save}>
+          {isSaving ? t('pricing.saving') : t('common.save')}
+        </Button>
+      )}
+
+      {allow && invalid && (
+        <span className="text-xs text-danger-fg min-w-0">{t('financeModels.usedMinInvalid')}</span>
       )}
     </div>
   );
@@ -524,6 +636,17 @@ export function BranchFinanceModelsPage() {
                                 onSaved={() => queryClient.invalidateQueries({ queryKey: ['fin1-branch-configs'] })}
                               />
                             : <span className="text-xs text-subtle">{t('financeModels.downLoading')}</span>
+                        )}
+                      </div>
+
+                      {/* Used-device price floor. Also a FIN1 setting (the used
+                          price only exists on a FIN1 plan), so same row, same rule. */}
+                      <div className="shrink-0 w-[24rem] max-w-full">
+                        {g.fin1 && fin1Config && (
+                          <UsedMinEditor
+                            config={fin1Config}
+                            onSaved={() => queryClient.invalidateQueries({ queryKey: ['fin1-branch-configs'] })}
+                          />
                         )}
                       </div>
                     </div>
