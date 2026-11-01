@@ -1,3 +1,4 @@
+import type { DestAccount } from '../../components/ShopPayoutDestField';
 import type { FundDayCloseAmended } from '../../lib/fundDayPay';
 
 // Shapes of the fund-money document (`FB-…` / `FC-…`) — mig 1284-1295.
@@ -179,8 +180,13 @@ export interface FundBillPayment {
   flow: 'IN' | 'OUT';
   amount: number;
   bank_account_id: number | null;
+  /** The shop's account the money went to (migs 1575–1581: name + dashed
+   *  number come down ready-made; the screen never looks them up). */
   dest_bank_code: string | null;
+  dest_bank_name: string | null;
+  dest_bank_name_en: string | null;
   dest_account_no: string | null;
+  dest_account_number_display: string | null;
   dest_account_name: string | null;
   reference: string | null;
   paid_date: string;
@@ -350,6 +356,9 @@ export interface FundBillPayResult {
   payment_id: number | null;
   /** Every movement this press wrote. */
   payment_ids: number[];
+  /** Where the shop's money went (migs 1575–1581); null when nothing was
+   *  transferred to the shop this time. */
+  dest_account?: DestAccount | null;
 }
 
 export interface FundBillIssueResult {

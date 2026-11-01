@@ -5267,7 +5267,9 @@
     "lineType_CAPITAL_OUT": "Fund withdrawal",
     "lineType_OPERATING_EXPENSE": "Operating expense",
     "purpose_COMMISSION_EXTRA": "Extra commission",
-    "selectShopToView": "Pick a shop to see which steps are ready and which are still waiting"
+    "selectShopToView": "Pick a shop to see which steps are ready and which are still waiting",
+    "destAccount": "Transfer to",
+    "logAction_PAYMENT_DEST_SET": "Destination account corrected"
   },
   "fundBook": {
     "amount": "Amount",
@@ -6589,7 +6591,9 @@
     "remitHint": "Pay the fund back into this account · not the one customers pay into",
     "remitTitle": "Pay the fund back into this account",
     "title": "Accounts for this shop",
-    "installmentHint": "Tell customers to pay their instalments into this account"
+    "installmentHint": "Tell customers to pay their instalments into this account",
+    "channel_PAYOUT": "From the fund",
+    "payoutHint": "The fund transfers device money and commission into this account · set by the fund"
   },
   "partnerBalance": {
     "title": "Outstanding per shop",
@@ -10464,7 +10468,16 @@
     "saved": "Payout account saved",
     "removed": "Payout account removed",
     "removedHint": "Until a new account is set, this shop's bills cannot enter a payout round",
-    "removeConfirm": "Remove this shop's payout account?"
+    "removeConfirm": "Remove this shop's payout account?",
+    "historyAction": "History",
+    "historyTitle": "Payout account history",
+    "historyTransfers": "Transfers to this shop",
+    "historyTransfersNone": "No transfers yet",
+    "historyChanges": "Main account changes",
+    "historyChangesNone": "No changes recorded",
+    "historyFirstSet": "(first set)",
+    "historyRemoved": "(removed)",
+    "historyLatestN": "Latest {{count}} shown"
   },
   "companyBankAccount": {
     "tab": "Fund accounts",
@@ -10798,5 +10811,34 @@
     "myContracts": "Opened today",
     "myFinanced": "Financed today",
     "monthTitle": "Contracts opened by month"
+  },
+  "shopPayoutDest": {
+    "label": "Transfer to",
+    "placeholder": "Pick the shop's account",
+    "main": "main account",
+    "other": "Another account…",
+    "otherBank": "Bank or PromptPay",
+    "otherHint": "This account is remembered on the transfer and offered next time. It does not become the shop's main account — change that under Shop payout accounts.",
+    "noMain": "This shop has no main account yet — pick \"Another account…\" or set one under Shop payout accounts.",
+    "paidBefore": "paid {{count}} times · last {{date}}",
+    "invalid": "The destination account is not valid",
+    "reason_INCOMPLETE": "Fill in the bank, the number and the account name",
+    "reason_BANK_UNKNOWN": "Unknown bank",
+    "reason_DIGITS_ONLY": "The account number must be digits only",
+    "reason_DIGITS_LENGTH": "The account number has the wrong number of digits for this bank"
+  },
+  "fundPaymentDest": {
+    "action": "Correct destination",
+    "title": "Correct the destination account",
+    "now": "Recorded as",
+    "from": "From",
+    "to": "Transfer went to",
+    "reason": "Reason",
+    "reasonPlaceholder": "e.g. the bank's SMS shows PromptPay ending 1313",
+    "hint": "Only the recorded destination changes — the amount, the date and the fund's source account stay. The reason goes into the document's history.",
+    "submit": "Correct destination",
+    "done": "Destination corrected",
+    "unchanged": "Nothing changed",
+    "unchangedHint": "The account picked is the one already recorded, so nothing was written."
   }
 }

@@ -445,7 +445,7 @@ function ShopFundBillPanel({ bill }: { bill: PartnerMyFundBill }) {
                     {i18n.language === 'th' && p.method_name
                       ? p.method_name
                       : t(`settlement.method_${p.method}`, { defaultValue: p.method })}
-                    {p.dest_account_no && <> · <BankAccountInline account={{ bank_code: p.dest_bank_code, account_number: p.dest_account_no }} /></>}
+                    {p.dest_account_no && <> · <BankAccountInline account={{ bank_code: p.dest_bank_code, bank_name: p.dest_bank_name, bank_name_en: p.dest_bank_name_en, account_number: p.dest_account_no, account_number_display: p.dest_account_number_display }} /></>}
                     {p.reference && <> · {p.reference}</>}
                   </div>
                   {/* The fund's slips for a transfer that went through a bank.

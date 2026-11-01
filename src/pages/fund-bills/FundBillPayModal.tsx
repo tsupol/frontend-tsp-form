@@ -18,7 +18,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Button, Input, InputDatePicker, TextArea } from 'tsp-form';
 import { Keyboard } from 'lucide-react';
-import { apiClient } from '../../lib/api';
+import { apiClient, ApiError } from '../../lib/api';
 import { FundDayClosedHint, FundPayErrorBand } from '../../components/FundDayPayGuard';
 import { amendedDoneRows } from '../../lib/fundDayPay';
 import { useFundPayAttempt } from '../../hooks/useFundPayAttempt';
@@ -30,6 +30,11 @@ import { FundBillDeviceList } from './FundBillDeviceList';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency, makeDatePickerFormat, parseLocalDate, toLocalDateStr } from '../../lib/format';
 import { FundAccountField } from '../../components/FundAccountField';
+import {
+  ShopPayoutDestField, useShopPayoutDestChoice, destAsAccount, payoutDestErrorText, SHOP_PAYOUT_ACCOUNTS_KEY,
+} from '../../components/ShopPayoutDestField';
+import { bankAccountLabel } from '../../lib/bankAccount';
+import { useQueryClient } from '@tanstack/react-query';
 import { useFundAccountChoice } from '../../hooks/useFundAccountChoice';
 import { useFundBillInvalidate } from './useFundBills';
 import type { FundBill, FundBillPayResult } from './fundBillTypes';
@@ -58,6 +63,12 @@ export function FundBillPayModal({ open, bill, onClose }: FundBillPayModalProps)
   const invalidate = useFundBillInvalidate();
   const account = useFundAccountChoice(bill?.company_id ?? null);
   const { reset: resetAccount } = account;
+  // Where the shop's money goes (migs 1575–1581). Only a document with a shop
+  // has one; a commission-only document still transfers to the shop, so it
+  // gets the field too.
+  const queryClient = useQueryClient();
+  const dest = useShopPayoutDestChoice(open ? bill?.branch_id ?? null : null);
+  const { reset: resetDest } = dest;
 
   const today = toLocalDateStr(new Date());
 
@@ -80,6 +91,7 @@ export function FundBillPayModal({ open, bill, onClose }: FundBillPayModalProps)
     setPaidDate(toLocalDateStr(new Date()));
     setTyping(false);
     resetAccount();
+    resetDest();
     setReference('');
     setNote('');
     setSaving(false);
@@ -87,11 +99,12 @@ export function FundBillPayModal({ open, bill, onClose }: FundBillPayModalProps)
     resetSlip();
     setResult(null);
     setConfirmClose(false);
-  }, [open, resetAttempt, resetSlip, resetAccount]);
+  }, [open, resetAttempt, resetSlip, resetAccount, resetDest]);
 
-  const dirty = paidDate !== today || account.changed || !!reference.trim() || !!note.trim() || slip.files.length > 0;
+  const hasShop = bill?.branch_id != null;
+  const dirty = paidDate !== today || account.changed || dest.changed || !!reference.trim() || !!note.trim() || slip.files.length > 0;
   const futureDate = !!paidDate && paidDate > today;
-  const canSubmit = !!paidDate && !futureDate && !!account.accountId;
+  const canSubmit = !!paidDate && !futureDate && !!account.accountId && (!hasShop || dest.complete);
 
   const forceClose = () => { setConfirmClose(false); onClose(); };
   const handleClose = () => {
@@ -109,19 +122,28 @@ export function FundBillPayModal({ open, bill, onClose }: FundBillPayModalProps)
         p_bill_id: bill.bill_id,
         p_paid_date: paidDate,
         p_source_bank_account_id: Number(account.accountId),
+        // Nothing for the main account — the backend uses it itself; the
+        // three p_dest_* for any other destination.
+        ...(hasShop ? dest.params() : {}),
         p_reference: reference.trim() || null,
         p_note: note.trim() || null,
         ...attempt.amendParams(amend),
       });
       setResult(res);
       invalidate(bill.bill_id);
+      // The destination just used becomes a choice next time.
+      queryClient.invalidateQueries({ queryKey: [...SHOP_PAYOUT_ACCOUNTS_KEY] });
       // The pay is recorded; the slip goes on the movement the pay named
       // (null = no bank transfer this time, so no slip step) and its failure
       // is reported on the done view, never rolled back.
       await slip.attach(res.payment_id);
       setView('done');
     } catch (err) {
-      attempt.fail(err, amend);
+      if (err instanceof ApiError && err.code === 'SALE.VALIDATION.PARTNER_PAYOUT_ACCOUNT_INVALID') {
+        attempt.setError({ message: payoutDestErrorText(err, t), unclosedDate: null, closedDate: null });
+      } else {
+        attempt.fail(err, amend);
+      }
     } finally {
       setSaving(false);
     }
@@ -189,6 +211,10 @@ export function FundBillPayModal({ open, bill, onClose }: FundBillPayModalProps)
                   <FundDayClosedHint companyId={bill?.company_id} date={paidDate} enabled={open && !futureDate} />
                 </div>
 
+                {hasShop && (
+                  <ShopPayoutDestField choice={dest} label={t('fundBill.destAccount')} disabled={saving} />
+                )}
+
                 <FundAccountField choice={account} label={t('fundBill.sourceAccount')} disabled={saving} />
 
                 <div className="flex flex-col">
@@ -239,6 +265,9 @@ export function FundBillPayModal({ open, bill, onClose }: FundBillPayModalProps)
               // only ever read ฿0.
               ...(bill?.bill_purpose !== 'COMMISSION_EXTRA'
                 ? [{ label: t('fundBill.companyRecorded'), value: fmtCurrency(result.company_net) }]
+                : []),
+              ...(result.dest_account
+                ? [{ label: t('fundBill.destAccount'), value: bankAccountLabel(destAsAccount(result.dest_account), t, i18n.language) }]
                 : []),
               ...(result.source_account_display
                 ? [{ label: t('fundBill.sourceAccount'), value: result.source_account_display }]

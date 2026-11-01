@@ -239,7 +239,10 @@ export interface PartnerMyFundBillPayment {
   method_name: string | null;
   amount: number;
   dest_bank_code: string | null;
+  dest_bank_name: string | null;
+  dest_bank_name_en: string | null;
   dest_account_no: string | null;
+  dest_account_number_display: string | null;
   dest_account_name: string | null;
   reference: string | null;
   paid_date: string;

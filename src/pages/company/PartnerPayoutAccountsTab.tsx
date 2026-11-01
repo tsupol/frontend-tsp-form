@@ -24,7 +24,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, DataTable, DataTableColumnHeader, Input, Modal, Select, type ColumnDef } from 'tsp-form';
-import { Landmark, Trash2, Undo2 } from 'lucide-react';
+import { History, Landmark, Trash2, Undo2 } from 'lucide-react';
+import { useMyPermissions } from '../../hooks/useMyPermissions';
+import { PartnerPayoutHistoryModal } from './PartnerPayoutHistoryModal';
+import { FundPaymentSetDestModal, type FundPaymentDestTarget } from '../fund-cash/FundPaymentSetDestModal';
 import { apiClient } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
@@ -71,10 +74,12 @@ function PayoutStatusBadge({ row }: { row: PartnerPayoutRow }) {
 
 // ── Edit / remove modal ───────────────────────────────────────────────────────
 
-function PartnerPayoutAccountModal({ open, row, onClose }: {
+function PartnerPayoutAccountModal({ open, row, onClose, onHistory }: {
   open: boolean;
   row: PartnerPayoutRow | null;
   onClose: () => void;
+  /** Opens the shop's transfer + account-change history (§③) in place of this window. */
+  onHistory: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
@@ -288,17 +293,26 @@ function PartnerPayoutAccountModal({ open, row, onClose }: {
             </div>
             <ModalErrorBand message={error} onDismiss={() => setError(null)} />
             <div className="modal-footer">
-              {row?.has_payout_account && (
+              <div className="mr-auto flex items-center gap-1">
                 <Button
                   variant="ghost"
-                  className="mr-auto"
-                  onClick={() => setView('confirmRemove')}
-                  disabled={saving}
-                  startIcon={<Trash2 size={16} className="text-danger-fg" />}
+                  onClick={onHistory}
+                  disabled={saving || isDirty}
+                  startIcon={<History size={16} />}
                 >
-                  {t('dealPartnerRate.payoutRemove')}
+                  {t('partnerPayout.historyAction')}
                 </Button>
-              )}
+                {row?.has_payout_account && (
+                  <Button
+                    variant="ghost"
+                    onClick={() => setView('confirmRemove')}
+                    disabled={saving}
+                    startIcon={<Trash2 size={16} className="text-danger-fg" />}
+                  >
+                    {t('dealPartnerRate.payoutRemove')}
+                  </Button>
+                )}
+              </div>
               <Button variant="ghost" onClick={handleClose} disabled={saving}>{t('common.cancel')}</Button>
               <Button variant="primary" onClick={save} disabled={saving || !complete || problem !== null || !isDirty}>
                 {t('common.save')}
@@ -328,6 +342,13 @@ export function PartnerPayoutAccountsTab({ showCompany }: { showCompany: boolean
   const [editId, setEditId] = useState<number | null>(null);
   // Resolved from the live rows so the window shows what was just saved.
   const editRow = useMemo(() => rows.find(r => r.branch_id === editId) ?? null, [rows, editId]);
+  // History (§③) and the fix-destination window (§④) — one at a time; the
+  // history window hands its shop to the fix window and comes back after.
+  const [historyId, setHistoryId] = useState<number | null>(null);
+  const historyRow = useMemo(() => rows.find(r => r.branch_id === historyId) ?? null, [rows, historyId]);
+  const [fixDest, setFixDest] = useState<FundPaymentDestTarget | null>(null);
+  const { hasPermission } = useMyPermissions();
+  const canFixDest = hasPermission('FUND.PAYMENT_ACCOUNT_FIX');
 
   const accountCell = (r: PartnerPayoutRow) => {
     if (!r.has_payout_account) return <span className="text-subtler">—</span>;
@@ -438,7 +459,21 @@ export function PartnerPayoutAccountsTab({ showCompany }: { showCompany: boolean
         )}
       </div>
 
-      <PartnerPayoutAccountModal open={editId != null} row={editRow} onClose={() => setEditId(null)} />
+      <PartnerPayoutAccountModal
+        open={editId != null}
+        row={editRow}
+        onClose={() => setEditId(null)}
+        onHistory={() => { setHistoryId(editId); setEditId(null); }}
+      />
+      <PartnerPayoutHistoryModal
+        open={historyId != null && fixDest == null}
+        branchId={historyId}
+        branchName={historyRow?.branch_name ?? null}
+        canFixDest={canFixDest}
+        onFixDest={setFixDest}
+        onClose={() => setHistoryId(null)}
+      />
+      <FundPaymentSetDestModal open={fixDest != null} payment={fixDest} onClose={() => setFixDest(null)} />
     </>
   );
 }

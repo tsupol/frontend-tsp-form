@@ -40,6 +40,19 @@ interface PartnerBankAccount {
   account_name: string | null;
 }
 
+/** The shop's account the FUND transfers into (device money + commission on
+ *  a fund bill) — `v_partner_my_payout_account`, 0 or 1 row (migs 1575–1581).
+ *  Read-only here: the fund sets it under บัญชีธนาคาร → บัญชีรับเงินจากกองทุน. */
+interface PartnerPayoutAccount {
+  bank_code: string | null;
+  bank_name: string | null;
+  bank_name_en: string | null;
+  account_no: string | null;
+  account_number_display: string | null;
+  account_name: string | null;
+  updated_at: string | null;
+}
+
 /** The only two channels the shop is shown. Order follows the backend's sort. */
 const SHOWN_CHANNELS = ['INSTALLMENT', 'PARTNER_REMIT'];
 
@@ -65,19 +78,31 @@ export function PartnerRemitAccounts({ only, className }: PartnerRemitAccountsPr
     retry: false,
   });
 
+  // The third row — money the other way, fund → shop. Only on the full card:
+  // a screen about paying the fund back (`only`) must not show it (IMPLEMENT
+  // 1575 §①), and a shop that is not a deal partner gets no row from the view.
+  const { data: payoutRows, isLoading: payoutLoading } = useQuery({
+    queryKey: ['partner-payout-account', 'mine'],
+    queryFn: () => apiClient.get<PartnerPayoutAccount[]>('/v_partner_my_payout_account'),
+    enabled: !only,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+  const payout = !only ? (payoutRows?.[0] ?? null) : null;
+
   // The view returns every configured channel; the shop is shown only these.
   const rows = (data ?? []).filter(r => wanted.includes(r.channel));
   const missing = wanted.filter(c => !rows.some(r => r.channel === c));
 
-  if (isLoading) return null;
+  if (isLoading || (!only && payoutLoading)) return null;
   // Nothing configured and nothing to ask about — the caller is not a shop.
   if (rows.length === 0 && missing.length === 0) return null;
 
-  const copy = async (row: PartnerBankAccount) => {
-    if (!row.account_no) return;
+  const copy = async (key: string, accountNo: string | null) => {
+    if (!accountNo) return;
     try {
-      await navigator.clipboard.writeText(row.account_no);
-      setCopied(row.channel);
+      await navigator.clipboard.writeText(accountNo);
+      setCopied(key);
       setTimeout(() => setCopied(null), 1600);
     } catch {
       // A denied clipboard is not worth an error state — the number is on screen
@@ -125,7 +150,7 @@ export function PartnerRemitAccounts({ only, className }: PartnerRemitAccountsPr
               size="sm"
               variant="outline"
               startIcon={copied === row.channel ? <Check size={14} className="text-success" /> : <Copy size={14} />}
-              onClick={() => copy(row)}
+              onClick={() => copy(row.channel, row.account_no)}
             >
               {copied === row.channel ? t('common.copied') : t('common.copy')}
             </Button>
@@ -141,6 +166,44 @@ export function PartnerRemitAccounts({ only, className }: PartnerRemitAccountsPr
           <div className="text-sm mt-0.5">{t('partnerAccounts.notSet')}</div>
         </div>
       ))}
+
+      {/* Fund → shop. The one account the fund pays THIS shop into; the fund
+       *  owns it, so there is no edit here — only "not set" when it is missing. */}
+      {!only && (
+        <div className="px-3 py-2.5 border-t border-line flex items-start gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="text-xs text-subtle">{t('partnerAccounts.channel_PAYOUT')}</div>
+            {payout ? (
+              <>
+                <BankAccountLine
+                  className="mt-1"
+                  showWhere={false}
+                  account={{
+                    bank_code: payout.bank_code,
+                    bank_name: payout.bank_name || payout.bank_code,
+                    bank_name_en: payout.bank_name_en,
+                    account_name: payout.account_name,
+                    account_number_display: payout.account_number_display ?? payout.account_no ?? '—',
+                  }}
+                />
+                <div className="text-xs text-subtler mt-1">{t('partnerAccounts.payoutHint')}</div>
+              </>
+            ) : (
+              <div className="text-sm mt-0.5">{t('partnerAccounts.notSet')}</div>
+            )}
+          </div>
+          {payout?.account_no && (
+            <Button
+              size="sm"
+              variant="outline"
+              startIcon={copied === 'PAYOUT' ? <Check size={14} className="text-success" /> : <Copy size={14} />}
+              onClick={() => copy('PAYOUT', payout.account_no)}
+            >
+              {copied === 'PAYOUT' ? t('common.copied') : t('common.copy')}
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

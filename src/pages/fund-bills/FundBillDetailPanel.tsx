@@ -65,6 +65,8 @@ import { FundBillRemoveLineModal } from './FundBillRemoveLineModal';
 import { FundBillAddSettlementModal } from './FundBillAddSettlementModal';
 import { FundBillRemoveSettlementModal } from './FundBillRemoveSettlementModal';
 import { FundClawbackCollectModal } from '../fund-clawback/FundClawbackCollectModal';
+import { FundPaymentSetDestModal, type FundPaymentDestTarget } from '../fund-cash/FundPaymentSetDestModal';
+import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { FundPaymentEvidence } from './FundPaymentEvidence';
 
 /** Reasons that mean the button has no business being on screen at all. */
@@ -125,6 +127,14 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
   const [removeSettlement, setRemoveSettlement] = useState<ContractGroup | null>(null);
   const [removeLine, setRemoveLine] = useState<FundBillLine | null>(null);
   const [collectOpen, setCollectOpen] = useState(false);
+  // "แก้บัญชีปลายทาง" (mig 1579): a shop transfer whose destination was recorded
+  // wrong. Same permission as moving a line between the fund's own accounts.
+  const [fixDest, setFixDest] = useState<FundPaymentDestTarget | null>(null);
+  const { hasPermission } = useMyPermissions();
+  const canFixDest = hasPermission('FUND.PAYMENT_ACCOUNT_FIX');
+  const destFixable = (p: FundBillPayment) =>
+    canFixDest && p.party_type === 'BRANCH' && p.party_id != null && p.method === 'TRANSFER'
+    && p.flow === 'OUT' && !p.is_reversal && !p.voided_at;
 
   /** The backend ships Thai names on every row; English falls back to the code. */
   const statusLabel = (code: FundBillStatus) =>
@@ -693,9 +703,18 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
                               : t(`fundBill.method_${p.method}`, { defaultValue: p.method })}
                           </span>
                           {p.dest_account_no && (
-                            <BankAccountInline account={{ bank_code: p.dest_bank_code, account_number: p.dest_account_no }} />
+                            <BankAccountInline account={{ bank_code: p.dest_bank_code, bank_name: p.dest_bank_name, bank_name_en: p.dest_bank_name_en, account_number: p.dest_account_no, account_number_display: p.dest_account_number_display }} />
                           )}
                           {p.reference && <span>{p.reference}</span>}
+                          {destFixable(p) && (
+                            <button
+                              type="button"
+                              className="text-xs text-primary-fg hover:underline bg-transparent border-none p-0 cursor-pointer"
+                              onClick={() => setFixDest({ ...p, branch_id: p.party_id as number })}
+                            >
+                              {t('fundPaymentDest.action')}
+                            </button>
+                          )}
                         </div>
                       </div>
                       {/* Narrow: the three figures sit on their own line, each
@@ -819,6 +838,7 @@ export function FundBillDetailPanel({ billId, isMobile }: FundBillDetailPanelPro
       <FundBillPayModal open={payOpen} bill={bill} onClose={() => setPayOpen(false)} />
       <FundBillVoidModal open={voidOpen} bill={bill} onClose={() => setVoidOpen(false)} />
       <FundBillCreditNoteModal open={creditNoteOpen} bill={bill} onClose={() => setCreditNoteOpen(false)} />
+      <FundPaymentSetDestModal open={fixDest != null} payment={fixDest} onClose={() => setFixDest(null)} />
       <FundBillAddLineModal open={addLineOpen} bill={bill} onClose={() => setAddLineOpen(false)} />
       <FundBillAddSettlementModal
         open={addSettlementOpen}
