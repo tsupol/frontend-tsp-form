@@ -26,7 +26,7 @@ import { Badge, Button, Tooltip } from 'tsp-form';
 import {
   ArrowLeft, Clock, FileText, Smartphone, User, Wallet, MapPin, Phone, Users,
   History, AlertTriangle, ImageOff, Star, ChevronRight,
-  CheckCircle2, XCircle, Info, MessageCircle, Percent,
+  CheckCircle2, XCircle, Info, MessageCircle, Percent, Camera,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
@@ -34,7 +34,7 @@ import { EntityCodeLink } from '../../components/EntityCodeLink';
 import { fmtCurrency, formatTel, formatCid } from '../../lib/format';
 import { MediaLightboxKeyGallery, MediaThumbButton } from '../../components/MediaLightbox';
 import { normalizeKey } from '../../lib/mediaPath';
-import { useContractAlbumPhotos } from '../contracts/contractPhotoStatus';
+import { useContractAlbumPhotos, isCreditPhotoSlot } from '../contracts/contractPhotoStatus';
 import { passesThaiCidChecksum } from '../../lib/ocr/extractIdCard';
 import { thaiPhoneReason } from '../../lib/validators';
 import { TelLink, ValidMark } from '../../components/TelLink';
@@ -314,12 +314,15 @@ export function PartnerCaseDetailPanel({
       items: idDocs.map(d => ({ id: `d${d.id}`, key: normalizeKey(d.file_url!), thumb: normalizeKey(d.file_url!) })),
     });
   }
-  const usages = [...new Set(contractPhotos.map(p => p.usage_type))].sort((a, b) => slotOrder(a) - slotOrder(b));
+  // The shop's credit-support photos (mig 1559) are their own section below,
+  // with their captions — not photos *of* the customer.
+  const customerPhotos = contractPhotos.filter(p => !isCreditPhotoSlot(p.usage_type));
+  const usages = [...new Set(customerPhotos.map(p => p.usage_type))].sort((a, b) => slotOrder(a) - slotOrder(b));
   for (const u of usages) {
     photoGroups.push({
       key: u,
       label: slotLabel(u),
-      items: contractPhotos.filter(p => p.usage_type === u).map(p => ({
+      items: customerPhotos.filter(p => p.usage_type === u).map(p => ({
         id: `m${p.entity_media_id}`, key: p.storage_path, thumb: p.variants_json?.sm ?? p.storage_path,
       })),
     });
@@ -329,6 +332,12 @@ export function PartnerCaseDetailPanel({
     const index = keys.indexOf(key);
     if (index >= 0) setLightbox({ keys, index });
   };
+
+  // What the shop sent to support the request: grouped as the shop grouped
+  // them, each with the shop's own caption under it. One gallery for the lot.
+  const creditPhotos = contractPhotos.filter(p => isCreditPhotoSlot(p.usage_type));
+  const creditUsages = [...new Set(creditPhotos.map(p => p.usage_type))].sort((a, b) => slotOrder(a) - slotOrder(b));
+  const creditPhotoKeys = creditPhotos.map(p => p.storage_path);
 
   const devicePhotos = evidence.filter(s => s.photo_count > 0);
   const devicePhotoKeys = devicePhotos.flatMap(s => (s.photos ?? []).map(p => p.storage_path));
@@ -537,6 +546,39 @@ export function PartnerCaseDetailPanel({
             </div>
           )}
         </section>
+
+        {/* 2b. What the shop attached to make its case (mig 1559) — read with
+            the shop's note above. Empty is a fact, not a problem. */}
+        <Section icon={<Camera size={14} />} title={t('partnerCase.creditPhotosTitle')}>
+          {creditPhotos.length === 0 ? (
+            <div className="text-sm text-subtler flex items-center gap-2">
+              <ImageOff size={14} /> {t('partnerCase.creditPhotosNone')}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {creditUsages.map(u => (
+                <div key={u}>
+                  <div className="text-xs font-medium text-subtle mb-1.5">{slotLabel(u)}</div>
+                  <div className="flex flex-wrap gap-3">
+                    {creditPhotos.filter(p => p.usage_type === u).map(p => (
+                      <div key={p.entity_media_id} className="w-24 flex flex-col gap-1">
+                        <MediaThumbButton
+                          mediaKey={p.variants_json?.sm ?? p.storage_path}
+                          alt={p.caption ?? slotLabel(u)}
+                          className="w-24 h-24 rounded border border-line overflow-hidden cursor-zoom-in hover:opacity-80 transition-opacity bg-surface-shallow"
+                          onClick={() => openPhoto(p.storage_path, creditPhotoKeys)}
+                        />
+                        {p.caption && (
+                          <div className="text-[11px] leading-snug break-words" title={p.caption}>{p.caption}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
 
         {/* 3. Who the customer is, with every photo of them */}
         <Section icon={<User size={14} />} title={t('partnerCase.customerTitle')} sectionRef={identityRef}>

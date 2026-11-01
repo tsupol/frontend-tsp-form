@@ -36,6 +36,13 @@ export interface PhotoStatus {
   slots: PhotoStatusSlot[];
 }
 
+/** The two groups a deal-partner shop fills to support its credit request
+ *  (mig 1559) — attached while drafting, read by the credit desk on the
+ *  request, locked once it approves. Codes are the contract; labels come
+ *  from the slots view. */
+export const CREDIT_PHOTO_SLOTS = ['CREDIT_WORK', 'CREDIT_OTHER'];
+export const isCreditPhotoSlot = (slot: string) => CREDIT_PHOTO_SLOTS.includes(slot);
+
 export const photosKey = (contractId: number) => ['contract-photo-groups', contractId] as const;
 export const statusKey = (contractId: number) => ['contract-photo-status', contractId] as const;
 
@@ -58,6 +65,9 @@ export interface ContractPhoto {
   caption: string | null;
   storage_path: string;
   variants_json: Record<string, string> | null;
+  /** Locked per photo (mig 1559: the credit desk approved the request) —
+   *  no remove / move / caption edit; new photos may still be added. */
+  is_locked: boolean;
 }
 
 /** Every photo in the album, all groups in one read. `slots` = the groups to
@@ -68,7 +78,7 @@ export function useContractAlbumPhotos(contractId: number, slots: string[]) {
     queryFn: () => apiClient.get<ContractPhoto[]>(
       `/v_entity_media?entity_type=eq.CONTRACT&entity_id=eq.${contractId}`
       + `&usage_type=in.(${slots.join(',')})`
-      + '&select=entity_media_id,media_id,usage_type,sort_order,caption,storage_path,variants_json'
+      + '&select=entity_media_id,media_id,usage_type,sort_order,caption,storage_path,variants_json,is_locked'
       + '&order=usage_type,sort_order',
     ),
     enabled: slots.length > 0,

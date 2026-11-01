@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Button } from 'tsp-form';
 import { QRCodeSVG } from 'qrcode.react';
@@ -21,6 +21,8 @@ export function ContractCaptureModal({
   contractCode,
   onUploaded,
   onSessionActive,
+  slot,
+  slotLabel,
 }: {
   open: boolean;
   onClose: () => void;
@@ -31,11 +33,21 @@ export function ContractCaptureModal({
    *  keep refetching the album after this modal closes (photos may keep landing
    *  until the backend session TTL). */
   onSessionActive?: (expiresAt: string) => void;
+  /** The album group the phone starts on (mig 1561: `p_meta.slot`). The user
+   *  can still switch groups on the phone. Omit = the old "general" start. */
+  slot?: string | null;
+  /** That group's label, shown under the title. */
+  slotLabel?: string | null;
 }) {
   const { t } = useTranslation();
+  const meta = useMemo(
+    () => (slot ? { slot, source: 'contract-photo-groups' } : undefined),
+    [slot],
+  );
   const { phase, session, status, error, uploadCount, start, stop } = useMobileCaptureSession(
     contractId,
     contractCode,
+    { meta },
   );
 
   // Start a session whenever the modal opens; cancel + reset on close.
@@ -87,7 +99,11 @@ export function ContractCaptureModal({
       </div>
 
       <div className="modal-content">
-        {contractCode && <p className="text-sm text-subtle mb-4">{contractCode}</p>}
+        {(contractCode || slotLabel) && (
+          <p className="text-sm text-subtle mb-4">
+            {[contractCode, slotLabel].filter(Boolean).join(' · ')}
+          </p>
+        )}
 
         {phase === 'requesting' && (
           <div className="flex flex-col items-center justify-center py-12 text-subtle">

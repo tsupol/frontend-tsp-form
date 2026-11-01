@@ -32,7 +32,7 @@ import { MediaLightboxKeyGallery } from '../../components/MediaLightbox';
 import { useMobileCaptureSession, type MobileCaptureSession } from './workspace/useMobileCaptureSession';
 import { ContractPhotoGroups, ChecklistSummary } from './ContractPhotoGroups';
 import {
-  useContractPhotoStatus, useContractAlbumPhotos, photosKey, statusKey,
+  useContractPhotoStatus, useContractAlbumPhotos, photosKey, statusKey, isCreditPhotoSlot, CREDIT_PHOTO_SLOTS,
   type ContractPhoto, type PhotoStatusSlot,
 } from './contractPhotoStatus';
 
@@ -85,8 +85,13 @@ export function ContractAttachments({
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   const { data: status } = useContractPhotoStatus(contractId);
-  const slots: PhotoStatusSlot[] = status?.slots ?? [];
-  const { data: photos = [] } = useContractAlbumPhotos(contractId, slots.map(s => s.slot));
+  const allSlots: PhotoStatusSlot[] = status?.slots ?? [];
+  const { data: allPhotos = [] } = useContractAlbumPhotos(contractId, allSlots.map(s => s.slot));
+  // A shop's credit-support groups (mig 1559) have their own card beside the
+  // approval step — this box is the handover album, so it leaves them out.
+  // Staff see every group here.
+  const slots = isDealPartner ? allSlots.filter(s => !isCreditPhotoSlot(s.slot)) : allSlots;
+  const photos = isDealPartner ? allPhotos.filter(p => !isCreditPhotoSlot(p.usage_type)) : allPhotos;
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: photosKey(contractId) });
@@ -238,6 +243,7 @@ export function ContractAttachments({
         draft={draft}
         draftNote={draftNote}
         grouped={grouped !== false}
+        excludeSlots={isDealPartner ? CREDIT_PHOTO_SLOTS : undefined}
       />
     </div>
   );
@@ -322,6 +328,7 @@ function ManageModal({
   draft,
   draftNote,
   grouped,
+  excludeSlots,
 }: {
   open: boolean;
   onClose: () => void;
@@ -333,6 +340,8 @@ function ManageModal({
   draftNote?: string | null;
   /** False = one flat album: the general group, no checklist, nothing to drag into. */
   grouped: boolean;
+  /** Groups drawn elsewhere (a shop's credit-support card). */
+  excludeSlots?: string[];
 }) {
   const { t } = useTranslation();
   const { phase, session, status, error: qrError, uploadCount } = capture;
@@ -361,6 +370,7 @@ function ManageModal({
         hideRequired={draft || !grouped}
         pinnedSlot={grouped ? USAGE_TYPE : undefined}
         ungroupedSlot={grouped ? undefined : USAGE_TYPE}
+        excludeSlots={excludeSlots}
         scrollRef={scrollRef}
         onDraggingChange={handleDragging}
         renderLayout={({ pinned, body }) => (

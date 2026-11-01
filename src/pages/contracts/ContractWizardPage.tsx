@@ -33,6 +33,7 @@ import { CardContactRef } from './workspace/CardContactRef';
 import { PanelContactRef } from './workspace/PanelContactRef';
 import type { ModalId } from './workspace/WorkspaceTypes';
 import { PartnerCaseCard } from '../partner-cases/PartnerCaseCard';
+import { CreditSupportPhotosCard } from '../partner-cases/CreditSupportPhotosCard';
 import { CONFIDENCE_SCORE_ANCHOR } from './workspace/ConfidenceScoreEditor';
 
 /** After opening a step, wait for one of its blocks to mount, then scroll it
@@ -405,6 +406,18 @@ function WorkspaceContent() {
           </div>
         );
 
+        // The shop's photos for the credit desk (mig 1559) — the step right
+        // before asking for approval. Nothing for anyone else.
+        const creditPhotosCard = data.contractId ? (
+          <CreditSupportPhotosCard
+            contractId={data.contractId}
+            contractCode={data.contractCode ?? contract?.code_display ?? null}
+            commercialModel={contract?.commercial_model}
+            contractState={contract?.state}
+            variant="flush"
+          />
+        ) : null;
+
         const partnerCaseCard = data.contractId ? (
           <PartnerCaseCard
             contractId={data.contractId}
@@ -509,6 +522,7 @@ function WorkspaceContent() {
                         after documents, before the down payment. It shows where
                         the request stands; its buttons sit in the pinned bar.
                         Renders nothing for anyone else. */}
+                    {creditPhotosCard}
                     {partnerCaseCard}
 
                     {/* A shop's last step stays in order in the list (its next

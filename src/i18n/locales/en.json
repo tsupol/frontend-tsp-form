@@ -3896,7 +3896,17 @@
     "photoActions": "Photo actions",
     "dragToGroup": "Drag to reorder or move between groups",
     "errorPickImage": "Pick an image first",
-    "groupCapacity": "{{count}} of {{max}} photos used in this group"
+    "groupCapacity": "{{count}} of {{max}} photos used in this group",
+    "caption": "Caption",
+    "captionEdit": "Edit caption",
+    "captionTitle": "Photo caption",
+    "captionPlaceholder": "e.g. Employee card, Company A",
+    "captionHint": "The credit desk reads this under the photo",
+    "photoLocked": "This photo is locked — the credit desk approved the request; it can't be removed or edited",
+    "captureGroup": "Take from phone",
+    "creditTitle": "Credit support photos",
+    "creditHint": "Optional · photos for the credit desk to consider — employee card, workplace, payslip · add a caption under each · after approval the existing photos lock, new ones can still be added",
+    "creditLockedHint": "Approved by the credit desk — existing photos are locked; new ones can still be added"
   },
   "contractsOpened": {
     "title": "Contracts Opened",
@@ -6729,6 +6739,8 @@
     "outcome_WITHDRAWN": "Withdrawn",
     "idCardPhoto": "ID card",
     "noCustomerPhotos": "No photos of the customer yet",
+    "creditPhotosTitle": "Supporting photos from the shop",
+    "creditPhotosNone": "The shop attached none",
     "dateOfBirth": "Date of birth",
     "ageYears": "{{age}} years old",
     "reachTitle": "Reaching the customer",

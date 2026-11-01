@@ -25,7 +25,7 @@ import { useCallback, useEffect, useReducer, useRef, useState, type ReactNode, t
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Modal, Button, PopOver, MenuItem, MenuSeparator, Badge } from 'tsp-form';
+import { Modal, Button, PopOver, MenuItem, MenuSeparator, Badge, TextArea } from 'tsp-form';
 import type { UploadedImage } from 'tsp-form';
 import {
   DndContext, DragOverlay, pointerWithin, useDroppable, MeasuringStrategy,
@@ -39,7 +39,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import {
   XCircle, Plus, ImageOff, MoreHorizontal, FolderInput, RefreshCw, Trash2, X,
-  ZoomIn, Lock, CheckCircle2, AlertCircle,
+  ZoomIn, Lock, CheckCircle2, AlertCircle, MessageSquareText, QrCode,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -47,6 +47,7 @@ import { useMediaUrl } from '../../hooks/useMediaUrl';
 import { CONTRACT_EVIDENCE_RESIZE } from '../../lib/beMedia';
 import { normalizeKey, toStoragePath } from '../../lib/mediaPath';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { MediaLightboxKeyGallery } from '../../components/MediaLightbox';
 import { translateApiError } from '../../lib/apiErrors';
 import { uploadContractPhoto } from './uploadContractPhoto';
@@ -112,9 +113,22 @@ export interface PhotoGroupsLayoutParts {
   body: ReactNode;
 }
 
-export function ContractPhotoGroups({ contractId, className, hideBanner, hideRequired, pinnedSlot, ungroupedSlot, scrollRef, renderLayout, onDraggingChange }: {
+export function ContractPhotoGroups({
+  contractId, className, hideBanner, hideRequired, pinnedSlot, ungroupedSlot, onlySlots, excludeSlots,
+  captions, onCaptureGroup, scrollRef, renderLayout, onDraggingChange,
+}: {
   contractId: number;
   className?: string;
+  /** Show just these groups (the credit-support card); moves stay within them. */
+  onlySlots?: string[];
+  /** Hide these groups — a host that draws them in its own card. */
+  excludeSlots?: string[];
+  /** Per-photo captions (mig 1559): typed when adding, shown under the tile,
+   *  edited from its menu. */
+  captions?: boolean;
+  /** A "take from phone" button on each group — the host mints the QR with
+   *  that group so the phone starts there (mig 1561). */
+  onCaptureGroup?: (slot: PhotoStatusSlot) => void;
   /** The host pins its own checklist (ChecklistSummary) outside the scroll. */
   hideBanner?: boolean;
   /** Before signing: the handover photos can't all exist yet, so no group
@@ -140,6 +154,7 @@ export function ContractPhotoGroups({ contractId, className, hideBanner, hideReq
   const [error, setError] = useState('');
   const [addGroup, setAddGroup] = useState<PhotoStatusSlot | null>(null);
   const [replacePhoto, setReplacePhoto] = useState<ContractPhoto | null>(null);
+  const [captionPhoto, setCaptionPhoto] = useState<ContractPhoto | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<ContractPhoto | null>(null);
   const [lightbox, setLightbox] = useState<{ slot: string; index: number } | null>(null);
 
@@ -384,6 +399,9 @@ export function ContractPhotoGroups({ contractId, className, hideBanner, hideReq
   const lastReplace = useRef(replacePhoto);
   if (replacePhoto) lastReplace.current = replacePhoto;
   const replaceData = replacePhoto ?? lastReplace.current;
+  const lastCaption = useRef(captionPhoto);
+  if (captionPhoto) lastCaption.current = captionPhoto;
+  const captionData = captionPhoto ?? lastCaption.current;
 
   const lightboxKeys = lightbox
     ? photosIn(lightbox.slot).map(p => normalizeKey(fullKey(p)))
@@ -402,9 +420,12 @@ export function ContractPhotoGroups({ contractId, className, hideBanner, hideReq
     ok: !s.is_required,
     locks_with_settlement: s.locks_with_settlement,
   }));
+  const visibleGroups = allGroups
+    .filter(g => !onlySlots || onlySlots.includes(g.slot))
+    .filter(g => !excludeSlots?.includes(g.slot));
   const groups = ungroupedSlot
-    ? allGroups.filter(g => g.slot === ungroupedSlot || photosIn(g.slot).length > 0)
-    : allGroups;
+    ? visibleGroups.filter(g => g.slot === ungroupedSlot || photosIn(g.slot).length > 0)
+    : visibleGroups;
 
   // Whole-tile drag: mouse after a few pixels, touch after a short hold so a
   // swipe still scrolls. Keyboard keeps the tile reachable without a pointer.
@@ -423,13 +444,16 @@ export function ContractPhotoGroups({ contractId, className, hideBanner, hideReq
     locked: lockedGroup(group.slot),
     busy: remove.isPending || moveTo.isPending,
     isDropTarget: dragOverGroup === group.slot,
+    captions,
     moveTargets: groups
       .filter(g => g.slot !== group.slot && !lockedGroup(g.slot) && !isFull(g.count, g.max))
       .map(g => ({ slot: g.slot, label: isThai ? g.label_th : g.label_en })),
     onAdd: () => setAddGroup(group),
+    onCapture: onCaptureGroup ? () => onCaptureGroup(group) : undefined,
     onView: (index: number) => setLightbox({ slot: group.slot, index }),
     onMoveTo: (p: ContractPhoto, slot: string) => moveTo.mutate({ photo: p, slot }),
     onReplace: (p: ContractPhoto) => setReplacePhoto(p),
+    onCaption: captions ? (p: ContractPhoto) => setCaptionPhoto(p) : undefined,
     onRemove: (p: ContractPhoto) => setConfirmRemove(p),
   });
   const pinnedGroup = pinnedSlot ? groups.find(g => g.slot === pinnedSlot) : undefined;
@@ -483,6 +507,7 @@ export function ContractPhotoGroups({ contractId, className, hideBanner, hideReq
         group={addData}
         label={addData ? (isThai ? addData.label_th : addData.label_en) : ''}
         existingCount={addData ? photosIn(addData.slot).length : 0}
+        captions={captions}
         onAdded={() => { setAddGroup(null); refresh(); }}
       />
 
@@ -492,6 +517,13 @@ export function ContractPhotoGroups({ contractId, className, hideBanner, hideReq
         contractId={contractId}
         photo={replaceData}
         onReplaced={() => { setReplacePhoto(null); refresh(); }}
+      />
+
+      <CaptionModal
+        open={captionPhoto != null}
+        onClose={() => setCaptionPhoto(null)}
+        photo={captionData}
+        onSaved={() => { setCaptionPhoto(null); refresh(); }}
       />
 
       <ConfirmDialog
@@ -653,8 +685,8 @@ export function ChecklistSummary({ contractId }: { contractId: number }) {
 interface MoveTarget { slot: string; label: string }
 
 function GroupSection({
-  group, label, photos, locked, busy, isDropTarget, moveTargets, variant = 'grid', hideRequired,
-  onAdd, onView, onMoveTo, onReplace, onRemove,
+  group, label, photos, locked, busy, isDropTarget, moveTargets, variant = 'grid', hideRequired, captions,
+  onAdd, onCapture, onView, onMoveTo, onReplace, onCaption, onRemove,
 }: {
   group: PhotoStatusSlot;
   label: string;
@@ -665,13 +697,16 @@ function GroupSection({
   /** Groups a photo here can move to (not this one, not frozen, not full). */
   moveTargets: MoveTarget[];
   hideRequired?: boolean;
+  captions?: boolean;
   /** `strip` = one row that scrolls sideways, for a pinned band.
    *  `flat` = no box of its own — a row inside the frozen section. */
   variant?: 'grid' | 'strip' | 'flat';
   onAdd: () => void;
+  onCapture?: () => void;
   onView: (index: number) => void;
   onMoveTo: (p: ContractPhoto, slot: string) => void;
   onReplace: (p: ContractPhoto) => void;
+  onCaption?: (p: ContractPhoto) => void;
   onRemove: (p: ContractPhoto) => void;
 }) {
   const { t } = useTranslation();
@@ -680,17 +715,21 @@ function GroupSection({
   // The whole box is a drop target so a photo can land in an empty group.
   const { setNodeRef } = useDroppable({ id: groupDndId(group.slot), disabled: locked });
 
+  // A photo locked on its own (the credit desk approved — mig 1559) is as
+  // frozen as one in a frozen group, but the group still takes new photos.
   const tile = (p: ContractPhoto, i: number) => (
     <PhotoTile
       key={p.entity_media_id}
       photo={p}
-      locked={locked}
+      locked={locked || p.is_locked}
       busy={busy}
       compact
+      caption={captions}
       moveTargets={moveTargets}
       onView={() => onView(i)}
       onMoveTo={(slot) => onMoveTo(p, slot)}
       onReplace={() => onReplace(p)}
+      onCaption={onCaption ? () => onCaption(p) : undefined}
       onRemove={() => onRemove(p)}
     />
   );
@@ -755,7 +794,18 @@ function GroupSection({
             </span>
           )
         ) : (
-          <div className="ml-auto shrink-0 whitespace-nowrap">
+          <div className="ml-auto shrink-0 whitespace-nowrap flex items-center gap-1">
+            {onCapture && (
+              <Button
+                variant="outline"
+                size="sm"
+                startIcon={<QrCode size={14} />}
+                onClick={onCapture}
+                disabled={full}
+              >
+                {t('contractPhotos.captureGroup')}
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -775,7 +825,9 @@ function GroupSection({
           <div className="text-xs text-subtler py-2">{t('contractPhotos.emptyGroup')}</div>
         ) : (
           <div className="flex flex-wrap gap-2">
-            {photos.map((p, i) => <div key={p.entity_media_id} className="w-20 shrink-0">{tile(p, i)}</div>)}
+            {photos.map((p, i) => (
+              <div key={p.entity_media_id} className={captions ? 'w-24 shrink-0' : 'w-20 shrink-0'}>{tile(p, i)}</div>
+            ))}
           </div>
         )}
       </SortableContext>
@@ -785,16 +837,19 @@ function GroupSection({
 
 // ── Photo tile ───────────────────────────────────────────────────────────────
 
-function PhotoTile({ photo, locked, busy, compact, moveTargets, onView, onMoveTo, onReplace, onRemove }: {
+function PhotoTile({ photo, locked, busy, compact, caption, moveTargets, onView, onMoveTo, onReplace, onCaption, onRemove }: {
   photo: ContractPhoto;
   locked: boolean;
   busy: boolean;
   /** Small tile in a pinned strip — smaller handle and menu buttons. */
   compact?: boolean;
+  /** Show the caption under the photo and offer to edit it. */
+  caption?: boolean;
   moveTargets: MoveTarget[];
   onView: () => void;
   onMoveTo: (slot: string) => void;
   onReplace: () => void;
+  onCaption?: () => void;
   onRemove: () => void;
 }) {
   const knob = compact ? 'w-5 h-5' : 'w-6 h-6';
@@ -810,7 +865,7 @@ function PhotoTile({ photo, locked, busy, compact, moveTargets, onView, onMoveTo
   // The whole photo is the drag handle; zoom is the small button. Mouse drags
   // after a few pixels; touch after a short press-and-hold (sensors on the
   // album), so a swipe still scrolls the list and the strip.
-  return (
+  const square = (
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition: transition ?? undefined }}
@@ -826,6 +881,17 @@ function PhotoTile({ photo, locked, busy, compact, moveTargets, onView, onMoveTo
         <img src={url} alt="" draggable={false} className="w-full h-full object-cover pointer-events-none" />
       ) : (
         <div className="w-full h-full flex items-center justify-center text-subtler"><ImageOff size={18} /></div>
+      )}
+
+      {/* Locked on its own (the group is still open): say so on the tile. */}
+      {photo.is_locked && (
+        <span
+          className={`absolute bottom-1 right-1 ${knob} rounded-full bg-black/60 text-white flex items-center justify-center`}
+          title={undefined}
+          aria-label={t('contractPhotos.photoLocked')}
+        >
+          <Lock size={knobIcon} />
+        </span>
       )}
 
       {url && (
@@ -883,6 +949,13 @@ function PhotoTile({ photo, locked, busy, compact, moveTargets, onView, onMoveTo
                   <MenuSeparator />
                 </>
               )}
+              {onCaption && (
+                <MenuItem
+                  icon={<MessageSquareText size={14} />}
+                  label={t('contractPhotos.captionEdit')}
+                  onClick={() => { setMenuOpen(false); onCaption(); }}
+                />
+              )}
               <MenuItem
                 icon={<RefreshCw size={14} />}
                 label={t('contractPhotos.replace')}
@@ -901,6 +974,101 @@ function PhotoTile({ photo, locked, busy, compact, moveTargets, onView, onMoveTo
         </div>
       )}
     </div>
+  );
+
+  if (!caption) return square;
+
+  // The caption sits under the photo. Empty and editable → a dotted prompt
+  // that opens the editor, so the shop sees where the text goes.
+  const canEdit = !locked && !!onCaption;
+  return (
+    <div className="flex flex-col gap-1">
+      {square}
+      {photo.caption ? (
+        <button
+          type="button"
+          onClick={canEdit ? onCaption : undefined}
+          className={`text-[11px] leading-snug text-left bg-transparent border-none p-0 break-words ${
+            canEdit ? 'cursor-pointer hover:underline' : 'cursor-default'
+          }`}
+          title={photo.caption}
+        >
+          <span className="line-clamp-2">{photo.caption}</span>
+        </button>
+      ) : canEdit ? (
+        <button
+          type="button"
+          onClick={onCaption}
+          className="text-[11px] leading-snug text-left text-subtler bg-transparent border border-dashed border-line rounded px-1 py-0.5 cursor-pointer hover:text-fg"
+        >
+          + {t('contractPhotos.caption')}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+// ── Caption modal ────────────────────────────────────────────────────────────
+
+/** One line under the photo for the credit desk (mig 1559). Blank = remove. */
+function CaptionModal({ open, onClose, photo, onSaved }: {
+  open: boolean;
+  onClose: () => void;
+  photo: ContractPhoto | null;
+  onSaved: () => void;
+}) {
+  const { t } = useTranslation();
+  const [text, setText] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (open) { setText(photo?.caption ?? ''); setError(''); }
+    // The photo is fixed for the life of one opening.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const save = useMutation({
+    mutationFn: async () => {
+      if (!photo) return;
+      await apiClient.rpc('fn_media_set_caption', {
+        p_entity_media_id: photo.entity_media_id,
+        p_caption: text.trim() === '' ? null : text.trim(),
+      });
+    },
+    onSuccess: () => onSaved(),
+    onError: (err) => setError(translateErr(err, t)),
+  });
+
+  return (
+    <Modal open={open} onClose={onClose} maxWidth="28rem" width="100%">
+      <div className="modal-header">
+        <h2 className="modal-title">{t('contractPhotos.captionTitle')}</h2>
+        <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+      </div>
+      <div className="modal-content">
+        <div className="form-grid pb-0">
+          <div className="flex flex-col">
+            <label className="form-label">{t('contractPhotos.caption')}</label>
+            <TextArea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder={t('contractPhotos.captionPlaceholder')}
+              rows={3}
+              maxLength={200}
+              autoFocus
+            />
+            <span className="text-xs text-subtle mt-1">{t('contractPhotos.captionHint')}</span>
+          </div>
+        </div>
+      </div>
+      <ModalErrorBand message={error} onDismiss={() => setError('')} />
+      <div className="modal-footer">
+        <Button onClick={onClose} disabled={save.isPending}>{t('common.cancel')}</Button>
+        <Button color="primary" disabled={save.isPending} onClick={() => save.mutate()}>
+          {save.isPending ? t('common.loading') : t('common.save')}
+        </Button>
+      </div>
+    </Modal>
   );
 }
 
@@ -931,22 +1099,25 @@ function PhotoDragGhost({ photo, grab }: { photo: ContractPhoto; grab: { x: numb
 
 // ── Add modal ────────────────────────────────────────────────────────────────
 
-function AddPhotoModal({ open, onClose, contractId, group, label, existingCount, onAdded }: {
+function AddPhotoModal({ open, onClose, contractId, group, label, existingCount, captions, onAdded }: {
   open: boolean;
   onClose: () => void;
   contractId: number;
   group: PhotoStatusSlot | null;
   label: string;
   existingCount: number;
+  /** Offer a caption with the photo (mig 1559) — saved on the same attach. */
+  captions?: boolean;
   onAdded: () => void;
 }) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const [picked, setPicked] = useState<UploadedImage | null>(null);
+  const [caption, setCaption] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (open) { setPicked(null); setError(''); }
+    if (open) { setPicked(null); setCaption(''); setError(''); }
   }, [open]);
 
   const save = useMutation({
@@ -968,7 +1139,7 @@ function AddPhotoModal({ open, onClose, contractId, group, label, existingCount,
         p_usage_type: group.slot,
         // null appends to the end of the group (mig 1252).
         p_sort_order: null,
-        p_caption: null,
+        p_caption: captions && caption.trim() !== '' ? caption.trim() : null,
       });
     },
     onSuccess: () => onAdded(),
@@ -1013,8 +1184,21 @@ function AddPhotoModal({ open, onClose, contractId, group, label, existingCount,
             disabled={save.isPending}
           />
         )}
+        {captions && (
+          <div className="flex flex-col mt-3">
+            <label className="form-label">{t('contractPhotos.caption')}</label>
+            <TextArea
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              placeholder={t('contractPhotos.captionPlaceholder')}
+              rows={2}
+              maxLength={200}
+            />
+            <span className="text-xs text-subtle mt-1">{t('contractPhotos.captionHint')}</span>
+          </div>
+        )}
       </div>
-      {error && <div className="alert alert-danger mx-4 mb-2"><XCircle size={16} /><span>{error}</span></div>}
+      <ModalErrorBand message={error} onDismiss={() => setError('')} />
       <div className="modal-footer">
         <Button onClick={onClose} disabled={save.isPending}>{t('common.cancel')}</Button>
         <Button color="primary" disabled={!picked || save.isPending} onClick={() => save.mutate()}>
@@ -1092,7 +1276,7 @@ function ReplacePhotoModal({ open, onClose, contractId, photo, onReplaced }: {
           />
         )}
       </div>
-      {error && <div className="alert alert-danger mx-4 mb-2"><XCircle size={16} /><span>{error}</span></div>}
+      <ModalErrorBand message={error} onDismiss={() => setError('')} />
       <div className="modal-footer">
         <Button onClick={onClose} disabled={save.isPending}>{t('common.cancel')}</Button>
         <Button color="primary" disabled={!picked || save.isPending} onClick={() => save.mutate()}>

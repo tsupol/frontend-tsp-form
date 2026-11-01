@@ -25,6 +25,7 @@ import { fmtCurrency, formatDateTime } from '../../lib/format';
 import { getStateColor, getStateLabel, productName, formatInstallment } from './contractUtils';
 import { ContractActionButtons } from './ContractActions';
 import { PartnerCaseCard } from '../partner-cases/PartnerCaseCard';
+import { CreditSupportPhotosCard } from '../partner-cases/CreditSupportPhotosCard';
 import { useContractPartnerCases, usePartnerCaseLive } from '../partner-cases/usePartnerCases';
 import { ContractCapitalStrip } from './ContractCapitalStrip';
 import { SettlementCard } from '../partner-settlement/SettlementCard';
@@ -930,6 +931,12 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
       {isDealPartner && signingReminder}
       {/* Deal-partner FIN1 credit request — renders nothing for every other
           shop/contract, and drops away once the contract goes active. */}
+      <CreditSupportPhotosCard
+        contractId={contract.id}
+        contractCode={contract.code_display ?? contract.code}
+        commercialModel={contract.commercial_model}
+        contractState={contract.state}
+      />
       <PartnerCaseCard
         contractId={contract.id}
         contractCode={contract.code_display ?? contract.code}
