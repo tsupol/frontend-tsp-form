@@ -405,7 +405,7 @@ export function RegisterAssetModal({
                             {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
                           </span>
                         : undefined}
-                      className="w-full search-min-hint"
+                      className={`w-full search-min-hint${isBelowSearchMin(keyword) ? ' search-min-hint-on' : ''}`}
                     />
                     <div className="mt-2 max-h-44 overflow-auto better-scroll rounded-md border border-line divide-y divide-line">
                       {isFetching && models.length === 0 ? (

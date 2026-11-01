@@ -77,12 +77,15 @@
     /* Search boxes that show the "at least N characters" hint inside the field
        (right-aligned) instead of on a line below, so the list underneath never
        shifts as the user types. The end slot's default padding is sized for an
-       icon, which clips a short string. */
-    .search-min-hint .form-control.input-has-end-icon,
-    .search-min-hint input.form-control.input-has-end-icon,
-    .search-min-hint.form-control-sm .form-control.input-has-end-icon,
-    .search-min-hint.form-control-sm input.form-control.input-has-end-icon,
-    .search-min-hint .form-control.form-control-sm.input-has-end-icon {
+       icon, which clips a short string — so widen it, but ONLY while the hint is
+       on screen (`search-min-hint-on`, set by SearchInput). Reserving it always
+       left a narrow box ~50px for its text and cut both placeholder and typed
+       value mid-word ("ค้นหารหัส", "3508142") behind an icon-sized end slot. */
+    .search-min-hint-on .form-control.input-has-end-icon,
+    .search-min-hint-on input.form-control.input-has-end-icon,
+    .search-min-hint-on.form-control-sm .form-control.input-has-end-icon,
+    .search-min-hint-on.form-control-sm input.form-control.input-has-end-icon,
+    .search-min-hint-on .form-control.form-control-sm.input-has-end-icon {
         padding-right: 7.5rem;
     }
 

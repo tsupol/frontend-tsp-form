@@ -309,7 +309,7 @@ export function BarcodesPage() {
                 onEndIconClick={isBelowSearchMinLoose(searchInput)
                   ? undefined
                   : searchInput ? clearSearch : undefined}
-                className="w-full search-min-hint"
+                className={`w-full search-min-hint${isBelowSearchMinLoose(searchInput) ? ' search-min-hint-on' : ''}`}
                 autoFocus={!isMobile}
               />
               <div className="input-group-divider" />
@@ -693,7 +693,7 @@ function RegisterBarcodeModal({ open, onClose, initialBarcode, onSuccess }: Regi
                     {t('common.searchMinCharsShort', { n: SEARCH_MIN_CHARS })}
                   </span>
                 : undefined}
-              className="w-full search-min-hint"
+              className={`w-full search-min-hint${isBelowSearchMin(modelQuery) ? ' search-min-hint-on' : ''}`}
             />
             <div className="mt-3 h-60 overflow-auto better-scroll border border-line rounded-md">
               {modelsFetching && models.length === 0 && (

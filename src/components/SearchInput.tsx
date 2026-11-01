@@ -1,7 +1,8 @@
 import { forwardRef, useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Input } from 'tsp-form';
-import { Search } from 'lucide-react';
+import { Search, ScanBarcode } from 'lucide-react';
+import { useBarcodeScanner } from './BarcodeScanner';
 import { isSearchableLoose, isBelowSearchMinLoose, searchMinFor } from '../lib/searchKeyword';
 
 /**
@@ -35,6 +36,10 @@ export const SearchInput = forwardRef<HTMLInputElement, {
   endIcon?: ReactNode;
   /** Only fires while the caller's endIcon is the one on screen, not the hint. */
   onEndIconClick?: () => void;
+  /** Camera barcode scan button at the end of the box. A scan fills the box and
+   *  searches at once (no debounce). A caller's own `endIcon` takes the slot
+   *  while it is set — e.g. a clear × once something is typed. */
+  scan?: boolean;
   /** Almost never needed — the default (2) is right for every list in the app
    *  but Customers, which passes SEARCH_MIN_CHARS_NAME_TABLE because 17k rows
    *  of names drown a 2-char stem. Measure before raising a screen above 2. */
@@ -53,6 +58,7 @@ export const SearchInput = forwardRef<HTMLInputElement, {
   startIcon,
   endIcon,
   onEndIconClick,
+  scan = false,
   minChars,
   className = '',
   disabled,
@@ -60,6 +66,17 @@ export const SearchInput = forwardRef<HTMLInputElement, {
   'aria-label': ariaLabel,
 }, ref) {
   const { t } = useTranslation();
+  const { open: openScanner, scannerEl } = useBarcodeScanner({
+    onScan: (v) => {
+      onChange(v);
+      onDebouncedChange(isSearchableLoose(v, minChars) ? v.trim() : '');
+    },
+  });
+  const showScan = scan && endIcon == null;
+  const ownEndIcon = showScan
+    ? <ScanBarcode size={16} aria-label={t('barcodeScanner.title', { defaultValue: 'Scan barcode' })} />
+    : endIcon;
+  const ownEndIconClick = showScan ? openScanner : onEndIconClick;
 
   useEffect(() => {
     const next = isSearchableLoose(value, minChars) ? value.trim() : '';
@@ -71,6 +88,7 @@ export const SearchInput = forwardRef<HTMLInputElement, {
   }, [value, delay, minChars]);
 
   return (
+    <>
     <Input
       // Forwarded so a host can put the cursor back in the box — e.g. after
       // the barcode-scanner modal closes, or on "reset selection".
@@ -96,11 +114,13 @@ export const SearchInput = forwardRef<HTMLInputElement, {
         ? <span className="text-[11px] whitespace-nowrap">
             {t('common.searchMinCharsShort', { n: searchMinFor(value, minChars) })}
           </span>
-        : endIcon}
+        : ownEndIcon}
       // Paired with the icon above: the hint is text, not a button, so the
       // caller's handler must not be live while the hint is what's showing.
-      onEndIconClick={isBelowSearchMinLoose(value, minChars) ? undefined : onEndIconClick}
-      className={`search-min-hint ${className}`.trim()}
+      onEndIconClick={isBelowSearchMinLoose(value, minChars) ? undefined : ownEndIconClick}
+      className={`search-min-hint ${isBelowSearchMinLoose(value, minChars) ? 'search-min-hint-on ' : ''}${className}`.trim()}
     />
+    {scan && scannerEl}
+    </>
   );
 });
