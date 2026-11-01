@@ -183,6 +183,12 @@ interface PlanByMonthly {
  *  finance-rates chips use — a subset of what the slider can reach. */
 const UPLIFT_STEP = 500;
 
+/** Tap-to-pick down percents under the slider (owner 2026-11-01: "10, 15 … 50").
+ *  Every 5% from the branch's minimum up to this ceiling; the slider still
+ *  reaches the 1% steps and the branch maximum above it. */
+const DOWN_CHIP_STEP = 5;
+const DOWN_CHIP_MAX = 50;
+
 /** Which condition the customer is being quoted on. */
 type Condition = 'new' | 'used';
 
@@ -374,6 +380,15 @@ export function Fin1CalculatorPage() {
   const row = useMemo(
     () => table?.rows.find(r => r.down_percent === downPct) ?? null,
     [table, downPct],
+  );
+
+  // Chip percents come from the rows the server actually priced, so a chip can
+  // never point at a down the branch's policy doesn't allow.
+  const downChips = useMemo(
+    () => (table?.rows ?? [])
+      .map(r => r.down_percent)
+      .filter(p => p % DOWN_CHIP_STEP === 0 && p <= DOWN_CHIP_MAX),
+    [table],
   );
   const cell = useMemo(
     () => row?.cells.find(c => c.term_months === termMonths) ?? null,
@@ -1001,14 +1016,34 @@ export function Fin1CalculatorPage() {
                                   />
                                 </div>
                               ) : downPct != null && row ? (
-                                <Slider
-                                  value={downPct}
-                                  onChange={(v) => setDownPct(Math.round(v))}
-                                  min={table.policy.min_down_percent}
-                                  max={table.policy.max_down_percent}
-                                  step={1}
-                                  showMinMax
-                                />
+                                <>
+                                  <Slider
+                                    value={downPct}
+                                    onChange={(v) => setDownPct(Math.round(v))}
+                                    min={table.policy.min_down_percent}
+                                    max={table.policy.max_down_percent}
+                                    step={1}
+                                    showMinMax
+                                  />
+                                  {/* Tap-to-pick shortcuts every 5% — the same
+                                      chips as the finance-rates uplift row. */}
+                                  {downChips.length > 0 && (
+                                    <div className="flex flex-wrap items-center gap-1 mt-1">
+                                      {downChips.map(p => (
+                                        <Button
+                                          key={p}
+                                          size="sm"
+                                          variant={p === downPct ? 'solid' : 'outline'}
+                                          color={p === downPct ? 'primary' : 'default'}
+                                          className="tabular-nums"
+                                          onClick={() => setDownPct(p)}
+                                        >
+                                          {p}%
+                                        </Button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </>
                               ) : null}
 
                               {amountMode && downBounds?.min_down_amount != null && downBounds.max_down_amount != null && (
