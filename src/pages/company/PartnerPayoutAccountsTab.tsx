@@ -17,6 +17,10 @@
 // Reads: v_deal_partner_branch_configs (the DB nulls the number/name for a
 // viewer without CONFIG.DEAL_PARTNER_RATE / PARTNER.PAYOUT_APPROVE, so
 // `has_payout_account` is the only honest "set / not set").
+// The number as shown comes from v_fund_shop_payout_accounts' main row
+// (`account_number_display`, dashed for banks) — the config view only carries
+// the raw digits, and the screen never formats an account number itself. Same
+// permission gate as the config view's details; no row → raw digits.
 // Writes: fn_deal_partner_branch_config_set with the three p_payout_* params
 // only (every other param left out = keep), or p_clear_payout_account: true.
 
@@ -34,6 +38,7 @@ import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { ActionDoneView } from '../contracts/ActionDoneView';
 import { BankLogo } from '../../components/BankLogo';
 import { BankAccountInline } from '../../components/BankAccountLine';
+import { SHOP_PAYOUT_ACCOUNTS_KEY } from '../../components/ShopPayoutDestField';
 import {
   useRefBanks, validatePayoutAccount, payoutAccountDigits, EMPTY_PAYOUT_VALUE,
   type DealPartnerPayoutValue, type RefBank,
@@ -61,6 +66,19 @@ function usePartnerPayoutRows() {
     queryFn: () => apiClient.get<PartnerPayoutRow[]>(
       '/v_deal_partner_branch_configs?is_active=eq.true&select=branch_id,branch_name,company_id,company_name,payout_bank_code,payout_bank_name,payout_account_no,payout_account_name,has_payout_account,updated_at&order=branch_name',
     ),
+  });
+}
+
+/** branch_id → the DB-formatted main payout number (see the file header). */
+function useMainPayoutDisplay() {
+  return useQuery({
+    queryKey: [...SHOP_PAYOUT_ACCOUNTS_KEY, 'main-display'],
+    queryFn: async () => {
+      const rows = await apiClient.get<{ branch_id: number; account_number_display: string | null }[]>(
+        '/v_fund_shop_payout_accounts?is_main=is.true&select=branch_id,account_number_display',
+      );
+      return new Map(rows.map(r => [r.branch_id, r.account_number_display]));
+    },
   });
 }
 
@@ -151,6 +169,7 @@ function PartnerPayoutAccountModal({ open, row, onClose, onHistory }: {
   const afterWrite = () => {
     // The terms page and this tab read the same view under one key prefix.
     queryClient.invalidateQueries({ queryKey: ['deal-partner-branch-configs'] });
+    queryClient.invalidateQueries({ queryKey: SHOP_PAYOUT_ACCOUNTS_KEY });
   };
 
   const save = async () => {
@@ -339,6 +358,7 @@ function PartnerPayoutAccountModal({ open, row, onClose, onHistory }: {
 export function PartnerPayoutAccountsTab({ showCompany }: { showCompany: boolean }) {
   const { t } = useTranslation();
   const { data: rows = [], isLoading, isFetching } = usePartnerPayoutRows();
+  const { data: mainDisplay } = useMainPayoutDisplay();
   const [editId, setEditId] = useState<number | null>(null);
   // Resolved from the live rows so the window shows what was just saved.
   const editRow = useMemo(() => rows.find(r => r.branch_id === editId) ?? null, [rows, editId]);
@@ -358,7 +378,11 @@ export function PartnerPayoutAccountsTab({ showCompany }: { showCompany: boolean
     }
     return (
       <BankAccountInline
-        account={{ bank_code: r.payout_bank_code, bank_name: r.payout_bank_name, account_number: r.payout_account_no }}
+        account={{
+          bank_code: r.payout_bank_code,
+          bank_name: r.payout_bank_name,
+          account_number: mainDisplay?.get(r.branch_id) ?? r.payout_account_no,
+        }}
         size={20}
       />
     );
