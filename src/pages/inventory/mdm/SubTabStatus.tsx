@@ -5,6 +5,15 @@
 // timestamp as absolute + relative (§3.2, RelativeDateTime). Then the
 // profiles/apps accordion (§3.4) which is the render target for the pull
 // commands. Then the shared queue (§4).
+//
+// The "อนุญาตเฉพาะเครื่องนี้" panel (VPN for work, app removal, …) lives here,
+// not in ควบคุมแอป (IMPLEMENT 2026-11-01 mdm_allowance_panel_reachable_all_managers):
+// this is the only sub-tab past enrolment that every side sees when in_mdm —
+// deal-partner shops included, whose status view carries no may_* flags. The
+// panel gates itself on can('MDM.APP_CONTROL') and calls only
+// fn_mdm_device_allowance_status/_set, both granted to nnf_partner. Anything
+// added to this tab must use endpoints granted to nnf_partner too, or the shop
+// sees an error here.
 // ============================================================================
 
 import { useTranslation } from 'react-i18next';
@@ -20,13 +29,17 @@ import { RecentIntentsPanel } from './RecentIntentsPanel';
 import { MdmStoryBox } from './MdmStoryBox';
 import { useMdmStory } from './useMdmStory';
 import { DeviceProfilesApps } from './DeviceProfilesApps';
+import { MdmDeviceAllowancePanel } from './MdmDeviceAllowancePanel';
 
 export function SubTabStatus({
   status,
   onNotEnrolled,
+  onChanged,
 }: {
   status: AssetMdmStatus;
   onNotEnrolled: () => void;
+  /** Re-read the MDM status — an allowance changes the device's profile. */
+  onChanged: () => void;
 }) {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -111,6 +124,9 @@ export function SubTabStatus({
           )}
         </dl>
       </div>
+
+      {/* Per-device permanent allowances — shop managers grant VPN (งาน) here. */}
+      <MdmDeviceAllowancePanel serial={status.serial_number} onChanged={onChanged} />
 
       {/* Profiles & apps — the render target for the pull commands (§3.4). */}
       <DeviceProfilesApps assetId={status.asset_id} actorId={actorId} onNotEnrolled={onNotEnrolled} />

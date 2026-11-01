@@ -1521,7 +1521,7 @@
         "grantTitle": "Allow permanently",
         "revokeTitle": "Withdraw permission",
         "grantBody": "This stays on until someone withdraws it. The system sends it to the device within about a minute once the device is online. If the customer falls behind on payments far enough for a medium or hard restriction, it is switched off until they catch up.",
-        "grantBodyNotTimed": "It does not run out like the timed option above.",
+        "grantBodyNotTimed": "Does not expire on its own, unlike \"let the customer remove apps\" in the App control tab, which is timed.",
         "askCompanyAdmin": "A branch manager or company admin turns these on or off — tell them, with the customer’s reason.",
         "revokeBody": "The device goes back to normal. The system sends this to the device within about a minute once the device is online.",
         "reasonPlaceholder": "e.g. the branch says the customer asked for it",

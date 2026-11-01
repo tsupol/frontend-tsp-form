@@ -42,7 +42,6 @@ import { useMdmCommand } from './useMdmCommand';
 import { MdmErrorAlert, CommandAckNote, AppIcon } from './MdmSharedBits';
 import { RelativeDateTime } from './RelativeDateTime';
 import { MdmAppGatePanel } from './MdmAppGatePanel';
-import { MdmDeviceAllowancePanel } from './MdmDeviceAllowancePanel';
 import { MdmDeviceAppsSection } from './MdmDeviceAppsSection';
 
 export function SubTabAppControl({
@@ -100,9 +99,11 @@ export function SubTabAppControl({
       {/* Live state first — see the file header on why this is at the top. */}
       <MdmAppGatePanel serial={status.serial_number} onChanged={onChanged} />
 
-      {/* Its permanent sibling — "for 30 minutes" vs "for good", side by side
-          (IMPLEMENT 2026-10-06 app_removal_min_paid_installments §0.2). */}
-      <MdmDeviceAllowancePanel serial={status.serial_number} onChanged={onChanged} />
+      {/* The permanent allowances ("อนุญาตเฉพาะเครื่องนี้") used to sit here.
+          They moved to สถานะ & คิวงาน (IMPLEMENT 2026-11-01
+          mdm_allowance_panel_reachable_all_managers): deal-partner shops never
+          get this tab (their status view has no may_app_control), so shop
+          managers could not reach the VPN switch. */}
 
       {/* What's actually on the device, with the per-app remove button. */}
       <MdmDeviceAppsSection

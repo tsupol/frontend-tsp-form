@@ -152,7 +152,7 @@ export function AssetMdmTab({ assetId, onRefresh, onAddSerial }: {
         )}
 
         {effectiveActive === 'status' && (
-          <SubTabStatus status={status} onNotEnrolled={goToEnroll} />
+          <SubTabStatus status={status} onNotEnrolled={goToEnroll} onChanged={() => refetch()} />
         )}
 
         {effectiveActive === 'dunning' && (

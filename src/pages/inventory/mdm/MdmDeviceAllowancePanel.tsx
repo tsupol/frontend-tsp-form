@@ -6,10 +6,12 @@
 // app removal (VPN, Find My, iCloud menu), so its title and grant wording are
 // generic; the "unlike the timed option above" sentence is app removal's only.
 //
-// Placement (§0.2, owner 2026-10-07): sub-tab 5, directly under the temporary
-// "ให้ลูกค้าลบแอปเอง" panel. Same subject, different lifetime — seeing both lets
-// staff pick "for 30 minutes" vs "for good". ⛔ Never sub-tab 7 (that corner is
-// destructive/legal).
+// Placement: sub-tab 2 สถานะ & คิวงาน (IMPLEMENT 2026-11-01
+// mdm_allowance_panel_reachable_all_managers). It sat in sub-tab 5 under the
+// temporary "ให้ลูกค้าลบแอปเอง" panel (owner 2026-10-07), but deal-partner shops
+// never get sub-tab 5, so shop managers could not reach VPN (งาน). ⛔ Don't fix
+// that by opening sub-tab 5 to shops: its gate/app-list/whitelist endpoints are
+// not granted to nnf_partner. ⛔ Never sub-tab 7 (destructive/legal corner).
 //
 // Everything renders from fn_mdm_device_allowance_status:
 //   • one block per allowance row the RPC returns — no code is hard-coded;
@@ -68,8 +70,8 @@ export function MdmDeviceAllowancePanel({
   onChanged: () => void;
 }) {
   const { can } = useAuth();
-  // Read is MDM.APP_CONTROL, same as the temporary panel above. Split so the
-  // early return doesn't sit above hooks.
+  // Read is MDM.APP_CONTROL (kept from its sub-tab-5 days). Split so the early
+  // return doesn't sit above hooks.
   if (!can('MDM.APP_CONTROL') || !serial) return null;
   return <AllowancePanelBody serial={serial} onChanged={onChanged} />;
 }
