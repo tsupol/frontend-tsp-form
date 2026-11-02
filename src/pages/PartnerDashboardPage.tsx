@@ -107,11 +107,13 @@ export function PartnerDashboardPage() {
   // Credit requests the shop still has to act on. The request's own status is
   // not enough: an APPROVED request whose contract already went active (outcome
   // USED) is finished, and a RETURNED one that was resubmitted is history
-  // (is_latest false) — the view derives both, so the filter reads those.
+  // (is_latest false) — the view derives both, so the filter reads those. A
+  // request on a contract that has since expired or gone active is also finished:
+  // same open-contract filter as the shop's returned list and its badge (mig 1550).
   const casesQuery = useQuery({
     queryKey: ['partner-dashboard', 'cases-to-act'],
     queryFn: () => apiClient.get<PartnerCase[]>(
-      '/v_partner_my_cases?is_latest=eq.true&outcome=in.(IN_FORCE,RETURNED)&order=updated_at.desc',
+      '/v_partner_my_cases?is_latest=eq.true&outcome=in.(IN_FORCE,RETURNED)&contract_activated_at=is.null&contract_state=in.(DRAFT,PENDING_APPROVAL,APPROVED,PENDING_PAYMENT_AND_SIGN,PENDING_SIGN,PENDING_PAYMENT)&order=updated_at.desc',
     ),
     staleTime: 60_000,
     retry: false,

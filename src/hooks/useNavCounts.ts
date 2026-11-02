@@ -18,6 +18,11 @@ import { defaultScopeFor, scopeCounterParams, scopeCountersChannel, scopeKey } f
 // here; ask BE to add a key to the RPC.
 // See UI_FEEDBACK/2026-08-11_DELIVERY_counters_rpc_confirmed_filters.md.
 //
+// A shop session gets only the 8 keys its screens read (mig 1588). Any other key,
+// `chat_unread` for one, reads as a silent 0 here. Before giving a shop a new
+// menu or badge from this RPC, ask BE to add the key to the shop's set.
+// See UI_FEEDBACK/2026-11-02_NOTICE_partner_counters_own_keys_1588.md.
+//
 // The one exception is the unassigned badge — BE removed the `unassigned` key in
 // mig 1111 because it cost half the RPC's runtime to serve a number the main
 // dashboard never shows. It now comes from its own count query below, which mig
