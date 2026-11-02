@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Button, Modal, RadioGroup } from 'tsp-form';
+import { Button, Modal } from 'tsp-form';
 import { AlertTriangle } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
 import { blockingReasonText, translateApiError } from '../../../lib/apiErrors';
-import { CONDITION_VALUES, getConditionLabel } from '../../inventory/inventoryUtils';
+import { getConditionLabel } from '../../inventory/inventoryUtils';
+import { ConditionGradeButtons } from '../../inventory/ConditionGradeButtons';
 import { ActionDoneView } from '../ActionDoneView';
 import { ModalErrorBand } from '../../../components/ModalErrorBand';
 
@@ -84,12 +85,6 @@ export function DeviceGradeCheckModal({ open, device, onClose, onGradeChanged, o
   });
   const revalue = actions?.actions.find(a => a.action_code === 'ASSET_REVALUE');
 
-  // Real grades only: 'USED' is a filter value, not a grade a device can have.
-  const gradeOptions = useMemo(
-    () => CONDITION_VALUES.filter(v => v !== 'USED').map(v => ({ value: v, label: getConditionLabel(v, t) })),
-    [t],
-  );
-
   const mismatch = view === 'form' && answer !== '' && answer !== registered;
 
   const mutation = useMutation({
@@ -154,12 +149,10 @@ export function DeviceGradeCheckModal({ open, device, onClose, onGradeChanged, o
 
               <div className="flex flex-col gap-2">
                 <div className="form-label">{t('gradeCheck.question')}</div>
-                <RadioGroup
-                  name="device-grade-check"
+                <ConditionGradeButtons
+                  label={t('gradeCheck.question')}
                   value={answer}
-                  onChange={(v) => { setAnswer(v as string); setError(null); }}
-                  className="flex flex-col gap-2"
-                  options={gradeOptions}
+                  onChange={(grade) => { setAnswer(grade); setError(null); }}
                 />
               </div>
 

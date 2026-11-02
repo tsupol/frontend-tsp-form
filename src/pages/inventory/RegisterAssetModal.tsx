@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, keepPreviousData } from '@tanstack/react-query';
-import { Modal, Button, Input, Select, MaskedInput, LabeledCheckbox, InputDatePicker, FormErrorMessage, RadioGroup } from 'tsp-form';
+import { Modal, Button, Input, Select, MaskedInput, LabeledCheckbox, InputDatePicker, FormErrorMessage } from 'tsp-form';
 import { XCircle, Search, Package, Keyboard, ExternalLink, AlertTriangle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { makeDatePickerFormat, toLocalDateStr, fmtCurrency } from '../../lib/format';
@@ -13,7 +13,8 @@ import { AssetEvidenceTab } from './AssetEvidenceTab';
 import { ColorSwatch } from '../../components/ColorAutocomplete';
 import { SerialInput } from '../../components/SerialInput';
 import { identifierFormatReason, isAppleBrand } from '../../lib/validators';
-import { getConditionLabel, getBucketLabel, CONDITION_VALUES } from './inventoryUtils';
+import { getBucketLabel } from './inventoryUtils';
+import { ConditionGradeButtons } from './ConditionGradeButtons';
 import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 
 // Direct device intake — fn_inv_asset_register. The device lands straight in
@@ -201,12 +202,6 @@ export function RegisterAssetModal({
     if (!activeVariants.some(v => v.variant_id === variantId)) setVariantId(activeVariants[0].variant_id);
   }, [activeVariants, variantId]);
 
-  // Real grades only — 'USED' in CONDITION_VALUES is a filter meta-value, not a
-  // registrable grade.
-  const conditionOptions = useMemo(
-    () => CONDITION_VALUES.filter(v => v !== 'USED').map(v => ({ value: v, label: getConditionLabel(v, t) })),
-    [t],
-  );
 
   const buildIdentifiers = () => {
     const ids: { type: string; value: string }[] = [];
@@ -477,12 +472,10 @@ export function RegisterAssetModal({
                   {/* Condition: every option on show, none preselected. */}
                   <div className="flex flex-col">
                     <label className="form-label">{t('asset.registerCondition', { defaultValue: 'Condition' })} *</label>
-                    <RadioGroup
-                      name="register-condition"
+                    <ConditionGradeButtons
+                      label={t('asset.registerCondition', { defaultValue: 'Condition' })}
                       value={condition}
-                      onChange={(v) => setCondition(v as string)}
-                      className="flex flex-wrap gap-x-5 gap-y-2"
-                      options={conditionOptions}
+                      onChange={setCondition}
                     />
                   </div>
 
