@@ -9741,8 +9741,7 @@
     "hasBox": "มีกล่อง",
     "noBox": "ไม่มีกล่อง",
     "doneHeadline": "แก้เกรดเครื่องแล้ว",
-    "continueFin1": "ไปตั้งแผน FIN1",
-    "continuePlan": "เลือกแผนใหม่"
+    "continueFin1": "ไปตั้งแผน FIN1"
   },
   "wizard": {
     "barcodeNotFound": "ไม่พบบาร์โค้ด {{barcode}} ในระบบ",

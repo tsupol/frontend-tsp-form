@@ -48,8 +48,6 @@ interface Props {
   open: boolean;
   /** Stays set after closing, so the body doesn't blank during the fade-out. */
   device: GradeCheckDevice | null;
-  /** Label of the done step's button: what happens next differs per caller. */
-  continueLabel: string;
   onClose: () => void;
   /** The grade was saved. Runs at save time, even if the window is then closed with ×. */
   onGradeChanged: (grade: string) => void;
@@ -57,7 +55,7 @@ interface Props {
   onContinue: () => void;
 }
 
-export function DeviceGradeCheckModal({ open, device, continueLabel, onClose, onGradeChanged, onContinue }: Props) {
+export function DeviceGradeCheckModal({ open, device, onClose, onGradeChanged, onContinue }: Props) {
   const { t } = useTranslation();
   const [answer, setAnswer] = useState('');
   const [view, setView] = useState<'form' | 'done'>('form');
@@ -139,7 +137,7 @@ export function DeviceGradeCheckModal({ open, device, continueLabel, onClose, on
               to: getConditionLabel(saved.to, t),
               toColor: 'success',
             }}
-            doneLabel={continueLabel}
+            doneLabel={t('gradeCheck.continueFin1')}
             onClose={onContinue}
           />
         ) : (

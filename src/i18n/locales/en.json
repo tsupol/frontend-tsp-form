@@ -9753,8 +9753,7 @@
     "hasBox": "Has box",
     "noBox": "No box",
     "doneHeadline": "Device grade changed",
-    "continueFin1": "Go to the FIN1 plan",
-    "continuePlan": "Choose a plan again"
+    "continueFin1": "Go to the FIN1 plan"
   },
   "wizard": {
     "barcodeNotFound": "Barcode {{barcode}} not registered",
