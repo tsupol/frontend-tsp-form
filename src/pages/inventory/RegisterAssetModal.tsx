@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Modal, Button, Input, Select, MaskedInput, LabeledCheckbox, InputDatePicker, FormErrorMessage } from 'tsp-form';
 import { XCircle, Search, Package, Keyboard, ExternalLink, AlertTriangle } from 'lucide-react';
@@ -83,6 +84,7 @@ export function RegisterAssetModal({
   onRegistered: () => void;
 }) {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
 
   const [view, setView] = useState<'form' | 'done'>('form');
   const [result, setResult] = useState<RegisterResult | null>(null);
@@ -342,7 +344,12 @@ export function RegisterAssetModal({
           secondaryAction={{
             label: t('asset.registerViewAsset', { defaultValue: 'Open asset' }),
             to: `/admin/inventory/assets/${result.asset_id}`,
-            onClick: onClose,
+            // Same shape as LotsPage: `to` only serves ctrl/middle-click, the
+            // handler must navigate itself — `onClick: onClose` is a second Done.
+            onClick: () => {
+              onClose();
+              navigate(`/admin/inventory/assets/${result.asset_id}`);
+            },
             endIcon: <ExternalLink size={14} />,
           }}
           onClose={onClose}
