@@ -23,6 +23,10 @@
 // permission gate as the config view's details; no row → raw digits.
 // Writes: fn_deal_partner_branch_config_set with the three p_payout_* params
 // only (every other param left out = keep), or p_clear_payout_account: true.
+//
+// Every row carries visible buttons, because a click on the row alone could not
+// be found (IMPLEMENT 2026-11-02 partner_payout_tab_row_actions). Clicking the
+// row opens the first thing the user may do: the account window, else history.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -30,6 +34,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, DataTable, DataTableColumnHeader, Input, Modal, Select, type ColumnDef } from 'tsp-form';
 import { History, Landmark, Trash2, Undo2 } from 'lucide-react';
 import { useMyPermissions } from '../../hooks/useMyPermissions';
+import { useAuth } from '../../contexts/AuthContext';
 import { PartnerPayoutHistoryModal } from './PartnerPayoutHistoryModal';
 import { FundPaymentSetDestModal, type FundPaymentDestTarget } from '../fund-cash/FundPaymentSetDestModal';
 import { apiClient } from '../../lib/api';
@@ -140,10 +145,6 @@ function PartnerPayoutAccountModal({ open, row, onClose, onHistory }: {
     || value.account_name !== seed.account_name;
   const problem = validatePayoutAccount(value, banks);
   const complete = value.bank_code !== '' && payoutAccountDigits(value.account_no) !== '' && value.account_name.trim() !== '';
-  // Stored but hidden from this viewer: the fields come up empty although the
-  // shop has an account. Saving then overwrites it, which is what an admin who
-  // opens the window means; the hint says so.
-  const hidden = !!row?.has_payout_account && seed.bank_code === '' && seed.account_no === '' && seed.account_name === '';
 
   const bankLabel = (b: RefBank) => (i18n.language === 'en' && b.name_en) || b.name_th;
   const bankOptions = useMemo(
@@ -263,9 +264,6 @@ function PartnerPayoutAccountModal({ open, row, onClose, onHistory }: {
                 <div className="font-medium text-sm">{shown?.branch_name}</div>
                 <div className="text-xs text-subtle">{t('partnerPayout.targetHint')}</div>
               </div>
-              {hidden && (
-                <div className="alert alert-info mb-4"><span>{t('partnerPayout.hiddenHint')}</span></div>
-              )}
               <div className="form-grid">
                 <div className="flex flex-col">
                   <label className="form-label">{t('dealPartnerRate.payoutBank')}</label>
@@ -368,7 +366,34 @@ export function PartnerPayoutAccountsTab({ showCompany }: { showCompany: boolean
   const historyRow = useMemo(() => rows.find(r => r.branch_id === historyId) ?? null, [rows, historyId]);
   const [fixDest, setFixDest] = useState<FundPaymentDestTarget | null>(null);
   const { hasPermission } = useMyPermissions();
+  const { isReadOnlyViewer } = useAuth();
   const canFixDest = hasPermission('FUND.PAYMENT_ACCOUNT_FIX');
+  // hasPermission lets a read-only viewer keep DEAL_PARTNER_RATE, because that
+  // permission also opens the view's columns; such a user cannot save.
+  const canEdit = hasPermission('CONFIG.DEAL_PARTNER_RATE') && !isReadOnlyViewer;
+  // Same rule the config view uses to show the account number.
+  const canHistory = hasPermission('CONFIG.DEAL_PARTNER_RATE') || hasPermission('PARTNER.PAYOUT_APPROVE');
+  const rowOpens = canEdit || canHistory;
+  const openRow = (r: PartnerPayoutRow) => {
+    if (canEdit) setEditId(r.branch_id);
+    else if (canHistory) setHistoryId(r.branch_id);
+  };
+
+  // Stops at the buttons so the row's own click does not fire as well.
+  const rowActions = (r: PartnerPayoutRow, className = 'flex items-center justify-end gap-2 shrink-0') => (
+    <div className={className} onClick={e => e.stopPropagation()}>
+      {canEdit && (
+        <Button variant="outline" size="sm" onClick={() => setEditId(r.branch_id)}>
+          {r.has_payout_account ? t('common.edit') : t('partnerPayout.setAction')}
+        </Button>
+      )}
+      {canHistory && (
+        <Button variant="outline" size="sm" onClick={() => setHistoryId(r.branch_id)}>
+          {t('partnerPayout.historyAction')}
+        </Button>
+      )}
+    </div>
+  );
 
   const accountCell = (r: PartnerPayoutRow) => {
     if (!r.has_payout_account) return <span className="text-subtler">—</span>;
@@ -420,6 +445,13 @@ export function PartnerPayoutAccountsTab({ showCompany }: { showCompany: boolean
       enableSorting: false,
       cell: ({ row }) => <PayoutStatusBadge row={row.original} />,
     },
+    ...(rowOpens ? [{
+      id: 'actions',
+      header: () => null,
+      cell: ({ row }) => rowActions(row.original),
+      enableSorting: false,
+      className: 'w-px whitespace-nowrap',
+    } as ColumnDef<PartnerPayoutRow>] : []),
   ];
 
   const empty = (
@@ -432,7 +464,7 @@ export function PartnerPayoutAccountsTab({ showCompany }: { showCompany: boolean
     <>
       <p className="text-xs text-subtle mb-3 flex-none">{t('partnerPayout.tabHint')}</p>
 
-      {/* Desktop: a row opens the window (list-row rule: no edit icon). The
+      {/* Desktop: a row opens the first thing this user may do. The
           column-mode DataTable has no row-click prop, so the click is read off
           the wrapper and mapped by row index — safe because sorting is off and
           the list is unpaginated, so the body order is `rows`' order. */}
@@ -443,14 +475,14 @@ export function PartnerPayoutAccountsTab({ showCompany }: { showCompany: boolean
           if (!tr || !tr.parentElement) return;
           const idx = Array.prototype.indexOf.call(tr.parentElement.children, tr);
           const r = rows[idx];
-          if (r) setEditId(r.branch_id);
+          if (r) openRow(r);
         }}
       >
         <DataTable<PartnerPayoutRow>
           outlined
           data={rows}
           columns={columns}
-          tableClassName="[&_tbody_tr]:cursor-pointer"
+          tableClassName={rowOpens ? '[&_tbody_tr]:cursor-pointer' : undefined}
           className={`flex-1 min-h-0 ${isFetching ? 'opacity-60' : ''} transition-opacity`}
           noResults={empty}
         />
@@ -461,23 +493,23 @@ export function PartnerPayoutAccountsTab({ showCompany }: { showCompany: boolean
         {rows.length === 0 ? empty : (
           <div className="divide-y divide-line border-b border-line">
             {rows.map(r => (
-              <button
+              <div
                 key={r.branch_id}
-                type="button"
-                onClick={() => setEditId(r.branch_id)}
-                className="w-full text-left px-3 py-2.5 flex items-center gap-3 bg-transparent border-none cursor-pointer"
+                onClick={rowOpens ? () => openRow(r) : undefined}
+                className={`px-4 py-3.5 flex flex-col gap-3 ${rowOpens ? 'cursor-pointer' : ''}`}
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium truncate">{r.branch_name}</span>
-                    <PayoutStatusBadge row={r} />
-                  </div>
-                  <div className="text-xs text-subtle mt-0.5 flex items-center gap-1.5 min-w-0">
-                    {r.has_payout_account ? accountCell(r) : <><Landmark size={12} />{t('dealPartnerRate.payoutMissing')}</>}
+                <div className="flex items-center justify-between gap-3 min-w-0">
+                  <span className="text-sm font-medium truncate">{r.branch_name}</span>
+                  <span className="shrink-0"><PayoutStatusBadge row={r} /></span>
+                </div>
+                <div className="flex flex-col gap-1 min-w-0">
+                  <div className="text-sm text-subtle flex items-center gap-1.5 min-w-0">
+                    {r.has_payout_account ? accountCell(r) : <><Landmark size={14} />{t('dealPartnerRate.payoutMissing')}</>}
                   </div>
                   {r.payout_account_name && <div className="text-xs text-subtle truncate">{r.payout_account_name}</div>}
                 </div>
-              </button>
+                {rowOpens && rowActions(r, 'grid grid-flow-col auto-cols-fr gap-2')}
+              </div>
             ))}
           </div>
         )}
