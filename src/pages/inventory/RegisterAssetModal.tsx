@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, keepPreviousData } from '@tanstack/react-query';
-import { Modal, Button, Input, Select, MaskedInput, LabeledCheckbox, InputDatePicker, FormErrorMessage } from 'tsp-form';
+import { Modal, Button, Input, Select, MaskedInput, LabeledCheckbox, InputDatePicker, FormErrorMessage, RadioGroup } from 'tsp-form';
 import { XCircle, Search, Package, Keyboard, ExternalLink, AlertTriangle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { makeDatePickerFormat, toLocalDateStr, fmtCurrency } from '../../lib/format';
@@ -97,7 +97,8 @@ export function RegisterAssetModal({
   // serial rule depends on it: Apple = 10 or 12 characters.
   const [modelBrand, setModelBrand] = useState<string | null>(null);
   const [variantId, setVariantId] = useState<number | null>(null);
-  const [condition, setCondition] = useState<string>('NEW');
+  // Starts empty on purpose: a preselected New is how used devices got registered as new.
+  const [condition, setCondition] = useState<string>('');
   const [hasBox, setHasBox] = useState(true);
   const [battery, setBattery] = useState('');
   const [warranty, setWarranty] = useState('');
@@ -140,7 +141,7 @@ export function RegisterAssetModal({
   // field was already blank: no re-render, so the baseline lands on the first
   // keystroke.) The branch preselect isn't the user's input, so it stays out.
   const isDirty = keyword !== '' || modelId !== null || variantId !== null
-    || condition !== 'NEW' || !hasBox || battery !== '' || warranty !== ''
+    || condition !== '' || !hasBox || battery !== '' || warranty !== ''
     || imei !== '' || serial !== '' || costOverride !== '' || retailOverride !== ''
     || externalRef !== '';
 
@@ -149,7 +150,7 @@ export function RegisterAssetModal({
       setView('form'); setResult(null); setConfirmClose(false);
       setBranchId(null); setKeyword(''); setDebounced('');
       setModelId(null); setModelBrand(null); setVariantId(null);
-      setCondition('NEW'); setHasBox(true);
+      setCondition(''); setHasBox(true);
       setBattery(''); setWarranty(''); setTypingWarranty(false);
       setImei(''); setSerial('');
       setCostOverride(''); setRetailOverride('');
@@ -218,7 +219,7 @@ export function RegisterAssetModal({
   const imeiError = imei.trim() ? identifierFormatReason('IMEI', imei, false) : null;
   const serialError = serial.trim() ? identifierFormatReason('SERIAL_NO', serial, isAppleBrand(modelBrand)) : null;
 
-  const canSubmit = !!branchId && !!modelId && !!variantId
+  const canSubmit = !!branchId && !!modelId && !!variantId && condition !== ''
     && (imei.trim() !== '' || serial.trim() !== '')
     && !imeiError && !serialError;
 
@@ -473,25 +474,23 @@ export function RegisterAssetModal({
                     </div>
                   )}
 
-                  {/* Condition + has_box */}
-                  <div className="flex items-end gap-3">
-                    <div className="flex flex-col flex-1 min-w-0">
-                      <label className="form-label">{t('asset.registerCondition', { defaultValue: 'Condition' })} *</label>
-                      <Select
-                        options={conditionOptions}
-                        value={condition}
-                        onChange={(v) => setCondition(v as string)}
-                        showChevron
-                      />
-                    </div>
-                    <div className="pb-1">
-                      <LabeledCheckbox
-                        label={t('asset.hasBox', { defaultValue: 'Has box' })}
-                        checked={hasBox}
-                        onChange={(e) => setHasBox(e.target.checked)}
-                      />
-                    </div>
+                  {/* Condition: every option on show, none preselected. */}
+                  <div className="flex flex-col">
+                    <label className="form-label">{t('asset.registerCondition', { defaultValue: 'Condition' })} *</label>
+                    <RadioGroup
+                      name="register-condition"
+                      value={condition}
+                      onChange={(v) => setCondition(v as string)}
+                      className="flex flex-wrap gap-x-5 gap-y-2"
+                      options={conditionOptions}
+                    />
                   </div>
+
+                  <LabeledCheckbox
+                    label={t('asset.hasBox', { defaultValue: 'Has box' })}
+                    checked={hasBox}
+                    onChange={(e) => setHasBox(e.target.checked)}
+                  />
 
                   {/* Battery health + warranty expiry */}
                   <div className="flex gap-3">
