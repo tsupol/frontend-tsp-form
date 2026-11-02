@@ -4744,6 +4744,8 @@
   },
   "fin1Plan": {
     "startHint": "FIN1 plans are set from the model's retail price. Continue to pick the term, down payment and price uplift.",
+    "startHintNew": "This device is registered as {{grade}}. FIN1 plans are set from the model's retail price. Continue to pick the term, down payment and price uplift.",
+    "startHintUsed": "This device is registered as {{grade}}. The shop sets the price within the model's range. Continue to pick the price, term, down payment and price uplift.",
     "startButton": "Set FIN1 plan",
     "priceUplift": "Price",
     "baht": "baht",
@@ -9738,6 +9740,21 @@
     "insurance_method_blocked": "Insurance method blocked — {{remaining}} installments remaining (need 1)",
     "insurance_cashout_ok": "Cashout available — installments complete",
     "insurance_cashout_blocked": "Cashout blocked — {{remaining}} installments unpaid"
+  },
+  "gradeCheck": {
+    "title": "Check the device before using it",
+    "question": "What kind of device is this?",
+    "useDevice": "Use this device",
+    "changeTo": "Change to {{grade}}",
+    "mismatch": "This device is registered as {{registered}}, but you picked {{picked}}",
+    "lockWarning": "Correct the grade before using this device. It can't be changed while this contract holds the device.",
+    "batteryValue": "Battery {{value}}%",
+    "batteryNone": "Battery not recorded",
+    "hasBox": "Has box",
+    "noBox": "No box",
+    "doneHeadline": "Device grade changed",
+    "continueFin1": "Go to the FIN1 plan",
+    "continuePlan": "Choose a plan again"
   },
   "wizard": {
     "barcodeNotFound": "Barcode {{barcode}} not registered",

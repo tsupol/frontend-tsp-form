@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Input, Select, Badge, Button, MaskedInput, Tooltip, useSnackbarContext } from 'tsp-form';
 import { ScanBarcode, XCircle, X, Calculator, Info, CheckCircle, Package, BookOpen, AlertTriangle, ChevronsRight } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
@@ -12,6 +12,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import type { Quote } from './WorkspaceTypes';
 import { useBarcodeScanner } from '../../../components/BarcodeScanner';
 import { Fin1PlanEditor, type Fin1ConfirmState } from './Fin1PlanEditor';
+import { DeviceGradeCheckModal } from './DeviceGradeCheckModal';
 import { ColorSwatch } from '../../../components/ColorAutocomplete';
 import { lookupBarcode } from '../../../lib/barcodeLookup';
 import { translateApiError } from '../../../lib/apiErrors';
@@ -100,6 +101,8 @@ interface StockAsset {
    *  joined without the storage/model words the variant name repeats. */
   product_display_name: string | null;
   condition_grade: string;
+  battery_health: number | null;
+  has_box: boolean | null;
   current_cost_basis: number;
   serial_no: string | null;
   imei: string | null;
@@ -144,6 +147,16 @@ export function PanelProductPlan(_props: Props) {
   // v3.1 §1; owner 09-10). The approval freeze on the BE side will hold the
   // chosen device; here we keep the picking stock-only.
   const { isDealPartner } = useAuth();
+
+  // ── Grade check before a shop's contract points at a device ─────────
+  // While a contract holds the device its grade can't be changed (mig 1484), so
+  // the shop gets one look at it right before either step that binds: starting
+  // the FIN1 plan, or saving a FIN2 plan. Tapping a row binds nothing.
+  const queryClient = useQueryClient();
+  const gradeCheckedAssetRef = useRef<number | null>(null);
+  const [gradeCheckOpen, setGradeCheckOpen] = useState(false);
+  const [gradeCheckNext, setGradeCheckNext] = useState<{ kind: 'fin1' } | { kind: 'plan'; quote?: Quote }>({ kind: 'fin1' });
+  const [gradeCorrected, setGradeCorrected] = useState(false);
 
   // ── Mode: new vs used (drives the submit RPC path) ──────────────────
   // A pointed device puts the panel in device mode regardless of its grade —
@@ -611,6 +624,7 @@ export function PanelProductPlan(_props: Props) {
   };
 
   const handleResetSelection = () => {
+    gradeCheckedAssetRef.current = null;
     // Reset both NEW and USED state
     setSelectedModel(null);
     setLocalModelId(null);
@@ -635,6 +649,7 @@ export function PanelProductPlan(_props: Props) {
   // ── Handlers: pick from in-stock list (asset → derive mode by condition) ──
 
   const handleSelectAsset = (asset: StockAsset) => {
+    gradeCheckedAssetRef.current = null;
     // A shop's contract must point at the shop's own device whatever its grade
     // (mig 1235): a new one kept as model + colour only can never be submitted
     // for approval (TARGET_ASSET_REQUIRED). So for a shop every stock pick is a
@@ -781,6 +796,30 @@ export function PanelProductPlan(_props: Props) {
     } finally {
       setFin1Preparing(false);
     }
+  };
+
+  const needsGradeCheck = () => isDealPartner
+    && mode === 'used'
+    && !!selectedAsset
+    && !targetOnContract
+    && gradeCheckedAssetRef.current !== localTargetAssetId;
+
+  const requestOpenFin1 = () => {
+    if (!needsGradeCheck()) { void handleOpenFin1(); return; }
+    setGradeCheckNext({ kind: 'fin1' });
+    setGradeCorrected(false);
+    setGradeCheckOpen(true);
+  };
+
+  const handleGradeCorrected = (grade: string) => {
+    gradeCheckedAssetRef.current = localTargetAssetId;
+    setGradeCorrected(true);
+    setSelectedAsset(prev => (prev ? { ...prev, condition_grade: grade } : prev));
+    // A plan picked under the old grade may no longer exist under the new one.
+    setLocalQuote(null);
+    queryClient.invalidateQueries({ queryKey: ['used-quote', localTargetAssetId] });
+    queryClient.invalidateQueries({ queryKey: ['stock-asset-search'] });
+    queryClient.invalidateQueries({ queryKey: ['asset-actions', localTargetAssetId] });
   };
 
   // A FIN2 plan is negotiated in baht, not percent: the calculator always
@@ -980,6 +1019,32 @@ export function PanelProductPlan(_props: Props) {
 
   // ── Confirm button enabled logic ────────────────────────────────────
 
+  const requestConfirm = (quote?: Quote) => {
+    if (!needsGradeCheck()) { void handleConfirm(quote); return; }
+    setGradeCheckNext({ kind: 'plan', quote });
+    setGradeCorrected(false);
+    setGradeCheckOpen(true);
+  };
+
+  const handleGradeContinue = () => {
+    gradeCheckedAssetRef.current = localTargetAssetId;
+    setGradeCheckOpen(false);
+    if (gradeCheckNext.kind === 'fin1') void handleOpenFin1();
+    else if (!gradeCorrected) void handleConfirm(gradeCheckNext.quote);
+  };
+
+  // Before the device is on the contract the card can't read the price mode from
+  // the backend, so it follows the same rule: only a used grade prices in the
+  // model's used range (ref_condition_grades.is_used). No device: the old text.
+  const fin1HintGrade = mode === 'used'
+    ? selectedAsset?.condition_grade ?? contract?.target_asset_condition_grade ?? null
+    : null;
+  const fin1StartHint = !fin1HintGrade
+    ? t('fin1Plan.startHint')
+    : t(fin1HintGrade === 'USED_A' || fin1HintGrade === 'USED_B' ? 'fin1Plan.startHintUsed' : 'fin1Plan.startHintNew', {
+        grade: getConditionLabel(fin1HintGrade, t),
+      });
+
   const canConfirm = mode === 'used'
     ? !!localTargetAssetId && !!localQuote && !saving && hasChanges
     : !!localModelId && !saving && hasChanges;
@@ -987,6 +1052,14 @@ export function PanelProductPlan(_props: Props) {
   return (
     <div className="flex flex-col h-full">
     {scannerEl}
+    <DeviceGradeCheckModal
+      open={gradeCheckOpen}
+      device={selectedAsset}
+      continueLabel={t(gradeCheckNext.kind === 'fin1' ? 'gradeCheck.continueFin1' : 'gradeCheck.continuePlan')}
+      onClose={() => setGradeCheckOpen(false)}
+      onGradeChanged={handleGradeCorrected}
+      onContinue={handleGradeContinue}
+    />
     <div className="flex-1 overflow-y-auto better-scroll p-4 flex flex-col gap-3">
 
       {/* ── Selected display (either mode) ───────────────────────────── */}
@@ -1251,7 +1324,7 @@ export function PanelProductPlan(_props: Props) {
             />
           ) : (
             <div className="border border-line rounded-lg p-4 flex flex-col gap-3">
-              <span className="text-sm text-subtle">{t('fin1Plan.startHint')}</span>
+              <span className="text-sm text-subtle">{fin1StartHint}</span>
               {fin1Error && (
                 <div className="alert alert-danger">
                   <XCircle size={16} />
@@ -1262,7 +1335,7 @@ export function PanelProductPlan(_props: Props) {
                 <Button
                   size="sm"
                   color="primary"
-                  onClick={handleOpenFin1}
+                  onClick={requestOpenFin1}
                   disabled={fin1Preparing || !contract?.id}
                 >
                   {fin1Preparing ? t('common.saving') : t('fin1Plan.startButton')}
@@ -1294,7 +1367,7 @@ export function PanelProductPlan(_props: Props) {
               </div>
               <QuoteTable rows={fin2Rows} terms={fin2Terms} type="fin2" isSelected={isSelected} onSelect={(r) => setLocalQuote(toQuote(r, 'FIN2'))} t={t} />
               <Fin2Calculator fin2Rows={fin2Rows} fin2Terms={fin2Terms} t={t} saving={saving} onUse={(r) => {
-                void handleConfirm({
+                requestConfirm({
                   variant_id: localVariantId!,
                   item_name: localVariantName,
                   finance_model: 'FIN2',
@@ -1355,7 +1428,7 @@ export function PanelProductPlan(_props: Props) {
                 <AlertTriangle size={12} />
                 {t('wizard.selectedPlanUnsaved')}
               </span>
-              <Button size="sm" color="primary" onClick={() => handleConfirm()} disabled={!canConfirm}>
+              <Button size="sm" color="primary" onClick={() => requestConfirm()} disabled={!canConfirm}>
                 {saving ? t('common.saving') : t('wizard.savePlan')}
               </Button>
             </div>
