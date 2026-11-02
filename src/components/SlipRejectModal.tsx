@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Button, TextArea } from 'tsp-form';
-import { apiClient } from '../lib/api';
+import { apiClient, ApiError } from '../lib/api';
 import { translateApiError } from '../lib/apiErrors';
 import { useAuth } from '../contexts/AuthContext';
 import { ActionDoneView } from '../pages/contracts/ActionDoneView';
@@ -29,10 +29,11 @@ export function SlipRejectModal({ open, row: rowProp, onClose, onFinished }: {
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stale, setStale] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
 
   useEffect(() => {
-    if (open) { setView('form'); setReason(''); setError(null); setBusy(false); }
+    if (open) { setView('form'); setReason(''); setError(null); setStale(false); setBusy(false); }
     // Reset on open only: once the action succeeds the slip leaves the host's
     // list and its row turns null — resetting then would hide the done view.
   }, [open]);
@@ -40,7 +41,7 @@ export function SlipRejectModal({ open, row: rowProp, onClose, onFinished }: {
   const dirty = view === 'form' && reason.trim() !== '';
   const forceClose = () => {
     setConfirmClose(false);
-    const finished = view === 'done';
+    const finished = view === 'done' || stale;
     onClose();
     if (finished) onFinished();
   };
@@ -67,6 +68,8 @@ export function SlipRejectModal({ open, row: rowProp, onClose, onFinished }: {
       setView('done');
     } catch (err) {
       setError(translateApiError(err, t));
+      // Someone else got there first: refresh the list when this window closes.
+      if (err instanceof ApiError && err.code === 'CORE.CONFLICT.ALREADY_REVIEWED') setStale(true);
     } finally {
       setBusy(false);
     }

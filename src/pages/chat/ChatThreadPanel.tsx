@@ -1112,6 +1112,14 @@ export function ChatThreadPanel({
           queryClient.invalidateQueries({ queryKey: ['payment-submissions-pending-count'] });
           queryClient.invalidateQueries({ queryKey: ['nav', 'pending-submissions-summary'] });
         }}
+        onStale={(message) => {
+          setSelectedSlip(null);
+          queryClient.invalidateQueries({ queryKey: ['chat-thread-submissions', contractId] });
+          queryClient.invalidateQueries({ queryKey: ['payment-submissions'] });
+          queryClient.invalidateQueries({ queryKey: ['payment-submissions-pending-count'] });
+          queryClient.invalidateQueries({ queryKey: ['nav', 'pending-submissions-summary'] });
+          addSnackbar({ type: 'warning', message: <div className="alert alert-warning"><span>{message}</span></div> });
+        }}
         onSuccess={(action, extra) => {
           setSelectedSlip(null);
           queryClient.invalidateQueries({ queryKey: ['chat-thread-submissions', contractId] });

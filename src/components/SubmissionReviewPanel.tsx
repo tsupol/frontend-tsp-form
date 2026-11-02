@@ -18,6 +18,7 @@ import { normalizeKey } from '../lib/mediaPath';
 import { translateApiError } from '../lib/apiErrors';
 import { BillDayBlockedNotice } from './BillDayPreview';
 import { useBillDatePreview, useBillDayConfirm } from '../hooks/useBillDay';
+import { isQuietDuplicate, slipReviewerName } from './slipReviewHelpers';
 import { billDayShiftedText, type BillDay } from '../lib/billDay';
 import {
   SlipPayoffBadge, SlipPayoffStatusBox, SlipPayoffConfirmModal, SlipPayoffWithdrawModal,
@@ -201,6 +202,9 @@ export interface SubmissionReviewProps {
    *  refresh and clear the selection; no snackbar needed, the done view already
    *  said what happened. */
   onChanged: () => void;
+  /** Someone else already reviewed this slip. It is leaving the host's list, which
+   *  closes this panel, so the host has to say why (and refresh). */
+  onStale: (message: string) => void;
   /** A link inside the panel leads to another page — a drawer host closes here. */
   onNavigate?: () => void;
   /** Right end of the panel header (a drawer's close button). */
@@ -222,7 +226,7 @@ export interface SubmissionReviewProps {
  * `panel` is null when no slip is given; `overlays` are always rendered.
  */
 export function useSubmissionReview({
-  row, active = true, onSuccess, onChanged, onNavigate, headerEnd, linkCode = false,
+  row, active = true, onSuccess, onChanged, onStale, onNavigate, headerEnd, linkCode = false,
 }: SubmissionReviewProps): { panel: React.ReactNode; overlays: React.ReactNode } {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
@@ -397,7 +401,8 @@ export function useSubmissionReview({
     } catch (err) {
       if (err instanceof ApiError) {
         const translated = translateApiError(err, t);
-        setErrorMessage(translated || err.message);
+        if (err.code === 'CORE.CONFLICT.ALREADY_REVIEWED') onStale(translated || err.message);
+        else setErrorMessage(translated || err.message);
       } else {
         setErrorMessage(t('common.error'));
       }
@@ -588,10 +593,10 @@ export function useSubmissionReview({
               </>
             )}
 
-            {(row.reviewer_name || row.reviewed_at) && (
+            {(row.reviewer_name || row.reviewed_at || row.reviewed_by === 0) && (
               <>
                 <hr className="border-line my-2" />
-                <DetailRow label={t('paymentSubmissions.reviewedBy')} value={row.reviewer_name ?? '—'} />
+                <DetailRow label={t('paymentSubmissions.reviewedBy')} value={slipReviewerName(row, t)} />
                 <DetailRow label={t('paymentSubmissions.reviewedAt')}>
                   {row.reviewed_at ? <DateTime value={row.reviewed_at} /> : <span>—</span>}
                 </DetailRow>
@@ -798,6 +803,16 @@ function DuplicateAdvisory({ row }: { row: SubmissionRow }) {
 
   const cross = row.dup_cross_customer === true;
   const via = row.dup_match_via;
+  if (isQuietDuplicate(row)) {
+    return (
+      <div className="text-xs text-subtle inline-flex items-center gap-1.5 flex-wrap">
+        <Copy size={12} className="shrink-0" />
+        <span>{t('paymentSubmissions.dupSeenBefore', { count: row.dup_count ?? 1 })}</span>
+        {row.dup_first_code_display && <span className="tabular-nums">· {row.dup_first_code_display}</span>}
+        <Badge size="xs" color={submissionStatusColor('REJECTED')}>{t('paymentSubmissions.status_REJECTED')}</Badge>
+      </div>
+    );
+  }
   return (
     <div className={`alert ${cross ? 'alert-danger' : 'alert-warning'}`}>
       <Copy size={16} />

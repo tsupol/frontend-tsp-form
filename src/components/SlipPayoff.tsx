@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Badge, Button, Modal, TextArea } from 'tsp-form';
 import { AlertTriangle, ExternalLink } from 'lucide-react';
-import { apiClient } from '../lib/api';
+import { apiClient, ApiError } from '../lib/api';
 import { fmtCurrency } from '../lib/format';
 import { prepareErrorParams, translateApiError, translateErrorCode } from '../lib/apiErrors';
 import { useAuth } from '../contexts/AuthContext';
@@ -221,8 +221,9 @@ export function SlipPayoffConfirmModal({
   // of the branch (the drawer's approve list). Same picker the contract payoff uses.
   const [accountId, setAccountId] = useState<number | null>(null);
 
+  const [stale, setStale] = useState(false);
   useEffect(() => {
-    if (open) { setView('form'); setReason(''); setError(null); setResult(null); setBusy(false); }
+    if (open) { setStale(false); setView('form'); setReason(''); setError(null); setResult(null); setBusy(false); }
   }, [open, rowProp?.id]);
 
   // The first press of a FIN2 slip below the payoff figure asks for a discount and
@@ -233,7 +234,7 @@ export function SlipPayoffConfirmModal({
 
   const forceClose = () => {
     setConfirmClose(false);
-    const finished = view === 'done';
+    const finished = view === 'done' || stale;
     onClose();
     if (finished) onFinished();
   };
@@ -259,6 +260,8 @@ export function SlipPayoffConfirmModal({
       setView('done');
     } catch (err) {
       setError(translateApiError(err, t));
+      // Someone else got there first: refresh the list when this window closes.
+      if (err instanceof ApiError && err.code === 'CORE.CONFLICT.ALREADY_REVIEWED') setStale(true);
     } finally {
       setBusy(false);
     }
@@ -457,14 +460,15 @@ export function SlipPayoffWithdrawModal({ open, row: rowProp, onClose, onFinishe
   const [result, setResult] = useState<WithdrawResult | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
 
+  const [stale, setStale] = useState(false);
   useEffect(() => {
-    if (open) { setView('form'); setNote(''); setPin(''); setError(null); setResult(null); setBusy(false); }
+    if (open) { setStale(false); setView('form'); setNote(''); setPin(''); setError(null); setResult(null); setBusy(false); }
   }, [open, rowProp?.id]);
 
   const dirty = view === 'form' && (note.trim() !== '' || pin !== '');
   const forceClose = () => {
     setConfirmClose(false);
-    const finished = view === 'done';
+    const finished = view === 'done' || stale;
     onClose();
     if (finished) onFinished();
   };
@@ -491,6 +495,8 @@ export function SlipPayoffWithdrawModal({ open, row: rowProp, onClose, onFinishe
       setView('done');
     } catch (err) {
       setError(translateApiError(err, t));
+      // Someone else got there first: refresh the list when this window closes.
+      if (err instanceof ApiError && err.code === 'CORE.CONFLICT.ALREADY_REVIEWED') setStale(true);
     } finally {
       setBusy(false);
     }

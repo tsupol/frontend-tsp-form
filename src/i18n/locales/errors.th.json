@@ -74,6 +74,7 @@
   "inv.state.asset_in_credit_use": "เครื่องอยู่ในเคสสินเชื่อ/สัญญา {{code_display}} — ถอนเคสก่อนถึงจะแก้ได้",
   "inv.state.identifier_mdm_bound": "เครื่อง {{asset_code}} ผูก MDM อยู่ (Serial {{serial_no}}) จึงแก้ Serial เองไม่ได้ — แจ้งผู้ดูแล Company ให้ช่วยตรวจสอบ",
   "inv.state.identifier_mdm_bound_basic": "เครื่องนี้ผูก MDM อยู่ จึงแก้ Serial เองไม่ได้ — แจ้งผู้ดูแล Company ให้ช่วยตรวจสอบ",
+  "core.conflict.already_reviewed": "สลิปนี้ตรวจไปแล้ว",
   "inv.state.asset_in_credit_use_basic": "เครื่องอยู่ในเคสสินเชื่อหรือสัญญา — ถอนเคสก่อนถึงจะแก้ได้",
   "blockingReason.owner_type_not_match": "ประเภทเจ้าของเครื่องไม่ตรงกับเงื่อนไข",
   "blockingReason.not_bound_to_contract": "เครื่องไม่ได้ผูกกับสัญญา",

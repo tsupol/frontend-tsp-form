@@ -43,6 +43,7 @@ import { RepairRequestModal } from './RepairRequestModal';
 import { AppointmentCreateModal, AppointmentCancelModal } from './AppointmentModals';
 import { TransferBranchModal } from './TransferBranchModal';
 import { ActionDoneView, type ActionDoneDetailRow } from './ActionDoneView';
+import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { BillDayBlockedNotice } from '../../components/BillDayPreview';
 import { useBillDatePreview, useBillDayConfirm } from '../../hooks/useBillDay';
 import { billDayDoneRow, type BillDay } from '../../lib/billDay';
@@ -3108,7 +3109,6 @@ interface SlipPrecheck {
   own_prior_submission_id?: number;
   own_prior_status?: 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
   own_prior_submitted_at?: string;
-  other_count?: number;
   dup_first_submission_id?: number;
   dup_first_code_display?: string;
   dup_first_status?: 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
@@ -3136,6 +3136,15 @@ interface ContractAfterPay {
   next_due_amount: number | null;
   next_due_date: string | null;
   state: string;
+}
+
+/** What fn_payment_submission_create answers. A duplicate image is ok:true with
+ *  status REJECTED, and `duplicate_of_code` names the earlier slip. */
+interface SubmissionCreated {
+  submission_id: number | null;
+  status?: string;
+  submission_code?: string | null;
+  duplicate_of_code?: string | null;
 }
 
 function PayInstallmentModal({ open, contract, onClose }: {
@@ -3179,11 +3188,17 @@ function PayInstallmentModal({ open, contract, onClose }: {
   const [reference, setReference] = useState('');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
-  const [errorKey, setErrorKey] = useState(0);
-  const contentRef = useRef<HTMLDivElement>(null);
   const [result, setResult] = useState<PayInstallmentResult | null>(null);
   // slipReview done-view payload (the submission that was queued for review)
-  const [submissionResult, setSubmissionResult] = useState<{ submissionId: number | null; amount: number; previewUrl: string | null } | null>(null);
+  const [submissionResult, setSubmissionResult] = useState<{
+    submissionId: number | null;
+    amount: number;
+    previewUrl: string | null;
+    /** The backend turned the slip down on arrival: same image as an earlier slip (mig 1597). */
+    rejected: boolean;
+    submissionCode: string | null;
+    duplicateOfCode: string | null;
+  } | null>(null);
   /** R2 key of the slip the user uploaded in this modal session, before fn_media_attach. */
   const [slipKey, setSlipKey] = useState<string | null>(null);
   const [slipFile, setSlipFile] = useState<File | null>(null);
@@ -3237,7 +3252,6 @@ function PayInstallmentModal({ open, contract, onClose }: {
       // the client-side overpayBlocked guard) — the raw BE message is technical.
       if (err.code?.includes('OVERPAYMENT_NOT_ALLOWED') || err.messageKey?.includes('overpayment')) {
         setError(t('contract.payInstallment_overpayBlocked', { outstanding: fmtCurrency(outstanding) }));
-        setErrorKey(k => k + 1);
         return;
       }
       const translated = translateApiError(err, t);
@@ -3245,15 +3259,7 @@ function PayInstallmentModal({ open, contract, onClose }: {
     } else {
       setError(err instanceof Error ? err.message : String(err));
     }
-    setErrorKey(k => k + 1);
   };
-
-  // The alert renders at the top of the scrollable body. If the user submitted
-  // while scrolled down (long form), the error would land off-screen and look
-  // like nothing happened — scroll the body back up so the error is always seen.
-  useEffect(() => {
-    if (error) contentRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [errorKey, error]);
 
   // Existing slip count drives the next ALBUM idx + sort_order.
   const { data: slipCount = 0 } = useQuery({
@@ -3450,7 +3456,7 @@ function PayInstallmentModal({ open, contract, onClose }: {
   // Create step only — takes an already-attached media_id. Shared by the
   // straight-through path and the "proceed anyway" button on the dup dialog.
   const createSubmission = async (mediaId: number) =>
-    apiClient.rpc<{ submission_id: number }>(
+    apiClient.rpc<SubmissionCreated>(
       'fn_payment_submission_create',
       {
         p_contract_id: contract.id,
@@ -3521,20 +3527,25 @@ function PayInstallmentModal({ open, contract, onClose }: {
     },
     onSuccess: (res) => {
       if ((res as { held?: boolean }).held) return; // waiting on the dup dialog
-      onSubmissionCreated(res.submission_id ?? null);
+      onSubmissionCreated(res as SubmissionCreated);
     },
     onError: setApiError,
   });
 
   // Shared success handler for both the straight-through slip path and the
   // "proceed anyway" button on the duplicate dialog.
-  const onSubmissionCreated = (submissionId: number | null) => {
+  // A duplicate image still answers ok:true, so the outcome has to be read from
+  // `status`: REJECTED never reached the review queue (mig 1597).
+  const onSubmissionCreated = (res: SubmissionCreated) => {
     // Stash preview + amount for the done view; the media row now owns the R2
     // object, so clear the working slip copies (handleClose won't delete it).
     setSubmissionResult({
-      submissionId,
+      submissionId: res.submission_id ?? null,
       amount: parsedAmount,
       previewUrl: slipPreviewUrl,
+      rejected: res.status === 'REJECTED',
+      submissionCode: res.submission_code ?? null,
+      duplicateOfCode: res.duplicate_of_code ?? null,
     });
     setDupPrecheck(null);
     setSlipKey(null);
@@ -3556,7 +3567,7 @@ function PayInstallmentModal({ open, contract, onClose }: {
       if (!dupPrecheck) throw new Error('No pending slip');
       return createSubmission(dupPrecheck.mediaId);
     },
-    onSuccess: (res) => onSubmissionCreated(res.submission_id ?? null),
+    onSuccess: (res) => onSubmissionCreated(res),
     onError: setApiError,
   });
 
@@ -3586,7 +3597,9 @@ function PayInstallmentModal({ open, contract, onClose }: {
   })();
 
   const titleKey = view === 'done'
-    ? (submissionResult ? 'contract.attachSlip_doneTitle' : 'contract.payInstallment_doneTitle')
+    ? (submissionResult?.rejected
+      ? 'contract.attachSlip_dupTitle'
+      : submissionResult ? 'contract.attachSlip_doneTitle' : 'contract.payInstallment_doneTitle')
     : 'contract.payInstallment_title';
 
   return (
@@ -3599,19 +3612,7 @@ function PayInstallmentModal({ open, contract, onClose }: {
           </div>
 
           {view === 'form' && (
-            <div className="modal-content" ref={contentRef}>
-              {error && (
-                <div
-                  key={errorKey}
-                  className="animate-pop-in sticky -top-4 z-10 -mx-4 -mt-4 mb-4 bg-surface px-4 pt-4"
-                >
-                  <div className="alert alert-danger">
-                    <XCircle size={16} />
-                    <span>{error}</span>
-                  </div>
-                </div>
-              )}
-
+            <div className="modal-content">
               {/* Contract info summary */}
               <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
                 <div className="font-medium text-sm">{contract.code_display ?? contract.code}</div>
@@ -3883,7 +3884,43 @@ function PayInstallmentModal({ open, contract, onClose }: {
             />
           )}
 
-          {view === 'done' && submissionResult && (
+          {view === 'done' && submissionResult?.rejected && (
+            <ActionDoneView
+              tone="danger"
+              headline={submissionResult.duplicateOfCode
+                ? t('contract.attachSlip_dupHeadline', { code: submissionResult.duplicateOfCode })
+                : t('contract.attachSlip_dupHeadlineBasic')}
+              contractCode={contract.code_display ?? contract.code}
+              detailRows={[
+                { label: t('contract.amount'), value: fmtCurrency(submissionResult.amount), emphasis: true },
+                ...(submissionResult.submissionCode ? [{
+                  label: t('contract.attachSlip_submissionId', { defaultValue: 'Submission #' }),
+                  value: submissionResult.submissionCode,
+                }] : []),
+              ]}
+              extras={
+                <>
+                  <p className="text-sm text-subtle mb-3">{t('contract.attachSlip_dupBody')}</p>
+                  {submissionResult.previewUrl && (
+                    <div className="rounded-md border border-line overflow-hidden bg-surface p-2 flex items-center justify-center">
+                      <img
+                        src={submissionResult.previewUrl}
+                        alt={t('contract.payInstallment_slip', { defaultValue: 'Payment slip' })}
+                        className="max-h-48 w-auto object-contain block rounded"
+                      />
+                    </div>
+                  )}
+                </>
+              }
+              secondaryAction={{
+                label: t('contract.attachSlip_pickNew'),
+                onClick: () => { setSubmissionResult(null); setView('form'); },
+              }}
+              onClose={handleCloseWithCleanup}
+            />
+          )}
+
+          {view === 'done' && submissionResult && !submissionResult.rejected && (
             <ActionDoneView
               headline={t('contract.attachSlip_doneHeadline', { defaultValue: 'Slip sent to review queue' })}
               contractCode={contract.code_display ?? contract.code}
@@ -3914,6 +3951,8 @@ function PayInstallmentModal({ open, contract, onClose }: {
               onClose={handleCloseWithCleanup}
             />
           )}
+
+          {view === 'form' && <ModalErrorBand message={error} onDismiss={() => setError('')} />}
 
           {view === 'form' && (
             <div className="modal-footer">
@@ -3992,9 +4031,6 @@ function PayInstallmentModal({ open, contract, onClose }: {
                       <span className="text-xs text-subtle">· {t(`paymentSubmissions.dupVia_${info.match_via}`, { defaultValue: info.match_via })}</span>
                     )}
                   </div>
-                )}
-                {info.other_count != null && info.other_count > 0 && (
-                  <div className="text-xs text-subtle">{t('slipDup.otherCount', { count: info.other_count })}</div>
                 )}
               </div>
             );

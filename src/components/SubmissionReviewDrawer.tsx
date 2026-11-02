@@ -9,8 +9,8 @@ import { useSubmissionReview, type SubmissionReviewProps, type SubmissionRow } f
  * panel in its detail column instead.
  */
 export function SubmissionReviewDrawer({
-  row, open, onClose, onSuccess, onChanged,
-}: Pick<SubmissionReviewProps, 'onSuccess' | 'onChanged'> & {
+  row, open, onClose, onSuccess, onChanged, onStale,
+}: Pick<SubmissionReviewProps, 'onSuccess' | 'onChanged' | 'onStale'> & {
   row: SubmissionRow | null;
   open: boolean;
   onClose: () => void;
@@ -28,7 +28,7 @@ export function SubmissionReviewDrawer({
     row: shown,
     active: open,
     onSuccess,
-    onChanged,
+    onStale, onChanged,
     onNavigate: onClose,
     linkCode: true,
     headerEnd: (

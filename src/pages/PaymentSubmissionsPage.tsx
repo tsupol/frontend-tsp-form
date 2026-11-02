@@ -18,6 +18,7 @@ import {
   type SubmissionRow,
   type SubmissionStatus,
 } from '../components/SubmissionReviewPanel';
+import { isQuietDuplicate } from '../components/slipReviewHelpers';
 import { SlipPayoffBadge } from '../components/SlipPayoff';
 import { SearchInput } from '../components/SearchInput';
 import { FilterBar } from '../components/FilterBar';
@@ -226,7 +227,7 @@ export function PaymentSubmissionsPage() {
             <Badge size="xs" color="danger">{t('paymentSubmissions.ocrNonSlipShort')}</Badge>
           )}
           {row.is_duplicate_slip && (
-            <Badge size="xs" color={row.dup_cross_customer === true ? 'danger' : 'warning'}>
+            <Badge size="xs" color={row.dup_cross_customer === true ? 'danger' : isQuietDuplicate(row) ? 'default' : 'warning'}>
               {t('paymentSubmissions.dupShort')}
             </Badge>
           )}
@@ -422,6 +423,10 @@ export function PaymentSubmissionsPage() {
                     </div>
                   }
                   onChanged={afterDone}
+                  onStale={(message) => {
+                    afterDone();
+                    addSnackbar({ type: 'warning', message: <div className="alert alert-warning"><span>{message}</span></div> });
+                  }}
                   onSuccess={(action, extra) => {
                     afterDone();
                     const key =

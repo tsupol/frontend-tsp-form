@@ -42,12 +42,20 @@ export function useBillDayConfirm(preview: { refetch: () => Promise<{ data?: Bil
   if (pending) lastRef.current = pending;
   const shown = pending ?? lastRef.current;
 
+  // The check takes a moment and the host's button only turns busy when `run`
+  // starts, so without this a second press would run the action twice.
+  const checkingRef = useRef(false);
+
   const guard = useCallback(async (run: () => void) => {
+    if (checkingRef.current) return;
+    checkingRef.current = true;
     let day = preview.data;
     try {
       const fresh = await preview.refetch();
       if (fresh.data) day = fresh.data;
-    } catch { /* a failed preview never blocks */ }
+    } catch { /* a failed preview never blocks */ } finally {
+      checkingRef.current = false;
+    }
     if (day?.state === 'SHIFTED') {
       runRef.current = run;
       setPending(day);

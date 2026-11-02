@@ -7,6 +7,7 @@ import { ExternalLink } from 'lucide-react';
 import { DateTime } from './DateTime';
 import { fmtCurrency } from '../lib/format';
 import type { SubmissionRow } from './SubmissionReviewPanel';
+import { slipReviewerName } from './slipReviewHelpers';
 
 export function SlipActionSummary({ row, showRejection = false }: {
   row: SubmissionRow;
@@ -32,10 +33,10 @@ export function SlipActionSummary({ row, showRejection = false }: {
         </Link>
         {row.customer_name && <><span>·</span><span className="truncate">{row.customer_name}</span></>}
       </div>
-      {showRejection && (row.reject_reason || row.reviewer_name) && (
+      {showRejection && (row.reject_reason || row.reviewer_name || row.reviewed_by === 0) && (
         <div className="mt-2 pt-2 border-t border-line text-xs">
           <div className="text-subtle">
-            {t('paymentSubmissions.reviewedBy')} {row.reviewer_name ?? '—'}
+            {t('paymentSubmissions.reviewedBy')} {slipReviewerName(row, t)}
             {row.reviewed_at && <> · <DateTime value={row.reviewed_at} showTime /></>}
           </div>
           {row.reject_reason && (
