@@ -11,6 +11,7 @@ import { translateApiError } from '../lib/apiErrors';
 import { SearchInput } from '../components/SearchInput';
 import { useAuth } from '../contexts/AuthContext';
 import { UserPermissionGrantsModal } from './users/UserPermissionGrantsModal';
+import { ModalErrorBand } from '../components/ModalErrorBand';
 
 interface VUser {
   id: number;
@@ -78,6 +79,46 @@ function useRoles() {
     queryFn: () => apiClient.get<VRole[]>('/v_roles?order=code'),
     staleTime: 5 * 60 * 1000,
   });
+}
+
+// Own level first, then widest to narrowest. Scope values come from v_roles.
+const ROLE_SCOPE_ORDER = ['GLOBAL', 'HOLDING', 'COMPANY', 'BRANCH'];
+
+/**
+ * Options for the role pickers on the create, edit and change-role windows: only
+ * the roles this user may assign (v_role_assign_rules), grouped by scope. The
+ * database still enforces the rule, but user_change_role refuses with a generic
+ * code, so a role that would fail must not be offered. `keepCode` keeps the edited
+ * user's current role showing when this user could not assign it themselves.
+ */
+function useRoleOptions(keepCode?: string) {
+  const { t } = useTranslation();
+  const { user } = useAuth();
+  const actor = user?.role_code;
+  const { data: roles = [], isLoading: rolesLoading } = useRoles();
+  const { data: rules, isLoading: rulesLoading } = useQuery({
+    queryKey: ['role-assign-rules', actor],
+    queryFn: () => apiClient.get<{ target_role_code: string }[]>(
+      `/v_role_assign_rules?actor_role_code=eq.${actor}&select=target_role_code&order=target_role_code`,
+    ),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const roleOptions = useMemo(() => {
+    const allowed = rules ? new Set(rules.map((r) => r.target_role_code)) : null;
+    const visible = roles.filter((r) => !allowed || allowed.has(r.code) || r.code === keepCode);
+    const ownScope = roles.find((r) => r.code === actor)?.scope;
+    const rank = (scope: string) => (scope === ownScope ? -1 : ROLE_SCOPE_ORDER.indexOf(scope));
+    const scopes = [...new Set(visible.map((r) => r.scope))].sort((a, b) => rank(a) - rank(b));
+    return scopes.flatMap((scope) => [
+      { type: 'group' as const, label: t(`users.roleScope.${scope}`, { defaultValue: scope }) },
+      ...visible
+        .filter((r) => r.scope === scope)
+        .map((r) => ({ value: r.code, label: getRoleLabel(t, r.code) })),
+    ]);
+  }, [roles, rules, keepCode, actor, t]);
+
+  return { roles, roleOptions, rolesLoading: rolesLoading || rulesLoading };
 }
 
 function useCompanies(holdingId?: string) {
@@ -168,7 +209,6 @@ function ToggleActiveModal({ user, open, onClose }: { user: VUser | null; open: 
   const { addSnackbar } = useSnackbarContext();
   const [isPending, setIsPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [errorKey, setErrorKey] = useState(0);
 
   const isDeactivating = user?.is_active ?? true;
 
@@ -200,7 +240,6 @@ function ToggleActiveModal({ user, open, onClose }: { user: VUser | null; open: 
       } else {
         setErrorMessage(t('common.error'));
       }
-      setErrorKey(k => k + 1);
     } finally {
       const elapsed = Date.now() - start;
       if (elapsed < 300) await new Promise(r => setTimeout(r, 300 - elapsed));
@@ -221,14 +260,6 @@ function ToggleActiveModal({ user, open, onClose }: { user: VUser | null; open: 
           <button type="button" className="modal-close-btn" onClick={handleClose} aria-label="Close">×</button>
         </div>
         <div className="modal-content">
-          {errorMessage && (
-            <div key={errorKey} className="alert alert-danger mb-4 animate-pop-in">
-              <XCircle size={18} />
-              <div>
-                <div className="alert-description">{errorMessage}</div>
-              </div>
-            </div>
-          )}
           <p
             className="text-sm"
             dangerouslySetInnerHTML={{
@@ -236,6 +267,7 @@ function ToggleActiveModal({ user, open, onClose }: { user: VUser | null; open: 
             }}
           />
         </div>
+        <ModalErrorBand message={errorMessage} onDismiss={() => setErrorMessage('')} />
         <div className="modal-footer">
           <Button type="button" variant="ghost" onClick={handleClose}>
             {t('common.cancel')}
@@ -409,7 +441,6 @@ function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void
   const { addSnackbar } = useSnackbarContext();
   const [isPending, setIsPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [errorKey, setErrorKey] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
 
@@ -427,8 +458,7 @@ function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void
   const roleCode = watch('role_code');
   const companyId = watch('company_id');
 
-  const { data: roles = [], isLoading: rolesLoading } = useRoles();
-  const roleOptions = roles.map((r) => ({ value: r.code, label: getRoleLabel(t, r.code), scope: r.scope }));
+  const { roles, roleOptions, rolesLoading } = useRoleOptions();
   const selectedRole = roles.find((r) => r.code === roleCode);
   const needsCompany = selectedRole ? ['COMPANY', 'BRANCH'].includes(selectedRole.scope) : false;
   const needsBranch = selectedRole?.scope === 'BRANCH';
@@ -471,7 +501,6 @@ function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void
       } else {
         setErrorMessage(t('common.error'));
       }
-      setErrorKey(k => k + 1);
     } finally {
       const elapsed = Date.now() - start;
       if (elapsed < 300) await new Promise(r => setTimeout(r, 300 - elapsed));
@@ -501,15 +530,6 @@ function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void
           <button type="button" className="modal-close-btn" onClick={handleClose} aria-label="Close">×</button>
         </div>
         <div className="modal-content">
-          {errorMessage && (
-            <div key={errorKey} className="alert alert-danger mb-4 animate-pop-in">
-              <XCircle size={18} />
-              <div>
-                <div className="alert-description">{errorMessage}</div>
-              </div>
-            </div>
-          )}
-
           <div className="form-grid">
             <div className="flex flex-col">
               <label className="form-label" htmlFor="cu-username">{t('users.username')}</label>
@@ -570,7 +590,6 @@ function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void
                   setValue('branch_id', '');
                 }}
                 placeholder={t('users.selectRole')}
-                searchable={false}
                 showChevron
                 loading={rolesLoading}
                 error={!!errors.role_code}
@@ -612,6 +631,7 @@ function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void
             )}
           </div>
         </div>
+        <ModalErrorBand message={errorMessage} onDismiss={() => setErrorMessage('')} />
         <div className="modal-footer">
           <Button type="button" variant="ghost" onClick={handleClose}>
             {t('common.cancel')}
@@ -650,7 +670,6 @@ function EditUserModal({ user, open, onClose }: { user: VUser | null; open: bool
   const { addSnackbar } = useSnackbarContext();
   const [isPending, setIsPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [errorKey, setErrorKey] = useState(0);
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
 
   const {
@@ -681,8 +700,7 @@ function EditUserModal({ user, open, onClose }: { user: VUser | null; open: bool
   const roleCode = watch('role_code');
   const companyId = watch('company_id');
 
-  const { data: roles = [], isLoading: rolesLoading } = useRoles();
-  const roleOptions = roles.map((r) => ({ value: r.code, label: getRoleLabel(t, r.code), scope: r.scope }));
+  const { roles, roleOptions, rolesLoading } = useRoleOptions(user?.role_code);
   const selectedRole = roles.find((r) => r.code === roleCode);
   const needsCompany = selectedRole ? ['COMPANY', 'BRANCH'].includes(selectedRole.scope) : false;
   const needsBranch = selectedRole?.scope === 'BRANCH';
@@ -725,7 +743,6 @@ function EditUserModal({ user, open, onClose }: { user: VUser | null; open: bool
       } else {
         setErrorMessage(t('common.error'));
       }
-      setErrorKey(k => k + 1);
     } finally {
       const elapsed = Date.now() - start;
       if (elapsed < 300) await new Promise(r => setTimeout(r, 300 - elapsed));
@@ -753,15 +770,6 @@ function EditUserModal({ user, open, onClose }: { user: VUser | null; open: bool
           <button type="button" className="modal-close-btn" onClick={handleClose} aria-label="Close">×</button>
         </div>
         <div className="modal-content">
-          {errorMessage && (
-            <div key={errorKey} className="alert alert-danger mb-4 animate-pop-in">
-              <XCircle size={18} />
-              <div>
-                <div className="alert-description">{errorMessage}</div>
-              </div>
-            </div>
-          )}
-
           <div className="form-grid">
             <div className="flex flex-col">
               <label className="form-label" htmlFor="eu-username">{t('users.username')}</label>
@@ -785,7 +793,6 @@ function EditUserModal({ user, open, onClose }: { user: VUser | null; open: bool
                   setValue('branch_id', '');
                 }}
                 placeholder={t('users.selectRole')}
-                searchable={false}
                 showChevron
                 loading={rolesLoading}
                 error={!!errors.role_code}
@@ -843,6 +850,7 @@ function EditUserModal({ user, open, onClose }: { user: VUser | null; open: bool
             </div>
           </div>
         </div>
+        <ModalErrorBand message={errorMessage} onDismiss={() => setErrorMessage('')} />
         <div className="modal-footer">
           <Button type="button" variant="ghost" onClick={handleClose}>
             {t('common.cancel')}
@@ -1186,7 +1194,6 @@ function ChangeRoleModal({ user, open, onClose }: { user: VUser | null; open: bo
   const { addSnackbar } = useSnackbarContext();
   const [isPending, setIsPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [errorKey, setErrorKey] = useState(0);
 
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
 
@@ -1210,8 +1217,7 @@ function ChangeRoleModal({ user, open, onClose }: { user: VUser | null; open: bo
 
   const roleCode = watch('role_code');
 
-  const { data: roles = [], isLoading: rolesLoading } = useRoles();
-  const roleOptions = roles.map((r) => ({ value: r.code, label: getRoleLabel(t, r.code) }));
+  const { roleOptions, rolesLoading } = useRoleOptions(user?.role_code);
 
   const onSubmit = async (data: ChangeRoleFormData) => {
     if (!user) return;
@@ -1241,7 +1247,6 @@ function ChangeRoleModal({ user, open, onClose }: { user: VUser | null; open: bo
       } else {
         setErrorMessage(t('common.error'));
       }
-      setErrorKey(k => k + 1);
     } finally {
       const elapsed = Date.now() - start;
       if (elapsed < 300) await new Promise(r => setTimeout(r, 300 - elapsed));
@@ -1269,15 +1274,6 @@ function ChangeRoleModal({ user, open, onClose }: { user: VUser | null; open: bo
           <button type="button" className="modal-close-btn" onClick={handleClose} aria-label="Close">×</button>
         </div>
         <div className="modal-content">
-          {errorMessage && (
-            <div key={errorKey} className="alert alert-danger mb-4 animate-pop-in">
-              <XCircle size={18} />
-              <div>
-                <div className="alert-description">{errorMessage}</div>
-              </div>
-            </div>
-          )}
-
           <div className="form-grid">
             <div className="flex flex-col">
               <label className="form-label">{t('users.roleCode')}</label>
@@ -1286,7 +1282,6 @@ function ChangeRoleModal({ user, open, onClose }: { user: VUser | null; open: bo
                 value={roleCode}
                 onChange={(val) => setValue('role_code', val as string, { shouldValidate: true })}
                 placeholder={t('users.selectRole')}
-                searchable={false}
                 showChevron
                 loading={rolesLoading}
                 error={!!errors.role_code}
@@ -1296,6 +1291,7 @@ function ChangeRoleModal({ user, open, onClose }: { user: VUser | null; open: bo
             </div>
           </div>
         </div>
+        <ModalErrorBand message={errorMessage} onDismiss={() => setErrorMessage('')} />
         <div className="modal-footer">
           <Button type="button" variant="ghost" onClick={handleClose}>
             {t('common.cancel')}

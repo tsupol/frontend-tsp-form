@@ -74,6 +74,7 @@
   "inv.state.asset_in_credit_use": "The device is in credit case/contract {{code_display}} — withdraw the case before editing",
   "inv.state.identifier_mdm_bound": "Device {{asset_code}} is bound to MDM (serial {{serial_no}}), so you can't change its serial — ask a company admin to check it",
   "inv.state.identifier_mdm_bound_basic": "This device is bound to MDM, so you can't change its serial — ask a company admin to check it",
+  "auth.auth.forbidden_role_assign": "You don't have permission to assign this role",
   "core.conflict.already_reviewed": "This slip has already been reviewed",
   "inv.state.asset_in_credit_use_basic": "The device is in a credit case or contract — withdraw the case before editing",
   "blockingReason.owner_type_not_match": "Asset owner does not match",

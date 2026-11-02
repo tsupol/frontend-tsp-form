@@ -8763,6 +8763,8 @@
     "COMPANY_INVENTORY": "Company Inventory",
     "COMPANY_COLLECTOR": "Company Collector",
     "COMPANY_REPO": "Company Repossession",
+    "COMPANY_CREDIT_FINANCE": "Company Credit & Finance",
+    "HOLDING_REPO": "Holding Repossession",
     "HOLDING_ADMIN": "Holding Admin",
     "HOLDING_VIEWER": "Holding Viewer",
     "COMPANY_VIEWER": "Company Viewer",
@@ -9661,6 +9663,12 @@
     "companyId": "Company",
     "branchId": "Branch",
     "selectRole": "Select a role",
+    "roleScope": {
+      "BRANCH": "Branch level",
+      "COMPANY": "Company level",
+      "HOLDING": "Holding level",
+      "GLOBAL": "System level"
+    },
     "selectCompany": "Select a company",
     "selectBranch": "Select a branch",
     "editUser": "Edit User",

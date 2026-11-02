@@ -8750,6 +8750,8 @@
     "COMPANY_INVENTORY": "คลัง Company",
     "COMPANY_COLLECTOR": "ฝ่ายเรียกเก็บ",
     "COMPANY_REPO": "ฝ่ายยึดคืน",
+    "COMPANY_CREDIT_FINANCE": "ฝ่ายสินเชื่อและการเงิน",
+    "HOLDING_REPO": "ฝ่ายยึดคืนโฮลดิ้ง",
     "HOLDING_ADMIN": "ผู้ดูแลโฮลดิ้ง",
     "HOLDING_VIEWER": "ผู้ชมโฮลดิ้ง",
     "COMPANY_VIEWER": "ผู้ดูระดับบริษัท",
@@ -9647,6 +9649,12 @@
     "companyId": "Company",
     "branchId": "สาขา",
     "selectRole": "เลือกบทบาท",
+    "roleScope": {
+      "BRANCH": "ระดับสาขา",
+      "COMPANY": "ระดับบริษัท",
+      "HOLDING": "ระดับโฮลดิ้ง",
+      "GLOBAL": "ระดับระบบ"
+    },
     "selectCompany": "เลือก Company",
     "selectBranch": "เลือกสาขา",
     "editUser": "แก้ไขผู้ใช้",
