@@ -102,6 +102,16 @@ export interface BillActionsResponse {
   actions: BillAction[];
 }
 
+/** Whether THIS user must type a branch PIN to cancel the bill: read off the
+ *  evaluator (mig 1278), never hard-coded. The three lifecycle verbs are mutually
+ *  exclusive, so whichever one is offered decides. */
+export function billCancelPinRequired(actions: BillAction[]): boolean {
+  const verb = (['CANCEL_BILL', 'VOID_BILL', 'REVERSE_BILL'] as const)
+    .map(code => actions.find(a => a.action_code === code && a.is_available))
+    .find(Boolean);
+  return verb?.pin_required ?? true;
+}
+
 const STALE_TIME = 30 * 1000;
 
 export function useBillActions(billId: number | null) {

@@ -17,18 +17,17 @@ import { useBillSettle } from '../../hooks/useBillSettle';
 import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
 import { BranchPinInput } from '../../components/BranchPinInput';
-import { ModalErrorBand } from '../../components/ModalErrorBand';
+import { BillCancelModal } from './BillCancelModal';
 import { fmtCurrency } from '../../lib/format';
 import { printWithMarker } from '../../lib/printDoc';
 import { useBillPdfDownload } from '../../hooks/useBillPdfDownload';
-import { buildBillActionToast, hasBill, type StandardBillResponse } from '../../lib/billActionToast';
 import { type Branch, type BillRow, type BillDetail, type BillPayment, type BillLineItem, type BillLineRetypeOption, todayISO } from './accountingTypes';
 import { CorrectLineModal } from './CorrectLineModal';
 import { RetypeLineModal, useChargeTypeLabel, type RetypeTarget } from './RetypeLineModal';
 import { CreditNoteReverseModal } from './CreditNoteReverseModal';
 import { CancelClosedDayModal } from './CancelClosedDayModal';
 import { WaiveLateFeeModal } from './WaiveLateFeeModal';
-import { useBillActions, type BillAction, type BillActionCode } from '../../hooks/useBillActions';
+import { billCancelPinRequired, useBillActions, type BillAction, type BillActionCode } from '../../hooks/useBillActions';
 import { useVoidReasons } from '../../hooks/useVoidReasons';
 import { SearchInput } from '../../components/SearchInput';
 import { BankAccountSelect } from '../../components/BankAccountSelect';
@@ -485,26 +484,10 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
   const { settle } = useBillSettle();
   const [payError, setPayError] = useState('');
 
-  // Whether THIS user must type a branch PIN to cancel/void the bill. mig 1278
-  // added `pin_required` (per-caller) next to the action's own `require_pin`
-  // setting: a company admin cancelling a paid bill on its own day gets false
-  // and sends no PIN. Read it off the evaluator, never hard-code it. The three
-  // lifecycle verbs are mutually exclusive, so whichever one is offered decides.
-  const voidPinRequired = (() => {
-    const verb = (['CANCEL_BILL', 'VOID_BILL', 'REVERSE_BILL'] as const)
-      .map(code => allActions.find(a => a.action_code === code && a.is_available))
-      .find(Boolean);
-    return verb?.pin_required ?? true;
-  })();
+  const voidPinRequired = billCancelPinRequired(allActions);
 
   // Void (cancel whole bill) state
   const [voidOpen, setVoidOpen] = useState(false);
-  const [voidReason, setVoidReason] = useState('');
-  const [voidReasonCode, setVoidReasonCode] = useState('');
-  const [voidPin, setVoidPin] = useState('');
-  const [voiding, setVoiding] = useState(false);
-  const [voidError, setVoidError] = useState('');
-  const { options: voidReasonOptions } = useVoidReasons();
 
   // Void-single-payment state — the payment row the BM chose to void
   const [voidPayment, setVoidPayment] = useState<BillPayment | null>(null);
@@ -673,49 +656,6 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
       }
     } finally {
       setPaying(false);
-    }
-  };
-
-  const handleVoid = async () => {
-    if (!voidReasonCode || !voidReason.trim()) return;
-    if (voidPinRequired && !voidPin) return;
-    setVoiding(true);
-    setVoidError('');
-    try {
-      const result = await apiClient.rpc<Partial<StandardBillResponse>>('fn_bill_cancel', {
-        p_bill_id: billId,
-        p_reason: voidReason.trim(),
-        p_pin: voidPinRequired ? voidPin : null,
-        p_branch_id: detail.branch_id,
-        p_reason_code: voidReasonCode || null,
-      });
-      setVoidOpen(false);
-      setVoidReason('');
-      setVoidReasonCode('');
-      setVoidPin('');
-      invalidateAfterBillChange();
-      // If a CREDIT_NOTE was minted (cancelling a PAID bill), surface its code in the toast.
-      const enriched = hasBill(result) && result.bill_type === 'CREDIT_NOTE'
-        ? buildBillActionToast(result, t)
-        : undefined;
-      onBillChanged(enriched);
-    } catch (err) {
-      if (err instanceof ApiError) {
-        // Late-fee bills can't be cancelled by design — the BE answers
-        // LATE_FEE_BILL_CANNOT_CANCEL with hint_code USE_LATE_FEE_WAIVE
-        // (mig 1159). Route the user straight into the waive dialog.
-        if (err.messageParams?.hint_code === 'USE_LATE_FEE_WAIVE') {
-          setVoidOpen(false);
-          setWaiveLateFeeOpen(true);
-          return;
-        }
-        const translated = translateApiError(err, t);
-        setVoidError(translated || err.message);
-      } else {
-        setVoidError(err instanceof Error ? err.message : String(err));
-      }
-    } finally {
-      setVoiding(false);
     }
   };
 
@@ -1110,7 +1050,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
       <BillActionBar
         actions={allActions}
         suppressLifecycle={suppressLifecycle}
-        onVoidOrCancel={() => { setVoidOpen(true); setVoidError(''); setVoidReason(''); setVoidReasonCode(''); setVoidPin(''); }}
+        onVoidOrCancel={() => setVoidOpen(true)}
         onCancelClosedDay={() => setCancelClosedDayOpen(true)}
         onReverseCreditNote={() => setReverseCnOpen(true)}
         onWaiveLateFee={() => setWaiveLateFeeOpen(true)}
@@ -1127,47 +1067,19 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
         document.body,
       )}
 
-      {/* ── Void Modal ── */}
-      <Modal open={voidOpen} onClose={() => !voiding && setVoidOpen(false)} maxWidth="24rem" width="100%">
-        <div className="modal-header"><h2 className="modal-title">{t('accounting.bills.voidBill')}</h2></div>
-        <div className="modal-content">
-          <div className="form-grid">
-            <div className="flex flex-col">
-              <label className="form-label">{t('accounting.bills.voidReasonCode')} *</label>
-              <Select
-                options={voidReasonOptions}
-                value={voidReasonCode || null}
-                onChange={(v) => setVoidReasonCode((v as string) || '')}
-                placeholder={t('accounting.bills.voidReasonCodePlaceholder')}
-                searchable={false}
-              />
-            </div>
-            <div className="flex flex-col">
-              <label className="form-label">{t('accounting.bills.voidReason')} *</label>
-              <Input
-                value={voidReason}
-                onChange={(e) => setVoidReason(e.target.value)}
-                placeholder={t('accounting.bills.voidReasonPlaceholder')}
-                className="w-full"
-              />
-            </div>
-            {voidPinRequired && (
-              <BranchPinInput value={voidPin} onChange={setVoidPin} label={t('accounting.bills.pin')} required />
-            )}
-          </div>
-        </div>
-        <ModalErrorBand message={voidError} onDismiss={() => setVoidError('')} />
-        <div className="modal-footer">
-          <Button onClick={() => setVoidOpen(false)} disabled={voiding}>{t('common.cancel')}</Button>
-          <Button
-            color="danger"
-            onClick={handleVoid}
-            disabled={!voidReasonCode || !voidReason.trim() || (voidPinRequired && !voidPin) || voiding}
-          >
-            {voiding ? t('common.loading') : t('accounting.bills.confirmVoid')}
-          </Button>
-        </div>
-      </Modal>
+      <BillCancelModal
+        open={voidOpen}
+        onClose={() => setVoidOpen(false)}
+        billId={billId}
+        branchId={detail.branch_id}
+        billCode={detail.bill_code_display}
+        pinRequired={voidPinRequired}
+        onCancelled={() => {
+          invalidateAfterBillChange();
+          queryClient.invalidateQueries({ queryKey: ['accounting'] });
+        }}
+        onUseLateFeeWaive={() => setWaiveLateFeeOpen(true)}
+      />
 
       {/* ── Void single payment modal ── */}
       <VoidPaymentModal

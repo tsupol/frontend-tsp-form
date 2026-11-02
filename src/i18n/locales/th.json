@@ -404,6 +404,8 @@
       "voidReasonPlaceholder": "ระบุเหตุผลที่ยกเลิกบิล",
       "pin": "PIN สาขา",
       "confirmVoid": "ยืนยันยกเลิก",
+      "voidWarning": "การยกเลิกบิลนี้ไม่สามารถย้อนกลับได้",
+      "voidDone": "ยกเลิกบิลแล้ว",
       "voidPayment": "void รายการชำระ",
       "confirmVoidPayment": "ยืนยัน void รายการชำระ",
       "voidPaymentMessage": "ระบบจะบันทึกรายการกลับรายการ และบิลจะกลับมาเปิดให้ชำระใหม่",
@@ -8664,17 +8666,13 @@
       "takePayment": "รับชำระเงิน",
       "void": "ยกเลิก",
       "printBill": "พิมพ์บิล",
-      "openBillPage": "เปิดบิล",
+      "openBillPage": "ไปหน้าบิล",
+      "dayClosedHint": "วันของบิลนี้ปิดยอดแล้ว จึงยกเลิกไม่ได้",
       "amountDue": "ยอดที่ต้องชำระ",
       "paymentMethod": "วิธี",
       "confirmPayment": "ยืนยันการชำระ",
       "paymentSuccess": "รับชำระเรียบร้อย — เงินทอน {{change}}",
-      "paymentBlockedByApproval": "ชำระไม่ได้: ส่วนลด {{count}} รายการรออนุมัติ ({{statuses}})",
-      "voidWarning": "การยกเลิกบิลนี้ไม่สามารถย้อนกลับได้",
-      "voidReason": "เหตุผล",
-      "voidReasonPlaceholder": "ทำไมต้องยกเลิก?",
-      "confirmVoid": "ยืนยันการยกเลิก",
-      "voidSuccess": "ยกเลิกบิลเรียบร้อย"
+      "paymentBlockedByApproval": "ชำระไม่ได้: ส่วนลด {{count}} รายการรออนุมัติ ({{statuses}})"
     }
   },
   "retailSales": {

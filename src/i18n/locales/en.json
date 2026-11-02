@@ -404,6 +404,8 @@
       "voidReasonPlaceholder": "Why is this bill being voided?",
       "pin": "Branch PIN",
       "confirmVoid": "Confirm void",
+      "voidWarning": "This cannot be undone.",
+      "voidDone": "Bill voided",
       "voidPayment": "Void payment",
       "confirmVoidPayment": "Void payment",
       "voidPaymentMessage": "A reversal entry will be recorded and the bill will reopen for re-entry.",
@@ -8676,17 +8678,13 @@
       "takePayment": "Take Payment",
       "void": "Void",
       "printBill": "Print Bill",
-      "openBillPage": "Open Bill",
+      "openBillPage": "Go to bill page",
+      "dayClosedHint": "This bill's day is closed, so it can't be cancelled",
       "amountDue": "Amount Due",
       "paymentMethod": "Method",
       "confirmPayment": "Confirm Payment",
       "paymentSuccess": "Payment confirmed — change {{change}}",
-      "paymentBlockedByApproval": "Payment blocked: {{count}} discount line(s) awaiting approval ({{statuses}})",
-      "voidWarning": "This will void the bill. Cannot be undone.",
-      "voidReason": "Reason",
-      "voidReasonPlaceholder": "Why are you voiding this bill?",
-      "confirmVoid": "Void Bill",
-      "voidSuccess": "Bill voided"
+      "paymentBlockedByApproval": "Payment blocked: {{count}} discount line(s) awaiting approval ({{statuses}})"
     }
   },
   "retailSales": {

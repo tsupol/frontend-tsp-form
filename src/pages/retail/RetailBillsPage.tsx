@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation, keepPreviousData } from '@tanstack/react-query';
 import {
   PageNav, PageNavPanel, MobileHeader, DataTable, Select, Badge, Button,
-  Modal, MaskedInput, TextArea, useSnackbarContext,
+  Modal, MaskedInput, useSnackbarContext,
 } from 'tsp-form';
 import {
   ArrowRightFromLine, ArrowLeft, Plus, Wallet, Ban, AlertCircle, CheckCircle, XCircle, ChevronsRight,
@@ -15,16 +15,15 @@ import { apiClient, ApiError } from '../../lib/api';
 import { useBillSettle } from '../../hooks/useBillSettle';
 import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
-import { BranchPinInput } from '../../components/BranchPinInput';
 import { fmtCurrency } from '../../lib/format';
 import { printWithMarker } from '../../lib/printDoc';
 import { useBillPdfDownload } from '../../hooks/useBillPdfDownload';
 import { BillReceipt } from '../contracts/workspace/BillReceipt';
-import { buildBillActionToast, hasBill, type StandardBillResponse } from '../../lib/billActionToast';
 import { CreateRetailBillModal } from './CreateRetailBillModal';
-import { useBillActions, type BillAction, type BillBlockingReason } from '../../hooks/useBillActions';
+import { billCancelPinRequired, useBillActions, type BillAction, type BillBlockingReason } from '../../hooks/useBillActions';
+import { BillCancelModal } from '../accounting/BillCancelModal';
 import { BranchPaymentAccountField } from '../../components/BranchPaymentAccountField';
-import { translateApiError } from '../../lib/apiErrors';
+import { blockingReasonText, translateApiError } from '../../lib/apiErrors';
 import { BankAccountInline } from '../../components/BankAccountLine';
 
 interface Branch {
@@ -72,6 +71,9 @@ interface BillPayment {
 }
 
 interface BillDetail {
+  /** Same view as the bills page: a cancelled bill shows up in any of these. */
+  is_voided: boolean;
+  cancel_info: unknown | null;
   bill_id: number;
   branch_id: number;
   bill_code_display: string;
@@ -341,8 +343,18 @@ function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: bool
 
   const addPaymentAction = getAction('ADD_PAYMENT');
   const cancelBillAction = getAction('CANCEL_BILL');
+  // A PAID bill is cancelled through VOID_BILL (it gets a credit note); CANCEL_BILL
+  // is only ever offered on an unpaid one. The evaluator can still offer VOID_BILL
+  // on a bill already cancelled, so that case is ruled out here.
+  const voidBillAction = getAction('VOID_BILL');
+  const isCancelled = detail.is_voided || detail.status === 'VOIDED' || detail.cancel_info != null;
   const showPayBtn = !!addPaymentAction?.is_available;
-  const showVoidBtn = !!cancelBillAction?.is_available;
+  const showVoidBtn = !isCancelled && (!!cancelBillAction?.is_available || !!voidBillAction?.is_available);
+  // Why a paid bill can't be cancelled. Not for "no permission": staff would get the
+  // same warning on every paid bill, so the button is simply not there for them.
+  const voidHint = !isCancelled && detail.status === 'PAID' && voidBillAction && !voidBillAction.is_available
+    && voidBillAction.blocking_reason !== 'permission_denied'
+    ? voidBillAction : undefined;
   // Receipt only makes sense once money has moved — VOIDED has no receipt to print.
   const showReceiptBtns = detail.status !== 'VOIDED';
 
@@ -393,11 +405,11 @@ function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: bool
         )}
       </div>
 
-      {/* Blocked-action hint — show why ADD_PAYMENT or CANCEL_BILL is unavailable.
+      {/* Blocked-action hint — show why taking payment or cancelling is unavailable.
           status_not_allowed is suppressed: status alone is already obvious from the badge. */}
       {actionsData && (
         <BlockedActionHints
-          actions={[addPaymentAction, cancelBillAction].filter((a): a is BillAction =>
+          actions={[addPaymentAction, cancelBillAction, voidHint].filter((a): a is BillAction =>
             !!a && !a.is_available && !!a.blocking_reason && a.blocking_reason !== 'status_not_allowed'
           )}
           pendingCount={actionsData.pending_approval_count}
@@ -458,7 +470,7 @@ function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: bool
       </div>
 
       {/* Sticky action footer */}
-      <div className="flex-none border-t border-line px-4 py-3 flex flex-wrap items-center justify-end gap-2">
+      <div className={`flex-none border-t border-line px-4 py-3 gap-2 ${isMobile ? 'grid grid-cols-2' : 'flex flex-wrap items-center justify-end'}`}>
         {showReceiptBtns && (
           <>
             <Button
@@ -523,12 +535,14 @@ function RetailBillDetail({ billId, isMobile }: { billId: number; isMobile: bool
         remaining={detail.remaining}
         onSuccess={() => { setPayOpen(false); onMutationSuccess(); }}
       />
-      <VoidBillModal
+      <BillCancelModal
         open={voidOpen}
         onClose={() => setVoidOpen(false)}
-        billId={detail.bill_id}
+        billId={billId}
         branchId={detail.branch_id}
-        onSuccess={() => { setVoidOpen(false); onMutationSuccess(); }}
+        billCode={detail.bill_code_display}
+        pinRequired={billCancelPinRequired(actionsData?.actions ?? [])}
+        onCancelled={onMutationSuccess}
       />
 
       {/* Print receipt — body portal so no panel ancestor becomes the @page
@@ -699,111 +713,6 @@ function TakePaymentModal({
 }
 
 /* ───────────────────────────────────────────────────────────────────────────
- * Void Bill Modal
- * ─────────────────────────────────────────────────────────────────────────── */
-
-function VoidBillModal({
-  open, onClose, billId, branchId, onSuccess,
-}: {
-  open: boolean;
-  onClose: () => void;
-  billId: number;
-  branchId: number;
-  onSuccess: () => void;
-}) {
-  const { t } = useTranslation();
-  const { addSnackbar } = useSnackbarContext();
-  const [reason, setReason] = useState('');
-  const [pin, setPin] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
-
-  useEffect(() => {
-    if (open) {
-      setReason('');
-      setPin('');
-      setErrorMessage('');
-    }
-  }, [open]);
-
-  const valid = reason.trim().length > 0 && pin.length === 6;
-
-  const mutation = useMutation({
-    mutationFn: () => apiClient.rpc<Partial<StandardBillResponse>>('fn_bill_cancel', {
-      p_bill_id: billId,
-      p_branch_id: branchId,
-      p_pin: pin,
-      p_reason: reason.trim(),
-    }),
-    onSuccess: (result) => {
-      // Retail void on a PAID bill mints a CREDIT_NOTE — surface its code if so.
-      const message = hasBill(result) && result.bill_type === 'CREDIT_NOTE'
-        ? buildBillActionToast(result, t)
-        : (
-          <div className="alert alert-success">
-            <CheckCircle size={16} />
-            <span className="alert-description">{t('retail.bills.voidSuccess')}</span>
-          </div>
-        );
-      addSnackbar({ type: 'success', message });
-      onSuccess();
-    },
-    onError: (err) => {
-      if (err instanceof ApiError) {
-        const translated = translateApiError(err, t);
-        setErrorMessage(translated || err.message);
-      } else {
-        setErrorMessage(String(err));
-      }
-    },
-  });
-
-  return (
-    <Modal open={open} onClose={onClose} maxWidth="26rem" width="100%" ariaLabel="Void Bill">
-      <div className="flex flex-col overflow-hidden">
-        <div className="modal-header">
-          <h2 className="modal-title">{t('retail.bills.void')}</h2>
-          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">×</button>
-        </div>
-        <div className="modal-content form-grid">
-          <div className="alert alert-warning">
-            <AlertCircle size={16} />
-            <div className="alert-description">{t('retail.bills.voidWarning')}</div>
-          </div>
-          <div className="flex flex-col">
-            <label className="form-label">{t('retail.bills.voidReason')}</label>
-            <TextArea
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder={t('retail.bills.voidReasonPlaceholder')}
-              size="sm"
-              rows={2}
-              className="w-full"
-            />
-          </div>
-          <BranchPinInput value={pin} onChange={setPin} required />
-          {errorMessage && (
-            <div className="alert alert-danger">
-              <XCircle size={16} />
-              <div className="alert-description">{errorMessage}</div>
-            </div>
-          )}
-        </div>
-        <div className="modal-footer">
-          <Button onClick={onClose} disabled={mutation.isPending}>{t('common.cancel')}</Button>
-          <Button
-            color="danger"
-            disabled={!valid || mutation.isPending}
-            onClick={() => mutation.mutate()}
-          >
-            {t('retail.bills.confirmVoid')}
-          </Button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-/* ───────────────────────────────────────────────────────────────────────────
  * Blocked Action Hints — explains *why* an action button is hidden
  * ─────────────────────────────────────────────────────────────────────────── */
 
@@ -829,17 +738,26 @@ function BlockedActionHints({
     }
   };
 
+  // The label the user knows from this screen's own button.
+  const label = (a: BillAction) => (a.action_code === 'VOID_BILL' ? t('retail.bills.void') : t(a.action_code, { ns: 'billActions' }));
+  const reasonText = (a: BillAction) => {
+    const reason = a.blocking_reason as BillBlockingReason;
+    // The shared wording points at a closed-day button that retail bills don't offer.
+    if (a.action_code === 'VOID_BILL' && reason === 'day_closed') return t('retail.bills.dayClosedHint');
+    if (reason === 'pending_approval_blocks' || reason === 'not_paid_in_full') {
+      return t(`blockingReason.${reason}`, { ns: 'apiErrors', ...reasonInterp(reason) });
+    }
+    return blockingReasonText(a, t);
+  };
+
   return (
     <div className="flex-none px-4 py-3 border-b border-line flex flex-col gap-2">
       {actions.map(a => (
         <div key={a.action_code} className="alert alert-warning">
           <AlertCircle size={16} />
           <div className="alert-description">
-            <span className="font-medium">{t(a.action_code, { ns: 'billActions' })}: </span>
-            {t(`blockingReason.${a.blocking_reason}`, {
-              ns: 'apiErrors',
-              ...reasonInterp(a.blocking_reason as BillBlockingReason),
-            })}
+            <span className="font-medium">{label(a)}: </span>
+            {reasonText(a)}
           </div>
         </div>
       ))}
