@@ -42,8 +42,10 @@ export type BillBlockingReason =
   // while the branch's earlier day was still open; now the evaluator says so up
   // front instead of letting the click fail. Two distinct cases:
   //   previous_day_not_closed — the bill is today's; close `unclosed_date` and retry
-  //   previous_day_bill       — the bill itself belongs to that still-open earlier
-  //                             day; the shop can never cancel it, a system admin must
+  //   previous_day_bill       — the bill belongs to that still-open earlier day and
+  //                             its type must not be cancelled now: contract-open or
+  //                             device-sale bills (mig 1590). Other bills of an open
+  //                             earlier day can be cancelled, so this no longer blocks.
   | 'previous_day_not_closed'
   | 'previous_day_bill'
   // The shop's payment request locks the contract's opening bill once the shop

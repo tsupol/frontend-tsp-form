@@ -17,6 +17,7 @@ import { useBillSettle } from '../../hooks/useBillSettle';
 import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
 import { BranchPinInput } from '../../components/BranchPinInput';
+import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { fmtCurrency } from '../../lib/format';
 import { printWithMarker } from '../../lib/printDoc';
 import { useBillPdfDownload } from '../../hooks/useBillPdfDownload';
@@ -1131,12 +1132,6 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
         <div className="modal-header"><h2 className="modal-title">{t('accounting.bills.voidBill')}</h2></div>
         <div className="modal-content">
           <div className="form-grid">
-            {voidError && (
-              <div className="alert alert-danger">
-                <XCircle size={18} />
-                <div><div className="alert-description">{voidError}</div></div>
-              </div>
-            )}
             <div className="flex flex-col">
               <label className="form-label">{t('accounting.bills.voidReasonCode')} *</label>
               <Select
@@ -1161,6 +1156,7 @@ function BillDetailPanel({ billId, onBillChanged }: { billId: number; onBillChan
             )}
           </div>
         </div>
+        <ModalErrorBand message={voidError} onDismiss={() => setVoidError('')} />
         <div className="modal-footer">
           <Button onClick={() => setVoidOpen(false)} disabled={voiding}>{t('common.cancel')}</Button>
           <Button
