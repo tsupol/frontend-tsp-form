@@ -16,6 +16,7 @@ import { ContractDeviceTimeline } from '../../components/AssetContractTimeline';
 import { ColorSwatch } from '../../components/ColorAutocomplete';
 import { ImeiInput } from '../../components/ImeiInput';
 import { identifierFormatReason, isAppleBrand } from '../../lib/validators';
+import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { SerialInput } from '../../components/SerialInput';
 import { translateApiError } from '../../lib/apiErrors';
 import { useAuth } from '../../contexts/AuthContext';
@@ -1031,12 +1032,6 @@ function CorrectIdentifierModal({
       </div>
       <div className="modal-content">
         <div className="form-grid">
-          {error && (
-            <div className="alert alert-danger">
-              <XCircle size={16} />
-              <span>{error}</span>
-            </div>
-          )}
           <div className="flex flex-col">
             <label className="form-label">{t('contract.identifierCorrectExisting', { defaultValue: 'Current value' })}</label>
             <div className="text-sm font-mono px-3 py-2 rounded-md border border-line bg-surface text-subtle">{oldValue}</div>
@@ -1056,6 +1051,7 @@ function CorrectIdentifierModal({
           </div>
         </div>
       </div>
+      <ModalErrorBand message={error} onDismiss={() => setError('')} />
       <div className="modal-footer">
         <Button onClick={onClose} disabled={saving}>{t('common.cancel')}</Button>
         <Button
