@@ -8,7 +8,7 @@ import type { ReactNode } from 'react';
  *
  * A bar can be a single fill or a two-segment stack (`segments`): the segments
  * sum to `value` and lay out left→right, each with its own colour. Used by:
- *   - "เปิดสัญญาตามรุ่น" (opened-by-model): financed + down = agreed
+ *   - "เปิดสัญญาตามรุ่น" (opened-by-model): financed + down (down may be absent)
  *   - "สัดส่วนค่าใช้จ่าย" (expense-by-category): single fill = total_amount
  * ─────────────────────────────────────────────────────────────────────────── */
 

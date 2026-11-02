@@ -13,7 +13,7 @@ import {
 /* ───────────────────────────────────────────────────────────────────────────
  * Calendar view of รายงานเปิดสัญญา — the same month rows as the bar chart,
  * laid out Sunday→Saturday (the app's date pickers start on Sunday).
- * Each day: date · contracts (bold) · financed amount, abbreviated. The cell
+ * Each day: date · contracts (bold) · financed amount (ยอดจัด), abbreviated. The cell
  * background deepens with the day's contracts against the month's busiest day.
  * Saturday/Sunday columns are shaded; company holidays carry a label.
  * Hover (mouse) or tap (touch) a day → the same breakdown as the bar hover.
@@ -164,7 +164,7 @@ export function ContractsOpenedCalendar({ month, points, branchRowsByDay, holida
                   <div className="mt-auto flex flex-col items-end leading-tight">
                     <span className="text-base sm:text-lg font-semibold tabular-nums">{contracts}</span>
                     <span className={`text-[10px] tabular-nums max-sm:hidden ${level === 4 ? '' : 'text-subtle'}`}>
-                      {fmtCompact(p!.agreed)}
+                      {fmtCompact(p!.financed ?? 0)}
                     </span>
                   </div>
                 )}

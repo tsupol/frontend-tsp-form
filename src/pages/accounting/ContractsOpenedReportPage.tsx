@@ -5,12 +5,14 @@ import { Button, MobileHeader, Select } from 'tsp-form';
 import { ArrowRightFromLine, BarChart3, CalendarDays, TrendingUp } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
-import { fmtCurrency } from '../../lib/format';
 import { MonthPicker } from '../../components/MonthPicker';
 import {
   ContractsOpenedChart,
   ChartLegend,
+  OpenedMetricStrip,
+  hasOpenedData,
   monthStartIso,
+  openedMetricCells,
   useBranchRowsByDay,
   useDayPoints,
   useMonthTotals,
@@ -27,6 +29,9 @@ import { ContractsOpenedCalendar } from '../../components/ContractsOpenedCalenda
  * Spec: UI_FEEDBACK/2026-07-05_IMPLEMENT_report_contracts_opened.md
  *     + UI_FEEDBACK/2026-10-18_IMPLEMENT_report_contracts_opened_upgrade.md
  *       (per-branch hover, calendar view, company holidays)
+ *     + UI_FEEDBACK/2026-11-02_IMPLEMENT_report_contracts_opened_money_tiers.md
+ *       (eight money figures, null = hidden; summary cells come from the
+ *       shared OPENED_METRICS table, never written per screen)
  * ─────────────────────────────────────────────────────────────────────────── */
 
 interface Branch { id: number; name: string; company_id: number }
@@ -87,7 +92,7 @@ export function ContractsOpenedReportPage() {
 
   const points = useDayPoints(rows);
   const totals = useMonthTotals(points);
-  const hasData = totals.agreed > 0 || totals.contracts > 0;
+  const hasData = hasOpenedData(totals);
   // Per-branch hover only when several branches are in play; one branch picked
   // (or a branch user) keeps the single-day summary.
   const branchRowsByDay = useBranchRowsByDay(rows);
@@ -193,15 +198,9 @@ export function ContractsOpenedReportPage() {
         <div className="shrink-0">{viewSwitch}</div>
       </div>
 
-      {/* Summary strip */}
-      <div className="flex-none flex items-stretch divide-x divide-line border-b border-line">
-        <SummaryCell label={t('contractsOpened.sumContracts')} value={String(totals.contracts)} />
-        <SummaryCell label={t('contractsOpened.sumAgreed')} value={`฿${fmtCurrency(totals.agreed)}`} />
-        <SummaryCell
-          label={t('contractsOpened.sumDown')}
-          value={`฿${fmtCurrency(totals.down)}`}
-          hint={t('contractsOpened.downHint')}
-        />
+      {/* Summary strip — the tier's visible figures; a hidden (null) one has no cell. */}
+      <div className="flex-none">
+        <OpenedMetricStrip cells={openedMetricCells(totals, t)} />
       </div>
 
       {/* Body — capped height, page scrolls past it rather than stretching bars. */}
@@ -229,6 +228,7 @@ export function ContractsOpenedReportPage() {
             <ChartLegend
               downLabel={t('contractsOpened.legendDown')}
               financedLabel={t('contractsOpened.legendFinanced')}
+              hideDown={totals.down == null}
             />
             <div className="h-[380px]">
               <ContractsOpenedChart
@@ -239,16 +239,6 @@ export function ContractsOpenedReportPage() {
           </div>
         )}
       </div>
-    </div>
-  );
-}
-
-function SummaryCell({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <div className="flex-1 px-4 py-2.5 min-w-0">
-      <div className="text-xs text-subtle truncate">{label}</div>
-      <div className="text-lg font-semibold tabular-nums truncate">{value}</div>
-      {hint && <div className="text-[10px] text-subtler truncate">{hint}</div>}
     </div>
   );
 }

@@ -9,33 +9,48 @@ import {
   fmtCurrency, toLocalDateStr, parseLocalDate, makeDateRangePickerFormat,
 } from '../../lib/format';
 import { HBarReport, HBarLegend, type HBarRow } from '../../components/HBarReport';
+import {
+  COLOR_DOWN,
+  COLOR_FINANCED,
+  OpenedMetricStrip,
+  addOpenedRow,
+  emptyOpenedMoney,
+  openedMetricCells,
+  type OpenedRow,
+} from '../../components/ContractsOpenedChart';
 
 /* ───────────────────────────────────────────────────────────────────────────
  * รายงานเปิดสัญญาตามรุ่น — opened contracts ranked by product model.
- * Horizontal bar per model. Each bar is 2 segments: financed (dark) + down
- * (light), summing to agreed_total. End label = count · ฿agreed · down %.
+ * Horizontal bar per model. Each bar is 2 segments: financed + down, in the
+ * same colours as รายงานเปิดสัญญา; bar length = financed + down. End label = count · ฿financed · down %.
+ * A branch-tier caller gets `down_total` = null → one-segment bars, no %.
  * Order (opened vs financed) is a header toggle → p_order_by; render as-is.
  * Data: POST /rpc/fn_contracts_opened_by_model. Scope is JWT-bound; the
  * company/branch dropdowns only narrow inside what the JWT already permits.
+ * Summary cells come from the shared OPENED_METRICS table (null = hidden),
+ * with this report's own labels and its ราคาตกลงรวม cell (work order §4.3).
  * Spec: UI_FEEDBACK/2026-07-28_IMPLEMENT_report_opened_by_model_chart.md
+ *     + UI_FEEDBACK/2026-11-02_IMPLEMENT_report_contracts_opened_money_tiers.md
  * ─────────────────────────────────────────────────────────────────────────── */
 
-// Chart palette lives in src/chart-theme.css — use its slots, never a
-// color-mix toward --color-bg (that blend darkens to near-invisible in dark
-// mode, which is why the theme file exists).
-const COLOR_FINANCED = 'var(--chart-1)';
-const COLOR_DOWN = 'var(--chart-4)';
 const TOP_N = 15;
 
-interface ModelRow {
+// This report's words for the shared figures. It keeps its own "รวม" labels.
+const SUMMARY_LABELS: Record<string, string> = {
+  contracts: 'openedByModel.sumContracts',
+  financed: 'openedByModel.sumFinanced',
+  down: 'openedByModel.sumDown',
+};
+
+interface ModelRow extends OpenedRow {
   model_id: number | null;
   product_display_name: string;
-  opened_contracts: number;
-  financed_total: number;
-  agreed_total: number;
-  down_total: number;
-  down_pct: number | null;
 }
+
+/** Bar length: the money in the contract (financed) plus the down payment
+ *  when this caller may see it. Never `agreed_total` — that is null for a
+ *  branch, which drew empty bars. */
+const barValue = (r: OpenedRow) => Number(r.financed_total) + (Number(r.down_total) || 0);
 
 interface Branch { id: number; name: string; company_id: number }
 interface Company { id: number; name: string }
@@ -98,16 +113,22 @@ export function OpenedByModelReportPage() {
     }),
   });
 
-  const totals = useMemo(() => rows.reduce(
-    (acc, r) => {
-      acc.contracts += r.opened_contracts;
-      acc.agreed += Number(r.agreed_total) || 0;
-      acc.financed += Number(r.financed_total) || 0;
-      acc.down += Number(r.down_total) || 0;
-      return acc;
-    },
-    { contracts: 0, agreed: 0, financed: 0, down: 0 },
-  ), [rows]);
+  const totals = useMemo(() => rows.reduce(addOpenedRow, emptyOpenedMoney()), [rows]);
+
+  const summaryCells = useMemo(() => {
+    const cells = openedMetricCells(totals, t).map((c) => (
+      SUMMARY_LABELS[c.key] ? { ...c, label: t(SUMMARY_LABELS[c.key]), hint: undefined } : c
+    ));
+    if (totals.agreed != null) {
+      const afterDown = cells.findIndex((c) => c.key === 'down') + 1;
+      cells.splice(afterDown || cells.length, 0, {
+        key: 'agreed',
+        label: t('openedByModel.sumAgreed'),
+        value: `฿${fmtCurrency(totals.agreed)}`,
+      });
+    }
+    return cells;
+  }, [totals, t]);
 
   // Show top-N by the RPC's own order, roll the long tail into one "others" bar.
   const barRows = useMemo<HBarRow[]>(() => {
@@ -116,7 +137,7 @@ export function OpenedByModelReportPage() {
     const out: HBarRow[] = head.map((r) => ({
       key: r.model_id ?? 'none',
       label: r.model_id == null ? t('openedByModel.noModel') : r.product_display_name,
-      value: Number(r.agreed_total) || 0,
+      value: barValue(r),
       segments: [
         { value: Number(r.financed_total) || 0, color: COLOR_FINANCED, label: t('openedByModel.financed') },
         { value: Number(r.down_total) || 0, color: COLOR_DOWN, label: t('openedByModel.down') },
@@ -124,34 +145,25 @@ export function OpenedByModelReportPage() {
       endLabel: (
         <span>
           {t('openedByModel.contractsN', { count: r.opened_contracts })}
-          {' · '}฿{fmtCurrency(r.agreed_total)}
+          {' · '}฿{fmtCurrency(r.financed_total)}
           {r.down_pct != null && <span className="text-subtler"> · {t('openedByModel.downPct', { pct: r.down_pct })}</span>}
         </span>
       ),
     }));
     if (tail.length > 0) {
-      const agg = tail.reduce(
-        (acc, r) => {
-          acc.contracts += r.opened_contracts;
-          acc.agreed += Number(r.agreed_total) || 0;
-          acc.financed += Number(r.financed_total) || 0;
-          acc.down += Number(r.down_total) || 0;
-          return acc;
-        },
-        { contracts: 0, agreed: 0, financed: 0, down: 0 },
-      );
+      const agg = tail.reduce(addOpenedRow, emptyOpenedMoney());
       out.push({
         key: '__others__',
         label: t('openedByModel.others', { count: tail.length }),
-        value: agg.agreed,
+        value: (agg.financed ?? 0) + (agg.down ?? 0),
         segments: [
-          { value: agg.financed, color: COLOR_FINANCED },
-          { value: agg.down, color: COLOR_DOWN },
+          { value: agg.financed ?? 0, color: COLOR_FINANCED },
+          { value: agg.down ?? 0, color: COLOR_DOWN },
         ],
         endLabel: (
           <span>
             {t('openedByModel.contractsN', { count: agg.contracts })}
-            {' · '}฿{fmtCurrency(agg.agreed)}
+            {' · '}฿{fmtCurrency(agg.financed ?? 0)}
           </span>
         ),
       });
@@ -275,12 +287,9 @@ export function OpenedByModelReportPage() {
         <div className="self-start">{orderToggle}</div>
       </div>
 
-      {/* Summary strip */}
-      <div className="flex-none flex items-stretch divide-x divide-line border-b border-line">
-        <SummaryCell label={t('openedByModel.sumContracts')} value={String(totals.contracts)} />
-        <SummaryCell label={t('openedByModel.sumFinanced')} value={`฿${fmtCurrency(totals.financed)}`} />
-        <SummaryCell label={t('openedByModel.sumDown')} value={`฿${fmtCurrency(totals.down)}`} />
-        <SummaryCell label={t('openedByModel.sumAgreed')} value={`฿${fmtCurrency(totals.agreed)}`} />
+      {/* Summary strip — the tier's visible figures; a hidden (null) one has no cell. */}
+      <div className="flex-none">
+        <OpenedMetricStrip cells={summaryCells} />
       </div>
 
       {/* Bars */}
@@ -295,22 +304,13 @@ export function OpenedByModelReportPage() {
             <div className="mb-4">
               <HBarLegend items={[
                 { color: COLOR_FINANCED, label: t('openedByModel.financed') },
-                { color: COLOR_DOWN, label: t('openedByModel.down') },
+                ...(totals.down == null ? [] : [{ color: COLOR_DOWN, label: t('openedByModel.down') }]),
               ]} />
             </div>
             <HBarReport rows={barRows} isMuted={(r) => r.key === '__others__'} />
           </div>
         )}
       </div>
-    </div>
-  );
-}
-
-function SummaryCell({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex-1 px-4 py-2.5 min-w-0">
-      <div className="text-xs text-subtle truncate">{label}</div>
-      <div className="text-lg font-semibold tabular-nums truncate">{value}</div>
     </div>
   );
 }

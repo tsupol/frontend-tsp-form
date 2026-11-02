@@ -39,7 +39,7 @@ import { useNavCounts } from '../hooks/useNavCounts';
 import { PartnerRemitAccounts } from '../components/PartnerRemitAccounts';
 import { PushSubscribeBanner } from '../components/PushSubscribeBanner';
 import { MonthPicker } from '../components/MonthPicker';
-import { MonthOpenedView, monthStartIso, useDayPoints, useMonthTotals, type MonthlyRow } from '../components/ContractsOpenedChart';
+import { MonthOpenedView, hasOpenedData, monthStartIso, useDayPoints, useMonthTotals, type MonthlyRow } from '../components/ContractsOpenedChart';
 import { translateApiError } from '../lib/apiErrors';
 import type { PartnerCase } from './partner-cases/partnerCaseTypes';
 import { SHOP_TODO_PATH, shopTodoRowPath } from './contracts/ShopTodoPage';
@@ -132,7 +132,7 @@ export function PartnerDashboardPage() {
   });
   const monthPoints = useDayPoints(monthlyQuery.data ?? []);
   const monthTotals = useMonthTotals(monthPoints);
-  const monthHasData = monthTotals.agreed > 0 || monthTotals.contracts > 0;
+  const monthHasData = hasOpenedData(monthTotals);
 
   const workCount = actions.length + cases.length;
 

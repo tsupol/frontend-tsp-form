@@ -37,6 +37,7 @@ import {
   monthStartIso,
   useDayPoints,
   useMonthTotals,
+  hasOpenedData,
   type MonthlyRow,
 } from '../components/ContractsOpenedChart';
 import { PushSubscribeBanner } from '../components/PushSubscribeBanner';
@@ -426,7 +427,7 @@ export function DashboardPage() {
   });
   const monthPoints = useDayPoints(monthlyQuery.data ?? []);
   const monthTotals = useMonthTotals(monthPoints);
-  const monthHasData = monthTotals.agreed > 0 || monthTotals.contracts > 0;
+  const monthHasData = hasOpenedData(monthTotals);
 
   return (
     <>
