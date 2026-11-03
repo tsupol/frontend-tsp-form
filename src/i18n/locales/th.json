@@ -2254,7 +2254,31 @@
       "generic": "ประมวลผลภาพไม่ได้"
     }
   },
+  "lostMode": {
+    "sectionTitle": "Lost Mode",
+    "message": "ข้อความ Lost Mode",
+    "phone": "เบอร์ Lost Mode",
+    "messageHint": "แสดงบนเครื่องที่ถูกล็อก ไม่ต้องใส่เบอร์ เบอร์อยู่ช่องถัดไป",
+    "usesDefault": "ค่า default ของระบบ",
+    "resetDefault": "คืนค่า default",
+    "phoneEmptyBranch": "ว่าง = ใช้เบอร์สาขา",
+    "phoneEmptyCompany": "ว่าง = ใช้เบอร์บริษัท",
+    "branchHint": "สิ่งที่ลูกค้าเห็นบนจอล็อก เมื่อพนักงานกด Lost Mode",
+    "fundHint": "ใช้กับทุกร้านของกองทุนนี้",
+    "setAtFund": "ตั้งที่บริษัทกองทุน",
+    "preview": "ดูตัวอย่าง",
+    "previewTitle": "ตัวอย่างจอล็อก",
+    "phoneMissing": "ยังไม่มีเบอร์ ตอนกด Lost Mode พนักงานต้องพิมพ์เบอร์เอง",
+    "sampleContract": "(เลขสัญญาตัวอย่าง จอจริงแสดงเลขสัญญาของเครื่องนั้น)",
+    "previewCaveat": "ภาพจำลอง หน้าจอ iPhone จริงอาจต่างเล็กน้อย",
+    "screenTitle": "iPhone สูญหาย",
+    "screenCall": "โทร",
+    "screenEmergency": "ฉุกเฉิน"
+  },
   "branches": {
+    "savedTitle": "บันทึกสาขาแล้ว",
+    "createdTitle": "สร้างสาขาแล้ว",
+    "deactivatedTitle": "ปิดใช้งานสาขาแล้ว",
     "title": "สาขา",
     "description": "จัดการสาขาและประเภทสาขา",
     "allTypes": "ทุกประเภท",
@@ -6495,6 +6519,8 @@
     "noData": "ไม่มีสัญญาที่เปิดในช่วงนี้"
   },
   "org": {
+    "branchPhoneRequiredHint": "บังคับกรอก ลูกค้าเห็นเบอร์นี้บนเครื่องที่ถูกล็อก",
+    "branchPhoneInvalid": "ตรวจเบอร์อีกครั้ง ต้องเป็น 9–10 หลัก ขึ้นต้นด้วย 0",
     "title": "องค์กร",
     "description": "โฮลดิ้ง Company และสาขา",
     "empty": "ไม่พบข้อมูลองค์กร",

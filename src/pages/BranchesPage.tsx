@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   DataTable, MobileHeader,
-  Input, Badge, Modal, Button, Select, PopOver, LabeledCheckbox,
+  Input, Badge, Modal, Button, Select, PopOver, LabeledCheckbox, FormErrorMessage,
   type SortingState,
 } from 'tsp-form';
 import { ArrowRightFromLine, ExternalLink, Plus, Pencil, Power, Search, SlidersHorizontal } from 'lucide-react';
@@ -14,6 +14,13 @@ import { translateApiError } from '../lib/apiErrors';
 import { useCompanyTypes } from '../hooks/useCompanyTypes';
 import { useMyPermissions } from '../hooks/useMyPermissions';
 import { ModalErrorBand } from '../components/ModalErrorBand';
+import { ActionDoneView, type ActionDoneDetailRow } from './contracts/ActionDoneView';
+import { useFormSnapshot } from '../hooks/useFormSnapshot';
+import { thaiPhoneReason } from '../lib/validators';
+import { formatTel } from '../lib/format';
+import { LostModeFields, LostModePreviewButton, LostModeReadOnly } from '../components/lostMode/LostModeFields';
+import { LostModePreviewModal } from '../components/lostMode/LostModePreviewModal';
+import { useLostModeDraft, type LostModeValues } from '../components/lostMode/useLostModeDraft';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -36,6 +43,12 @@ interface Branch {
   line_id: string | null;
   google_map_url: string | null;
   facebook_url: string | null;
+  /** mig 1608 — BRANCH = edited here · COMPANY = a shop under a fund, shows the fund's. */
+  lost_mode_scope: 'BRANCH' | 'COMPANY';
+  lost_mode_message: string | null;
+  lost_mode_phone: string | null;
+  lost_mode_message_effective: string | null;
+  lost_mode_phone_effective: string | null;
 }
 
 interface BranchEditModel {
@@ -152,6 +165,11 @@ export function BranchesPage() {
   const [modalOrig, setModalOrig] = useState<Branch | null>(null);
   const [modalError, setModalError] = useState('');
   const [modalSaving, setModalSaving] = useState(false);
+  const [modalView, setModalView] = useState<'form' | 'done'>('form');
+  const [doneTitle, setDoneTitle] = useState('');
+  const [doneRows, setDoneRows] = useState<ActionDoneDetailRow[]>([]);
+  const [confirmClose, setConfirmClose] = useState(false);
+  const snapshot = useFormSnapshot({ ...modalData });
 
   const updateField = <K extends keyof BranchEditModel>(key: K, val: BranchEditModel[K]) => {
     setModalData(d => ({ ...d, [key]: val }));
@@ -215,6 +233,21 @@ export function BranchesPage() {
   // and under a fund company an internal branch has to be the warehouse.
   const warehouseApplies = modalMode === 'create' && modalData.branch_type === 'INTERNAL';
   const warehouseRequired = warehouseApplies && modalIsFundCompany;
+  // Every branch of an operating company needs a phone (work order 2026-11-03):
+  // it is what the customer's locked device shows. A warehouse has no customers.
+  const phoneRequired = modalMode === 'create' && !!modalCompanyType && !modalIsFundCompany && !modalData.is_company_warehouse;
+  const phoneInvalid = modalMode === 'create' && modalData.phone !== '' && thaiPhoneReason(modalData.phone) !== null;
+
+  // Same gate as the document name (157 §1a). A shop under a fund shows the
+  // fund's values read-only; a branch manager does not see the section at all.
+  const showLostMode = modalMode === 'edit' && canEditDocName && !!modalOrig;
+  const lostModeEditable = modalOrig?.lost_mode_scope === 'BRANCH';
+  const lostMode = useLostModeDraft({
+    target: modalOrig ? { branchId: modalOrig.id } : null,
+    values: modalOrig as LostModeValues | null,
+    editable: lostModeEditable,
+    seedKey: modalOpen && modalOrig ? modalOrig.id : null,
+  });
 
   const filtered = useMemo(() => {
     let result = branches;
@@ -257,6 +290,8 @@ export function BranchesPage() {
       code: '',
     });
     setModalError('');
+    setModalView('form');
+    snapshot.resetNext();
     setModalOpen(true);
   };
 
@@ -281,10 +316,23 @@ export function BranchesPage() {
       is_active: b.is_active,
     });
     setModalError('');
+    setModalView('form');
+    snapshot.resetNext();
     setModalOpen(true);
   };
 
-  const closeModal = () => { setModalOpen(false); setModalError(''); };
+  const closeModal = () => { setConfirmClose(false); setModalOpen(false); setModalError(''); };
+
+  const handleClose = () => {
+    if (modalView === 'form' && (snapshot.isDirty || lostMode.isDirty)) { setConfirmClose(true); return; }
+    closeModal();
+  };
+
+  const showDone = (title: string, rows: ActionDoneDetailRow[]) => {
+    setDoneTitle(title);
+    setDoneRows(rows);
+    setModalView('done');
+  };
 
   const handleSave = async () => {
     setModalError('');
@@ -300,11 +348,18 @@ export function BranchesPage() {
           // Postgres 23502 (verified on DEV 2026-09-18); omitting the param lets
           // the RPC default it. So only send it when the user typed something.
           ...(modalData.address ? { p_address: modalData.address } : {}),
+          ...(modalData.phone ? { p_phone: modalData.phone } : {}),
           // mig 1269 — only meaningful for an internal branch; sending true on
           // any other type is refused with WAREHOUSE_BRANCH_TYPE.
           p_is_company_warehouse: modalData.branch_type === 'INTERNAL' && modalData.is_company_warehouse,
         });
+        showDone(t('branches.createdTitle'), [
+          { label: t('org.code'), value: modalData.code ?? '' },
+          { label: t('branches.phone'), value: formatTel(modalData.phone) },
+        ]);
       } else if (modalOrig) {
+        // First, so a message the backend refuses stops the save before anything else is written.
+        if (showLostMode) await lostMode.save();
         const patch = buildUpdatePatch(modalOrig, modalData);
         // Only call the update RPC if something actually changed.
         if (Object.keys(patch).length > 1) {
@@ -325,9 +380,21 @@ export function BranchesPage() {
             p_doc_name: modalData.doc_name,
           });
         }
+        const rows: ActionDoneDetailRow[] = [];
+        if (showLostMode) {
+          // Read back rather than echo the form: a changed document name or branch
+          // phone moves these too when the Lost Mode fields are on their defaults.
+          const [saved] = await apiClient.get<LostModeValues[]>(
+            `/v_branches?id=eq.${modalOrig.id}&select=lost_mode_message_effective,lost_mode_phone_effective`,
+          );
+          rows.push(
+            { label: t('lostMode.message'), value: saved?.lost_mode_message_effective ?? '—' },
+            { label: t('lostMode.phone'), value: formatTel(saved?.lost_mode_phone_effective) },
+          );
+        }
+        showDone(t('branches.savedTitle'), rows);
       }
       queryClient.invalidateQueries({ queryKey: ['branches-list'] });
-      closeModal();
     } catch (err) {
       if (err instanceof ApiError) {
         const translated = translateApiError(err, t);
@@ -343,7 +410,7 @@ export function BranchesPage() {
     try {
       await apiClient.rpc('fn_branch_deactivate', { p_branch_id: modalData.id });
       queryClient.invalidateQueries({ queryKey: ['branches-list'] });
-      closeModal();
+      showDone(t('branches.deactivatedTitle'), []);
     } catch (err) {
       if (err instanceof ApiError) {
         const translated = translateApiError(err, t);
@@ -576,10 +643,14 @@ export function BranchesPage() {
       </div>
 
       {/* Create/Edit Modal */}
-      <Modal open={modalOpen} onClose={closeModal} maxWidth="28rem" width="100%">
+      <Modal open={modalOpen} onClose={handleClose} maxWidth="28rem" width="100%">
         <div className="modal-header">
           <h2 className="modal-title">{modalMode === 'create' ? t('org.createBranch') : t('org.editBranch')}</h2>
         </div>
+        {modalView === 'done' ? (
+          <ActionDoneView headline={doneTitle} contractCode={modalData.name} detailRows={doneRows} onClose={closeModal} />
+        ) : (
+        <>
         <div className="modal-content">
           <div className="form-grid">
             {/* Company — create only */}
@@ -689,14 +760,17 @@ export function BranchesPage() {
               <Input value={modalData.address} onChange={(e) => updateField('address', e.target.value)} size="md" className="w-full" />
             </div>
 
-            {/* Edit-only fields — fn_branch_update accepts them; fn_branch_create
-                does not. Hidden on create. */}
+            <div className="flex flex-col">
+              <label className="form-label">{t('branches.phone')}{phoneRequired && ' *'}</label>
+              <PhoneInput value={modalData.phone} onChange={(raw) => updateField('phone', raw)} size="md" className="w-full" error={phoneInvalid} />
+              {phoneInvalid
+                ? <FormErrorMessage error={{ message: t('org.branchPhoneInvalid') }} />
+                : phoneRequired && <span className="text-xs text-subtler mt-1">{t('org.branchPhoneRequiredHint')}</span>}
+            </div>
+
+            {/* The create form stays short: the rest can be filled in afterwards. */}
             {modalMode === 'edit' && (
               <>
-                <div className="flex flex-col">
-                  <label className="form-label">{t('branches.phone')}</label>
-                  <PhoneInput value={modalData.phone} onChange={(raw) => updateField('phone', raw)} size="md" className="w-full" />
-                </div>
                 <div className="flex flex-col">
                   <label className="form-label">{t('branches.lineId')}</label>
                   <Input value={modalData.line_id} onChange={(e) => updateField('line_id', e.target.value)} size="md" className="w-full" />
@@ -742,23 +816,50 @@ export function BranchesPage() {
               </>
             )}
 
+            {showLostMode && (
+              <div className="flex flex-col gap-5 border-t border-line pt-5">
+                <div>
+                  <h3 className="text-sm font-semibold">{t('lostMode.sectionTitle')}</h3>
+                  <p className="text-xs text-subtle mt-0.5">{t('lostMode.branchHint')}</p>
+                </div>
+                {lostModeEditable
+                  ? <LostModeFields draft={lostMode} phoneEmptyHint={t('lostMode.phoneEmptyBranch')} disabled={modalSaving} />
+                  : <LostModeReadOnly message={modalOrig?.lost_mode_message_effective ?? null} phone={modalOrig?.lost_mode_phone_effective ?? null} />}
+                <div>
+                  <LostModePreviewButton draft={lostMode} disabled={modalSaving} />
+                </div>
+              </div>
+            )}
           </div>
         </div>
-        <ModalErrorBand message={modalError} />
+        <ModalErrorBand message={modalError || lostMode.generalError} />
         <div className="modal-footer">
           {modalMode === 'edit' && modalData.is_active !== false && (
             <Button variant="ghost" color="danger" size="sm" startIcon={<Power size={14} />} onClick={handleDeactivate} disabled={modalSaving} className="mr-auto">
               {t('org.deactivate')}
             </Button>
           )}
-          <Button variant="ghost" onClick={closeModal} disabled={modalSaving}>{t('common.cancel')}</Button>
+          <Button variant="ghost" onClick={handleClose} disabled={modalSaving}>{t('common.cancel')}</Button>
           <Button
             color="primary"
             onClick={handleSave}
-            disabled={modalSaving || !modalData.branch_type || (warehouseRequired && !modalData.is_company_warehouse)}
+            disabled={modalSaving || !modalData.branch_type || (warehouseRequired && !modalData.is_company_warehouse) || (phoneRequired && !modalData.phone) || phoneInvalid}
           >
             {modalSaving ? t('common.saving') : t('common.save')}
           </Button>
+        </div>
+        </>
+        )}
+      </Modal>
+
+      <LostModePreviewModal open={lostMode.previewOpen} onClose={lostMode.closePreview} content={lostMode.previewData} />
+
+      <Modal open={confirmClose} onClose={() => setConfirmClose(false)} maxWidth="24rem" width="100%">
+        <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
+        <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
+        <div className="modal-footer">
+          <Button variant="ghost" onClick={() => setConfirmClose(false)}>{t('common.cancel')}</Button>
+          <Button color="danger" onClick={closeModal}>{t('common.discard')}</Button>
         </div>
       </Modal>
     </>

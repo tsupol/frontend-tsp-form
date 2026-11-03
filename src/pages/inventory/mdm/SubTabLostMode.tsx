@@ -28,7 +28,7 @@ import { PhoneInput } from '../../../components/PhoneInput';
 import { formatTel } from '../../../lib/format';
 import {
   MapPin, Bell, BellOff, Volume2, LocateFixed, ExternalLink, AlertTriangle,
-  Repeat, Square, Loader2,
+  Repeat, Square, Loader2, Smartphone,
 } from 'lucide-react';
 import { DateTime } from '../../../components/DateTime';
 import { RelativeDateTime } from './RelativeDateTime';
@@ -42,6 +42,7 @@ import {
 import { useMdmCommand } from './useMdmCommand';
 import { MDM_NO_CACHE } from './useMdmStatus';
 import { MdmErrorAlert, CommandAckNote } from './MdmSharedBits';
+import { LostModePreviewModal, type LostModeScreenContent } from '../../../components/lostMode/LostModePreviewModal';
 
 const LOOP_WINDOW_SEC = 3600; // 60 min, matching ops (§8.4).
 
@@ -96,6 +97,18 @@ export function SubTabLostMode({
   const templates = msgOptions?.templates ?? [];
   const branchPhone = msgOptions?.phone_number ?? null;
   const pickedTemplate = templates.find((tpl) => tpl.template_key === templateKey) ?? null;
+
+  // What this device's lock screen would show (157 §1c): the wording and contract
+  // number are the backend's, the phone is whichever one the press would send.
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const previewPhone = mode === 'template' ? (branchPhone || phone.trim()) : phone.trim();
+  const previewContent: LostModeScreenContent = {
+    message: mode === 'template' ? (pickedTemplate?.message ?? '') : message.trim(),
+    phone_number: previewPhone || null,
+    phone_missing: !previewPhone,
+    footnote: (pickedTemplate ?? templates[0])?.footnote ?? null,
+    footnote_is_sample: false,
+  };
 
   // Typing your own: start from the standard wording and the branch's phone,
   // once, without overwriting anything already typed.
@@ -284,7 +297,7 @@ export function SubTabLostMode({
                       </>
                     )}
                   </div>
-                  <div>
+                  <div className="flex gap-2">
                     <Button color="danger" size="sm" startIcon={<Bell size={15} />} disabled={!canEnableTemplate}
                       onClick={() => actorId != null && templateKey && run(
                         () => enableLostModeFromTemplate({
@@ -294,6 +307,9 @@ export function SubTabLostMode({
                         () => lostBackoff.start(),
                       )}>
                       {t('asset.mdm.lost.enable')}
+                    </Button>
+                    <Button variant="outline" size="sm" startIcon={<Smartphone size={14} />} disabled={!pickedTemplate} onClick={() => setPreviewOpen(true)}>
+                      {t('lostMode.preview')}
                     </Button>
                   </div>
                 </>
@@ -307,7 +323,7 @@ export function SubTabLostMode({
                     <label className="form-label">{t('asset.mdm.lost.phone')} *</label>
                     <PhoneInput value={phone} onChange={(raw) => setPhone(raw)} size="sm" className="w-full" placeholder={t('asset.mdm.lost.phonePlaceholder')} />
                   </div>
-                  <div>
+                  <div className="flex gap-2">
                     <Button color="danger" size="sm" startIcon={<Bell size={15} />} disabled={!canEnableCustom}
                       onClick={() => actorId != null && run(
                         () => enableLostMode({
@@ -316,6 +332,9 @@ export function SubTabLostMode({
                         () => lostBackoff.start(),
                       )}>
                       {t('asset.mdm.lost.enable')}
+                    </Button>
+                    <Button variant="outline" size="sm" startIcon={<Smartphone size={14} />} disabled={!message.trim()} onClick={() => setPreviewOpen(true)}>
+                      {t('lostMode.preview')}
                     </Button>
                   </div>
                 </>
@@ -416,6 +435,8 @@ export function SubTabLostMode({
           {loc && <LocationCard loc={loc} serial={status.serial_number} />}
         </div>
       )}
+
+      <LostModePreviewModal open={previewOpen} onClose={() => setPreviewOpen(false)} content={previewContent} />
     </div>
   );
 }

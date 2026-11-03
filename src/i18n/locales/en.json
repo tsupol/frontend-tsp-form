@@ -2255,7 +2255,31 @@
       "generic": "Couldn't process the image."
     }
   },
+  "lostMode": {
+    "sectionTitle": "Lost Mode",
+    "message": "Lost Mode message",
+    "phone": "Lost Mode phone",
+    "messageHint": "Shown on the locked device. The phone number goes in its own field.",
+    "usesDefault": "System default",
+    "resetDefault": "Reset to default",
+    "phoneEmptyBranch": "Empty = the branch phone",
+    "phoneEmptyCompany": "Empty = the company phone",
+    "branchHint": "What the customer sees on the lock screen when staff turn on Lost Mode.",
+    "fundHint": "Used on every shop under this fund.",
+    "setAtFund": "Set in the fund company settings.",
+    "preview": "Preview",
+    "previewTitle": "Lock screen preview",
+    "phoneMissing": "No phone number yet. When staff turn on Lost Mode they must type one.",
+    "sampleContract": "(Sample contract number. The real screen shows that device's contract.)",
+    "previewCaveat": "A simulated picture. The real iPhone may differ slightly.",
+    "screenTitle": "Lost iPhone",
+    "screenCall": "Call",
+    "screenEmergency": "Emergency"
+  },
   "branches": {
+    "savedTitle": "Branch saved",
+    "createdTitle": "Branch created",
+    "deactivatedTitle": "Branch deactivated",
     "title": "Branches",
     "description": "Manage branches and their types",
     "allTypes": "All types",
@@ -6504,6 +6528,8 @@
     "noData": "No contracts opened in this range"
   },
   "org": {
+    "branchPhoneRequiredHint": "Required. Customers see this number on a locked device.",
+    "branchPhoneInvalid": "Check the phone number: 9–10 digits starting with 0.",
     "title": "Organization",
     "description": "Holdings, companies, and branches",
     "empty": "No organizations found",
