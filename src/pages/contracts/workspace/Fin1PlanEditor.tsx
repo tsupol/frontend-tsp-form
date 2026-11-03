@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, MaskedInput, Slider } from 'tsp-form';
+import { DownPercentChips } from '../../../components/DownPercentChips';
 import { Check, ShieldCheck, XCircle, AlertTriangle, Loader2 } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
 import { translateApiError } from '../../../lib/apiErrors';
@@ -729,14 +730,24 @@ export function Fin1PlanEditor({
           </div>
 
           {downMode === 'percent' ? (
-            <Slider
-              value={downPercent ?? policy.min_down_percent}
-              onChange={(v) => setDownPercent(Math.round(v))}
-              min={policy.min_down_percent}
-              max={policy.max_down_percent}
-              step={1}
-              showMinMax
-            />
+            <>
+              <Slider
+                value={downPercent ?? policy.min_down_percent}
+                onChange={(v) => setDownPercent(Math.round(v))}
+                min={policy.min_down_percent}
+                max={policy.max_down_percent}
+                step={1}
+                showMinMax
+              />
+              <DownPercentChips
+                percents={Array.from(
+                  { length: policy.max_down_percent - policy.min_down_percent + 1 },
+                  (_, i) => policy.min_down_percent + i,
+                )}
+                value={downPercent}
+                onChange={setDownPercent}
+              />
+            </>
           ) : (
             <div className="flex flex-col gap-1">
               <div className="w-44">

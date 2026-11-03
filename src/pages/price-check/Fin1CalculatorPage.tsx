@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Button, DataTable, Input, MaskedInput, MobileHeader, PageNav, PageNavPanel, Slider } from 'tsp-form';
+import { DownPercentChips } from '../../components/DownPercentChips';
 import { ArrowLeft, ArrowRight, ArrowRightFromLine, Calculator, Lock, RefreshCw, Search, ShieldCheck, X, XCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
@@ -182,12 +183,6 @@ interface PlanByMonthly {
  *  `uplift_options` (0, then min..max by 1,000) is the suggestion list the
  *  finance-rates chips use — a subset of what the slider can reach. */
 const UPLIFT_STEP = 500;
-
-/** Tap-to-pick down percents under the slider (owner 2026-11-01: "10, 15 … 50").
- *  Every 5% from the branch's minimum up to this ceiling; the slider still
- *  reaches the 1% steps and the branch maximum above it. */
-const DOWN_CHIP_STEP = 5;
-const DOWN_CHIP_MAX = 50;
 
 /** Which condition the customer is being quoted on. */
 type Condition = 'new' | 'used';
@@ -382,14 +377,6 @@ export function Fin1CalculatorPage() {
     [table, downPct],
   );
 
-  // Chip percents come from the rows the server actually priced, so a chip can
-  // never point at a down the branch's policy doesn't allow.
-  const downChips = useMemo(
-    () => (table?.rows ?? [])
-      .map(r => r.down_percent)
-      .filter(p => p % DOWN_CHIP_STEP === 0 && p <= DOWN_CHIP_MAX),
-    [table],
-  );
   const cell = useMemo(
     () => row?.cells.find(c => c.term_months === termMonths) ?? null,
     [row, termMonths],
@@ -1025,24 +1012,14 @@ export function Fin1CalculatorPage() {
                                     step={1}
                                     showMinMax
                                   />
-                                  {/* Tap-to-pick shortcuts every 5% — the same
-                                      chips as the finance-rates uplift row. */}
-                                  {downChips.length > 0 && (
-                                    <div className="flex flex-wrap items-center gap-1 mt-1">
-                                      {downChips.map(p => (
-                                        <Button
-                                          key={p}
-                                          size="sm"
-                                          variant={p === downPct ? 'solid' : 'outline'}
-                                          color={p === downPct ? 'primary' : 'default'}
-                                          className="tabular-nums"
-                                          onClick={() => setDownPct(p)}
-                                        >
-                                          {p}%
-                                        </Button>
-                                      ))}
-                                    </div>
-                                  )}
+                                  {/* Percents come from the rows the server actually priced,
+                                      so a chip can never point at a down the branch's
+                                      policy doesn't allow. */}
+                                  <DownPercentChips
+                                    percents={(table.rows ?? []).map(r => r.down_percent)}
+                                    value={downPct}
+                                    onChange={setDownPct}
+                                  />
                                 </>
                               ) : null}
 
