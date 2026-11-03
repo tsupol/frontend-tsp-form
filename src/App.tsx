@@ -12,6 +12,7 @@ import { LoginPage } from './pages/LoginPage';
 import { HomePage } from './pages/HomePage';
 import { DashboardPage } from './pages/DashboardPage';
 import { PartnerDashboardPage } from './pages/PartnerDashboardPage';
+import { SimulationPage } from './pages/simulation/SimulationPage';
 import { UserPage } from './pages/UserPage';
 import { EnrollRedirectPage } from './pages/EnrollRedirectPage';
 import { HoldingSelectModal } from './components/HoldingSelectModal';
@@ -283,6 +284,18 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <DashboardOrShopHome />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Simulation / ภาพจำลอง — opened from the dashboard button; the page guards its own permission */}
+      <Route
+        path="/admin/simulation"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <SimulationPage />
             </AdminLayout>
           </ProtectedRoute>
         }

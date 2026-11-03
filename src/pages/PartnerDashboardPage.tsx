@@ -43,6 +43,7 @@ import { MonthOpenedView, hasOpenedData, monthStartIso, useDayPoints, useMonthTo
 import { translateApiError } from '../lib/apiErrors';
 import type { PartnerCase } from './partner-cases/partnerCaseTypes';
 import { SHOP_TODO_PATH, shopTodoRowPath } from './contracts/ShopTodoPage';
+import { SimulationLink } from './simulation/SimulationLink';
 
 /** v_partner_my_rank_today — always exactly one row, the shop's own. */
 interface MyRankToday {
@@ -159,7 +160,10 @@ export function PartnerDashboardPage() {
 
         <div className="flex-none flex items-start justify-between gap-4">
           <div>
-            <h1 className="heading-2 max-md:hidden">{t('nav.dashboard')}</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="heading-2 max-md:hidden">{t('nav.dashboard')}</h1>
+              <SimulationLink />
+            </div>
             <div className="text-sm font-medium md:text-subtle md:font-normal">
               {user?.branch_name}
               <span className="text-subtle"> · <DateTime value={new Date().toISOString()} showTime={false} /></span>

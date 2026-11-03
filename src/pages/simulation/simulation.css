@@ -1,0 +1,136 @@
+/* Simulation (156). The floor is an illustration with its own bright palette in both
+   themes; the cards floating over it use the app's tokens, so they follow the theme.
+   Layout: .sim__scene fills the page; .sim__stack (tabs, clock, cards) sits on top in
+   normal flow; .sim__body takes the rest and holds the panels. Both let touches through
+   to the floor except on the cards themselves. */
+.sim { position: relative; display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; background: #dcebd5; color: var(--color-fg); }
+.sim button { touch-action: manipulation; }
+
+.sim__scene { position: absolute; inset: 0; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.sim__scene:active { cursor: grabbing; }
+.sim__world { position: absolute; left: 0; top: 0; transform-origin: 0 0; background: #dcebd5; }
+.sim-person { transition: opacity .5s ease; }
+.sim-person--out { opacity: 0; }
+.sim__note { font-size: 9.5px; font-weight: 600; }
+.sim__spot { font-size: 10px; font-weight: 600; fill: #93a1aa; letter-spacing: .02em; pointer-events: none; }
+.sim__pile-label { font-size: 12px; font-weight: 700; fill: #1f2d3a; paint-order: stroke; stroke: #fff; stroke-width: 3px; pointer-events: none; }
+.sim__gain { font-size: 13px; font-weight: 700; fill: #1f2d3a; paint-order: stroke; stroke: #fff; stroke-width: 3px; animation: sim-gain 2.8s ease-out forwards; pointer-events: none; }
+@keyframes sim-gain { 0% { opacity: 0; transform: translateY(6px); } 15% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; transform: translateY(-26px); } }
+
+.sim__tag { position: absolute; transform: translate(-50%, -50%) scale(var(--sim-tag-scale, 1)); display: flex; flex-direction: column; gap: 1px; padding: 4px 9px; border: 0; border-radius: 9px; background: var(--color-surface-elevated); color: var(--color-fg); font: inherit; font-size: 13px; white-space: nowrap; box-shadow: 0 1px 4px rgba(20, 40, 50, .24); cursor: pointer; }
+.sim__tag--on { outline: 2px solid var(--color-primary); }
+.sim__tag-row { display: flex; align-items: center; gap: 7px; }
+.sim__tag-sub { font-size: 11px; color: var(--color-subtle); }
+.sim__count { font-style: normal; font-size: 11px; font-weight: 600; padding: 0 6px; border-radius: 999px; }
+.sim__count--lo { background: var(--color-success-soft); color: var(--color-success-fg); }
+.sim__count--mid { background: var(--color-warning-soft); color: var(--color-warning-fg); }
+.sim__count--hi { background: var(--color-danger-soft); color: var(--color-danger-fg); }
+
+.sim__card { background: var(--color-surface-elevated); color: var(--color-fg); border-radius: 14px; box-shadow: 0 2px 8px rgba(20, 40, 50, .14); }
+.sim__stack { position: relative; flex: none; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 0; pointer-events: none; }
+.sim__stack > * > *, .sim__band { pointer-events: auto; }
+.sim__top { display: flex; gap: 10px; justify-content: space-between; align-items: stretch; }
+.sim__companies { display: flex; gap: 4px; padding: 6px; min-width: 0; overflow-x: auto; }
+.sim__company { flex: none; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 6px 14px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.sim__company:hover { background: var(--color-surface-hover); }
+.sim__company small { font-size: 11px; font-weight: 400; color: var(--color-subtle); }
+.sim__company small i, .sim__company-label small i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 4px; }
+.sim__company em { font-style: normal; font-size: 12px; font-weight: 600; color: var(--color-success-fg); }
+.sim__company--on, .sim__company--on:hover { color: #fff; }
+.sim__company--on small, .sim__company--on em { color: #fff; }
+.sim__company--on small i { background: #fff !important; }
+.sim__company-label { display: flex; flex-direction: column; justify-content: center; gap: 1px; padding: 8px 16px; font-size: 14px; min-width: 0; }
+.sim__company-label small { font-size: 11px; color: var(--color-subtle); }
+.sim__clock { flex: none; display: grid; grid-template-columns: auto auto; align-items: center; gap: 0 8px; padding: 8px 14px; }
+.sim__clock strong { font-size: 22px; font-variant-numeric: tabular-nums; }
+.sim__clock small { grid-column: 1 / -1; font-size: 11px; color: var(--color-subtle); }
+.sim__dot { width: 9px; height: 9px; border-radius: 50%; background: #28a745; }
+.sim__dot--bad { background: #d9534f; }
+.sim__band { margin: 0; }
+
+/* Cards wrap rather than clip: a figure on a card is never cut (§12). */
+.sim__kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.sim__kpi { min-width: 0; display: flex; flex-direction: column; padding: 7px 12px; }
+.sim__kpi label { font-size: 12px; color: var(--color-subtle); }
+.sim__kpi strong { font-size: 20px; line-height: 1.25; white-space: nowrap; }
+.sim__kpi strong span { font-size: 12px; font-weight: 400; color: var(--color-subtle); }
+.sim__kpi small { font-size: 11px; color: var(--color-subtle); }
+.sim__icon { display: inline-block; flex: none; vertical-align: -2px; margin-right: 4px; }
+
+.sim__body { position: relative; flex: 1; min-height: 0; pointer-events: none; }
+.sim__body > * { pointer-events: auto; }
+.sim__loading { position: absolute; inset: 12px; display: flex; flex-direction: column; gap: 12px; }
+.sim__empty { position: absolute; left: 50%; top: 40%; transform: translateX(-50%); padding: 12px 20px; font-size: 14px; }
+
+.sim__zoom { position: absolute; left: 12px; top: 12px; display: flex; flex-direction: column; gap: 2px; padding: 4px; background: var(--color-surface-elevated); border-radius: 10px; box-shadow: 0 2px 8px rgba(20, 40, 50, .14); }
+
+.sim__panel { position: absolute; right: 12px; top: 12px; bottom: 12px; width: 300px; display: flex; flex-direction: column; overflow: hidden; }
+.sim__panel h3 { flex: none; margin: 0; padding: 10px 12px; font-size: 14px; }
+.sim__row { display: flex; flex-direction: column; gap: 3px; width: 100%; padding: 7px 12px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.sim__row-top { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+.sim__row-top em { font-style: normal; font-size: 12px; color: var(--color-subtle); white-space: nowrap; }
+.sim__row-sub { font-size: 11px; color: var(--color-subtle); }
+.sim__row-money { display: flex; align-items: center; gap: 2px; }
+.sim__row-money .sim__icon { margin: 0 2px 0 6px; }
+.sim__row-money .sim__icon:first-child { margin-left: 0; }
+.sim__rank { display: inline-block; min-width: 18px; margin-right: 6px; padding: 0 4px; border-radius: 6px; background: var(--color-surface-hover); color: var(--color-subtle); font-style: normal; font-size: 11px; font-weight: 600; text-align: center; }
+.sim__rank--sold { background: var(--color-success-soft); color: var(--color-success-fg); }
+
+.sim__card-head { position: relative; padding-right: 34px; }
+.sim__card-head h3 { margin: 0 0 8px; font-size: 14px; }
+.sim__card-head h3 small { display: block; font-weight: 400; font-size: 11px; color: var(--color-subtle); }
+.sim__close { position: absolute !important; right: -4px; top: -4px; }
+
+.sim__detail { position: absolute; left: 12px; bottom: 12px; width: 300px; max-height: calc(100% - 156px); overflow: auto; padding: 12px; font-size: 13px; z-index: 2; }
+.sim__detail dl { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; margin: 0 0 8px; }
+.sim__detail dt { color: var(--color-subtle); }
+.sim__detail dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.sim__opened { display: grid; grid-template-columns: 1fr auto; gap: 0 8px; padding: 5px 0; border-top: 1px solid var(--color-line); font-size: 12px; }
+.sim__opened small { grid-column: 1 / -1; color: var(--color-subtle); font-size: 11px; }
+.sim__waiter { font-size: 12px; padding: 2px 0; }
+.sim__waiter i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
+
+.sim__days { width: 100%; margin: 4px 0 8px; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+.sim__days th { text-align: right; font-size: 12px; padding: 3px 4px; height: auto; }
+.sim__days th:first-child, .sim__days td:first-child { text-align: left; }
+.sim__days td { padding: 3px 4px; text-align: right; border-top: 1px solid var(--color-line); }
+.sim__row-future td { color: var(--color-subtle); }
+
+.sim__collect { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 600px; max-width: calc(100% - 24px); max-height: calc(100% - 24px); overflow: auto; padding: 14px 16px; font-size: 13px; z-index: 3; box-shadow: 0 8px 28px rgba(20, 40, 50, .28); }
+.sim__collect h3 { font-size: 15px; }
+.sim__collect h3 small { font-size: 12px; }
+.sim__legend-row { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--color-subtle); }
+.sim__legend-row i, .sim__tip i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; }
+.sim__legend-row .sim__swatch-future { box-sizing: border-box; background: rgba(163, 169, 174, .4); border: 1px dashed #a3a9ae; }
+.sim__chart { position: relative; overflow-x: auto; }
+.sim__chart svg { display: block; touch-action: pan-x; }
+.sim__axis { font-size: 11px; fill: var(--color-subtle); font-variant-numeric: tabular-nums; }
+.sim__pct { font-size: 12px; font-weight: 700; fill: var(--color-fg); }
+.sim__tip { position: absolute; top: 4px; width: 190px; display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 8px; background: var(--color-surface); border: 1px solid var(--color-line); box-shadow: 0 2px 10px rgba(20, 40, 50, .22); font-size: 12px; pointer-events: none; }
+.sim__tip small { color: var(--color-subtle); font-size: 11px; }
+.sim__muted { margin: 6px 0 0; font-size: 11px; color: var(--color-subtle); }
+
+.sim__legend { position: absolute; left: 12px; right: 324px; bottom: 12px; margin-inline: auto; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 12px; width: fit-content; padding: 6px 12px; font-size: 12px; }
+.sim__legend > span { white-space: nowrap; }
+.sim__legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin: 0 4px 0 0; }
+.sim__legend .sim__legend-floor i { width: 12px; height: 9px; border: 1.5px solid; box-sizing: border-box; }
+.sim__legend-icon { display: inline-flex; align-items: center; }
+
+/* Portrait iPad (744–1023 wide): the branch list becomes a bottom panel and is never
+   hidden, the shop card covers it at full width, zoom and legend sit above it. */
+@media (max-width: 1023px) {
+  .sim__panel { top: auto; left: 12px; right: 12px; bottom: 12px; width: auto; height: 34%; }
+  .sim__detail { left: 12px; right: 12px; width: auto; max-height: 55%; }
+  .sim__zoom { top: auto; bottom: calc(34% + 24px); }
+  .sim__legend { left: 72px; right: 12px; bottom: calc(34% + 24px); margin-inline: auto 0; justify-content: flex-end; }
+}
+
+/* Fingers: anything tappable is at least 44 px. */
+@media (pointer: coarse) {
+  .sim__zoom .btn { width: 44px; height: 44px; }
+  .sim__close.btn { width: 44px; height: 44px; right: -10px; top: -10px; }
+  .sim__row { padding: 10px 12px; min-height: 44px; }
+  .sim__company { padding: 10px 16px; }
+  .sim__tag { min-height: 44px; justify-content: center; transform: translate(-50%, -50%); }
+  .sim__detail .btn { min-height: 44px; }
+}

@@ -41,6 +41,7 @@ import {
   type MonthlyRow,
 } from '../components/ContractsOpenedChart';
 import { PushSubscribeBanner } from '../components/PushSubscribeBanner';
+import { SimulationLink } from './simulation/SimulationLink';
 import { MediaLightbox } from '../components/MediaLightbox';
 import { useBranchPaymentAccounts, type BranchPaymentAccount } from '../components/BranchPaymentAccountField';
 import { BankAccountLine } from '../components/BankAccountLine';
@@ -453,7 +454,11 @@ export function DashboardPage() {
         {/* Desktop header with scope picker */}
         <div className="mb-4 flex-none max-md:hidden flex items-start justify-between gap-4">
           <div>
-            <h1 className="heading-2">{t('nav.dashboard')}</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="heading-2">{t('nav.dashboard')}</h1>
+              {/* Beside the title: the top-right corner is where approval notices float. */}
+              <SimulationLink />
+            </div>
             <div className="text-subtle text-sm">
               <DateTime value={new Date().toISOString()} showTime={false} />
             </div>
@@ -479,6 +484,7 @@ export function DashboardPage() {
 
         {/* Mobile scope picker + receiving account */}
         <div className="mb-3 md:hidden flex flex-col gap-2">
+          <div className="flex justify-end empty:hidden"><SimulationLink /></div>
           <ReportSideSelect />
           <DashboardScopePicker scope={scope} onChange={setScope} />
           <ReceivingAccount
