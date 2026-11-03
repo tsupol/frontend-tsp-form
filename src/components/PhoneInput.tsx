@@ -13,10 +13,18 @@ const thaiPhoneMask = (digits: string) => {
 /**
  * Project-standard phone input — wraps tsp-form's MaskedInput with
  * Thai phone dynamic mask baked in.
+ *
+ * Digits only go to the mask: it counts every character of `value` as a digit,
+ * so a stored "02-123-4567" would show as "02--12-3-45".
  */
 export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(
-  (props, ref) => (
-    <MaskedInput ref={ref} {...props} dynamicMask={thaiPhoneMask} />
+  ({ value, ...props }, ref) => (
+    <MaskedInput
+      ref={ref}
+      {...props}
+      value={value === undefined ? undefined : value.replace(/\D/g, '')}
+      dynamicMask={thaiPhoneMask}
+    />
   ),
 );
 
