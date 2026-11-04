@@ -15,7 +15,7 @@ import { PILE_ICON } from './simulationIcons';
 import { SimulationCollection } from './SimulationCollection';
 import {
   AMBER, BLUE, FLOOR, GREEN, HAPPY, PILES, PURPLE, SIMULATION_PERMISSION, SOLD_EDGE,
-  ageText, annualAtRate, annualPct, baht, bangkokClock, codeOf, companyEdge, gradeLabel, stateColor, stateLabel,
+  ageText, annualAtRate, annualPct, baht, bangkokClock, codeOf, companyEdge, downPct, downPctOf, gradeLabel, stateColor, stateLabel,
   type PileKey, type SimBranch,
 } from './simulationTypes';
 import './simulation.css';
@@ -65,12 +65,13 @@ function useClock() {
   return now;
 }
 
-function Kpi({ label, value, unit, sub, icon }: { label: string; value: ReactNode; unit?: string; sub?: string; icon?: ReactNode }) {
+function Kpi({ label, value, unit, sub, sub2, icon }: { label: string; value: ReactNode; unit?: string; sub?: string; sub2?: string; icon?: ReactNode }) {
   return (
     <div className="sim__card sim__kpi">
       <label>{icon}{label}</label>
       <strong>{value}{unit && <span> {unit}</span>}</strong>
       {sub && <small>{sub}</small>}
+      {sub2 && <small>{sub2}</small>}
     </div>
   );
 }
@@ -243,7 +244,8 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
             <Kpi label={t('simulation.kpi.contracts')} value={openedRows.length} unit={t('simulation.unit.contracts', { count: openedRows.length })} sub={grades} />
             {isFund ? (
               <>
-                <Kpi label={t('simulation.kpi.financed')} value={baht(sum(b => b.financed))} sub={`${t('simulation.commission')} ${baht(sum(b => b.commission))}`} />
+                <Kpi label={t('simulation.kpi.financed')} value={baht(sum(b => b.financed))} sub={`${t('simulation.commission')} ${baht(sum(b => b.commission))}`}
+                  sub2={`${t('simulation.downAvg')} ${downPctOf(sum(b => b.down), sum(b => b.device_price))}`} />
                 <Kpi label={t('simulation.kpi.paidOut')} value={baht(sum(b => b.payout))} sub={t('simulation.kpi.paidOutSub')} />
                 <Kpi label={t('simulation.kpi.pendingPayout')} value={baht(sum(b => b.pending_payout))}
                   sub={sum(b => b.pending_older) > 0
@@ -354,6 +356,7 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
                   {isFund ? (
                     <>
                       <dt>{t('simulation.financed')}</dt><dd>{baht(detail.financed)}</dd>
+                      <dt>{t('simulation.downAvg')}</dt><dd>{detail.down_pct == null ? '—' : t('simulation.downOfPrice', { pct: downPct(detail.down_pct) })}</dd>
                       <dt>{t('simulation.commission')}</dt><dd>{baht(detail.commission)}</dd>
                       <dt><PileIcon k="payout" />{t('simulation.kpi.paidOut')}</dt><dd>{baht(detail.payout)}</dd>
                       <dt><PileIcon k="pending_payout" />{t('simulation.kpi.pendingPayout')}</dt><dd>{baht(detail.pending_payout)}</dd>
@@ -403,7 +406,7 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
                     <b>{o.product || '—'}</b>
                     <span>{gradeLabel(t, o.grade)}{isFund ? ` · ${baht(o.financed)}` : ''}</span>
                     <small>{[
-                      codeOf(o.code, o.months),
+                      isFund ? `${codeOf(o.code, o.months)} ${t('simulation.downShort')} ${downPct(o.down_pct)}` : codeOf(o.code, o.months),
                       o.asset,
                       isFund && canProfit ? `${t('simulation.annualShort')} ${annualPct(o.profit ?? 0, ((o.investment ?? 0) * o.months) / 12)}` : '',
                     ].filter(Boolean).join(' · ')}</small>

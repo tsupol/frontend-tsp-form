@@ -30,6 +30,9 @@ export interface SimOpened {
   profit: number | null;
   investment: number | null;
   months: number;
+  down: number;
+  device_price: number;
+  down_pct: number | null;
 }
 
 export interface SimPayoutDay {
@@ -57,6 +60,9 @@ export interface SimBranch {
   opened_today: number;
   financed: number;
   commission: number;
+  down: number;
+  device_price: number;
+  down_pct: number | null;
   future: number | null;
   profit: number | null;
   investment: number | null;
@@ -137,6 +143,12 @@ export const annualPct = (profit: number, capitalYears: number) =>
   (capitalYears > 0 ? `${((profit / capitalYears) * 100).toFixed(1)}%` : '—');
 export const annualAtRate = (future: number, investment: number, capitalYears: number) =>
   annualPct(COLLECT_RATE * future - investment, capitalYears);
+
+// Down payment % of device price (mig 1612): `20%` when whole, else `22.7%`, null → `—` (§6d).
+export const downPct = (pct: number | null | undefined) => (pct == null ? '—' : `${+pct.toFixed(1)}%`);
+// The company card sums every room's down and device price first, never averages the rooms' % (§5).
+export const downPctOf = (down: number, devicePrice: number) =>
+  downPct(devicePrice > 0 ? (down / devicePrice) * 100 : null);
 
 // ── Wording: the DB sends codes, the screen owns the words (§8) ──────────────
 type T = (key: string, opts?: Record<string, unknown>) => string;
