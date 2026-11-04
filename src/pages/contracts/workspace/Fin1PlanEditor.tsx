@@ -158,6 +158,8 @@ export interface Fin1PlanResponse {
   commission?: Fin1Commission | null;
   /** Absent on a `policy_only` answer (no down chosen yet) — draws nothing. */
   d_score?: number | null;
+  /** Null = no uplift chosen, no second row. */
+  d_score_ex_uplift?: number | null;
 }
 
 /** A commission percent as the shop reads it: whole when whole, else up to two
@@ -995,6 +997,7 @@ function PlanSummary({ plan, t }: { plan: Fin1PlanResponse; t: TFn }) {
           </div>
         )}
         <DScoreLine score={plan.d_score} size={14} />
+        <DScoreLine score={plan.d_score_ex_uplift} size={14} label={t('dScore.exUplift')} />
       </div>
       <div className="border-t border-line">
         {[

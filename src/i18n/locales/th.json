@@ -3136,6 +3136,7 @@
   },
   "dScore": {
     "label": "D-score",
+    "exUplift": "D-score หัก uplift",
     "requested": "ยื่น",
     "deal": "ใช้จริง"
   },

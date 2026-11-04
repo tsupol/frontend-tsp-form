@@ -11,6 +11,8 @@ import { DScoreStars } from '../../components/DScore';
 
 export interface ContractDevicePriceFields {
   d_score?: number | null;
+  /** Staff and fund only, the shop's view has no such key. Null = no uplift, no second row. */
+  d_score_ex_uplift?: number | null;
   device_price_kind?: 'COST' | 'SHOP_SALE' | null;
   device_price_base?: number | null;
   device_uplift?: number | null;
@@ -34,7 +36,12 @@ export function ContractDevicePriceBlock({ contract }: { contract: ContractDevic
   return (
     <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-line">
       {contract.d_score != null && (
-        <Cell label={t('dScore.label')}><DScoreStars score={contract.d_score} /></Cell>
+        <div className="flex flex-col gap-3">
+          <Cell label={t('dScore.label')}><DScoreStars score={contract.d_score} /></Cell>
+          {contract.d_score_ex_uplift != null && (
+            <Cell label={t('dScore.exUplift')}><DScoreStars score={contract.d_score_ex_uplift} /></Cell>
+          )}
+        </div>
       )}
       {hasPrice && contract.device_price_kind === 'COST' && (
         <Cell label={t('contract.deviceCost')}>{fmtCurrency(contract.device_price_total)}</Cell>

@@ -28,6 +28,7 @@ import {
   usePartnerCaseReturnReasons,
   type PartnerMyCaseTab,
 } from '../partner-cases/usePartnerCases';
+import { CaseDScoreLines } from '../partner-cases/CaseDScoreLines';
 import { outcomeBadgeColor, type PartnerCase } from '../partner-cases/partnerCaseTypes';
 import { ContractDetailPanel } from './ContractDetailPanel';
 import { ContractDetailSlot } from './ContractDetailSlot';
@@ -213,6 +214,13 @@ export function PendingApprovalPage({ view }: { view: PendingApprovalView }) {
                             : t('partnerCase.lastUpdated')}{' '}
                           <DateTime value={isWaiting ? r.submitted_at : r.updated_at} showTime />
                         </div>
+                        <CaseDScoreLines
+                          waiting={isWaiting}
+                          dScore={r.d_score}
+                          dealDScore={r.deal_d_score}
+                          exUplift={r.d_score_ex_uplift}
+                          dealExUplift={r.deal_d_score_ex_uplift}
+                        />
                       </button>
                     );
                   }}

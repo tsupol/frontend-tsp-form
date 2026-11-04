@@ -533,6 +533,18 @@ export function PartnerCaseDetailPanel({
                     <DScoreStars score={detail.approved_d_score} size={12} />
                   </div>
                 )}
+                {(detail.d_score_ex_uplift != null || detail.approved_d_score_ex_uplift != null) && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-subtle flex-1 min-w-0">{t('dScore.exUplift')}</span>
+                    {detail.d_score_ex_uplift != null
+                      ? <DScoreStars score={detail.d_score_ex_uplift} size={12} />
+                      : <span className="text-subtle">—</span>}
+                    <span className="text-subtler">→</span>
+                    {detail.approved_d_score_ex_uplift != null
+                      ? <DScoreStars score={detail.approved_d_score_ex_uplift} size={12} />
+                      : <span className="text-subtle">—</span>}
+                  </div>
+                )}
                 {adjustmentRows(detail.adjustments).map(r => (
                   <div key={r.key} className="flex items-center gap-2">
                     <span className="text-subtle flex-1 min-w-0">{adjustLabel(r.key, t)}</span>
@@ -795,7 +807,12 @@ export function PartnerCaseDetailPanel({
             />
             <Field label={t('partnerCase.docFee')} value={fmtCurrency(detail.deal_doc_fee_amount)} />
             {detail.deal_d_score != null && (
-              <Field label={t('dScore.label')} value={<DScoreStars score={detail.deal_d_score} />} />
+              <div className="flex flex-col gap-3">
+                <Field label={t('dScore.label')} value={<DScoreStars score={detail.deal_d_score} />} />
+                {detail.deal_d_score_ex_uplift != null && (
+                  <Field label={t('dScore.exUplift')} value={<DScoreStars score={detail.deal_d_score_ex_uplift} />} />
+                )}
+              </div>
             )}
             {/* No deal total comes down ready-made; the agreed price is the
                 down plus every installment (BE's own definition), so the

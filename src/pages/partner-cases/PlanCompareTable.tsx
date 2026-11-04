@@ -18,8 +18,10 @@ export interface PlanSide {
   /** Shown under the monthly figure only when it differs from it. */
   lastInstallment: number | null;
   dueAtSigning: number | null;
-  /** From the backend like the rest. The shop's own view doesn't carry it, and the row then stays off. */
+  /** From the backend like the rest. Null on both sides = no row. */
   dScore?: number | null;
+  /** The approve window's preview has no such figure, so that window has no second row. */
+  dScoreExUplift?: number | null;
 }
 
 interface Props {
@@ -72,6 +74,13 @@ export function PlanCompareTable({ requested, approved, changes, pending }: Prop
           <span className="font-medium">{t('dScore.label')}</span>
           <span className="text-right"><DScoreStars score={requested.dScore} /></span>
           <span className={`text-right ${newCls}`}><DScoreStars score={approved.dScore} /></span>
+        </div>
+      )}
+      {(requested.dScoreExUplift != null || approved.dScoreExUplift != null) && (
+        <div className="grid grid-cols-subgrid col-span-3 gap-x-4 px-3 py-2 border-t border-line items-center">
+          <span className="font-medium">{t('dScore.exUplift')}</span>
+          <span className="text-right"><DScoreStars score={requested.dScoreExUplift} /></span>
+          <span className={`text-right ${newCls}`}><DScoreStars score={approved.dScoreExUplift} /></span>
         </div>
       )}
 

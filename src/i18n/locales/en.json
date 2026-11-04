@@ -3139,6 +3139,7 @@
   },
   "dScore": {
     "label": "D-score",
+    "exUplift": "D-score ex uplift",
     "requested": "Submitted",
     "deal": "Actual"
   },

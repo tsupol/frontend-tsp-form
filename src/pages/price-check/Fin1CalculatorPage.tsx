@@ -63,6 +63,8 @@ interface PriceTableCell {
   last_installment_amount: number;
   total_effective: number;
   d_score?: number | null;
+  /** Null = no uplift chosen, no second row. */
+  d_score_ex_uplift?: number | null;
 }
 
 interface PriceTableRow {
@@ -136,6 +138,7 @@ interface QuoteRow {
   last_installment_amount?: number;
   total_effective?: number;
   d_score?: number | null;
+  d_score_ex_uplift?: number | null;
   down_payment?: number;
   down_percent?: number;
   error_code?: string;
@@ -393,11 +396,13 @@ export function Fin1CalculatorPage() {
   // question the other way round: one row per active term at this exact down.
   const downAmountNum = downAmountDebounced === '' ? null : parseFloat(downAmountDebounced);
   const { data: quoteAll, error: quotesError, isFetching: quotesLoading } = useQuery({
-    queryKey: ['fin1-quote-all', effectivePrice, downAmountNum, commissionPct],
+    queryKey: ['fin1-quote-all', effectivePrice, downAmountNum, uplift, commissionPct],
     queryFn: () =>
       apiClient.rpc<{ quotes: QuoteRow[]; down?: DownBounds }>('fn_fin1_quote_all', {
         p_price: effectivePrice!,
         p_down: downAmountNum!,
+        // Already inside p_price. Only used for the D-score with the uplift taken off.
+        p_uplift: uplift,
         ...commParam,
       }),
     enabled: amountMode && effectivePrice != null && downAmountNum != null && downAmountNum > 0,
@@ -689,6 +694,7 @@ export function Fin1CalculatorPage() {
         docFee: plan.doc_fee_amount,
         exact: plan.exact,
         dScore: plan.d_score,
+        dScoreExUplift: null,
       })
     : amountMode
     ? (quote && table && {
@@ -702,6 +708,7 @@ export function Fin1CalculatorPage() {
         docFee: table.policy.doc_fee_amount,
         exact: true,
         dScore: quote.d_score,
+        dScoreExUplift: quote.d_score_ex_uplift,
       })
     : (row && cell && table && {
         down: row.down_amount,
@@ -712,6 +719,7 @@ export function Fin1CalculatorPage() {
         docFee: table.policy.doc_fee_amount,
         exact: true,
         dScore: cell.d_score,
+        dScoreExUplift: cell.d_score_ex_uplift,
       });
 
   // The answer to the typed amount, in one line under the box. Hidden while
@@ -831,8 +839,8 @@ export function Fin1CalculatorPage() {
                     <span className="text-sm font-medium truncate">{modelLabel(model)}</span>
                     <span className="text-xs text-subtle truncate">{modelSubLabel(model)}</span>
                   </div>
-                  <div className="flex-1 overflow-auto better-scroll px-4 py-3">
-                    <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] xl:gap-8 xl:items-start">
+                  <div className="@container flex-1 overflow-auto better-scroll px-4 py-3">
+                    <div className="flex flex-col gap-4 @3xl:grid @3xl:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] @3xl:gap-8 @3xl:items-start">
                       <div className="flex flex-col gap-4">
                         {tableErrorMsg && (
                           <div className="alert alert-warning">
@@ -870,7 +878,7 @@ export function Fin1CalculatorPage() {
                         {usedMode && bounds && (
                           <div className="flex flex-col">
                             <label className="form-label">{t('fin1Calc.usedPriceLabel')}</label>
-                            <div className="w-56">
+                            <div className="w-full max-w-56">
                               <MaskedInput
                                 mask="number"
                                 decimalScale={0}
@@ -996,7 +1004,7 @@ export function Fin1CalculatorPage() {
                               </div>
 
                               {amountMode ? (
-                                <div className="w-56">
+                                <div className="w-full max-w-56">
                                   <MaskedInput
                                     mask="number"
                                     decimalScale={0}
@@ -1149,7 +1157,7 @@ export function Fin1CalculatorPage() {
                                   </div>
                                 )}
                               </div>
-                              <div className="w-56">
+                              <div className="w-full max-w-56">
                                 <MaskedInput
                                   mask="number"
                                   decimalScale={0}
@@ -1219,18 +1227,18 @@ export function Fin1CalculatorPage() {
 
                       {/* ── Summary ────────────────────────────────────── */}
                       {summary && (
-                        <div className="mt-4 xl:mt-0 xl:sticky xl:top-0">
+                        <div className="order-first @3xl:order-none @3xl:sticky @3xl:top-0">
                           <div className={`rounded-md border border-line overflow-hidden ${(tableLoading || planLoading || quotesLoading) ? 'opacity-60' : ''} transition-opacity`}>
                             <div className="px-4 py-3 bg-surface flex flex-col gap-1">
                               <div className="text-sm text-subtle">{t('fin1Calc.summaryTitle')}</div>
-                              <div className="text-2xl xl:text-3xl font-semibold tabular-nums">
+                              <div className="text-2xl @3xl:text-3xl font-semibold tabular-nums">
                                 {t('fin1Calc.summaryMonthly', {
                                   amount: fmtCurrency(summary.monthly),
                                   count: summary.last !== summary.monthly ? summary.months - 1 : summary.months,
                                 })}
                               </div>
                               {summary.last !== summary.monthly && (
-                                <div className="text-base xl:text-lg tabular-nums">
+                                <div className="text-base @3xl:text-lg tabular-nums">
                                   {t('fin1Calc.summaryLast', { amount: fmtCurrency(summary.last) })}
                                 </div>
                               )}
@@ -1240,6 +1248,7 @@ export function Fin1CalculatorPage() {
                                 </div>
                               )}
                               <DScoreLine score={summary.dScore} size={16} />
+                              <DScoreLine score={summary.dScoreExUplift} size={16} label={t('dScore.exUplift')} />
                             </div>
                             <div className="border-t border-line">
                               {[
