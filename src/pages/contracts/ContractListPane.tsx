@@ -469,7 +469,7 @@ export function ContractListPane({
                           )}
                         </div>
                       </div>
-                      <div className="text-right shrink-0">
+                      <div className="text-right shrink-0 self-stretch flex flex-col justify-between">
                         {rowRight(contract)}
                         <div className="text-xs text-subtle"><DateTime value={contract.created_at} showTime={false} /></div>
                       </div>

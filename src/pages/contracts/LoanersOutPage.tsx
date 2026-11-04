@@ -192,7 +192,7 @@ export function LoanersOutPage() {
                               )}
                             </div>
                           </div>
-                          <div className="text-right shrink-0">
+                          <div className="text-right shrink-0 self-stretch flex flex-col justify-between">
                             <div className="text-xs font-medium">
                               {t('loaner.daysOnLoan', { days: row.days_on_loan })}
                             </div>

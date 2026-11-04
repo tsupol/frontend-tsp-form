@@ -268,7 +268,7 @@ export function PausedContractsPage() {
                           )}
                         </div>
                       </div>
-                      <div className="text-right shrink-0">
+                      <div className="text-right shrink-0 self-stretch flex flex-col justify-between">
                         <div className="text-sm font-medium text-warning-fg">
                           {t('pausedList.pausedFor', { days: r.pause_days_elapsed })}
                         </div>

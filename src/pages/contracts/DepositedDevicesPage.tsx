@@ -263,7 +263,7 @@ export function DepositedDevicesPage() {
                               )}
                             </div>
                           </div>
-                          <div className="text-right shrink-0">
+                          <div className="text-right shrink-0 self-stretch flex flex-col justify-between">
                             <div className={`text-xs ${overdueDays ? 'text-danger font-medium' : row.sub_state === 'NEAR_DEADLINE' ? 'text-warning-fg' : 'text-subtle'}`}>
                               {overdueDays
                                 ? t('deposit.overdueDays', { days: -row.deposit_days_left })
