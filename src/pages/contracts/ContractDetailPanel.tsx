@@ -56,6 +56,8 @@ import { BankAccountInline } from '../../components/BankAccountLine';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
+import { ContractDevicePriceBlock, type ContractDevicePriceFields } from './ContractDevicePrice';
+
 /** One blacklisted party on the contract, from v_contract_detail.blacklist_hits.
  *  A blacklisted party blocks opening NEW contracts (the checklist surfaces
  *  CONTRACT.VALIDATION.CUSTOMER_BLACKLISTED); this contract itself is unaffected. */
@@ -69,7 +71,7 @@ interface BlacklistHit {
   created_at: string;
 }
 
-interface ContractDetail {
+interface ContractDetail extends ContractDevicePriceFields {
   id: number;
   code: string;
   code_display: string | null;
@@ -1186,6 +1188,7 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
             <InfoCell label={t('contract.saleDiscount')} value={`${fmtCurrency(contract.discount_amount)} (${contract.discount_percent ?? 0}%)`} />
           )}
         </div>
+        <ContractDevicePriceBlock contract={contract} />
       </div>
 
       {/* Payment progress */}

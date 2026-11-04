@@ -37,6 +37,7 @@ import type { OwnerType } from '../../lib/ownerTypes';
 import { translateApiError, blockingReasonText } from '../../lib/apiErrors';
 import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
 import { SearchInput } from '../../components/SearchInput';
+import { assetSourceDetails, assetSourceLabel } from './assetSource';
 
 // ============================================================================
 // Types (verified against live API 2026-03-25)
@@ -100,6 +101,12 @@ interface Asset {
   contract_state: string | null;
   source_po_id: number | null;
   source_lot_id: number | null;
+  // Where the device came from (mig 1610). Staff view only — the shop's
+  // v_partner_assets doesn't carry them.
+  source_kind?: string | null;
+  source_po_code?: string | null;
+  source_supplier_name?: string | null;
+  source_note?: string | null;
   created_by: number | null;
   created_at: string;
   updated_at: string;
@@ -1410,9 +1417,14 @@ function AssetDetailPanel({
           </div>
         </div>
 
-        {(asset.source_po_id || asset.source_lot_id) && (
+        {(asset.source_kind || asset.source_po_id || asset.source_lot_id) && (
           <div>
             <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-1">{t('asset.source')}</h3>
+            {asset.source_kind && (
+              <div className="text-sm mb-1">
+                {[assetSourceLabel(asset.source_kind, t), ...assetSourceDetails(asset, t)].join(' · ')}
+              </div>
+            )}
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
               {asset.source_po_id && (
                 <Link

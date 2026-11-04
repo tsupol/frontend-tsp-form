@@ -7,6 +7,7 @@ import { apiClient } from '../../../lib/api';
 import { translateApiError } from '../../../lib/apiErrors';
 import { fmtCurrency } from '../../../lib/format';
 import { InfoHint } from '../../../components/InfoHint';
+import { DScoreLine } from '../../../components/DScore';
 
 // ============================================================================
 // FIN1 rate step — DELIVERY 2026-09-09 "เลือกเรท FIN1" (mig 1178 / 1179 / 1182)
@@ -155,6 +156,8 @@ export interface Fin1PlanResponse {
   check: Fin1Check | null;
   /** Null for an internal branch; `adjustable: false` for a fixed plan. */
   commission?: Fin1Commission | null;
+  /** Absent on a `policy_only` answer (no down chosen yet) — draws nothing. */
+  d_score?: number | null;
 }
 
 /** A commission percent as the shop reads it: whole when whole, else up to two
@@ -991,6 +994,7 @@ function PlanSummary({ plan, t }: { plan: Fin1PlanResponse; t: TFn }) {
             {t('fin1Plan.summaryLast', { amount: fmtCurrency(plan.last_installment_amount) })}
           </div>
         )}
+        <DScoreLine score={plan.d_score} size={14} />
       </div>
       <div className="border-t border-line">
         {[

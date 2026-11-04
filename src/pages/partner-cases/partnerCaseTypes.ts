@@ -50,6 +50,11 @@ export interface PartnerCase {
 
   status: PartnerCaseStatus;
 
+  /** D-score of what the shop submitted / of the figures in force. Staff views
+   *  only: the shop's own `v_partner_my_cases` does not carry them. */
+  d_score?: number | null;
+  deal_d_score?: number | null;
+
   customer_id: number;
   customer_name: string | null;
   target_asset_id: number | null;
@@ -222,6 +227,8 @@ export interface PartnerCaseDetail extends PartnerCase {
   adjustments: PartnerCaseAdjustments | null;
   /** Staff view only — the shop's view carries no names. */
   acknowledged_by_name?: string | null;
+  /** D-score of the approved figures. Null = no approved figures on this case. */
+  approved_d_score?: number | null;
   /** What the shop asked to collect at signing (down + doc fee). */
   requested_due_at_signing: number | null;
   // The approved plan, frozen at approval. All null on a case without adjustments.
@@ -268,6 +275,7 @@ export interface PartnerCaseQueueRow {
   age_hours: number;
   /** This reviewer sits in the pool that owns the submitting branch. */
   in_my_pool: boolean;
+  d_score?: number | null;
 }
 
 /** Row of `v_ref_partner_case_statuses` / `v_partner_ref_partner_case_statuses`. */

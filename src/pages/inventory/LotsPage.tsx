@@ -25,6 +25,7 @@ import { identifierFormatReason, isAppleBrand } from '../../lib/validators';
 import { SearchInput } from '../../components/SearchInput';
 import { OwnerBadge } from '../../components/OwnerBadge';
 import type { OwnerType } from '../../lib/ownerTypes';
+import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { translateApiError, prepareErrorParams, translateErrorCode } from '../../lib/apiErrors';
 
 // ============================================================================
@@ -66,6 +67,8 @@ interface Lot {
   po_no: string | null;
   po_code_display: string | null;
   po_type: string | null;
+  /** The PO's supplier (mig 1610). */
+  supplier_name: string | null;
   source_lot_id: number | null;
   owner_type: string | null;
   owner_id: number | null;
@@ -578,6 +581,20 @@ interface ReceiptFromLot {
   code_display: string | null;
 }
 
+/** "<PO type label> · <supplier>" — null for a lot with no PO. */
+function useLotSource(lot: Lot): string | null {
+  const { i18n } = useTranslation();
+  const { data: refs } = useQuery({
+    queryKey: ['ref', 'po_types'],
+    queryFn: () => apiClient.get<Array<{ code: string; name_th: string; name_en: string }>>('/v_ref_po_types?order=sort_order&is_active=eq.true'),
+    staleTime: 60 * 60 * 1000,
+  });
+  if (!lot.po_id) return null;
+  const ref = refs?.find(r => r.code === lot.po_type);
+  const label = ref ? (i18n.language === 'th' ? ref.name_th : ref.name_en) : lot.po_type;
+  return [label, lot.supplier_name].filter(Boolean).join(' · ');
+}
+
 function LotDetailPanel({
   lot,
   loading,
@@ -596,6 +613,7 @@ function LotDetailPanel({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [activeAction, setActiveAction] = useState<BackendLotAction | null>(null);
+  const lotSource = useLotSource(lot);
 
   // Open (not-yet-received) transfer lines that move this lot
   const { data: openTransfers = [] } = useQuery({
@@ -767,9 +785,9 @@ function LotDetailPanel({
       {/* Provenance — PO + Receipt cross-links */}
       {lot.po_no && lot.po_id && (
         <div className="flex-none px-4 py-2.5 border-b border-line flex flex-col gap-1.5 text-sm">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-subtle shrink-0">{t('lot.from')}</span>
-            <Badge size="xs" color="default">{lot.po_type}</Badge>
+          <div className="flex items-center gap-x-2 flex-wrap">
+            <span className="text-xs text-subtle shrink-0">{t('lot.source')}</span>
+            <span>{lotSource} ·</span>
             <Link
               to={`/admin/inventory/po/${lot.po_id}`}
               className="inline-flex items-center gap-1 text-primary-fg hover:underline font-medium"
@@ -1141,6 +1159,7 @@ function LotActionModal({
   const translateBatchError = useTranslateBatchError();
   const config = action ? SIMPLE_ACTIONS[action.action_code] : null;
 
+  const lotSource = useLotSource(lot);
   const isConvert = action?.action_code === 'LOT_CONVERT_TO_ASSET';
   const isTransferCreate = action?.action_code === 'LOT_TRANSFER_CREATE';
   const isTransferAddLine = action?.action_code === 'LOT_TRANSFER_ADD_LINE';
@@ -1482,12 +1501,6 @@ function LotActionModal({
           {view === 'form' && (
           <>
           <div className="modal-content">
-            {error && (
-              <div className="alert alert-danger mb-4 animate-pop-in">
-                <XCircle size={16} />
-                <span>{error}</span>
-              </div>
-            )}
             <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
               <div className="font-medium text-sm">{codeDisplay(lot.lot_code_display, lot.lot_code)}</div>
               <div className="text-xs text-subtle truncate">
@@ -1496,6 +1509,11 @@ function LotActionModal({
               <div className="text-xs text-subtle tabular-nums">
                 {t('lot.remaining')}: {fmtNum(lot.qty_on_hand)} {t('lot.units')}
               </div>
+              {lotSource && (
+                <div className="text-xs text-subtle">
+                  {t('lot.source')}: {lotSource} · {codeDisplay(lot.po_code_display, lot.po_no)}
+                </div>
+              )}
             </div>
 
             {isConvert && (
@@ -1740,6 +1758,7 @@ function LotActionModal({
               </div>
             )}
           </div>
+          <ModalErrorBand message={error} onDismiss={() => setError('')} />
           <div className="modal-footer">
             <Button onClick={onClose}>{t('common.cancel')}</Button>
             {isConvert && (

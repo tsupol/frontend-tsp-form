@@ -9,6 +9,7 @@ import { apiClient, ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { fmtCurrency } from '../../lib/format';
 import { isSearchable, isBelowSearchMin, SEARCH_MIN_CHARS } from '../../lib/searchKeyword';
+import { DScoreLine } from '../../components/DScore';
 import {
   CommissionChooser,
   fmtCommissionPct,
@@ -61,6 +62,7 @@ interface PriceTableCell {
   installment_amount: number;
   last_installment_amount: number;
   total_effective: number;
+  d_score?: number | null;
 }
 
 interface PriceTableRow {
@@ -133,6 +135,7 @@ interface QuoteRow {
   installment_amount?: number;
   last_installment_amount?: number;
   total_effective?: number;
+  d_score?: number | null;
   down_payment?: number;
   down_percent?: number;
   error_code?: string;
@@ -170,6 +173,8 @@ interface PlanByMonthly {
   exact: boolean;
   requested_monthly: number;
   doc_fee_amount: number;
+  /** Not sent yet (mig 1610 left this RPC out) — the stars stay hidden until it is. */
+  d_score?: number | null;
 }
 
 /** Slider granularity for the uplift.
@@ -683,6 +688,7 @@ export function Fin1CalculatorPage() {
         total: plan.total_effective,
         docFee: plan.doc_fee_amount,
         exact: plan.exact,
+        dScore: plan.d_score,
       })
     : amountMode
     ? (quote && table && {
@@ -695,6 +701,7 @@ export function Fin1CalculatorPage() {
         // figure, identical to the one the price table already returned.
         docFee: table.policy.doc_fee_amount,
         exact: true,
+        dScore: quote.d_score,
       })
     : (row && cell && table && {
         down: row.down_amount,
@@ -704,6 +711,7 @@ export function Fin1CalculatorPage() {
         total: cell.total_effective,
         docFee: table.policy.doc_fee_amount,
         exact: true,
+        dScore: cell.d_score,
       });
 
   // The answer to the typed amount, in one line under the box. Hidden while
@@ -1231,6 +1239,7 @@ export function Fin1CalculatorPage() {
                                   {t('fin1Calc.notExact', { count: plan.term_months, amount: fmtCurrency(plan.installment_amount) })}
                                 </div>
                               )}
+                              <DScoreLine score={summary.dScore} size={16} />
                             </div>
                             <div className="border-t border-line">
                               {[

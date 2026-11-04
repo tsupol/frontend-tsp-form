@@ -374,11 +374,13 @@ export function PartnerCaseApproveModal({ open, detail, onClose, onApproved }: P
                           installment: detail?.installment_amount ?? null,
                           lastInstallment: detail?.last_installment_amount ?? null,
                           dueAtSigning: detail?.requested_due_at_signing ?? null,
+                          dScore: detail?.d_score,
                         }}
                         approved={{
                           installment: preview.installment_amount,
                           lastInstallment: preview.last_installment_amount,
                           dueAtSigning: preview.due_at_signing,
+                          dScore: preview.d_score,
                         }}
                         changes={changedKeys.map(k => ({ key: k, requested: requested[k], approved: current[k] }))}
                         pending={previewing}

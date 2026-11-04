@@ -1647,6 +1647,13 @@
     "source": "Source",
     "sourcePO": "From PO",
     "sourceLot": "From Lot",
+    "sourceKind_PO_PURCHASE": "Purchase from supplier",
+    "sourceKind_PO_BUYBACK": "Buyback from customer",
+    "sourceKind_PO_DEAL_PARTNER": "From deal partner",
+    "sourceKind_PARTNER_REGISTER": "Registered by partner shop",
+    "sourceKind_LEGACY_IMPORT": "Moved from old system",
+    "sourceKind_DIRECT_REGISTER": "Registered directly",
+    "sourceLegacyCode": "Old code {{code}}",
     "filteredBySourceLot": "From lot",
     "filteredBySourcePo": "From PO",
     "registered": "Registered",
@@ -1713,6 +1720,7 @@
     "writeOffSuccess": "Asset written off",
     "internalUseSuccess": "Asset assigned for internal use",
     "registerExternalRef": "External ref",
+    "registerSourceNote": "Source (optional)",
     "registerExternalRefPlaceholder": "e.g. supplier invoice no."
   },
   "assetEvidence": {
@@ -3129,6 +3137,11 @@
     "staffN_other": "{{count}} people",
     "rankHintBranch": "company-wide branch rank"
   },
+  "dScore": {
+    "label": "D-score",
+    "requested": "Submitted",
+    "deal": "Actual"
+  },
   "common": {
     "actions": "Actions",
     "active": "Active",
@@ -3459,6 +3472,10 @@
     "payoffDiscount_amount": "Payoff discount",
     "payoffDiscount": "Payoff discount",
     "saleDiscount": "Discount at sale",
+    "deviceCost": "Device cost",
+    "devicePriceBase": "Device price",
+    "deviceUplift": "Added amount (uplift)",
+    "deviceShopSale": "Shop's sale price to the fund",
     "totalReceived": "Actually received",
     "payoffDiscount_cap": "Up to {{max}} ({{pct}}% of the {{base}} still owed)",
     "payoffDiscount_customerPaid": "Customer paid",
@@ -5894,6 +5911,7 @@
     "primaryRepairing": "In repair"
   },
   "lot": {
+    "source": "Source",
     "search": "Search by lot code, SKU, model, PO",
     "allBuckets": "All buckets",
     "allPoTypes": "All PO types",

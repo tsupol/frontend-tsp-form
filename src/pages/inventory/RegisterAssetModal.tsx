@@ -71,6 +71,7 @@ interface RegisterResult {
   // the cost the staff entered. The user pressed "register a new device" but the
   // system re-registered an existing one, so the done view says so explicitly.
   re_registered?: boolean;
+  source_note?: string | null;
   from_branch_id?: number | null;
   final_cost?: number | null;
 }
@@ -109,6 +110,7 @@ export function RegisterAssetModal({
   const [costOverride, setCostOverride] = useState('');
   const [retailOverride, setRetailOverride] = useState('');
   const [externalRef, setExternalRef] = useState('');
+  const [sourceNote, setSourceNote] = useState('');
   // The ApiError itself (not its text): `ApiErrorBand` translates it and, on
   // INV.CONFLICT.IDENTIFIER_CONFLICT, links to the existing asset from its params.
   const [error, setError] = useState<unknown>(null);
@@ -144,7 +146,7 @@ export function RegisterAssetModal({
   const isDirty = keyword !== '' || modelId !== null || variantId !== null
     || condition !== '' || !hasBox || battery !== '' || warranty !== ''
     || imei !== '' || serial !== '' || costOverride !== '' || retailOverride !== ''
-    || externalRef !== '';
+    || externalRef !== '' || sourceNote !== '';
 
   useEffect(() => {
     if (open) {
@@ -156,6 +158,7 @@ export function RegisterAssetModal({
       setImei(''); setSerial('');
       setCostOverride(''); setRetailOverride('');
       setExternalRef('');
+      setSourceNote('');
       setError(null);
     }
   }, [open]);
@@ -258,6 +261,7 @@ export function RegisterAssetModal({
       // Battery health rides in the condition snapshot (key UPPERCASE, 0–100).
       p_condition_snapshot: battery.trim() ? { BATTERY_HEALTH: Number(battery) } : null,
       p_warranty_expired_date: warranty || null,
+      p_source_note: sourceNote.trim() || null,
     }),
     onSuccess: (data) => {
       setResult(data);
@@ -311,9 +315,12 @@ export function RegisterAssetModal({
             : t('asset.registerDone', { defaultValue: 'Asset registered' })}
           contractCode={result.code_display ?? result.asset_code}
           contractLink={{ to: `/admin/inventory/assets/${result.asset_id}`, onNavigate: onClose }}
-          detailRows={result.re_registered && result.final_cost != null
-            ? [{ label: t('asset.reRegisterCostLabel', { defaultValue: 'Cost' }), value: fmtCurrency(result.final_cost) }]
-            : undefined}
+          detailRows={[
+            ...(result.re_registered && result.final_cost != null
+              ? [{ label: t('asset.reRegisterCostLabel', { defaultValue: 'Cost' }), value: fmtCurrency(result.final_cost) }]
+              : []),
+            ...(result.source_note ? [{ label: t('asset.source'), value: result.source_note }] : []),
+          ]}
           extras={
             <>
               {result.re_registered && (
@@ -569,6 +576,11 @@ export function RegisterAssetModal({
                       className="w-full"
                       placeholder={t('asset.registerExternalRefPlaceholder', { defaultValue: 'e.g. supplier invoice no.' })}
                     />
+                  </div>
+
+                  <div className="flex flex-col">
+                    <label className="form-label">{t('asset.registerSourceNote')}</label>
+                    <Input value={sourceNote} onChange={(e) => setSourceNote(e.target.value)} className="w-full" />
                   </div>
                 </div>
               </>

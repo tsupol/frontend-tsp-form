@@ -27,6 +27,7 @@ import {
 import { PartnerCaseDetailPanel } from './PartnerCaseDetailPanel';
 import { useCustomerRisk } from './customerRisk';
 import { CustomerRiskBadge } from '../../components/CustomerRiskBadge';
+import { DScoreLine } from '../../components/DScore';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   outcomeBadgeColor,
@@ -61,6 +62,10 @@ interface RailRow {
   submitted_by_name: string | null;
   /** Queue: when it arrived. History: when it was last acted on. */
   timestamp: string;
+  /** D-score of what the shop submitted. */
+  d_score?: number | null;
+  /** History only: D-score of the figures actually in force. */
+  deal_d_score?: number | null;
   /** Queue only. */
   age_hours?: number;
   in_my_pool?: boolean;
@@ -77,6 +82,7 @@ const fromQueue = (r: PartnerCaseQueueRow): RailRow => ({
   branch_name: r.branch_name,
   model_label: r.product_display_name,
   financed_amount: r.financed_amount,
+  d_score: r.d_score,
   is_used_asset: r.is_used_asset,
   submitted_by_name: r.submitted_by_name,
   timestamp: r.submitted_at,
@@ -93,6 +99,8 @@ const fromHistory = (r: PartnerCase): RailRow => ({
   model_label: r.product_display_name,
   // The deal, not the request: an adjusted approval's financed amount (mig 1526).
   financed_amount: r.deal_financed_amount,
+  d_score: r.d_score,
+  deal_d_score: r.deal_d_score,
   is_used_asset: r.is_used_asset,
   submitted_by_name: r.submitted_by_name,
   timestamp: r.updated_at,
@@ -348,6 +356,16 @@ export function PartnerCaseQueuePage() {
                         </div>
                         <div className="text-xs text-subtle mt-0.5">
                           {r.submitted_by_name ?? '—'} · <DateTime value={r.timestamp} showTime />
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-3 mt-0.5">
+                          {isQueue ? (
+                            <DScoreLine score={r.d_score} />
+                          ) : (
+                            <>
+                              <DScoreLine score={r.d_score} label={`${t('dScore.label')} ${t('dScore.requested')}`} />
+                              <DScoreLine score={r.deal_d_score} label={t('dScore.deal')} />
+                            </>
+                          )}
                         </div>
                       </button>
                     );

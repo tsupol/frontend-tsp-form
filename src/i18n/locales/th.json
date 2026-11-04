@@ -1647,6 +1647,13 @@
     "source": "แหล่งที่มา",
     "sourcePO": "จาก PO",
     "sourceLot": "จาก Lot",
+    "sourceKind_PO_PURCHASE": "ซื้อจาก supplier",
+    "sourceKind_PO_BUYBACK": "ซื้อคืนจากลูกค้า",
+    "sourceKind_PO_DEAL_PARTNER": "รับจาก partner",
+    "sourceKind_PARTNER_REGISTER": "ร้าน partner ลงทะเบียนเอง",
+    "sourceKind_LEGACY_IMPORT": "ย้ายจากระบบเก่า",
+    "sourceKind_DIRECT_REGISTER": "ลงทะเบียนตรง",
+    "sourceLegacyCode": "รหัสเดิม {{code}}",
     "filteredBySourceLot": "จาก lot",
     "filteredBySourcePo": "จาก PO",
     "registered": "ลงทะเบียน",
@@ -1713,6 +1720,7 @@
     "writeOffSuccess": "ตัดบัญชีสินทรัพย์แล้ว",
     "internalUseSuccess": "มอบหมายใช้ภายในแล้ว",
     "registerExternalRef": "เลขอ้างอิงภายนอก",
+    "registerSourceNote": "แหล่งที่มา (ไม่บังคับ)",
     "registerExternalRefPlaceholder": "เช่น เลขที่ใบส่งของผู้ขาย"
   },
   "assetEvidence": {
@@ -3126,6 +3134,11 @@
     "staffN_other": "พนักงาน {{count}} คน",
     "rankHintBranch": "อันดับสาขาเทียบทั้งบริษัท"
   },
+  "dScore": {
+    "label": "D-score",
+    "requested": "ยื่น",
+    "deal": "ใช้จริง"
+  },
   "common": {
     "actions": "การดำเนินการ",
     "active": "เปิดใช้งาน",
@@ -3456,6 +3469,10 @@
     "payoffDiscount_amount": "ส่วนลดปิดยอด",
     "payoffDiscount": "ส่วนลดปิดยอด",
     "saleDiscount": "ส่วนลดตอนขาย",
+    "deviceCost": "ราคาทุนเครื่อง",
+    "devicePriceBase": "ราคาเครื่อง",
+    "deviceUplift": "ราคาเพิ่ม (uplift)",
+    "deviceShopSale": "ราคาที่ร้านขายให้กองทุน",
     "totalReceived": "รับเงินจริง",
     "payoffDiscount_cap": "ลดได้ไม่เกิน {{max}} ({{pct}}% ของยอดคงเหลือ {{base}})",
     "payoffDiscount_customerPaid": "ยอดที่ลูกค้าจ่าย",
@@ -5889,6 +5906,7 @@
     "primaryRepairing": "กำลังซ่อม"
   },
   "lot": {
+    "source": "แหล่งที่มา",
     "search": "ค้นหาด้วยรหัส lot, SKU, รุ่น, PO",
     "allBuckets": "ทุกสถานะ",
     "allPoTypes": "ทุกประเภท PO",

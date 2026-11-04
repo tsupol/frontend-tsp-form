@@ -152,12 +152,20 @@ input[type="number"
    source order decides the winner. */
 :root {
     --swatch-ring: rgba(0, 0, 0, 0.18);
+    /* D-score stars: yellow when lit, black when not (owner's words). */
+    --d-score-on: #facc15;
+    --d-score-on-line: #ca8a04;
+    --d-score-off: #18181b;
+    --d-score-off-line: #18181b;
 }
 
 [data-theme="dark"] {
     --color-skeleton: #1c1c1e;
     /* light ring so dark colour swatches stay visible on the dark surface */
     --swatch-ring: rgba(255, 255, 255, 0.22);
+    /* still black inside, but a black star needs an edge on a dark surface */
+    --d-score-off: #000000;
+    --d-score-off-line: #71717a;
 }
 
 .page-header {
@@ -1083,3 +1091,6 @@ div:has(> .checkbox-hidden) {
 .lost-mode-phone-call { margin-top: 0.5em; padding: 0.4em 2.6em; border-radius: 1.2em; background: #86d97f; font-size: 1.25em; font-weight: 500; text-decoration: underline; }
 .lost-mode-phone-emergency { flex: none; padding: 0.55em 1.2em; border-radius: 1.3em; background: #3a3a3c; font-size: 1em; font-weight: 500; text-decoration: underline; }
 .lost-mode-phone-footnote { flex: none; margin-top: 1em; font-size: 0.8em; line-height: 1.35; overflow-wrap: anywhere; }
+
+.d-score-star-on { fill: var(--d-score-on); color: var(--d-score-on-line); }
+.d-score-star-off { fill: var(--d-score-off); color: var(--d-score-off-line); }

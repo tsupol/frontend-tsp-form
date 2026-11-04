@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Badge } from 'tsp-form';
 import { Copy, Check, PiggyBank, Star } from 'lucide-react';
+import { ContractDevicePriceBlock, type ContractDevicePriceFields } from './ContractDevicePrice';
 import { apiClient } from '../../lib/api';
 import { DateTime } from '../../components/DateTime';
 import { fmtCurrency } from '../../lib/format';
@@ -13,7 +14,7 @@ import { WalletsTab } from './wallet/WalletsTab';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-interface ContractDetail {
+interface ContractDetail extends ContractDevicePriceFields {
   id: number;
   code: string;
   code_display: string | null;
@@ -296,6 +297,7 @@ function SavingOverviewTab({ contract, t }: { contract: ContractDetail; t: Retur
               <InfoCell label={t('contract.discount')} value={`${fmtCurrency(contract.discount_amount)} (${contract.discount_percent ?? 0}%)`} />
             )}
           </div>
+          <ContractDevicePriceBlock contract={contract} />
         </div>
       )}
 

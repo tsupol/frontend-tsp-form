@@ -9,6 +9,7 @@
 
 import { useTranslation } from 'react-i18next';
 import { fmtCurrency } from '../../lib/format';
+import { DScoreStars } from '../../components/DScore';
 import { adjustLabel, adjustValue } from './adjustFormat';
 import type { PartnerCaseAdjustKey } from './partnerCaseTypes';
 
@@ -17,6 +18,8 @@ export interface PlanSide {
   /** Shown under the monthly figure only when it differs from it. */
   lastInstallment: number | null;
   dueAtSigning: number | null;
+  /** From the backend like the rest. The shop's own view doesn't carry it, and the row then stays off. */
+  dScore?: number | null;
 }
 
 interface Props {
@@ -64,6 +67,13 @@ export function PlanCompareTable({ requested, approved, changes, pending }: Prop
         <span className="text-right tabular-nums text-subtle">{fmtCurrency(requested.dueAtSigning)}</span>
         <span className={`text-right text-lg font-semibold leading-tight ${newCls}`}>{fmtCurrency(approved.dueAtSigning)}</span>
       </div>
+      {(requested.dScore != null || approved.dScore != null) && (
+        <div className="grid grid-cols-subgrid col-span-3 gap-x-4 px-3 py-2 border-t border-line items-center">
+          <span className="font-medium">{t('dScore.label')}</span>
+          <span className="text-right"><DScoreStars score={requested.dScore} /></span>
+          <span className={`text-right ${newCls}`}><DScoreStars score={approved.dScore} /></span>
+        </div>
+      )}
 
       {/* Only what credit changed. */}
       {changes.map(c => (

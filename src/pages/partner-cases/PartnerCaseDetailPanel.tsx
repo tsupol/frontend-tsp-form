@@ -48,6 +48,7 @@ import { PartnerCaseApproveModal } from './PartnerCaseApproveModal';
 import { adjustLabel, adjustValue, adjustmentRows } from './adjustFormat';
 import { PartnerCaseReturnModal } from './PartnerCaseReturnModal';
 import { PartnerCaseCommissionSection } from './PartnerCaseCommissionSection';
+import { DScoreStars } from '../../components/DScore';
 
 interface PartnerCaseDetailPanelProps {
   detail: PartnerCaseDetail | null;
@@ -524,6 +525,14 @@ export function PartnerCaseDetailPanel({
                 )}
               </div>
               <div className="flex flex-col gap-1 text-sm">
+                {detail.approved_d_score != null && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-subtle flex-1 min-w-0">{t('dScore.label')}</span>
+                    <DScoreStars score={detail.d_score} size={12} />
+                    <span className="text-subtler">→</span>
+                    <DScoreStars score={detail.approved_d_score} size={12} />
+                  </div>
+                )}
                 {adjustmentRows(detail.adjustments).map(r => (
                   <div key={r.key} className="flex items-center gap-2">
                     <span className="text-subtle flex-1 min-w-0">{adjustLabel(r.key, t)}</span>
@@ -785,6 +794,9 @@ export function PartnerCaseDetailPanel({
               value={fmtCurrency(detail.deal_last_installment_amount)}
             />
             <Field label={t('partnerCase.docFee')} value={fmtCurrency(detail.deal_doc_fee_amount)} />
+            {detail.deal_d_score != null && (
+              <Field label={t('dScore.label')} value={<DScoreStars score={detail.deal_d_score} />} />
+            )}
             {/* No deal total comes down ready-made; the agreed price is the
                 down plus every installment (BE's own definition), so the
                 total is that price less the down. */}

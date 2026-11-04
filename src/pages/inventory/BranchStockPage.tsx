@@ -16,6 +16,7 @@ import { ReportSideTag } from '../../components/ReportSideSelect';
 import { RetailWriteOffModal, type RetailWriteOffTarget } from './RetailWriteOffModal';
 import { printWithMarker } from '../../lib/printDoc';
 import { downloadXlsx, type XlsxColumn } from '../../lib/xlsx';
+import { assetSourceLabel } from './assetSource';
 import { StockCountSheet, type StockSheetRow, type StockSheetTab } from './StockCountSheet';
 
 // ============================================================================
@@ -118,6 +119,8 @@ interface AssetDetailRow {
   updated_at: string;
   in_mdm: boolean;
   mdm_since: string | null;
+  source_kind?: string | null;
+  source_supplier_name?: string | null;
 }
 
 interface Branch {
@@ -987,6 +990,9 @@ function AssetDetailList({
               {branchName(row.branch_id)}
               {row.battery_health != null && <> · {t('branchStock.battery')} {row.battery_health}%</>}
               <> · {t('branchStock.externalRef')} {row.external_ref || '—'}</>
+              {row.source_kind && (
+                <> · {[assetSourceLabel(row.source_kind, t), row.source_supplier_name].filter(Boolean).join(' · ')}</>
+              )}
             </div>
           </div>
           <div className="text-right shrink-0 flex flex-col items-end">
