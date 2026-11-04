@@ -180,7 +180,6 @@ export const STATE_COLOR: Record<string, string> = {
   PENDING_PAYMENT_AND_SIGN: '#c2478f',
 };
 export const stateColor = (state: string) => STATE_COLOR[state] ?? '#7b8794';
-export const HAPPY = '#28a745';
 export const SOLD_EDGE = '#4aa25e';
 export const FLOOR = { idle: '#fbfdfb', guest: '#fff4d8', busy: '#fde8e4', sold: '#d6f0da', closed: '#eef0f2' };
 export const companyEdge = (type?: CompanyType) => (type === 'FINANCIER' ? '#4f46b8' : '#0f8f7a');

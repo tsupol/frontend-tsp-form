@@ -1,20 +1,20 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button, DataTable, MobileHeader, PageNav, PageNavPanel, Skeleton, useSnackbarContext } from 'tsp-form';
-import { ArrowRightFromLine, House, Minus, Plus, X, XCircle } from 'lucide-react';
+import { ArrowRightFromLine, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, House, Info, Minus, Plus, X, XCircle } from 'lucide-react';
 import { ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { DateTime } from '../../components/DateTime';
 import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { useSimulationLive } from './useSimulationLive';
-import { SimulationScene, type Focus, type SceneHandle } from './SimulationScene';
-import { useCrowd } from './useCrowd';
+import type { Focus, SceneHandle } from './SimulationScene';
+import { useCustomers } from './useCustomers';
 import { PILE_ICON } from './simulationIcons';
 import { SimulationCollection } from './SimulationCollection';
 import {
-  AMBER, BLUE, FLOOR, GREEN, HAPPY, PILES, PURPLE, SIMULATION_PERMISSION, SOLD_EDGE,
+  AMBER, BLUE, FLOOR, GREEN, PILES, PURPLE, SIMULATION_PERMISSION, SOLD_EDGE,
   ageText, annualAtRate, annualPct, baht, bangkokClock, codeOf, companyEdge, downPct, downPctOf, gradeLabel, stateColor, stateLabel,
   type PileKey, type SimBranch,
 } from './simulationTypes';
@@ -25,7 +25,12 @@ import './simulation.css';
 // as a floor plan. What may be seen is decided ONLY by the RPC's can_see_* flags:
 // a hidden figure hides its whole card or line, never a "—" or a 0 (§3).
 
+// Three.js is only worth downloading for the people who open this page.
+const SimulationScene = lazy(() => import('./SimulationScene').then(m => ({ default: m.SimulationScene })));
+
 const COMPANY_KEY = 'nnf.simulation.company';
+const PANEL_KEY = 'nnf.simulation.panelClosed';
+const TABS_KEY = 'nnf.simulation.tabsClosed';
 const LEGEND_STATES = ['DRAFT', 'PENDING_APPROVAL', 'PENDING_SIGN', 'PENDING_PAYMENT'];
 const PHONE_QUERY = '(max-width: 743.98px)';
 
@@ -43,6 +48,26 @@ function saveCompany(id: number) {
   } catch {
     /* no storage: the page just forgets the company */
   }
+}
+
+// Whether a floating part is minimized is this viewer's own convenience, kept per browser.
+function useClosed(key: string) {
+  const [closed, setClosed] = useState(() => {
+    try {
+      return localStorage.getItem(key) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const set = (next: boolean) => {
+    setClosed(next);
+    try {
+      localStorage.setItem(key, next ? '1' : '0');
+    } catch {
+      /* no storage: it just opens again next time */
+    }
+  };
+  return [closed, set] as const;
 }
 
 function useIsPhone() {
@@ -67,7 +92,7 @@ function useClock() {
 
 function Kpi({ label, value, unit, sub, sub2, icon }: { label: string; value: ReactNode; unit?: string; sub?: string; sub2?: string; icon?: ReactNode }) {
   return (
-    <div className="sim__card sim__kpi">
+    <div className="sim__kpi">
       <label>{icon}{label}</label>
       <strong>{value}{unit && <span> {unit}</span>}</strong>
       {sub && <small>{sub}</small>}
@@ -124,6 +149,43 @@ export function SimulationPage() {
   );
 }
 
+// The row scrolls sideways when the companies don't fit. Its edge fades only on a side
+// that has more, so a tab cut by the edge reads as "there is more" and not as broken.
+function CompanyTabs({ children, activeId, onMinimize }: { children: ReactNode; activeId: number; onMinimize: () => void }) {
+  const { t } = useTranslation();
+  const row = useRef<HTMLDivElement>(null);
+  const [more, setMore] = useState({ left: false, right: false });
+  const measure = () => {
+    const el = row.current;
+    if (!el) return;
+    const left = el.scrollLeft > 1;
+    const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+    setMore(m => (m.left === left && m.right === right ? m : { left, right }));
+  };
+  useEffect(() => {
+    measure();
+    const el = row.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  useEffect(() => {
+    row.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    measure();
+  }, [activeId]);
+  return (
+    <div className="sim__card sim__companies-wrap">
+      <div ref={row} className="sim__companies hidden-scroll" role="tablist" onScroll={measure}
+        onWheel={e => { if (row.current && e.deltaY && !e.deltaX) row.current.scrollLeft += e.deltaY; }}
+        style={{ '--sim-fade-left': more.left ? '36px' : '0px', '--sim-fade-right': more.right ? '36px' : '0px' } as CSSProperties}>
+        {children}
+      </div>
+      <button type="button" className="sim__tabs-toggle" aria-label={t('simulation.companiesHide')} aria-expanded onClick={onMinimize}><ChevronLeft size={16} /></button>
+    </div>
+  );
+}
+
 function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolean }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -134,6 +196,9 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
   const [company, setCompany] = useState<number | null>(readCompany);
   const [picked, setPicked] = useState<number | null>(null);
   const [collectOf, setCollectOf] = useState<number | null>(null);
+  const [legendOpen, setLegendOpen] = useState(false);
+  const [panelClosed, setPanelClosed] = useClosed(PANEL_KEY);
+  const [tabsClosed, setTabsClosed] = useClosed(TABS_KEY);
   const scene = useRef<SceneHandle>(null);
 
   // §4.6 — permission revoked while the page is open.
@@ -143,7 +208,7 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
     navigate('/admin', { replace: true });
   };
   const { data, failed } = useSimulationLive(company, ready, onForbidden);
-  const { actors, bind } = useCrowd(data);
+  const customers = useCustomers(data);
 
   const [focusKey, setFocusKey] = useState<string | null>(null);
   const focusTimer = useRef(0);
@@ -185,12 +250,12 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
     setCollectOf(null);
   };
 
-  const inRoom = (id: number) => actors.filter(a => a.branchId === id && !a.leaving);
+  const inRoom = (id: number) => customers.filter(c => c.branchId === id);
   const sum = (f: (b: SimBranch) => number | null) => branches.reduce((s, b) => s + (f(b) ?? 0), 0);
   const openedRows = branches.flatMap(b => b.opened);
   const newCount = openedRows.filter(o => o.grade === 'NEW').length;
   const standing = branches.reduce((s, b) => s + inRoom(b.id).length, 0);
-  const longest = Math.max(0, ...branches.flatMap(b => inRoom(b.id).map(a => a.age)));
+  const longest = Math.max(0, ...branches.flatMap(b => inRoom(b.id).map(c => c.age)));
   const ranked = useMemo(
     () => [...branches].sort((a, b) => b.opened.length - a.opened.length || (canProfit ? (b.profit ?? 0) - (a.profit ?? 0) : 0)),
     [branches, canProfit],
@@ -204,13 +269,15 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
   return (
     <div className="sim">
       {data && !empty && (
-        <SimulationScene key={data.company_id} ref={scene} branches={branches} actors={actors} bind={bind} picked={picked} focus={focus} canSeeProfit={canProfit} onPick={pick} />
+        <Suspense fallback={null}>
+          <SimulationScene key={data.company_id} ref={scene} branches={branches} customers={customers} picked={picked} focus={focus} onPick={pick} />
+        </Suspense>
       )}
 
       <div className="sim__stack">
         <div className="sim__top">
-          {data && !empty && (showTabs ? (
-            <div className="sim__card sim__companies hidden-scroll" role="tablist">
+          {data && !empty && (showTabs && !tabsClosed ? (
+            <CompanyTabs activeId={data.company_id} onMinimize={() => setTabsClosed(true)}>
               {companies.map(c => {
                 const on = c.id === data.company_id;
                 return (
@@ -222,7 +289,15 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
                   </button>
                 );
               })}
-            </div>
+            </CompanyTabs>
+          ) : showTabs && current ? (
+            <button type="button" className="sim__card sim__company-label sim__company-min" aria-label={t('simulation.companiesShow')} aria-expanded={false} onClick={() => setTabsClosed(false)}>
+              <span>
+                <b>{current.name}</b>
+                <small><i style={{ background: companyEdge(current.company_type) }} />{t(`simulation.companyType.${current.company_type}`)} · {t('simulation.branchCount', { n: current.branch_count, count: current.branch_count })}</small>
+              </span>
+              <i className="sim__tabs-toggle"><ChevronRight size={16} /></i>
+            </button>
           ) : current && (
             <div className="sim__card sim__company-label">
               <b>{current.name}</b>
@@ -237,41 +312,9 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
         </div>
 
         {failed && <div className="alert alert-warning sim__band">{t('simulation.loadError')}</div>}
-
-        {data && !empty && (
-          <div className="sim__kpis">
-            <Kpi label={t('simulation.kpi.standing')} value={standing} unit={t('simulation.unit.people', { count: standing })} sub={standing > 0 ? t('simulation.kpi.longest', { age: ageText(t, longest) }) : undefined} />
-            <Kpi label={t('simulation.kpi.contracts')} value={openedRows.length} unit={t('simulation.unit.contracts', { count: openedRows.length })} sub={grades} />
-            {isFund ? (
-              <>
-                <Kpi label={t('simulation.kpi.financed')} value={baht(sum(b => b.financed))} sub={`${t('simulation.commission')} ${baht(sum(b => b.commission))}`}
-                  sub2={`${t('simulation.downAvg')} ${downPctOf(sum(b => b.down), sum(b => b.device_price))}`} />
-                <Kpi label={t('simulation.kpi.paidOut')} value={baht(sum(b => b.payout))} sub={t('simulation.kpi.paidOutSub')} />
-                <Kpi label={t('simulation.kpi.pendingPayout')} value={baht(sum(b => b.pending_payout))}
-                  sub={sum(b => b.pending_older) > 0
-                    ? t('simulation.kpi.olderSub', { amount: baht(sum(b => b.pending_older)) })
-                    : t('simulation.billsReady', { bills: sum(b => b.pending_bills), ready: sum(b => b.pending_ready), count: sum(b => b.pending_bills) })} />
-                {canFuture && <Kpi label={t('simulation.kpi.future')} value={baht(sum(b => b.future))} sub={t('simulation.kpi.futureSub')} />}
-                {canProfit && <Kpi label={t('simulation.kpi.profit')} value={baht(sum(b => b.profit))} />}
-                {canProfit && <Kpi label={t('simulation.kpi.annual')} value={annualPct(sum(b => b.profit), sum(b => b.capital_years))} sub={t('simulation.kpi.annualSub')} />}
-                {canProfit && <Kpi label={t('simulation.kpi.annualRate')} value={annualAtRate(sum(b => b.future), sum(b => b.investment), sum(b => b.capital_years))} />}
-              </>
-            ) : (
-              <>
-                {canFuture && <Kpi label={t('simulation.kpi.future')} value={baht(sum(b => b.future))} sub={t('simulation.kpi.futureSub')} />}
-                {canProfit && <Kpi label={t('simulation.kpi.profit')} value={baht(sum(b => b.profit))} sub={t('simulation.kpi.profitSubOperating')} />}
-                <Kpi label={t('simulation.kpi.retail')} value={baht(sum(b => b.retail))} />
-                <Kpi label={t('simulation.kpi.service')} value={baht(sum(b => b.service))} />
-                <Kpi icon={<PileIcon k="cash" />} label={t('simulation.pile.cash')} value={baht(sum(b => b.cash))} />
-                <Kpi icon={<PileIcon k="transfer" />} label={t('simulation.pile.transfer')} value={baht(sum(b => b.transfer))} />
-                <Kpi icon={<PileIcon k="wallet" />} label={t('simulation.pile.wallet')} value={baht(sum(b => b.wallet))} />
-              </>
-            )}
-          </div>
-        )}
       </div>
 
-      <div className="sim__body">
+      <div className={`sim__body${panelClosed ? ' sim__body--panel-closed' : ''}`}>
         {!data && !failed && (
           <div className="sim__loading" aria-busy="true">
             <Skeleton variant="rectangular" width="100%" height={72} />
@@ -286,9 +329,44 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
               <Button variant="ghost" size="sm" startIcon={<Plus size={14} />} aria-label={t('simulation.zoomIn')} onClick={() => scene.current?.zoom(1.2)} />
               <Button variant="ghost" size="sm" startIcon={<Minus size={14} />} aria-label={t('simulation.zoomOut')} onClick={() => scene.current?.zoom(0.83)} />
               <Button variant="ghost" size="sm" startIcon={<House size={14} />} aria-label={t('simulation.zoomFit')} onClick={() => scene.current?.fit()} />
+              <Button variant={legendOpen ? 'outline' : 'ghost'} size="sm" startIcon={<Info size={14} />} aria-label={t('simulation.legendToggle')} aria-expanded={legendOpen} onClick={() => setLegendOpen(v => !v)} />
             </div>
 
-            <aside className="sim__card sim__panel">
+            <aside className={`sim__card sim__panel${panelClosed ? ' sim__panel--closed' : ''}`}>
+              <button type="button" className="sim__panel-toggle" aria-expanded={!panelClosed} aria-label={t(panelClosed ? 'simulation.panelShow' : 'simulation.panelHide')} onClick={() => setPanelClosed(!panelClosed)}>
+                <span>{t('simulation.overview')}</span>
+                {panelClosed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+              </button>
+              {!panelClosed && <>
+              <div className="sim__kpis">
+                <Kpi label={t('simulation.kpi.standing')} value={standing} unit={t('simulation.unit.people', { count: standing })} sub={standing > 0 ? t('simulation.kpi.longest', { age: ageText(t, longest) }) : undefined} />
+                <Kpi label={t('simulation.kpi.contracts')} value={openedRows.length} unit={t('simulation.unit.contracts', { count: openedRows.length })} sub={grades} />
+                {isFund ? (
+                  <>
+                    <Kpi label={t('simulation.kpi.financed')} value={baht(sum(b => b.financed))} sub={`${t('simulation.commission')} ${baht(sum(b => b.commission))}`}
+                      sub2={`${t('simulation.downAvg')} ${downPctOf(sum(b => b.down), sum(b => b.device_price))}`} />
+                    <Kpi label={t('simulation.kpi.paidOut')} value={baht(sum(b => b.payout))} sub={t('simulation.kpi.paidOutSub')} />
+                    <Kpi label={t('simulation.kpi.pendingPayout')} value={baht(sum(b => b.pending_payout))}
+                      sub={sum(b => b.pending_older) > 0
+                        ? t('simulation.kpi.olderSub', { amount: baht(sum(b => b.pending_older)) })
+                        : t('simulation.billsReady', { bills: sum(b => b.pending_bills), ready: sum(b => b.pending_ready), count: sum(b => b.pending_bills) })} />
+                    {canFuture && <Kpi label={t('simulation.kpi.future')} value={baht(sum(b => b.future))} sub={t('simulation.kpi.futureSub')} />}
+                    {canProfit && <Kpi label={t('simulation.kpi.profit')} value={baht(sum(b => b.profit))} />}
+                    {canProfit && <Kpi label={t('simulation.kpi.annual')} value={annualPct(sum(b => b.profit), sum(b => b.capital_years))} sub={t('simulation.kpi.annualSub')} />}
+                    {canProfit && <Kpi label={t('simulation.kpi.annualRate')} value={annualAtRate(sum(b => b.future), sum(b => b.investment), sum(b => b.capital_years))} />}
+                  </>
+                ) : (
+                  <>
+                    {canFuture && <Kpi label={t('simulation.kpi.future')} value={baht(sum(b => b.future))} sub={t('simulation.kpi.futureSub')} />}
+                    {canProfit && <Kpi label={t('simulation.kpi.profit')} value={baht(sum(b => b.profit))} sub={t('simulation.kpi.profitSubOperating')} />}
+                    <Kpi label={t('simulation.kpi.retail')} value={baht(sum(b => b.retail))} />
+                    <Kpi label={t('simulation.kpi.service')} value={baht(sum(b => b.service))} />
+                    <Kpi icon={<PileIcon k="cash" />} label={t('simulation.pile.cash')} value={baht(sum(b => b.cash))} />
+                    <Kpi icon={<PileIcon k="transfer" />} label={t('simulation.pile.transfer')} value={baht(sum(b => b.transfer))} />
+                    <Kpi icon={<PileIcon k="wallet" />} label={t('simulation.pile.wallet')} value={baht(sum(b => b.wallet))} />
+                  </>
+                )}
+              </div>
               <h3>{t('simulation.branches')}</h3>
               <DataTable<SimBranch>
                 data={ranked}
@@ -340,6 +418,7 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
                   );
                 }}
               />
+              </>}
             </aside>
 
             {detail && (
@@ -422,17 +501,16 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
               <SimulationCollection branch={collectBranch} generatedAt={data.generated_at} onClose={() => setCollectOf(null)} />
             )}
 
-            <div className="sim__card sim__legend">
+            {legendOpen && <div className="sim__card sim__legend">
               {LEGEND_STATES.map(s => (
                 <span key={s}><i style={{ background: stateColor(s) }} />{stateLabel(t, s)}</span>
               ))}
-              <span><i style={{ background: HAPPY }} />{t('simulation.legend.opened')}</span>
               <span className="sim__legend-floor"><i style={{ background: FLOOR.sold, borderColor: SOLD_EDGE }} />{t('simulation.legend.sold')}</span>
               <span className="sim__legend-floor"><i style={{ background: FLOOR.guest, borderColor: '#e2c98f' }} />{t('simulation.legend.guest')}</span>
               {isFund && PILES.FINANCIER.map(p => (
                 <span key={p.key} className="sim__legend-icon"><PileIcon k={p.key} />{t(`simulation.legend.${p.key}`)}</span>
               ))}
-            </div>
+            </div>}
           </>
         )}
       </div>
