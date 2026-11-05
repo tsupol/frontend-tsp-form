@@ -50,6 +50,7 @@ import { billDayDoneRow, type BillDay } from '../../lib/billDay';
 import { ContractFeeModal } from './ContractFeeModal';
 import { LateFeeCollectModal } from './LateFeeCollectModal';
 import { RescheduleDueDayModal } from './RescheduleDueDayModal';
+import { productName } from './contractUtils';
 import { AmendSignedTermsModal } from './AmendSignedTermsModal';
 import { PauseContractModal } from './PauseContractModal';
 import { ResumeContractModal } from './ResumeContractModal';
@@ -81,6 +82,12 @@ interface ContractForActions {
   device_id: number | null;
   /** The device the contract points at before one is bound (mig 1235). */
   target_asset_id?: number | null;
+  /** What the contract was sold as — shown when binding, so staff pick that model. */
+  product_display_name?: string | null;
+  variant_name?: string | null;
+  model_name?: string | null;
+  is_used_asset?: boolean;
+  target_asset_condition_grade?: string | null;
   outstanding_amount: number | null;
   late_fee_balance: number | null;
   credit_balance: number | null;
@@ -1946,9 +1953,27 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
             )}
 
             {/* Contract info summary */}
-            <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
-              <div className="font-medium text-sm">{contract.code_display ?? contract.code}</div>
-              <div className="text-xs text-subtle">{t(`contract.state_${contract.state}`, { defaultValue: contract.state })} · {contract.commercial_model ?? ''}</div>
+            <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line flex items-start justify-between gap-3">
+              <div className="shrink-0 whitespace-nowrap">
+                <div className="font-medium text-sm">{contract.code_display ?? contract.code}</div>
+                <div className="text-xs text-subtle">{t(`contract.state_${contract.state}`, { defaultValue: contract.state })} · {contract.commercial_model ?? ''}</div>
+              </div>
+              {/* Binding: the model and condition the contract was sold as, so the
+                  device picked below is checked against it at a glance. */}
+              {config.needsDevice && (
+                <div className="min-w-0 text-right flex flex-col items-end gap-1" data-testid="bind-contract-product">
+                  <div className="text-sm font-medium">
+                    {productName(contract.product_display_name) ?? contract.variant_name ?? contract.model_name ?? '—'}
+                  </div>
+                  <Badge size="sm" color={contract.is_used_asset ? 'warning' : 'success'}>
+                    {contract.is_used_asset
+                      ? (contract.target_asset_condition_grade
+                        ? t(`inventory.condition${contract.target_asset_condition_grade}`, { defaultValue: t('wizard.conditionUsed') })
+                        : t('wizard.conditionUsed'))
+                      : t('wizard.conditionNew')}
+                  </Badge>
+                </div>
+              )}
             </div>
 
             <div className="form-grid">
