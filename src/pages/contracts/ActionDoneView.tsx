@@ -59,7 +59,7 @@ export interface ActionDoneViewProps {
   extras?: ReactNode;
   /** If set, a secondary "View bill" button opens a nested receipt modal for this bill id. */
   billId?: number | null;
-  /** Optional explicit secondary button (e.g. "Open PO", "View asset"). Rendered to the left of Done. Ignored if billId is also set — billId takes precedence. */
+  /** Optional explicit secondary button (e.g. "Open PO", "View asset"). Rendered to the left of Done. With billId set it shows only when isNextStep — an unpaid bill still needs its next step. */
   secondaryAction?: ActionDoneSecondaryAction;
   /** Done button label override. Default: t('common.done'). */
   doneLabel?: string;
@@ -148,6 +148,23 @@ export function ActionDoneView({
       : tone === 'danger' ? 'danger'
       : 'info');
   const fromColor: BadgeColor = stateTransition?.fromColor ?? 'info';
+  const isNextStep = secondaryAction?.isNextStep === true;
+
+  const billButtons = billId != null && (
+    <>
+      <Button
+        variant="outline"
+        startIcon={downloadingPdf ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+        disabled={downloadingPdf}
+        onClick={() => downloadPdf(billId)}
+      >
+        {t('wizard.receipt_download')}
+      </Button>
+      <Button variant="outline" startIcon={<Printer size={16} />} onClick={handlePrintBill}>
+        {t('wizard.receipt_print')}
+      </Button>
+    </>
+  );
 
   return (
     <>
@@ -193,25 +210,12 @@ export function ActionDoneView({
         {extras && <div className="mt-3">{extras}</div>}
       </div>
 
-      <div className={`modal-footer${secondaryAction?.isNextStep ? ' flex-row-reverse justify-start' : ''}`}>
-        {billId != null ? (
-          <>
-            <Button
-              variant="outline"
-              startIcon={downloadingPdf ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-              disabled={downloadingPdf}
-              onClick={() => downloadPdf(billId)}
-            >
-              {t('wizard.receipt_download')}
-            </Button>
-            <Button variant="outline" startIcon={<Printer size={16} />} onClick={handlePrintBill}>
-              {t('wizard.receipt_print')}
-            </Button>
-          </>
-        ) : secondaryAction && (
+      <div className={`modal-footer${isNextStep ? ' flex-row-reverse justify-start flex-wrap' : ''}`}>
+        {!isNextStep && billButtons}
+        {secondaryAction && (billId == null || isNextStep) && (
           <Button
-            variant={secondaryAction.isNextStep ? 'solid' : 'outline'}
-            color={secondaryAction.isNextStep ? 'primary' : undefined}
+            variant={isNextStep ? 'solid' : 'outline'}
+            color={isNextStep ? 'primary' : undefined}
             onClick={(e) => {
               const to = secondaryAction.to;
               if (to && (e.ctrlKey || e.metaKey)) { window.open(to, '_blank'); return; }
@@ -224,9 +228,10 @@ export function ActionDoneView({
             {secondaryAction.label}
           </Button>
         )}
-        <Button color={doneColor} variant={secondaryAction?.isNextStep ? 'outline' : undefined} onClick={onClose}>
+        <Button color={doneColor} variant={isNextStep ? 'outline' : undefined} onClick={onClose}>
           {doneLabel ?? t('common.done', { defaultValue: 'Done' })}
         </Button>
+        {isNextStep && billButtons}
       </div>
 
       {printReady && billId != null && createPortal(
