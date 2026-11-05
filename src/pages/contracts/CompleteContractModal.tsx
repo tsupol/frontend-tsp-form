@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, Modal, MaskedInput, Select, TextArea, useSnackbarContext } from 'tsp-form';
-import { CheckCircle, XCircle, PiggyBank, CreditCard, ShieldCheck, ArrowRight, ChevronsRight, ExternalLink, Loader2, Plus, Trash2, Receipt } from 'lucide-react';
+import { AlertTriangle, CheckCircle, XCircle, PiggyBank, CreditCard, ShieldCheck, ArrowRight, ChevronsRight, ExternalLink, Loader2, Plus, Trash2, Receipt } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useBillSettle } from '../../hooks/useBillSettle';
 import { BranchPinInput } from '../../components/BranchPinInput';
@@ -18,7 +18,8 @@ import { useBillDatePreview, useBillDayConfirm } from '../../hooks/useBillDay';
 import { billDayDoneRow, type BillDay } from '../../lib/billDay';
 import { ContractFeeModal } from './ContractFeeModal';
 import { useContractInvalidate } from './useContractInvalidate';
-import { translateApiError } from '../../lib/apiErrors';
+import { blockingReasonText, translateApiError } from '../../lib/apiErrors';
+import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { useAllowedPaymentMethods, useBranchIsPartner } from '../../hooks/useAllowedPaymentMethods';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -197,9 +198,19 @@ interface Props {
     tab: 'overview' | 'device' | 'notes' | 'customers' | 'money' | 'signing',
     moneySection?: 'installments' | 'txns' | 'wallets' | 'bills',
   ) => void;
+  /** mig 1623: the button stays pressable while something must be done first;
+   *  the evaluator still names it. Shown on the first step, before the PIN. */
+  blocker?: { reason: string; params?: Record<string, unknown> | null } | null;
 }
 
 const WALLET_ORDER: WalletType[] = ['SAVING', 'CREDIT', 'INSURANCE'];
+
+// An evaluator blocking_reason → the error the RPC would answer, so the notice
+// before the PIN offers the same way out as the refusal after it.
+const BLOCKER_TO_CODE: Record<string, string> = {
+  late_fee_not_cleared: 'SALE.STATE.LATE_FEE_NOT_CLEARED',
+  open_bills_pending: 'SALE.STATE.BILLS_PENDING_RESOLVE_FIRST',
+};
 
 const WALLET_ICON: Record<WalletType, React.ComponentType<{ size?: number; className?: string }>> = {
   SAVING: PiggyBank,
@@ -225,7 +236,7 @@ type TerminateReason = typeof TERMINATE_REASONS[number];
 
 // ── Modal ────────────────────────────────────────────────────────────────────
 
-export function CompleteContractModal({ open, contract, action, onClose, onSuccess: _onSuccess, onNavigateTab }: Props) {
+export function CompleteContractModal({ open, contract, action, onClose, onSuccess: _onSuccess, onNavigateTab, blocker }: Props) {
   const { t } = useTranslation();
   const { addSnackbar } = useSnackbarContext();
   const queryClient = useQueryClient();
@@ -553,6 +564,31 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
     onError: setApiError,
   });
 
+  // The way out of a close blocker, shared by the refusal band and the notice
+  // shown before the PIN. Late fee not billed yet (hint_code USE_LATE_FEE_COLLECT,
+  // mig 1158): the fee modal is part of this flow, so it opens in place. Open
+  // bills: the contract's bill list, to settle or waive them.
+  const wayOut = (code: string | undefined): React.ReactNode => {
+    const linkClass = 'text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer self-start';
+    if (code === 'SALE.STATE.LATE_FEE_NOT_CLEARED') {
+      return (
+        <button type="button" onClick={() => setFeeModalOpen(true)} className={linkClass}>
+          {t('contract.goIssueLateFeeBill', { defaultValue: 'Issue the late-fee bill (collect / waive)' })}
+          <ExternalLink size={12} />
+        </button>
+      );
+    }
+    if (code === 'SALE.STATE.BILLS_PENDING_RESOLVE_FIRST' && onNavigateTab) {
+      return (
+        <button type="button" onClick={() => { onClose(); onNavigateTab('money', 'bills'); }} className={linkClass}>
+          {t('contract.goToOpenBills', { defaultValue: 'Go to the open bills' })}
+          <ExternalLink size={12} />
+        </button>
+      );
+    }
+    return null;
+  };
+
   const titleKey = view === 'clear-wallet' && clearTarget
     ? `wallet.action_${clearTarget.action.toLowerCase()}`
     : titleKeyForAction(action);
@@ -588,44 +624,23 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
         </div>
 
         <div className="modal-content">
-          {error && view !== 'clear-wallet' && (
-            <div key={errorKey} className="alert alert-danger mb-4 animate-pop-in">
-              <XCircle size={16} />
-              <div className="flex flex-col gap-1">
-                <span>{error}</span>
-                {/* Late fee not billed yet (hint_code USE_LATE_FEE_COLLECT, mig 1158)
-                    → the fee modal is part of this flow; open it in place. */}
-                {errorCode === 'SALE.STATE.LATE_FEE_NOT_CLEARED' && (
-                  <button
-                    type="button"
-                    onClick={() => setFeeModalOpen(true)}
-                    className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer self-start"
-                  >
-                    {t('contract.goIssueLateFeeBill', { defaultValue: 'Issue the late-fee bill (collect / waive)' })}
-                    <ExternalLink size={12} />
-                  </button>
-                )}
-                {/* OPEN/PARTIAL bills block the close → send the user to the
-                    contract's bill list to settle or waive them. */}
-                {errorCode === 'SALE.STATE.BILLS_PENDING_RESOLVE_FIRST' && onNavigateTab && (
-                  <button
-                    type="button"
-                    onClick={() => { onClose(); onNavigateTab('money', 'bills'); }}
-                    className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer self-start"
-                  >
-                    {t('contract.goToOpenBills', { defaultValue: 'Go to the open bills' })}
-                    <ExternalLink size={12} />
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
           {view !== 'clear-wallet' && (
             <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
               <div className="font-medium text-sm">{contract.code_display ?? contract.code}</div>
               <div className="text-xs text-subtle">
                 {contract.state} · {contract.commercial_model ?? ''}
+              </div>
+            </div>
+          )}
+
+          {/* What still has to be done, said before the PIN (mig 1623). The wallet
+              rows below already cover wallet balances, so those are not repeated. */}
+          {view === 'wallets' && blocker && !blocker.reason.endsWith('_balance_not_cleared') && (
+            <div className="alert alert-warning mb-4" data-blocked-reason={blocker.reason}>
+              <AlertTriangle size={16} />
+              <div className="flex flex-col gap-1">
+                <span>{blockingReasonText({ blocking_reason: blocker.reason, blocking_params: blocker.params }, t)}</span>
+                {wayOut(BLOCKER_TO_CODE[blocker.reason])}
               </div>
             </div>
           )}
@@ -789,6 +804,13 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
             />
           )}
         </div>
+        {/* Outside the scroller, so a refusal after pressing confirm is seen. */}
+        <ModalErrorBand
+          key={errorKey}
+          message={view !== 'clear-wallet' ? error : null}
+          onDismiss={() => { setError(''); setErrorCode(null); }}
+          action={errorCode ? wayOut(errorCode) : undefined}
+        />
       </div>
     </Modal>
 

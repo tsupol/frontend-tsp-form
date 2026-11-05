@@ -847,6 +847,13 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
     staleTime: 30 * 1000,
   });
 
+  // mig 1623: terminate is pressable while a "do this first" blocker remains;
+  // the close flow says which one before asking for the PIN.
+  const terminateAction = actionsResp?.actions?.find(a => a.action_code === 'TERMINATE_CONTRACT');
+  const terminateBlocker = terminateAction?.is_available && terminateAction.blocking_reason
+    ? { reason: terminateAction.blocking_reason, params: terminateAction.blocking_params ?? null }
+    : null;
+
   // An active deal-partner contract ends only through a device-return document
   // (146 §0). The evaluator says so itself: cancel / terminate / unbind / the
   // open bill's void all come back blocked, with `blocking_params.code` naming
@@ -1066,7 +1073,9 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
       endIcon = <Wrench size={12} />;
       lines.push(t('contract.actionNotImplemented', { defaultValue: 'Not yet wired in this page' }));
     }
-    if (!a.is_available && a.blocking_reason) {
+    // mig 1623: TERMINATE_CONTRACT stays pressable while something must be done
+    // first, and still names it — say it here too, not only behind the PIN.
+    if (a.blocking_reason) {
       // When the backend names the error it would answer (`blocking_params.code`,
       // mig 1250/1254's settlement locks), say that sentence — it explains what
       // the shop must do, where the reason label only names the category.
@@ -1368,6 +1377,7 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
         open={isTerminate}
         contract={contract}
         action={{ kind: 'terminate' }}
+        blocker={terminateBlocker}
         onClose={() => setActiveAction(null)}
         onSuccess={handleSuccess}
         onNavigateTab={onNavigateTab}

@@ -7,7 +7,7 @@ import { getBucketLabel } from '../pages/inventory/inventoryUtils';
 // Backend error/blocking params that carry a plain `YYYY-MM-DD` date. They go
 // straight into a user-facing sentence, so render them the way every other date
 // in the app is rendered instead of leaking the ISO form.
-const DATE_PARAM_KEYS = ['bill_date', 'unclosed_date', 'today', 'close_date', 'min_date', 'max_date'] as const;
+const DATE_PARAM_KEYS = ['bill_date', 'unclosed_date', 'today', 'close_date', 'min_date', 'max_date', 'oldest_open_bill_date'] as const;
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // Try every reasonable translation key for an API error before falling back
@@ -120,6 +120,23 @@ export function prepareErrorParams(
       .filter((m): m is string => typeof m === 'string')
       .map((m) => t(`paymentMethod.${m}`, { defaultValue: m }));
     if (labels.length > 0) params.allowed_label = labels.join(' · ');
+  }
+  // mig 1623: void_related_bills_first ships related_bills[] and open_bills_pending
+  // ships open_bills[] ({bill_id, code, …}); the sentence names the bill codes.
+  for (const key of ['related_bills', 'open_bills'] as const) {
+    if (Array.isArray(params[key])) {
+      const codes = (params[key] as unknown[])
+        .map((b) => (b && typeof b === 'object' ? (b as { code?: unknown }).code : null))
+        .filter((c): c is string => typeof c === 'string');
+      if (codes.length > 0) params[`${key}_label`] = codes.join(', ');
+    }
+  }
+  // mig 1625b: HAS_OPEN_BILLS names the days whose bills are still open.
+  if (Array.isArray(params.open_bill_dates)) {
+    const dates = (params.open_bill_dates as unknown[])
+      .filter((d): d is string => typeof d === 'string' && ISO_DATE_RE.test(d))
+      .map((d) => formatDateTime(d, i18n.language, false));
+    if (dates.length > 0) params.open_bill_dates_label = dates.join(', ');
   }
   for (const key of DATE_PARAM_KEYS) {
     const value = params[key];

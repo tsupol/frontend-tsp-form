@@ -234,6 +234,10 @@ export function DayClosePage() {
       message?: string;
       open_bill_count?: number;
       open_bill_amount?: number;
+      // mig 1625b: the days whose open bills block this close, oldest first —
+      // they can be earlier than the day being closed.
+      open_bill_dates?: string[];
+      oldest_open_bill_date?: string | null;
     }>('fn_day_close_check', {
       p_branch_id: Number(effectiveBranchId),
       p_close_date: closingDate,
@@ -249,6 +253,19 @@ export function DayClosePage() {
     !!effectiveBranchId &&
     isCloseable &&
     closeCheck?.allowed === true;
+
+  // The check's refusal, with a way to the day that has to be dealt with first
+  // when the open bills sit on another day (mig 1625b).
+  const checkBlock = closeCheck && !closeCheck.allowed
+    ? {
+        title: t('accounting.dayClose.notAllowedTitle'),
+        desc: closeCheck.message ?? closeCheck.reason ?? '',
+        reason: closeCheck.reason,
+        goToDate: closeCheck.oldest_open_bill_date && closeCheck.oldest_open_bill_date !== closingDate
+          ? closeCheck.oldest_open_bill_date
+          : undefined,
+      }
+    : null;
 
   const selectDate = (d: string, goTo?: (panel: string) => void) => {
     setSelectedDate(d);
@@ -537,18 +554,11 @@ export function DayClosePage() {
                   summaryFetched={unclosedSummaryFetched}
                   fallbackBillCount={selectedUnclosed.bill_count}
                   fallbackTotalAmount={selectedUnclosed.total_amount}
-                  blockMessage={
-                    closeCheck && !closeCheck.allowed
-                      ? {
-                          title: t('accounting.dayClose.notAllowedTitle'),
-                          desc: closeCheck.message ?? closeCheck.reason ?? '',
-                          reason: closeCheck.reason,
-                        }
-                      : null
-                  }
+                  blockMessage={checkBlock}
                   canClose={canCloseSelected}
                   onOpenClose={() => setCloseModalOpen(true)}
                   onViewBills={() => navigate(`/admin/accounting/bills?status=OPEN${effectiveBranchId ? `&branch_id=${effectiveBranchId}` : ''}`)}
+                  onGoToDate={(d) => selectDate(d)}
                 />
               )}
 
@@ -569,18 +579,15 @@ export function DayClosePage() {
                       ? {
                           title: t('accounting.dayClose.previousUnclosedTitle'),
                           desc: t('accounting.dayClose.previousUnclosedMessage', { count: unclosedDays.length }),
+                          // The list is ordered by bill_date: the first row is the oldest.
+                          goToDate: unclosedDays[0]?.bill_date,
                         }
-                      : closeCheck && !closeCheck.allowed
-                        ? {
-                            title: t('accounting.dayClose.notAllowedTitle'),
-                            desc: closeCheck.message ?? closeCheck.reason ?? '',
-                            reason: closeCheck.reason,
-                          }
-                        : null
+                      : checkBlock
                   }
                   canClose={canCloseSelected}
                   onOpenClose={() => setCloseModalOpen(true)}
                   onViewBills={() => navigate(`/admin/accounting/bills?status=OPEN${effectiveBranchId ? `&branch_id=${effectiveBranchId}` : ''}`)}
+                  onGoToDate={(d) => selectDate(d)}
                 />
               )}
 
@@ -641,7 +648,7 @@ function useTransferSplit(branchId: string, billDate: string) {
 function ReconcileBody({
   branchId, billDate, headerIcon, headerLabel, headerBadge,
   summary, summaryFetched, fallbackBillCount, fallbackTotalAmount,
-  blockMessage, canClose, onOpenClose, onViewBills,
+  blockMessage, canClose, onOpenClose, onViewBills, onGoToDate,
 }: {
   branchId: string;
   billDate: string;
@@ -652,12 +659,14 @@ function ReconcileBody({
   summaryFetched: boolean;
   fallbackBillCount: number;
   fallbackTotalAmount: number;
-  blockMessage: { title: string; desc: string; reason?: string } | null;
+  // goToDate: the day the staff must deal with first, when it isn't this one.
+  blockMessage: { title: string; desc: string; reason?: string; goToDate?: string } | null;
   canClose: boolean;
   onOpenClose: () => void;
   onViewBills: () => void;
+  onGoToDate: (date: string) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const hasPending = (summary?.pending_bill_count ?? 0) > 0;
   // Danger alert from HAS_OPEN_BILLS already conveys the pending-bills situation.
   // Suppress the warning in that case to avoid two alerts saying the same thing.
@@ -715,6 +724,15 @@ function ReconcileBody({
               <div>
                 <div className="alert-title">{blockMessage.title}</div>
                 <div className="alert-description">{blockMessage.desc}</div>
+                {blockMessage.goToDate && (
+                  <button
+                    className="text-sm underline mt-1 mr-3 cursor-pointer bg-transparent border-none text-current"
+                    data-action="DAY_CLOSE_GO_TO_DATE"
+                    onClick={() => onGoToDate(blockMessage.goToDate!)}
+                  >
+                    {t('accounting.dayClose.goToDate', { date: formatDateTime(blockMessage.goToDate, i18n.language, false) })}
+                  </button>
+                )}
                 {blockIsOpenBills && (
                   <button
                     className="text-sm underline mt-1 cursor-pointer bg-transparent border-none text-current"
