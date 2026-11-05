@@ -4,6 +4,7 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { ShowAllButton } from './ShowAllButton';
 
 export interface CustomerPin {
   /** contract id */
@@ -21,7 +22,9 @@ export interface CustomerPin {
   label: string;
 }
 
-const DOT = '<circle cx="14" cy="14" r="5" fill="#ffffff"/>';
+const FIT_OPTIONS: L.FitBoundsOptions = { padding: [40, 40], maxZoom: 15 };
+
+const DOT ='<circle cx="14" cy="14" r="5" fill="#ffffff"/>';
 const HOUSE = '<path d="M8.5 14.5l5.5-4.8 5.5 4.8M10.2 13.3V19h2.8v-3h2v3h2.8v-5.7" fill="none" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>';
 
 function pinIcon(p: CustomerPin, selected: boolean): L.DivIcon {
@@ -39,12 +42,13 @@ function pinIcon(p: CustomerPin, selected: boolean): L.DivIcon {
   });
 }
 
-export default function CustomerMapCanvas({ pins, selectedId, focusTick = 0, onPinClick, className = '' }: {
+export default function CustomerMapCanvas({ pins, selectedId, focusTick = 0, onPinClick, showAllLabel, className = '' }: {
   pins: CustomerPin[];
   selectedId: number | null;
   /** Bumped when a row asks to bring its pin into view. */
   focusTick?: number;
   onPinClick: (id: number) => void;
+  showAllLabel: string;
   className?: string;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -53,6 +57,7 @@ export default function CustomerMapCanvas({ pins, selectedId, focusTick = 0, onP
   const markers = useRef(new Map<number, L.Marker>());
   const onClickRef = useRef(onPinClick);
   onClickRef.current = onPinClick;
+  const fitRef = useRef<{ bounds: L.LatLngBounds; at: number } | null>(null);
 
   useEffect(() => {
     if (!hostRef.current) return;
@@ -66,7 +71,13 @@ export default function CustomerMapCanvas({ pins, selectedId, focusTick = 0, onP
     mapRef.current = map;
     // Thailand, until the pins arrive.
     map.setView([13.75, 100.5], 6);
-    const observer = new ResizeObserver(() => map.invalidateSize());
+    // A fit made just before the panel settled is made again, or the pins end
+    // up at an edge (or off the map).
+    const observer = new ResizeObserver(() => {
+      map.invalidateSize();
+      const fit = fitRef.current;
+      if (fit && Date.now() - fit.at < 1500) map.fitBounds(fit.bounds, FIT_OPTIONS);
+    });
     observer.observe(hostRef.current);
     return () => {
       observer.disconnect();
@@ -90,9 +101,17 @@ export default function CustomerMapCanvas({ pins, selectedId, focusTick = 0, onP
         .addTo(layer);
       markers.current.set(p.id, m);
     }
-    if (pins.length === 1) map.setView([pins[0].lat, pins[0].lon], 15);
-    else if (pins.length > 1) map.fitBounds(L.latLngBounds(pins.map((p) => [p.lat, p.lon] as L.LatLngTuple)), { padding: [40, 40], maxZoom: 15 });
+    showAll(true);
   }, [pinKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function showAll(justDrawn = false) {
+    const map = mapRef.current;
+    if (!map || pins.length === 0) return;
+    if (pins.length === 1) { map.setView([pins[0].lat, pins[0].lon], 15); return; }
+    const bounds = L.latLngBounds(pins.map((p) => [p.lat, p.lon] as L.LatLngTuple));
+    map.fitBounds(bounds, FIT_OPTIONS);
+    if (justDrawn) fitRef.current = { bounds, at: Date.now() };
+  }
 
   // The chosen pin is drawn larger and on top.
   const lastSelected = useRef<number | null>(null);
@@ -115,5 +134,10 @@ export default function CustomerMapCanvas({ pins, selectedId, focusTick = 0, onP
     if (p) mapRef.current?.setView([p.lat, p.lon], Math.max(mapRef.current.getZoom(), 15));
   }, [focusTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return <div ref={hostRef} className={`isolate z-0 ${className}`} />;
+  return (
+    <div className={`relative isolate z-0 ${className}`}>
+      <div ref={hostRef} className="h-full w-full" />
+      {pins.length > 1 && <ShowAllButton label={showAllLabel} onClick={() => showAll()} />}
+    </div>
+  );
 }

@@ -288,8 +288,6 @@
       "payments": "Payments",
       "physicalTotal": "Total (cash + transfer)",
       "preview": "Preview",
-      "previousUnclosedMessage": "There are {{count}} unclosed day(s) with pending bills. You must close them before closing today.",
-      "previousUnclosedTitle": "Close previous days first",
       "readyToClose": "Ready to close · {{count}} bills",
       "recentCloses": "Recent closes",
       "reconcileDesc": "Bill-by-bill check — charged vs paid",
@@ -11113,7 +11111,8 @@
       "stats": "{{fixes}} fixes · {{days}} days · {{mornings}} mornings · radius {{m}} m",
       "span": "First {{first}} · last {{last}} ({{ago}})",
       "mapLabel": "Group {{no}} · {{fixes}} fixes · {{days}} days"
-    }
+    },
+    "showAll": "Show all"
   },
   "icloudLock": {
     "title": "iCloud menu",
@@ -11200,6 +11199,7 @@
       "repo": "Awaiting repo / legal",
       "resident": "Lives here",
       "stale": "Fix older than {{days}} days"
-    }
+    },
+    "pickHint": "Pick a contract in the list or a pin on the map to open it in Google Maps"
   }
 }

@@ -288,8 +288,6 @@
       "payments": "การชำระ",
       "physicalTotal": "รวม (สด + โอน)",
       "preview": "ตัวอย่าง",
-      "previousUnclosedMessage": "มี {{count}} วันที่ยังไม่ปิดและมีบิลค้าง ต้องปิดวันเก่าก่อนถึงจะปิดวันนี้ได้",
-      "previousUnclosedTitle": "ต้องปิดวันก่อนหน้าก่อน",
       "readyToClose": "พร้อมปิด · {{count}} บิล",
       "recentCloses": "ประวัติการปิดล่าสุด",
       "reconcileDesc": "ตรวจทีละบิล — เรียกเก็บ vs ชำระ",
@@ -2858,7 +2856,7 @@
     "contractState": {
       "ACTIVE": "ผ่อนชำระอยู่",
       "COMPLETED": "ผ่อนครบแล้ว",
-      "TERMINATED": "ยกเลิกสัญญา",
+      "TERMINATED": "เลิกสัญญา",
       "VOIDED": "ยกเลิก (void)"
     },
     "emoji": {
@@ -3271,8 +3269,8 @@
     "action_saving_deposit_success": "บันทึกเงินฝากออมสำเร็จ",
     "action_settlement_refund": "คืนเงินเจรจา",
     "action_settlement_refund_success": "คืนเงินเจรจาสำเร็จ",
-    "action_terminate": "ยกเลิกสัญญา",
-    "action_terminate_success": "ยกเลิกสัญญาสำเร็จ",
+    "action_terminate": "เลิกสัญญา",
+    "action_terminate_success": "เลิกสัญญาสำเร็จ",
     "action_transfer_accept": "รับโอน",
     "action_transfer_accept_success": "รับโอนสำเร็จ",
     "action_transfer_branch": "โอนสาขา",
@@ -3372,7 +3370,7 @@
     "closeReason_NORMAL": "ปกติ",
     "closeReason_PARTNER_RETURN": "คืนเครื่อง",
     "closeReason_STAFF_CANCEL": "พนักงานยกเลิก",
-    "closeReason_TERMINATED": "บอกเลิกสัญญา",
+    "closeReason_TERMINATED": "เลิกสัญญา",
     "closeReason_VOIDED": "ยกเลิกสัญญา",
     "closedAt": "ปิดเมื่อ",
     "coLessees": "ผู้เช่าร่วม",
@@ -3730,7 +3728,7 @@
     "state_PENDING_PAYMENT_AND_SIGN": "รอชำระและเซ็น",
     "state_PENDING_SIGN": "รอเซ็น",
     "state_SAVING": "ออม",
-    "state_TERMINATED": "ยกเลิก",
+    "state_TERMINATED": "เลิกสัญญา",
     "state_VOIDED": "ยกเลิกในวัน",
     "state_WAIT_LEGAL_PROCESS": "รอดำเนินคดี",
     "swapCurrentLessee": "ผู้เช่าปัจจุบัน (ผู้โอน)",
@@ -3763,19 +3761,19 @@
     "tab_txns": "รายการเคลื่อนไหว",
     "tab_wallets": "กระเป๋า",
     "termMonths": "ระยะเวลา",
-    "terminate_confirm": "ยกเลิกสัญญา",
+    "terminate_confirm": "เลิกสัญญา",
     "terminate_done_installmentsTerminated": "จำนวนงวดที่ยุติ",
-    "terminate_done_title": "ยกเลิกสัญญาสำเร็จ",
+    "terminate_done_title": "เลิกสัญญาสำเร็จ",
     "terminate_reason": "เหตุผล",
     "terminate_reason_CUSTOMER_REQUEST": "ลูกค้าร้องขอ",
     "terminate_reason_DEATH": "เสียชีวิต",
     "terminate_reason_DEVICE_DAMAGED": "เครื่องเสียหาย",
     "terminate_reason_MUTUAL_AGREEMENT": "ตกลงร่วมกัน",
     "terminate_reason_OTHER": "อื่นๆ (ต้องระบุหมายเหตุ)",
-    "terminate_submitting": "กำลังยกเลิก...",
-    "terminate_title": "ยกเลิกสัญญา",
-    "terminate_wallets_hint": "ต้องเคลียร์กระเป๋าทั้ง 3 ใบก่อนยกเลิกสัญญา",
-    "terminate_warning": "การยุติสัญญาเป็นการปิดสัญญาก่อนกำหนด ต้องถอดเครื่องออกก่อน ไม่สามารถย้อนกลับได้",
+    "terminate_submitting": "กำลังเลิกสัญญา...",
+    "terminate_title": "เลิกสัญญา",
+    "terminate_wallets_hint": "ต้องเคลียร์กระเป๋าทั้ง 3 ใบก่อนเลิกสัญญา",
+    "terminate_warning": "การเลิกสัญญาเป็นการปิดสัญญาก่อนกำหนด ต้องถอดเครื่องออกก่อน ไม่สามารถย้อนกลับได้",
     "toBranch": "โอนไปสาขา",
     "totalPaid": "ชำระแล้ว",
     "totalToCollect": "ยอดรวมให้เก็บทั้งหมด",
@@ -11085,7 +11083,8 @@
       "stats": "{{fixes}} ครั้ง · {{days}} วัน · เช้า {{mornings}} วัน · รัศมี {{m}} ม.",
       "span": "ครั้งแรก {{first}} · ล่าสุด {{last}} ({{ago}})",
       "mapLabel": "กลุ่ม {{no}} · {{fixes}} ครั้ง · {{days}} วัน"
-    }
+    },
+    "showAll": "แสดงทั้งหมด"
   },
   "icloudLock": {
     "title": "เมนู iCloud",
@@ -11172,6 +11171,7 @@
       "repo": "รอยึด / รอกฎหมาย",
       "resident": "ที่อยู่จริง",
       "stale": "พิกัดเก่ากว่า {{days}} วัน"
-    }
+    },
+    "pickHint": "เลือกสัญญาในรายการหรือหมุดบนแผนที่ เพื่อเปิดใน Google Maps"
   }
 }

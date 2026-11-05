@@ -130,16 +130,20 @@ export function CustomerMapPage() {
       ) : (
         <div className="flex-1 min-h-0 flex flex-col lg:flex-row">
           {/* On a phone the map comes first. */}
-          <div className="lg:order-2 flex-none h-[45dvh] lg:h-auto lg:flex-1 min-w-0 relative">
-            <Suspense fallback={<div className="h-full" />}>
-              <CustomerMapCanvas
-                className="h-full w-full"
-                pins={mapPins}
-                selectedId={selectedId}
-                focusTick={focusTick}
-                onPinClick={(id) => { setSelectedId(id); openDialog(id); }}
-              />
-            </Suspense>
+          <div className="lg:order-2 flex-none h-[45dvh] lg:h-auto lg:flex-1 min-w-0 flex flex-col">
+            <div className="flex-1 min-h-0 relative">
+              <Suspense fallback={<div className="h-full" />}>
+                <CustomerMapCanvas
+                  className="h-full w-full"
+                  pins={mapPins}
+                  selectedId={selectedId}
+                  focusTick={focusTick}
+                  onPinClick={(id) => { setSelectedId(id); openDialog(id); }}
+                  showAllLabel={t('deviceLocation.showAll')}
+                />
+              </Suspense>
+            </div>
+            <MapFooter pin={pins.find((p) => p.contract.id === selectedId) ?? null} />
           </div>
           <div className="lg:order-1 flex-1 lg:flex-none lg:w-[26rem] min-h-0 flex flex-col border-t lg:border-t-0 lg:border-r border-line">
             <div className="md:hidden px-3 py-2 border-b border-line"><Legend /></div>
@@ -235,6 +239,35 @@ function PinRow({ pin, onPick, onOpen }: { pin: CustomerMapPin; onPick: () => vo
       >
         {t('deviceLocation.button')}
       </Button>
+    </div>
+  );
+}
+
+/** Under the map: the chosen contract's newest fix, with its Google Maps link. */
+function MapFooter({ pin }: { pin: CustomerMapPin | null }) {
+  const { t } = useTranslation();
+  const when = useLocationWhen();
+  return (
+    <div className="shrink-0 min-h-10 px-3 py-2 border-t border-line flex items-center gap-x-3 gap-y-1 flex-wrap text-sm" data-testid="customer-map-footer">
+      {pin ? (
+        <>
+          <span className="font-medium">{pin.contract.code}</span>
+          <span className="text-subtle truncate">{pin.customer.name ?? '—'}</span>
+          <span className="text-xs text-subtle">{when.at(pin.fix.when)} · {when.ago(pin.fix.when)}</span>
+          <span className="text-xs text-subtle font-mono">{pin.fix.lat}, {pin.fix.lon}</span>
+          <a
+            href={pin.fix.map_url}
+            target="_blank"
+            rel="noreferrer"
+            className="ml-auto text-primary-fg hover:underline inline-flex items-center gap-1 shrink-0"
+            data-testid="customer-map-google"
+          >
+            {t('deviceLocation.openGoogleMaps')}<ExternalLink size={12} />
+          </a>
+        </>
+      ) : (
+        <span className="text-xs text-subtle">{t('customerMap.pickHint')}</span>
+      )}
     </div>
   );
 }

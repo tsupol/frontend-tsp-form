@@ -80,19 +80,27 @@ export function DeviceLocationDialog({ open, target, lastFixAt, onClose }: {
     label: `${when.at(r.when)} · ${when.ago(r.when)}`,
   })), [rows]); // eslint-disable-line react-hooks/exhaustive-deps
   const mapClusters = useMemo(() => clusters.map((c) => ({
-    clusterNo: c.cluster_no, lat: c.lat, lon: c.lon, radiusM: c.radius_m,
+    clusterNo: c.cluster_no, lat: c.lat, lon: c.lon, radiusM: c.radius_m, fixes: c.fixes,
     label: t('deviceLocation.cluster.mapLabel', { no: c.cluster_no, fixes: c.fixes, days: c.days }),
   })), [clusters]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const focusOn = (lat: number, lon: number, radiusM?: number | null) =>
     setFocus((f) => ({ tick: (f?.tick ?? 0) + 1, lat, lon, radiusM }));
 
+  const ready = !error && !isLoading && !!data;
+  const showSplit = ready && !data.reason_code;
+  const summary = data?.summary && data.summary.first_when && data.summary.last_when ? data.summary : null;
+
   return (
     <Modal open={open} onClose={onClose} maxWidth="72rem" width="100%" ariaLabel={t('deviceLocation.title')}>
-      <div className="flex flex-col overflow-hidden" style={{ maxHeight: '92dvh' }}>
-        <div className="modal-header">
-          <h2 className="modal-title inline-flex items-center gap-2"><MapPin size={16} />{t('deviceLocation.title')}</h2>
-          <div className="flex items-center gap-1">
+      {/* A fixed height on wider screens, so each half scrolls on its own. */}
+      <div className={`flex flex-col overflow-hidden ${showSplit ? 'md:h-[88dvh]' : ''}`} style={{ maxHeight: '92dvh' }}>
+        <div className="modal-header items-start">
+          <div className="min-w-0 flex flex-col gap-0.5">
+            <h2 className="modal-title inline-flex items-center gap-2"><MapPin size={16} />{t('deviceLocation.title')}</h2>
+            {data && <DeviceLine data={data} />}
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
             <Tooltip content={t('deviceLocation.refresh')} placement="bottom">
               <Button
                 variant="ghost"
@@ -107,101 +115,112 @@ export function DeviceLocationDialog({ open, target, lastFixAt, onClose }: {
           </div>
         </div>
 
-        <div className="modal-content min-w-0 flex flex-col gap-3">
-          {error ? (
-            <div className="alert alert-danger"><AlertTriangle size={16} /><span>{errorText(error, t)}</span></div>
-          ) : isLoading || !data ? (
-            <div className="py-10 flex justify-center text-subtler"><Loader2 size={20} className="animate-spin" /></div>
-          ) : (
-            <>
-              <DeviceBox data={data} />
-              {residence && (
-                <ResidenceBand residence={residence} canFocus={home != null} onFocus={() => home && focusOn(home.lat, home.lon, home.radiusM)} />
-              )}
-              {data.reason_code ? (
-                <div className="py-8 flex flex-col items-center gap-2 text-subtle text-sm">
-                  <MapPinOff size={24} className="text-subtler" />
-                  {t(`deviceLocation.reason.${data.reason_code}`, { defaultValue: data.reason_code })}
-                </div>
-              ) : (
-                <>
-                  {data.summary && data.summary.first_when && data.summary.last_when && (
+        {!showSplit ? (
+          <div className="modal-content min-w-0 flex flex-col gap-3">
+            {error ? (
+              <div className="alert alert-danger"><AlertTriangle size={16} /><span>{errorText(error, t)}</span></div>
+            ) : !ready ? (
+              <div className="py-10 flex justify-center text-subtler"><Loader2 size={20} className="animate-spin" /></div>
+            ) : (
+              <div className="py-8 flex flex-col items-center gap-2 text-subtle text-sm">
+                <MapPinOff size={24} className="text-subtler" />
+                {t(`deviceLocation.reason.${data.reason_code}`, { defaultValue: data.reason_code })}
+              </div>
+            )}
+          </div>
+        ) : (
+          // Phone: one column that scrolls as a whole, map first. Wider: two halves.
+          <div className="flex-1 min-h-0 flex flex-col md:flex-row max-md:overflow-y-auto">
+            {/* Right half: the map fills it and the chosen fix stays under it. */}
+            <div className="md:order-2 md:w-1/2 min-w-0 md:min-h-0 flex flex-col gap-2 p-4 md:pl-2 md:overflow-y-auto">
+              <Suspense fallback={<div className="h-64 md:h-auto md:flex-1 rounded-md border border-line" />}>
+                <LocationMap
+                  className="h-64 md:h-auto md:flex-1 md:min-h-64 rounded-md border border-line overflow-hidden"
+                  fixes={mapFixes}
+                  clusters={mapClusters}
+                  selected={selected ? { id: selected.id, lat: selected.lat, lon: selected.lon, radiusM: selected.accuracy_m } : null}
+                  home={home}
+                  focus={focus}
+                  onSelectFix={setSelectedId}
+                  showAllLabel={t('deviceLocation.showAll')}
+                />
+              </Suspense>
+              {selected && <div className="shrink-0"><FixCard row={selected} /></div>}
+            </div>
+
+            {/* Left half: the answer stays on top, groups and fixes scroll under it. */}
+            <div className="md:order-1 md:w-1/2 min-w-0 md:min-h-0 flex flex-col md:border-r border-line">
+              {(residence || summary) && (
+                <div className="shrink-0 px-4 pt-4 md:pt-3 pb-3 flex flex-col gap-2 md:border-b border-line" data-testid="location-pinned">
+                  {residence && (
+                    <ResidenceBand residence={residence} canFocus={home != null} onFocus={() => home && focusOn(home.lat, home.lon, home.radiusM)} />
+                  )}
+                  {summary && summary.first_when && summary.last_when && (
                     <div className="text-sm text-subtle flex flex-wrap gap-x-3 gap-y-0.5" data-testid="location-summary">
-                      <span><span className="font-medium text-fg">{data.summary.fixes}</span> {t('deviceLocation.summary.fixes')}</span>
-                      <span><span className="font-medium text-fg">{data.summary.days}</span> {t('deviceLocation.summary.days')}</span>
-                      <span>{when.day(data.summary.first_when)} – {when.day(data.summary.last_when)}</span>
-                      <span><span className="font-medium text-fg">{data.summary.clusters}</span> {t('deviceLocation.summary.clusters')}</span>
+                      <span><span className="font-medium text-fg">{summary.fixes}</span> {t('deviceLocation.summary.fixes')}</span>
+                      <span><span className="font-medium text-fg">{summary.days}</span> {t('deviceLocation.summary.days')}</span>
+                      <span>{when.day(summary.first_when)} – {when.day(summary.last_when)}</span>
+                      <span><span className="font-medium text-fg">{summary.clusters}</span> {t('deviceLocation.summary.clusters')}</span>
                     </div>
                   )}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 min-w-0">
-                    {/* On a phone the map comes first, so a tapped row moves a pin that is on screen. */}
-                    <div className="md:order-2 min-w-0 flex flex-col gap-2">
-                      <Suspense fallback={<div className="h-64 md:h-[24rem] rounded-md border border-line" />}>
-                        <LocationMap
-                          className="h-64 md:h-[24rem] rounded-md border border-line overflow-hidden"
-                          fixes={mapFixes}
-                          clusters={mapClusters}
-                          selected={selected ? { id: selected.id, lat: selected.lat, lon: selected.lon, radiusM: selected.accuracy_m } : null}
-                          home={home}
-                          focus={focus}
-                          onSelectFix={setSelectedId}
-                        />
-                      </Suspense>
-                      {selected && <FixCard row={selected} />}
-                    </div>
-                    <div className="md:order-1 min-w-0 md:h-[31rem] flex flex-col gap-2">
-                      {clusters.length > 0 && (
-                        <ClusterList clusters={clusters} onPick={(c) => focusOn(c.lat, c.lon, c.radius_m)} />
-                      )}
-                      <div className="flex-1 min-h-48 flex flex-col border border-line rounded-md overflow-hidden">
-                        <DataTable<LocationRow>
-                          data={rows}
-                          renderHeader={() => (
-                            <div className={`${ROW_GRID} px-3 py-2 text-xs font-medium text-subtle border-b border-line`}>
-                              <span />
-                              <span>{t('deviceLocation.col.time')}</span>
-                              <span>{t('deviceLocation.col.source')}</span>
-                              <span className="text-right">{t('deviceLocation.col.accuracy')}</span>
-                            </div>
-                          )}
-                          renderRow={(row) => {
-                            const r = row.original;
-                            return (
-                              <button
-                                type="button"
-                                className={`${ROW_GRID} w-full text-left px-3 py-1.5 text-sm cursor-pointer bg-transparent border-none`}
-                                onClick={() => setSelectedId(r.id)}
-                              >
-                                <ClusterDot no={r.cluster_no} />
-                                <span className="min-w-0 flex flex-col">
-                                  <span className="truncate">{when.at(r.when)}</span>
-                                  <span className="text-xs text-subtle inline-flex items-center gap-1">
-                                    {when.ago(r.when)}
-                                    {r.when.is_morning && <Sunrise size={12} className="text-warning-fg" aria-label={t('deviceLocation.morning')} />}
-                                  </span>
-                                </span>
-                                <span className="min-w-0 text-xs text-subtle">
-                                  {t(`deviceLocation.source.${r.source_code}`, { defaultValue: r.source_code })}
-                                </span>
-                                <span className="text-right text-xs tabular-nums text-subtle">
-                                  {r.accuracy_m != null ? t('deviceLocation.accuracyValue', { m: Math.round(r.accuracy_m) }) : '—'}
-                                </span>
-                              </button>
-                            );
-                          }}
-                          getRowProps={(row) => ({ 'data-state': row.original.id === selected?.id ? 'selected' : undefined })}
-                          enableKeyboardNav
-                          onRowActivate={(row) => setSelectedId(row.original.id)}
-                          className={`flex-1 min-h-0 panel-datatable ${isFetching ? 'opacity-60' : ''} transition-opacity`}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </>
+                </div>
               )}
-            </>
-          )}
-        </div>
+              <div className="md:flex-1 md:min-h-0 md:overflow-y-auto better-scroll px-4 pb-4 flex flex-col gap-3" data-testid="location-left-scroll">
+                {/* Top spacing that scrolls away: padding on the scroller would
+                    leave a strip above the sticky header where rows show through. */}
+                <div aria-hidden className="max-md:hidden shrink-0 h-0" />
+                {clusters.length > 0 && (
+                  <ClusterList clusters={clusters} onPick={(c) => focusOn(c.lat, c.lon, c.radius_m)} />
+                )}
+                {/* The table does not scroll by itself: this half scrolls, and its
+                    header sticks to the top of it. `overflow-clip` keeps the
+                    rounded frame without breaking the sticky header. */}
+                <div className="border border-line rounded-md overflow-clip shrink-0">
+                  <DataTable<LocationRow>
+                    data={rows}
+                    renderHeader={() => (
+                      <div className={`${ROW_GRID} px-3 py-2 text-xs font-medium text-subtle`}>
+                        <span />
+                        <span>{t('deviceLocation.col.time')}</span>
+                        <span>{t('deviceLocation.col.source')}</span>
+                        <span className="text-right">{t('deviceLocation.col.accuracy')}</span>
+                      </div>
+                    )}
+                    renderRow={(row) => {
+                      const r = row.original;
+                      return (
+                        <button
+                          type="button"
+                          className={`${ROW_GRID} w-full text-left px-3 py-1.5 text-sm cursor-pointer bg-transparent border-none`}
+                          onClick={() => setSelectedId(r.id)}
+                        >
+                          <ClusterDot no={r.cluster_no} />
+                          <span className="min-w-0 flex flex-col">
+                            <span className="truncate">{when.at(r.when)}</span>
+                            <span className="text-xs text-subtle inline-flex items-center gap-1">
+                              {when.ago(r.when)}
+                              {r.when.is_morning && <Sunrise size={12} className="text-warning-fg" aria-label={t('deviceLocation.morning')} />}
+                            </span>
+                          </span>
+                          <span className="min-w-0 text-xs text-subtle">
+                            {t(`deviceLocation.source.${r.source_code}`, { defaultValue: r.source_code })}
+                          </span>
+                          <span className="text-right text-xs tabular-nums text-subtle">
+                            {r.accuracy_m != null ? t('deviceLocation.accuracyValue', { m: Math.round(r.accuracy_m) }) : '—'}
+                          </span>
+                        </button>
+                      );
+                    }}
+                    getRowProps={(row) => ({ 'data-state': row.original.id === selected?.id ? 'selected' : undefined })}
+                    enableKeyboardNav
+                    onRowActivate={(row) => setSelectedId(row.original.id)}
+                    className={`h-auto! [&_.data-table-content]:overflow-visible! [&_.data-table-content]:pb-0! ${isFetching ? 'opacity-60' : ''} transition-opacity`}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Modal>
   );
@@ -243,7 +262,7 @@ function ClusterList({ clusters, onPick }: { clusters: LocationCluster[]; onPick
   const { t } = useTranslation();
   const when = useLocationWhen();
   return (
-    <div className="border border-line rounded-md shrink-0 max-h-44 overflow-y-auto" data-testid="location-clusters">
+    <div className="border border-line rounded-md shrink-0" data-testid="location-clusters">
       <div className="px-3 py-1.5 text-xs font-medium text-subtle border-b border-line">
         {t('deviceLocation.cluster.title', { count: clusters.length })}
       </div>
@@ -276,29 +295,22 @@ function ClusterList({ clusters, onPick }: { clusters: LocationCluster[]; onPick
   );
 }
 
-function DeviceBox({ data }: { data: DeviceLocations }) {
+/** The phone and its contract, as one line under the window's title. */
+function DeviceLine({ data }: { data: DeviceLocations }) {
   const { t } = useTranslation();
   const { device, contract } = data;
   return (
-    <div className="px-3 py-2.5 rounded-md bg-surface border border-line flex flex-col gap-0.5">
-      {device ? (
-        <>
-          <div className="flex items-center gap-2 flex-wrap text-sm">
-            {/* A new tab: this window sits on a page the person is working on. */}
-            <Link to={`/admin/inventory/assets/${device.asset_id}`} target="_blank" className="font-medium text-primary-fg hover:underline inline-flex items-center gap-1">
-              {device.asset_code}<ExternalLink size={12} />
-            </Link>
-            {device.product_display_name && <span>{device.product_display_name}</span>}
-          </div>
-          <div className="text-xs text-subtle flex items-center gap-x-3 gap-y-0.5 flex-wrap">
-            {device.serial_number && <span className="font-mono">SN {device.serial_number}</span>}
-            {contract && <span>{t('deviceLocation.contract')} {contract.code}</span>}
-            {device.last_seen_at && <span>{t('deviceLocation.lastSeen')} <DateTime value={device.last_seen_at} /></span>}
-          </div>
-        </>
-      ) : (
-        <div className="font-medium text-sm">{contract?.code ?? '—'}</div>
+    <div className="text-xs text-subtle flex items-center gap-x-3 gap-y-0.5 flex-wrap font-normal" data-testid="location-device-line">
+      {device && (
+        // A new tab: this window sits on a page the person is working on.
+        <Link to={`/admin/inventory/assets/${device.asset_id}`} target="_blank" className="text-primary-fg hover:underline inline-flex items-center gap-1">
+          {device.asset_code}<ExternalLink size={11} />
+        </Link>
       )}
+      {device?.product_display_name && <span className="text-fg">{device.product_display_name}</span>}
+      {device?.serial_number && <span className="font-mono">SN {device.serial_number}</span>}
+      {contract && <span>{t('deviceLocation.contract')} {contract.code}</span>}
+      {device?.last_seen_at && <span>{t('deviceLocation.lastSeen')} <DateTime value={device.last_seen_at} /></span>}
     </div>
   );
 }

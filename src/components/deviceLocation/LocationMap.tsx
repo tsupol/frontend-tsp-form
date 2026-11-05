@@ -7,6 +7,7 @@ import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { clusterColor } from './mapColors';
+import { ShowAllButton } from './ShowAllButton';
 
 export interface MapPoint {
   lat: number;
@@ -29,7 +30,19 @@ export interface MapCluster {
   lat: number;
   lon: number;
   radiusM: number;
+  /** How many fixes the group holds; drawn on the ring, since its dots stack. */
+  fixes: number;
   label: string;
+}
+
+// The fix count of a group, beside its centre (the pin and the house sit on it).
+function countIcon(count: number, color: string): L.DivIcon {
+  return L.divIcon({
+    className: '',
+    iconSize: [26, 18],
+    iconAnchor: [-8, 9],
+    html: `<div style="min-width:26px;height:18px;padding:0 5px;border-radius:9px;background:${color};color:#fff;font:600 11px/18px system-ui,sans-serif;text-align:center;box-shadow:0 0 0 1.5px #fff">${count}</div>`,
+  });
 }
 
 /** A request to bring a place into view; `tick` changes on every request. */
@@ -41,6 +54,7 @@ export interface MapFocus {
 }
 
 const ZOOM = 16;
+const FIT_OPTIONS: L.FitBoundsOptions = { padding: [32, 32], maxZoom: 17 };
 // Rings smaller than this are hard to see or hover on a city-scale view.
 const MIN_RING_M = 25;
 
@@ -59,8 +73,9 @@ const homeIcon = L.divIcon({
 });
 
 export default function LocationMap({
-  fixes, clusters, selected, home, focus, onSelectFix, className = '',
+  fixes, clusters, selected, home, focus, onSelectFix, showAllLabel, className = '',
 }: {
+  showAllLabel: string;
   fixes: MapFix[];
   clusters: MapCluster[];
   selected: (MapPoint & { id: number }) | null;
@@ -77,6 +92,7 @@ export default function LocationMap({
   const pinLayer = useRef<L.LayerGroup | null>(null);
   const onSelectRef = useRef(onSelectFix);
   onSelectRef.current = onSelectFix;
+  const fitRef = useRef<{ bounds: L.LatLngBounds; at: number } | null>(null);
 
   useEffect(() => {
     if (!hostRef.current) return;
@@ -92,8 +108,13 @@ export default function LocationMap({
     pinLayer.current = L.layerGroup().addTo(map);
     mapRef.current = map;
 
-    // The window animates open and the panel resizes with it.
-    const observer = new ResizeObserver(() => map.invalidateSize());
+    // The window animates open and the panel resizes with it. A fit made just
+    // before the pane settled is made again, or the dots end up at an edge.
+    const observer = new ResizeObserver(() => {
+      map.invalidateSize();
+      const fit = fitRef.current;
+      if (fit && Date.now() - fit.at < 1500) map.fitBounds(fit.bounds, FIT_OPTIONS);
+    });
     observer.observe(hostRef.current);
 
     return () => {
@@ -117,6 +138,9 @@ export default function LocationMap({
       L.circle([c.lat, c.lon], {
         radius: Math.max(c.radiusM, MIN_RING_M), color, weight: 2, dashArray: '5 4', fillColor: color, fillOpacity: 0.08,
       }).bindTooltip(c.label, { direction: 'top' }).addTo(cl);
+      if (c.fixes > 1) {
+        L.marker([c.lat, c.lon], { icon: countIcon(c.fixes, color), keyboard: false, interactive: false, zIndexOffset: 1500 }).addTo(cl);
+      }
     }
     for (const f of fixes) {
       const color = clusterColor(f.clusterNo);
@@ -125,11 +149,21 @@ export default function LocationMap({
         .on('click', () => onSelectRef.current?.(f.id))
         .addTo(fl);
     }
-    const points: L.LatLngExpression[] = fixes.map((f) => [f.lat, f.lon]);
-    if (home) points.push([home.lat, home.lon]);
-    if (points.length === 1) map.setView(points[0], ZOOM);
-    else if (points.length > 1) map.fitBounds(L.latLngBounds(points), { padding: [32, 32], maxZoom: 17 });
+    showAll(true);
   }, [fixKey, clusters.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** Every fix and the house in view. */
+  function showAll(justDrawn = false) {
+    const map = mapRef.current;
+    if (!map) return;
+    const points: L.LatLngTuple[] = fixes.map((f) => [f.lat, f.lon]);
+    if (home) points.push([home.lat, home.lon]);
+    if (points.length === 1) { map.setView(points[0], ZOOM); return; }
+    if (points.length === 0) return;
+    const bounds = L.latLngBounds(points);
+    map.fitBounds(bounds, FIT_OPTIONS);
+    if (justDrawn) fitRef.current = { bounds, at: Date.now() };
+  }
 
   useEffect(() => {
     const layer = homeLayer.current;
@@ -166,5 +200,10 @@ export default function LocationMap({
   }, [focus?.tick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // `isolate` keeps Leaflet's own z-indexes (up to 1000) inside this box.
-  return <div ref={hostRef} className={`isolate z-0 ${className}`} />;
+  return (
+    <div className={`relative isolate z-0 ${className}`}>
+      <div ref={hostRef} className="h-full w-full" />
+      {fixes.length > 1 && <ShowAllButton label={showAllLabel} onClick={() => showAll()} />}
+    </div>
+  );
 }
