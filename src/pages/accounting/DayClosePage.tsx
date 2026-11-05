@@ -221,11 +221,11 @@ export function DayClosePage() {
   // Transfer front/slip split for the day being closed — feeds the close modal's
   // read-only sub-lines under the transfer row (same source as the ② page).
   const closingSplit = useTransferSplit(effectiveBranchId, closingDate);
-  // For today, also block close if there are previous unclosed days
-  const blockTodayClose = selectedIsToday && unclosedDays.length > 0;
-
-  // Pre-flight check via fn_day_close_check (canonical gate per §89)
-  const isCloseable = !!selectedUnclosed || (selectedIsToday && !todayAlreadyClosed && !blockTodayClose);
+  // Pre-flight check via fn_day_close_check (canonical gate per §89). The backend
+  // does not make days close in order (DONE 1625): an earlier day blocks today
+  // only through its open bills, which the check reports with their dates. So
+  // the screen adds no rule of its own about earlier unclosed days.
+  const isCloseable = !!selectedUnclosed || (selectedIsToday && !todayAlreadyClosed);
   const { data: closeCheck } = useQuery({
     queryKey: ['accounting', 'day-close-check', effectiveBranchId, closingDate],
     queryFn: () => apiClient.rpc<{
@@ -574,16 +574,7 @@ export function DayClosePage() {
                   summaryFetched
                   fallbackBillCount={0}
                   fallbackTotalAmount={0}
-                  blockMessage={
-                    blockTodayClose
-                      ? {
-                          title: t('accounting.dayClose.previousUnclosedTitle'),
-                          desc: t('accounting.dayClose.previousUnclosedMessage', { count: unclosedDays.length }),
-                          // The list is ordered by bill_date: the first row is the oldest.
-                          goToDate: unclosedDays[0]?.bill_date,
-                        }
-                      : checkBlock
-                  }
+                  blockMessage={checkBlock}
                   canClose={canCloseSelected}
                   onOpenClose={() => setCloseModalOpen(true)}
                   onViewBills={() => navigate(`/admin/accounting/bills?status=OPEN${effectiveBranchId ? `&branch_id=${effectiveBranchId}` : ''}`)}
