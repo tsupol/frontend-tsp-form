@@ -7,7 +7,8 @@ import {
 } from 'tsp-form';
 import { ArrowLeft, ArrowRightFromLine, CheckCircle, ChevronLeft, ChevronRight, Inbox } from 'lucide-react';
 import { apiClient } from '../lib/api';
-import { fmtCurrency, formatRelativeAgo } from '../lib/format';
+import { bangkokDaysAgo, bangkokTime, fmtCurrency, formatRelativeAgo } from '../lib/format';
+import { SlipSentDayTag } from '../components/SlipSentDay';
 import { isSearchable } from '../lib/searchKeyword';
 import { useAuth } from '../contexts/AuthContext';
 import { wsClient } from '../lib/api/ws';
@@ -193,6 +194,8 @@ export function PaymentSubmissionsPage() {
   // Line 4: funder ref · activation date · installment n/total
   const renderRowContent = (row: SubmissionRow) => {
     const ago = formatRelativeAgo(row.submitted_at, i18n.language);
+    // Today and yesterday are said by the tag; under it only the time is left.
+    const sentDays = bangkokDaysAgo(row.submitted_at);
     const byLabel = row.is_staff_submitted
       ? `${t('paymentSubmissions.by')} ${row.submitter_username ?? '—'}`
       : t('paymentSubmissions.byCustomer');
@@ -239,16 +242,17 @@ export function PaymentSubmissionsPage() {
           )}
           <Badge size="xs" color={row.is_staff_submitted ? 'info' : 'default'}>{byLabel}</Badge>
         </div>
-          <span className="shrink-0 text-xs text-subtle leading-5">{ago.rel}</span>
+          {/* Which day the customer sent it, loud: today / yesterday / n days ago. */}
+          <span className="shrink-0"><SlipSentDayTag submittedAt={row.submitted_at} /></span>
         </div>
         <div className="flex items-baseline justify-between gap-3 mt-1">
           <span className="min-w-0 truncate text-xs text-subtle">
             {row.customer_name ?? '—'} · {row.branch_name ?? '—'}
             {senderLine ? ` · ${senderLine}` : ''}
           </span>
-          {ago.abs && ago.abs !== ago.rel && (
-            <span className="shrink-0 text-[11px] text-subtler tabular-nums">{ago.abs}</span>
-          )}
+          <span className="shrink-0 text-[11px] text-subtler tabular-nums">
+            {sentDays != null && sentDays <= 1 ? bangkokTime(row.submitted_at) : ago.abs}
+          </span>
         </div>
         {/* Renders nothing when the contract isn't active yet (mig 1186). */}
         <SubmissionContractInfoLine row={row} className="mt-1 text-xs text-subtle truncate" />

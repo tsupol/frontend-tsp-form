@@ -281,6 +281,25 @@ export function formatRelativeAgo(
   };
 }
 
+/** Calendar days between `value` and now, both counted in Bangkok time:
+ *  0 = today, 1 = yesterday. Null for a missing or unreadable value. */
+export function bangkokDaysAgo(value: string | null | undefined, now: Date = new Date()): number | null {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  // en-CA prints YYYY-MM-DD.
+  const day = (x: Date) => x.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+  return Math.round((Date.parse(day(now)) - Date.parse(day(d))) / 86_400_000);
+}
+
+/** HH:MM in Bangkok time. */
+export function bangkokTime(value: string | null | undefined): string {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok', hour12: false });
+}
+
 /** Format Thai phone: 0xx-xxx-xxxx (mobile) or 0x-xxx-xxxx (landline) */
 export function formatTel(tel: string | null | undefined): string {
   if (!tel) return '—';

@@ -7501,7 +7501,11 @@
     "payoffWithdrawNote": "หมายเหตุ (ถ้ามี)",
     "payoffWithdrawDone": "ถอนปิดจบแล้ว",
     "payoffWithdrawDoneHint": "สลิปกลับเป็นรอตรวจ อนุมัติหรือปฏิเสธแบบปกติได้",
-    "payoffBillCancelled": "บิลที่ยกเลิก"
+    "payoffBillCancelled": "บิลที่ยกเลิก",
+    "sentToday": "วันนี้",
+    "sentYesterday": "เมื่อวาน",
+    "sentDaysAgo": "{{n}} วันก่อน",
+    "sentBy": "ลูกค้าส่งมา"
   },
   "permissionGrants": {
     "title": "สิทธิ์พิเศษรายคน",

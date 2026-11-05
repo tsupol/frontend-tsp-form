@@ -27,6 +27,7 @@ import {
 import { SlipReopenModal } from './SlipReopenModal';
 import { SlipRejectModal } from './SlipRejectModal';
 import { BankAccountSelect } from './BankAccountSelect';
+import { SlipSentDayBand } from './SlipSentDay';
 
 export type SubmissionStatus = 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
 
@@ -439,6 +440,8 @@ export function useSubmissionReview({
 
       <div className="flex-1 min-h-0 overflow-auto better-scroll px-4 py-3">
         <div className="space-y-4">
+          <SlipSentDayBand submittedAt={row.submitted_at} />
+
           {(row.submit_channel || row.ocr_source || row.payoff_phase) && (
             <div className="flex items-center gap-2 flex-wrap">
               <SlipPayoffBadge row={row} />

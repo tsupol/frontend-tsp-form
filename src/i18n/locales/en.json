@@ -7512,7 +7512,11 @@
     "payoffWithdrawNote": "Note (optional)",
     "payoffWithdrawDone": "Payoff withdrawn",
     "payoffWithdrawDoneHint": "The slip is back to waiting for review and can be approved or rejected normally.",
-    "payoffBillCancelled": "Cancelled bill"
+    "payoffBillCancelled": "Cancelled bill",
+    "sentToday": "Today",
+    "sentYesterday": "Yesterday",
+    "sentDaysAgo": "{{n}} days ago",
+    "sentBy": "Sent"
   },
   "permissionGrants": {
     "title": "Permission grants",
