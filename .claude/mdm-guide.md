@@ -45,6 +45,7 @@ src/pages/inventory/
 ```
 Sub-tab order (131 §0): 1 Enroll · 2 Status & queue · 3 Dunning · 4 Wallpaper · 5 App control ·
 6 Lost mode & location · 7 Pause. Route: `/admin/inventory/assets/<id>?tab=mdm`.
+Looking at fixes is one window for the whole system (`src/components/deviceLocation/`, UI_SUMMARY 159): contract device tab, this tab's header, the collector panel, the repo job, and the customer map (`/admin/nnf-extra/customer-map`, `fn_mdm_location_map`, clicking a pin opens the window). The window reads all 50 fixes at once (the backend keeps no more) and prints `when`, `clusters` and `summary` as given: never work out the weekday, "days ago" or groups. Every read is audited, so it never runs on a timer or on focus, and the customer map filters branches on the pins it already has instead of reading again; `fn_mdm_read_locations` and `ops_repo_location_trail` are no longer called.
 
 **Sub-tab 5 holds everything about apps** (2026-08-14): the customer-self-removal window on top,
 then the installed-app list with its per-row remove, then the whitelist presets. The list lived in

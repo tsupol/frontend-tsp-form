@@ -5,25 +5,34 @@
 import { type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Smartphone, MonitorSmartphone, ListChecks } from 'lucide-react';
+import { Smartphone, MonitorSmartphone, ListChecks, MapPinned, Map as MapIcon } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
+import { useLocationViewCan } from '../../components/deviceLocation/deviceLocationApi';
 
 const NAV_ITEMS = [
   { path: '/admin/nnf-extra/mdm-devices', labelKey: 'nav.mdmDevices', icon: ListChecks },
   { path: '/admin/nnf-extra/mdm', labelKey: 'nav.mdmDetection', icon: MonitorSmartphone },
   { path: '/admin/nnf-extra/app', labelKey: 'nav.appDetection', icon: Smartphone },
 ];
+const CUSTOMER_MAP_ITEM = { path: '/admin/nnf-extra/customer-map', labelKey: 'nav.customerMap', icon: MapIcon };
+const LOCATION_ACCESS_ITEM = { path: '/admin/nnf-extra/location-access', labelKey: 'nav.locationAccess', icon: MapPinned };
 
 export function NnfExtraLayout({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
   const navGuard = useNavGuard();
+  const locationCan = useLocationViewCan().data;
+  const items = [
+    ...NAV_ITEMS,
+    ...(locationCan?.can_view ? [CUSTOMER_MAP_ITEM] : []),
+    ...(locationCan?.can_grant ? [LOCATION_ACCESS_ITEM] : []),
+  ];
 
   return (
     <div className="flex h-dvh overflow-hidden">
       <nav className="hidden lg:flex flex-col gap-0.5 shrink-0 w-50 border-r border-line p-2 pt-7.5 h-full min-h-0 overflow-y-auto better-scroll">
         <span className="subnav-group-label mb-1">{t('nav.nnfExtra')}</span>
-        {NAV_ITEMS.map(({ path, labelKey, icon: Icon }) => {
+        {items.map(({ path, labelKey, icon: Icon }) => {
           // exact match — '/admin/nnf-extra/mdm' is a prefix of '…/mdm-devices',
           // so startsWith would light up both.
           const isActive = pathname === path;

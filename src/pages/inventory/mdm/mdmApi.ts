@@ -118,8 +118,8 @@ export interface AssetMdmStatus {
   // DONE 2026-08-30 (mig 1129) — timestamp of the device's latest location fix,
   // no coordinates, so polling it is free (NOT a PDPA access). null = never
   // reported / past retention. This is THE signal for "a new fix exists":
-  // poll it, and call the audited fn_mdm_read_locations exactly once when it
-  // advances. Same freshness rule as the RPC, so the two never disagree.
+  // poll it to learn that a fix landed. Reading the fixes is the audited location
+  // window (components/deviceLocation), opened by a person.
   last_location_at: string | null;
 
   // ── §3.0 status box: "what's happening now" (DONE 2026-07-27) ──────────────
@@ -1230,22 +1230,6 @@ export function fetchLastLocationAt(assetId: number): Promise<string | null> {
       `/v_asset_mdm_status?asset_id=eq.${assetId}&select=asset_id,last_location_at`,
     )
     .then((r) => r[0]?.last_location_at ?? null);
-}
-
-// fn_mdm_read_locations — uses p_enrollment_id (NOT asset_id), no p_actor_id.
-// Returns the latest location object, or null if the device never reported.
-export interface MdmLocation {
-  lat: number;
-  lon: number;
-  accuracy_m: number | null;
-  reported_at: string;
-  received_at: string | null;
-  is_stale: boolean;
-  staleness_band: string | null;
-  enrollment_id: number;
-}
-export function readLocations(enrollmentId: number): Promise<MdmLocation | null> {
-  return apiClient.rpc<MdmLocation | null>('fn_mdm_read_locations', { p_enrollment_id: enrollmentId });
 }
 
 // ── Sub-tab 7: enforcement pause (§9) — DB-only, no device command ───────────

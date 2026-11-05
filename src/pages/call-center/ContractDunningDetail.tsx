@@ -240,7 +240,7 @@ function OverviewTab({ row }: { row: BookRow }) {
   // §1) — shown inside the device box, under whichever device they describe.
   const { data: signals } = useDeviceSignals(row.contract_id);
   const signalLines = signals
-    ? <DeviceSignalsPanel contractId={row.contract_id} signals={signals} bare />
+    ? <DeviceSignalsPanel contractId={row.contract_id} signals={signals} bare showLocate />
     : null;
 
   const refreshRow = () => {

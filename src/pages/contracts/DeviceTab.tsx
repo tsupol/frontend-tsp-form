@@ -22,10 +22,13 @@ import { translateApiError } from '../../lib/apiErrors';
 import { useAuth } from '../../contexts/AuthContext';
 import { useContractPartnerCases } from '../partner-cases/usePartnerCases';
 import { MdmCheckBody, MdmCheckToggle } from '../inventory/MdmCheck';
+import { DeviceLocationButton } from '../../components/deviceLocation/DeviceLocationDialog';
+import { useLocationViewCan } from '../../components/deviceLocation/deviceLocationApi';
+import { IcloudLockBox, type ContractIcloudLockFields } from './IcloudLockBox';
 
 type IdentifierType = 'IMEI' | 'SERIAL_NO';
 
-interface ContractForDevice {
+interface ContractForDevice extends ContractIcloudLockFields {
   id: number;
   state: string;
   branch_id: number;
@@ -197,6 +200,10 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
   const hasLoaner = contract.loaner_device_id != null;
   const primaryBucket = contract.device_current_bucket;
   const primaryWithCustomer = primaryBucket === 'WITH_CUSTOMER_ACTIVE';
+  const canViewLocation = useLocationViewCan().data?.can_view === true;
+  // iCloud menu box: Apple phones only, and absent on the shop's contract view.
+  const showIcloudLock = contract.icloud_lock_source !== undefined
+    && (!hasPrimary || (primaryAsset != null && isAppleBrand(primaryAsset.brand_name)));
 
   return (
     <div className="p-4 flex flex-col gap-4">
@@ -390,8 +397,9 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
                   answers (collectors, the repo team while the job is theirs). */}
               <DeviceSignalsPanel contractId={contract.id} showDeviceCode={false} className="mt-2" />
 
-              {(canDo('DEVICE_REPAIR_REQUEST') || canDo('UNBIND_DEVICE') || canDo('CUSTOMER_DEPOSIT_DEVICE') || canDo('RETURN_DEPOSIT')) && (
+              {(canViewLocation || canDo('DEVICE_REPAIR_REQUEST') || canDo('UNBIND_DEVICE') || canDo('CUSTOMER_DEPOSIT_DEVICE') || canDo('RETURN_DEPOSIT')) && (
                 <div className="flex flex-wrap gap-2 pt-2 border-t border-line mt-2">
+                  <DeviceLocationButton contractId={contract.id} />
                   {canDo('DEVICE_REPAIR_REQUEST') && (
                     <Button
                       size="sm"
@@ -472,6 +480,8 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
           )}
         </div>
       </section>
+
+      {showIcloudLock && <IcloudLockBox contract={contract} />}
 
       {mdmAssetId != null && (
         <section className="border border-line rounded-md">

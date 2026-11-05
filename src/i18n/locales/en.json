@@ -327,7 +327,8 @@
       "walletInsurance": "Insurance",
       "walletNoCount": "Wallet is reconciled by the company — no count here.",
       "walletSaving": "Saving",
-      "walletUsedNet": "Wallet used (net)"
+      "walletUsedNet": "Wallet used (net)",
+      "goToDate": "Go to {{date}} →"
     },
     "dayCloseHistory": {
       "description": "Historical day close snapshots with audit flags."
@@ -1412,19 +1413,14 @@
         "needLostMode": "Location is only available while Lost Mode is on.",
         "request": "Request location",
         "waitingFix": "Waiting for the device to report its location…",
-        "readLatest": "Show latest location",
-        "none": "No location reported yet. Enable Lost Mode, then request a location.",
-        "current": "Current location ·",
-        "asOf": "As of",
-        "googleMaps": "Google Maps",
-        "appleMaps": "Apple Maps",
         "startLoop": "Track continuously",
         "stopLoop": "Stop tracking",
         "loopHint": "Repeatedly asks the device for its location for about an hour.",
         "loopRunning": "Tracking location",
         "loopAttempts": "{{made}} of {{max}} checks",
         "loopEnds": "ends",
-        "loopLast": "last fix"
+        "loopLast": "last fix",
+        "lastFix": "Latest location"
       },
       "pause": {
         "intro": "Pause enforcement when you shouldn't act on this device yet — the customer is negotiating, promised a pay date, or it's under legal hold.",
@@ -3813,7 +3809,7 @@
     "payoffDiscount_resubmit": "Send the request again",
     "payoffDiscount_resubmitReason": "Branch sent the discount request again",
     "hint": {
-      "USE_LATE_FEE_COLLECT": "Use “Collect late fee”",
+      "USE_LATE_FEE_COLLECT": "Use “Late fee”",
       "USE_LATE_FEE_WAIVE": "Use “Waive late fee”",
       "USE_WALLET_CASHOUT": "Use the wallet cash-out action",
       "USE_WALLET_CASHOUT_SAVING": "Use “Cash out savings”",
@@ -5743,24 +5739,31 @@
     "th": "ไทย"
   },
   "lateFee": {
-    "title": "Collect late fee",
-    "done": "Late fee collected",
-    "accruedBalance": "Accrued late fee",
-    "collectAmount": "Amount to collect",
-    "waiveSome": "Waive part of it",
+    "title": "Late fee",
+    "done": "Bill issued",
+    "accruedBalance": "Late fee on the system",
+    "collectAmount": "Amount to bill",
     "note": "Note",
     "notePlaceholder": "Reason (optional)",
     "netCharged": "Net charged",
-    "collected": "Collected",
+    "collected": "Late fee on this bill",
     "waived": "Waived",
-    "remainingBalance": "Remaining late fee",
-    "confirm": "Confirm & collect",
-    "blockNoBalance": "No outstanding late fee",
-    "blockNoCollect": "Enter an amount to collect",
-    "blockWaiveExceeds": "Waive amount cannot exceed the collected amount",
-    "blockWaiveAmount": "Enter the amount to waive",
-    "blockWaiveReason": "Enter a reason for the waive",
-    "notePlaceholderWaive": "Reason for the waive (required)"
+    "remainingBalance": "Late fee on the system",
+    "confirm": "Issue bill for payment",
+    "blockNoBalance": "No late fee on the system",
+    "blockNoCollect": "Enter an amount to bill",
+    "notePlaceholderWaive": "Reason for the waive (required)",
+    "doneNothingToPay": "Bill issued, nothing to pay",
+    "waiveAmount": "Waive late fee",
+    "billCode": "Bill",
+    "billStatus": "Bill status",
+    "confirmNothingToPay": "Issue bill, nothing to pay",
+    "goPay": "Go to payment",
+    "partialOpen": "Split",
+    "partialCancel": "No split",
+    "partialRemain": "Stays on the system",
+    "waiveAll": "Waive all",
+    "blockWaiveReason": "Enter a reason for the waive before issuing the bill"
   },
   "legal": {
     "caseStatus_QUEUED": "Queued",
@@ -6322,7 +6325,9 @@
     "fundCash": "Cash position",
     "fundPassbook": "Bank passbook",
     "fundBankAccounts": "Fund bank accounts",
-    "fundPartnerPayoutAccounts": "Shop payout accounts"
+    "fundPartnerPayoutAccounts": "Shop payout accounts",
+    "locationAccess": "Location Access",
+    "customerMap": "Customer Map"
   },
   "nnfApp": {
     "title": "NNF App",
@@ -8476,8 +8481,6 @@
       "start": "Lock device + locate",
       "startAgain": "Locate again",
       "stop": "Release Lost Mode",
-      "trail": "Latest locations",
-      "trailRefresh": "Reload locations",
       "pickUpFirst": "Add this job to today first.",
       "noMdm": "This device has no MDM.",
       "noMdmCannotSend": "This device has no MDM — it cannot be locked or located.",
@@ -8507,15 +8510,7 @@
         }
       },
       "followOnPanel": "Progress shows in the Device & app panel on the job.",
-      "noAnswer": "The device didn't answer within an hour — press again to retry.",
-      "trailEmpty": "No location yet — the device has not answered.",
-      "accuracy": "±{{m}} m",
-      "openMap": "Map",
-      "band": {
-        "FRESH": "within 15 minutes",
-        "OLDER_THAN_15M": "over 15 minutes ago",
-        "OLDER_THAN_24H": "over a day ago"
-      }
+      "noAnswer": "The device didn't answer within an hour — press again to retry."
     }
   },
   "reports": {
@@ -11053,6 +11048,158 @@
       "futureCount": "{{due}} installments · {{paid}} paid",
       "paidCount": "Fully paid {{paid}}/{{due}} installments",
       "note": "* This month isn't over, so Billed includes installments not yet due · ↗ A month ahead = installments of running contracts that will fall due; Collected there means paid in advance · On time = paid by the due date plus the company's grace days"
+    }
+  },
+  "deviceLocation": {
+    "button": "View location",
+    "title": "Device location",
+    "refresh": "Reload",
+    "contract": "Contract",
+    "lastSeen": "Device last online",
+    "openGoogleMaps": "Open in Google Maps",
+    "accuracyValue": "±{{m}} m",
+    "col": {
+      "time": "Time",
+      "source": "Source",
+      "accuracy": "Accuracy"
+    },
+    "source": {
+      "HEALTH_CHECK": "System check (morning round)",
+      "DUNNING_LOCATE": "Collections (morning round)",
+      "STAFF": "Requested by staff",
+      "OPS": "System team",
+      "OTHER": "Other"
+    },
+    "reason": {
+      "NO_DEVICE": "This contract has no device bound",
+      "NO_BINDING": "This device is not in MDM, so it has no locations",
+      "NO_LOCATIONS": "This device has no locations yet"
+    },
+    "residence": {
+      "RESIDENT": "Actual home · {{inCluster}}/{{mornings}} mornings",
+      "SCATTERED": "A different place each morning · {{inCluster}}/{{mornings}} mornings",
+      "NOT_YET": "Fewer than 3 mornings ({{mornings}}/3)",
+      "radius": "within {{m}} m",
+      "showOnMap": "Show on map"
+    },
+    "error": {
+      "notGranted": "You may not view this device's location",
+      "notVisible": "This device or contract is outside what you can see"
+    },
+    "dow": {
+      "0": "Sun",
+      "1": "Mon",
+      "2": "Tue",
+      "3": "Wed",
+      "4": "Thu",
+      "5": "Fri",
+      "6": "Sat"
+    },
+    "ago": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "days": "{{n}} days ago"
+    },
+    "morning": "Morning",
+    "summary": {
+      "fixes": "fixes",
+      "days": "days",
+      "clusters": "groups"
+    },
+    "cluster": {
+      "title": "Groups of fixes ({{count}})",
+      "name": "Group {{no}}",
+      "none": "No group",
+      "stats": "{{fixes}} fixes · {{days}} days · {{mornings}} mornings · radius {{m}} m",
+      "span": "First {{first}} · last {{last}} ({{ago}})",
+      "mapLabel": "Group {{no}} · {{fixes}} fixes · {{days}} days"
+    }
+  },
+  "icloudLock": {
+    "title": "iCloud menu",
+    "stateGrey": "Greyed out",
+    "stateOpen": "Open",
+    "noDevice": "No device",
+    "noDeviceHint": "No device bound — the flag takes effect once one is bound and the customer logs in",
+    "ruleOff": "This company has no iCloud grey-out rule",
+    "ruleDeviceAllowance": "The system team released this device's iCloud menu — the contract flag has no effect until that is removed",
+    "ruleContract": "Contract flag: grey until {{n}} installments are paid · paid {{paid}}",
+    "ruleContractOff": "iCloud grey-out is off for this contract",
+    "ruleCompany": "Company rule: iCloud menu grey until {{n}} installments are paid · paid {{paid}}",
+    "ruleCompanyZero": "This company is set to 0 installments (not greyed out)",
+    "flagSetBy": "Flag {{n}} installments, set by {{user}}",
+    "reason": "Reason",
+    "setFlag": "Set grey-until-N flag",
+    "editFlag": "Edit flag",
+    "clearFlag": "Remove flag",
+    "details": "Details",
+    "detailsTitle": "iCloud menu details",
+    "paidOf": "Paid {{paid}} of {{total}} installments",
+    "countLabel": "Grey until how many installments are paid (0 - {{max}})",
+    "countRange": "Enter 0 to {{max}} installments",
+    "zeroHint": "0 = rule off for this contract, the iCloud menu will not be grey",
+    "explainGrey": "Grey means the customer cannot sign out, change Apple ID, turn off Find My, or remove MDM during Apple's first 30 days. The phone otherwise works normally.",
+    "explainPaid": "Once N installments are paid the menu opens by itself; cancelling bills below N greys it again. No need to remove the flag when paid.",
+    "explainSwap": "The flag belongs to the contract: swapping the device keeps it.",
+    "explainClear": "After removal the company rule applies again.",
+    "doneSet": "Flag set",
+    "doneClear": "Flag removed",
+    "doneUnchanged": "Same number, nothing changed",
+    "doneHint": "A device that is online changes within about 1-2 minutes",
+    "flagRow": "Contract flag",
+    "inForceRow": "In force",
+    "paidRow": "Paid / total",
+    "stateRow": "iCloud menu now",
+    "untilCount": "Grey until {{n}} installments",
+    "noRule": "No rule",
+    "noteWaitingLogin": "Waiting for the customer to log in to the NNF app; the menu greys out after that",
+    "noteSwitching": "The device has not taken the latest setting yet",
+    "noteExempt": "The system team released this device's menu ({{flags}}) — the contract flag has no effect until that is removed",
+    "noteCutoff": "This device was bound before 25 Oct, so the company rule does not cover it — a contract flag can be set",
+    "historyTitle": "Contract flag history",
+    "historyEmpty": "No flag has been set",
+    "historyActive": "In force",
+    "historyCleared": "Removed by",
+    "ruleOffWithFlag": "This company has no iCloud grey-out rule yet; the flag takes effect once it does",
+    "notInMdm": "Not in MDM",
+    "notInMdmHint": "This phone is not in MDM yet, so the iCloud menu is not greyed out — the flag takes effect once the phone is in MDM and the customer logs in"
+  },
+  "locationAccess": {
+    "title": "Who may view device locations",
+    "hint": "A person granted here can view locations of every device in their scope. Collection pools, repo teams, branch managers and company admins already see theirs through their job; they need no entry here.",
+    "add": "Grant",
+    "revoke": "Revoke",
+    "empty": "No personal grants yet",
+    "notAllowed": "This page is for system dev and holding admin only",
+    "userPlaceholder": "Type a username to search",
+    "doneAdd": "Granted",
+    "doneRevoke": "Revoked",
+    "col": {
+      "user": "User",
+      "role": "Role",
+      "note": "Reason",
+      "grantedAt": "Granted at"
+    }
+  },
+  "customerMap": {
+    "title": "Customer map",
+    "refresh": "Reload",
+    "allBranches": "All branches · {{count}} contracts",
+    "branchOption": "{{name}} · {{pins}} contracts",
+    "withFix": "contracts with a fix",
+    "noFix": "bound, no fix yet",
+    "empty": "No contract has a fix yet",
+    "fixesTotal": "{{n}} fixes",
+    "overdue": "{{days}} days overdue · {{amount}}",
+    "notOverdue": "Not overdue",
+    "resident": "Lives here",
+    "legend": {
+      "none": "Not overdue",
+      "some": "1–6 days overdue",
+      "late": "7+ days overdue",
+      "repo": "Awaiting repo / legal",
+      "resident": "Lives here",
+      "stale": "Fix older than {{days}} days"
     }
   }
 }

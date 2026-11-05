@@ -2,13 +2,11 @@
 //
 // The device's status lines (§1) sit in the job card under the device; this
 // section keeps them polled every 15 s while a lock command or a location loop
-// is under way (§3.2), and holds the three actions from the evaluator:
-//   REPO_LOCATE_START   → confirm, then ops_repo_locate_start (Lost Mode + loop)
-//   REPO_LOCATE_STOP    → confirm, then ops_repo_locate_stop
-//   REPO_LOCATION_TRAIL → the last 3 fixes, inline. Each call is logged as a look
-//                         at the customer's location, so it runs when the user
-//                         presses the button and again only when the device
-//                         reports a NEWER fix — never on a timer.
+// is under way (§3.2), and holds the actions:
+//   REPO_LOCATE_START → confirm, then ops_repo_locate_start (Lost Mode + loop)
+//   REPO_LOCATE_STOP  → confirm, then ops_repo_locate_stop
+//   ดูตำแหน่ง          → the system's one location window (UI_SUMMARY 159). It reads
+//                       again only when the device reports a NEWER fix.
 // A button the evaluator marks unavailable stays visible, disabled, with the
 // reason: not picked up yet, or the device has no MDM.
 
@@ -16,19 +14,19 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button, Modal, Tooltip } from 'tsp-form';
-import { Lock, LockOpen, MapPin, ExternalLink, AlertTriangle, Loader2, RefreshCw } from 'lucide-react';
+import { Lock, LockOpen, AlertTriangle, Loader2 } from 'lucide-react';
 import { ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
-import { DateTime } from '../../components/DateTime';
 import { PhoneInput } from '../../components/PhoneInput';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { ActionDoneView } from '../contracts/ActionDoneView';
+import { DeviceLocationButton } from '../../components/deviceLocation/DeviceLocationDialog';
 import {
   useDeviceSignals, deviceSignalsKey, type ContractDeviceSignals,
 } from '../../components/DeviceSignalsPanel';
 import {
-  repoLocateStart, repoLocateStop, repoLocationTrail,
-  type RepoAction, type RepoLocateStartResult, type RepoLocateStopResult, type RepoLocationTrail,
+  repoLocateStart, repoLocateStop,
+  type RepoAction, type RepoLocateStartResult, type RepoLocateStopResult,
 } from './repoApi';
 
 type LocateMode = 'start' | 'stop';
@@ -42,7 +40,7 @@ function blockedReason(
   if (a.is_available) return null;
   if (!inPool) return t('repo.action.onlyWhileInPool');
   if (!onFocus) return t('repo.locate.pickUpFirst');
-  if (a.action_code !== 'REPO_LOCATION_TRAIL' && s && !s.mdm_enrolled) return t('repo.locate.noMdm');
+  if (s && !s.mdm_enrolled) return t('repo.locate.noMdm');
   return t('repo.action.notAvailableNow');
 }
 
@@ -61,45 +59,11 @@ export function RepoLocateSection({
   const lastMode = useRef<LocateMode>('start');
   if (mode) lastMode.current = mode;
 
-  // Location trail — loaded on press, then followed while the section is open.
-  const [trail, setTrail] = useState<RepoLocationTrail | null>(null);
-  const [trailOpen, setTrailOpen] = useState(false);
-  const [trailLoading, setTrailLoading] = useState(false);
-  const [trailError, setTrailError] = useState<string | null>(null);
-  const trailForFix = useRef<string | null>(null);
-
-  const loadTrail = async () => {
-    setTrailLoading(true);
-    setTrailError(null);
-    try {
-      trailForFix.current = signals?.mdm_last_location_at ?? null;
-      setTrail(await repoLocationTrail(contractId));
-      setTrailOpen(true);
-    } catch (err) {
-      setTrailError(locateErrorText(err, t));
-    } finally {
-      setTrailLoading(false);
-    }
-  };
-
-  // A newer fix arrived while the list is open → read it once.
-  const lastFix = signals?.mdm_last_location_at ?? null;
-  useEffect(() => {
-    if (!trailOpen || trailLoading || !lastFix) return;
-    if (trailForFix.current && lastFix <= trailForFix.current) return;
-    void loadTrail();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lastFix, trailOpen]);
-
-  // Reset when switching to another job.
-  useEffect(() => { setTrail(null); setTrailOpen(false); setTrailError(null); trailForFix.current = null; }, [contractId]);
-
   const find = (code: string) => actions.find((a) => a.action_code === code && a.is_permitted) ?? null;
   const startA = find('REPO_LOCATE_START');
   const stopA = find('REPO_LOCATE_STOP');
-  const trailA = find('REPO_LOCATION_TRAIL');
 
-  // A user with none of the three still gets the facts panel.
+  // A user with neither action still gets the facts panel.
   const lostOn = !!signals?.mdm_lost_mode_on;
   const lostPending = !!signals?.mdm_lost_mode_pending;
 
@@ -113,7 +77,7 @@ export function RepoLocateSection({
 
   const actionButton = (
     a: RepoAction, label: string, icon: React.ReactNode, onClick: () => void,
-    filled = false, busy = false,
+    filled = false,
   ) => {
     const reason = blockedReason(a, inPool, onFocus, signals, t);
     return (
@@ -122,8 +86,8 @@ export function RepoLocateSection({
           variant={filled ? 'solid' : 'outline'}
           color={filled ? 'danger' : 'default'}
           size="sm"
-          startIcon={busy ? <Loader2 size={14} className="animate-spin" /> : icon}
-          disabled={!!reason || busy}
+          startIcon={icon}
+          disabled={!!reason}
           onClick={onClick}
           data-action={a.action_code}
           data-blocked-reason={reason ?? undefined}
@@ -144,29 +108,17 @@ export function RepoLocateSection({
         </div>
       )}
 
-      {(startA || stopA || trailA) && (
-        <div className="flex flex-wrap gap-2">
-          {startA && actionButton(
-            startA,
-            lostOn ? t('repo.locate.startAgain') : t('repo.locate.start'),
-            <Lock size={14} />,
-            () => { setSawPending(false); setMode('start'); },
-            !lostOn,
-          )}
-          {stopA && (lostOn || lostPending) && actionButton(stopA, t('repo.locate.stop'), <LockOpen size={14} />, () => setMode('stop'))}
-          {trailA && actionButton(
-            trailA,
-            trailOpen ? t('repo.locate.trailRefresh') : t('repo.locate.trail'),
-            trailOpen ? <RefreshCw size={14} /> : <MapPin size={14} />,
-            () => void loadTrail(),
-            false,
-            trailLoading,
-          )}
-        </div>
-      )}
-
-      {trailError && <div className="alert alert-danger"><AlertTriangle size={16} /><span>{trailError}</span></div>}
-      {trailOpen && trail && <TrailList trail={trail} />}
+      <div className="flex flex-wrap gap-2">
+        {startA && actionButton(
+          startA,
+          lostOn ? t('repo.locate.startAgain') : t('repo.locate.start'),
+          <Lock size={14} />,
+          () => { setSawPending(false); setMode('start'); },
+          !lostOn,
+        )}
+        {stopA && (lostOn || lostPending) && actionButton(stopA, t('repo.locate.stop'), <LockOpen size={14} />, () => setMode('stop'))}
+        <DeviceLocationButton contractId={contractId} lastFixAt={signals?.mdm_last_location_at ?? null} />
+      </div>
 
       <RepoLocateModal
         open={mode !== null}
@@ -175,41 +127,6 @@ export function RepoLocateSection({
         contractCode={contractCode}
         onClose={() => setMode(null)}
       />
-    </div>
-  );
-}
-
-function TrailList({ trail }: { trail: RepoLocationTrail }) {
-  const { t } = useTranslation();
-  if (trail.count === 0) {
-    return <div className="text-xs text-subtle">{t('repo.locate.trailEmpty')}</div>;
-  }
-  return (
-    <div className="border border-line rounded-md divide-y divide-line">
-      {trail.fixes.map((f, i) => {
-        const old = f.staleness_band !== 'FRESH';
-        return (
-          <div key={f.location_id} className={`px-3 py-2 flex items-center gap-3 text-sm ${old ? 'text-subtle' : ''}`}>
-            <MapPin size={14} className={`shrink-0 ${i === 0 && !old ? 'text-danger-fg' : 'text-subtler'}`} />
-            <div className="min-w-0 flex-1">
-              <DateTime value={f.reported_at} />
-              <div className="text-xs text-subtle">
-                {f.accuracy_m != null ? t('repo.locate.accuracy', { m: Math.round(f.accuracy_m) }) : '—'}
-                {' · '}
-                {t(`repo.locate.band.${f.staleness_band}`, { defaultValue: f.staleness_band })}
-              </div>
-            </div>
-            <a
-              href={`https://www.google.com/maps?q=${f.lat},${f.lon}`}
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs text-primary-fg hover:underline inline-flex items-center gap-1 shrink-0"
-            >
-              {t('repo.locate.openMap')}<ExternalLink size={12} />
-            </a>
-          </div>
-        );
-      })}
     </div>
   );
 }

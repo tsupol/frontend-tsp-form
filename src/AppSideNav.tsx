@@ -64,7 +64,11 @@ import {
   CalendarClock, History, PiggyBank, BookOpenText,
   // Bank SMS phones
   MessageSquareText,
+  // Who may view device locations
+  MapPinned,
+  Map as MapIcon,
 } from 'lucide-react';
+import { useLocationViewCan } from './components/deviceLocation/deviceLocationApi';
 import { useAuth } from './contexts/AuthContext';
 import { filterSideNavForShop } from './lib/shopMenu';
 import { SHOP_STAGES, SHOP_STAGE_GROUP_LABEL } from './lib/shopStages';
@@ -214,6 +218,9 @@ export const AppSideNav = () => {
   const role = user?.role_code ?? '';
   const { showFin1, showFin2 } = useMyCommercialModels();
   const { hasPermission } = useMyPermissions();
+  const locationCan = useLocationViewCan().data;
+  const canGrantLocation = locationCan?.can_grant === true;
+  const canViewLocation = locationCan?.can_view === true;
   // Company inventory approves POs and buybacks only (NOTICE 2026-10-30), so its
   // badge counts those kinds rather than counters.pending_approvals.
   const approvalScope = useApprovalScope();
@@ -469,6 +476,12 @@ export const AppSideNav = () => {
         { key: 'mdm-devices', icon: <ListChecks size="1rem" />, label: t('nav.mdmDevices'), path: '/admin/nnf-extra/mdm-devices' },
         { key: 'nnf-mdm', icon: <MonitorSmartphone size="1rem" />, label: t('nav.mdmDetection'), path: '/admin/nnf-extra/mdm' },
         { key: 'nnf-app', icon: <Smartphone size="1rem" />, label: t('nav.appDetection'), path: '/admin/nnf-extra/app' },
+        ...(canViewLocation
+          ? [{ key: 'customer-map', icon: <MapIcon size="1rem" />, label: t('nav.customerMap'), path: '/admin/nnf-extra/customer-map' }]
+          : []),
+        ...(canGrantLocation
+          ? [{ key: 'location-access', icon: <MapPinned size="1rem" />, label: t('nav.locationAccess'), path: '/admin/nnf-extra/location-access' }]
+          : []),
       ],
     },
     ...(canApprove

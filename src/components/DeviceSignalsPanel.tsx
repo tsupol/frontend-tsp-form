@@ -20,6 +20,7 @@ import { Smartphone, Loader2 } from 'lucide-react';
 import { apiClient } from '../lib/api';
 import { DateTime } from './DateTime';
 import { DetailLine } from './DetailLine';
+import { DeviceLocationButton } from './deviceLocation/DeviceLocationDialog';
 
 export interface ContractDeviceSignals {
   contract_id: number;
@@ -95,22 +96,24 @@ function useMinutesLeft(iso: string | null): number | null {
  *  already shows the device (collector overview, repo job card) — the device
  *  is not repeated there. */
 export function DeviceSignalsPanel({
-  contractId, signals, showDeviceCode = true, bare = false, className = '',
+  contractId, signals, showDeviceCode = true, bare = false, showLocate = false, className = '',
 }: {
   contractId: number;
   signals?: ContractDeviceSignals | null;
   showDeviceCode?: boolean;
   bare?: boolean;
+  /** Adds the "ดูตำแหน่ง" button, for a host that has no such button of its own. */
+  showLocate?: boolean;
   className?: string;
 }) {
   const { data: fetched } = useDeviceSignals(contractId);
   const s = signals !== undefined ? signals : fetched;
   if (!s) return null;
-  return <DeviceSignalsBody s={s} showDeviceCode={showDeviceCode} bare={bare} className={className} />;
+  return <DeviceSignalsBody s={s} showDeviceCode={showDeviceCode} bare={bare} showLocate={showLocate} className={className} />;
 }
 
-function DeviceSignalsBody({ s, showDeviceCode, bare, className }: {
-  s: ContractDeviceSignals; showDeviceCode: boolean; bare: boolean; className: string;
+function DeviceSignalsBody({ s, showDeviceCode, bare, showLocate, className }: {
+  s: ContractDeviceSignals; showDeviceCode: boolean; bare: boolean; showLocate: boolean; className: string;
 }) {
   const { t } = useTranslation();
   const loopMinutes = useMinutesLeft(s.locate_loop_ends_at);
@@ -184,6 +187,11 @@ function DeviceSignalsBody({ s, showDeviceCode, bare, className }: {
                 <span className="text-xs text-subtle">{t('deviceSignals.lastFix')} <DateTime value={s.mdm_last_location_at} /></span>
               )}
             </DetailLine>
+          )}
+          {showLocate && (
+            <div>
+              <DeviceLocationButton contractId={s.contract_id} lastFixAt={s.mdm_last_location_at} />
+            </div>
           )}
         </>
       )}

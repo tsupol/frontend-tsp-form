@@ -327,7 +327,8 @@
       "walletInsurance": "กรมธรรม์",
       "walletNoCount": "Wallet บริหารโดย Company — ไม่ต้องนับตรงนี้",
       "walletSaving": "เงินออม",
-      "walletUsedNet": "ใช้ wallet (สุทธิ)"
+      "walletUsedNet": "ใช้ wallet (สุทธิ)",
+      "goToDate": "ไปวันที่ {{date}} →"
     },
     "dayCloseHistory": {
       "description": "บันทึกประวัติการปิดวันพร้อมธงเตือน"
@@ -1412,19 +1413,14 @@
         "needLostMode": "ขอตำแหน่งได้เฉพาะตอนเปิดโหมดสูญหายอยู่",
         "request": "ขอตำแหน่ง",
         "waitingFix": "กำลังรอเครื่องรายงานตำแหน่ง…",
-        "readLatest": "ดูตำแหน่งล่าสุด",
-        "none": "ยังไม่มีตำแหน่งที่รายงานเข้ามา เปิดโหมดสูญหายก่อนแล้วค่อยขอตำแหน่ง",
-        "current": "ตำแหน่งปัจจุบัน ·",
-        "asOf": "ข้อมูลเมื่อ",
-        "googleMaps": "Google Maps",
-        "appleMaps": "Apple Maps",
         "startLoop": "ติดตามต่อเนื่อง",
         "stopLoop": "หยุดติดตาม",
         "loopHint": "จะขอตำแหน่งจากเครื่องซ้ำ ๆ ประมาณ 1 ชั่วโมง",
         "loopRunning": "กำลังติดตามตำแหน่ง",
         "loopAttempts": "ขอไปแล้ว {{made}} จาก {{max}} ครั้ง",
         "loopEnds": "สิ้นสุด",
-        "loopLast": "ล่าสุด"
+        "loopLast": "ล่าสุด",
+        "lastFix": "พิกัดล่าสุด"
       },
       "pause": {
         "intro": "พักการบังคับใช้เมื่อยังไม่ควรไปยุ่งกับเครื่องนี้ — ลูกค้ากำลังเจรจา รับปากวันจ่าย หรือติดคดี",
@@ -3809,7 +3805,7 @@
     "payoffDiscount_resubmit": "ส่งคำขออีกครั้ง",
     "payoffDiscount_resubmitReason": "สาขาส่งคำขอส่วนลดอีกครั้ง",
     "hint": {
-      "USE_LATE_FEE_COLLECT": "ใช้ปุ่ม “เก็บค่าปรับ”",
+      "USE_LATE_FEE_COLLECT": "ใช้ปุ่ม “ค่าปรับ”",
       "USE_LATE_FEE_WAIVE": "ใช้ปุ่ม “ยกเว้นค่าปรับ”",
       "USE_WALLET_CASHOUT": "ใช้ปุ่มถอนเงินกระเป๋า",
       "USE_WALLET_CASHOUT_SAVING": "ใช้ปุ่ม “ถอนเงินออม”",
@@ -5738,24 +5734,31 @@
     "th": "ไทย"
   },
   "lateFee": {
-    "title": "เก็บค่าปรับ",
-    "done": "เก็บค่าปรับแล้ว",
-    "accruedBalance": "ค่าปรับค้างชำระ",
-    "collectAmount": "จำนวนที่เรียกเก็บ",
-    "waiveSome": "ยกเว้นบางส่วน",
+    "title": "ค่าปรับ",
+    "done": "ออกบิลเรียกเก็บแล้ว",
+    "accruedBalance": "ค่าปรับค้างในระบบ",
+    "collectAmount": "จำนวนที่ออกบิลเรียกเก็บ",
     "note": "หมายเหตุ",
     "notePlaceholder": "เหตุผล (ถ้ามี)",
     "netCharged": "ยอดเรียกเก็บสุทธิ",
-    "collected": "เรียกเก็บ",
+    "collected": "ค่าปรับในบิลนี้",
     "waived": "ยกเว้น",
-    "remainingBalance": "ค่าปรับคงเหลือ",
-    "confirm": "ยืนยันและรับชำระ",
-    "blockNoBalance": "ไม่มีค่าปรับค้างชำระ",
-    "blockNoCollect": "ระบุจำนวนที่เรียกเก็บ",
-    "blockWaiveExceeds": "ยอดยกเว้นต้องไม่เกินยอดที่เรียกเก็บ",
-    "blockWaiveAmount": "ระบุจำนวนที่ยกเว้น",
-    "blockWaiveReason": "ระบุเหตุผลในการยกเว้นค่าปรับ",
-    "notePlaceholderWaive": "เหตุผลในการยกเว้น (บังคับกรอก)"
+    "remainingBalance": "ค่าปรับค้างในระบบ",
+    "confirm": "ออกบิลเพื่อชำระค่าปรับ",
+    "blockNoBalance": "ไม่มีค่าปรับค้างในระบบ",
+    "blockNoCollect": "ระบุจำนวนที่ออกบิลเรียกเก็บ",
+    "notePlaceholderWaive": "เหตุผลในการยกเว้น (บังคับกรอก)",
+    "doneNothingToPay": "ออกบิลแล้ว ไม่ต้องชำระ",
+    "waiveAmount": "ยกเว้นค่าปรับ",
+    "billCode": "เลขบิล",
+    "billStatus": "สถานะบิล",
+    "confirmNothingToPay": "ออกบิลไม่ต้องชำระ",
+    "goPay": "ไปชำระค่าปรับ",
+    "partialOpen": "แบ่งจ่าย",
+    "partialCancel": "ไม่แบ่ง",
+    "partialRemain": "เหลือค้างในระบบ",
+    "waiveAll": "ยกเว้นทั้งหมด",
+    "blockWaiveReason": "ระบุเหตุผลในการยกเว้นค่าปรับ ก่อนออกบิล"
   },
   "legal": {
     "caseStatus_QUEUED": "รอดำเนินการ",
@@ -6317,7 +6320,9 @@
     "fundCash": "ฐานะเงินสด",
     "fundPassbook": "สมุดบัญชีธนาคาร",
     "fundBankAccounts": "บัญชีธนาคารของกองทุน",
-    "fundPartnerPayoutAccounts": "บัญชีรับเงินจากกองทุน"
+    "fundPartnerPayoutAccounts": "บัญชีรับเงินจากกองทุน",
+    "locationAccess": "Location Access",
+    "customerMap": "Customer Map"
   },
   "nnfApp": {
     "title": "แอป NNF",
@@ -8464,8 +8469,6 @@
       "start": "ล็อกเครื่อง + ตามพิกัด",
       "startAgain": "ตามพิกัดอีกครั้ง",
       "stop": "ปลด Lost Mode",
-      "trail": "ดูพิกัดล่าสุด",
-      "trailRefresh": "โหลดพิกัดใหม่",
       "pickUpFirst": "เพิ่มงานนี้เข้างานวันนี้ก่อน",
       "noMdm": "เครื่องนี้ไม่มี MDM",
       "noMdmCannotSend": "เครื่องนี้ไม่มี MDM สั่งล็อกหรือตามพิกัดไม่ได้",
@@ -8495,15 +8498,7 @@
         }
       },
       "followOnPanel": "ดูความคืบหน้าได้ที่แผง \"เครื่อง & แอป\" ในหน้างาน",
-      "noAnswer": "เครื่องไม่ตอบภายใน 1 ชั่วโมง — กดใหม่ได้",
-      "trailEmpty": "ยังไม่มีพิกัด — เครื่องยังไม่ตอบ",
-      "accuracy": "±{{m}} ม.",
-      "openMap": "แผนที่",
-      "band": {
-        "FRESH": "ภายใน 15 นาที",
-        "OLDER_THAN_15M": "เกิน 15 นาที",
-        "OLDER_THAN_24H": "เกิน 1 วัน"
-      }
+      "noAnswer": "เครื่องไม่ตอบภายใน 1 ชั่วโมง — กดใหม่ได้"
     }
   },
   "reports": {
@@ -11025,6 +11020,158 @@
       "futureCount": "{{due}} งวด · จ่ายแล้ว {{paid}}",
       "paidCount": "จ่ายครบ {{paid}}/{{due}} งวด",
       "note": "* เดือนนี้ยังไม่จบ ยอดเรียกเก็บรวมงวดที่ยังไม่ถึงกำหนด · ↗ เดือนล่วงหน้า = ค่างวดที่จะครบกำหนดของสัญญาที่ยังเดินอยู่ ช่องเก็บได้คือจ่ายล่วงหน้า · ตรงเวลา = จ่ายภายในวันครบกำหนด + วันผ่อนผันของบริษัท"
+    }
+  },
+  "deviceLocation": {
+    "button": "ดูตำแหน่ง",
+    "title": "ดูตำแหน่งเครื่อง",
+    "refresh": "โหลดใหม่",
+    "contract": "สัญญา",
+    "lastSeen": "เครื่องออนไลน์ล่าสุด",
+    "openGoogleMaps": "เปิดใน Google Maps",
+    "accuracyValue": "±{{m}} ม.",
+    "col": {
+      "time": "เวลา",
+      "source": "ที่มา",
+      "accuracy": "ความแม่น"
+    },
+    "source": {
+      "HEALTH_CHECK": "ตรวจสอบระบบ (รอบเช้า)",
+      "DUNNING_LOCATE": "ทวงหนี้ (รอบเช้า)",
+      "STAFF": "พนักงานกดขอ",
+      "OPS": "ทีมระบบ",
+      "OTHER": "อื่น ๆ"
+    },
+    "reason": {
+      "NO_DEVICE": "สัญญานี้ยังไม่มีเครื่องผูกอยู่",
+      "NO_BINDING": "เครื่องนี้ไม่ได้อยู่ใน MDM จึงไม่มีพิกัด",
+      "NO_LOCATIONS": "เครื่องนี้ยังไม่มีพิกัด"
+    },
+    "residence": {
+      "RESIDENT": "ที่อยู่จริง · {{inCluster}}/{{mornings}} เช้า",
+      "SCATTERED": "เช้าแต่ละวันอยู่คนละที่ · {{inCluster}}/{{mornings}} เช้า",
+      "NOT_YET": "ยังไม่ครบ 3 เช้า ({{mornings}}/3)",
+      "radius": "ในรัศมี {{m}} ม.",
+      "showOnMap": "ดูบนแผนที่"
+    },
+    "error": {
+      "notGranted": "ไม่มีสิทธิ์ดูพิกัดเครื่องนี้",
+      "notVisible": "เครื่องหรือสัญญานี้อยู่นอกขอบเขตที่คุณเห็น"
+    },
+    "dow": {
+      "0": "อา.",
+      "1": "จ.",
+      "2": "อ.",
+      "3": "พ.",
+      "4": "พฤ.",
+      "5": "ศ.",
+      "6": "ส."
+    },
+    "ago": {
+      "today": "วันนี้",
+      "yesterday": "เมื่อวาน",
+      "days": "{{n}} วันก่อน"
+    },
+    "morning": "ช่วงเช้า",
+    "summary": {
+      "fixes": "พิกัด",
+      "days": "วัน",
+      "clusters": "กลุ่ม"
+    },
+    "cluster": {
+      "title": "กลุ่มพิกัด ({{count}})",
+      "name": "กลุ่ม {{no}}",
+      "none": "ไม่เข้ากลุ่ม",
+      "stats": "{{fixes}} ครั้ง · {{days}} วัน · เช้า {{mornings}} วัน · รัศมี {{m}} ม.",
+      "span": "ครั้งแรก {{first}} · ล่าสุด {{last}} ({{ago}})",
+      "mapLabel": "กลุ่ม {{no}} · {{fixes}} ครั้ง · {{days}} วัน"
+    }
+  },
+  "icloudLock": {
+    "title": "เมนู iCloud",
+    "stateGrey": "เทา",
+    "stateOpen": "เปิด",
+    "noDevice": "ยังไม่มีเครื่อง",
+    "noDeviceHint": "ยังไม่มีเครื่องผูก — ธงจะมีผลเมื่อผูกเครื่องและลูกค้า login",
+    "ruleOff": "บริษัทนี้ไม่มีกติกา iCloud เทา",
+    "ruleDeviceAllowance": "ทีมระบบปลดเมนู iCloud ของเครื่องนี้ไว้ — ธงสัญญาไม่มีผลจนกว่าจะถอน",
+    "ruleContract": "ธงสัญญา: เทาจนครบ {{n}} งวด · จ่ายแล้ว {{paid}}",
+    "ruleContractOff": "ปิดกติกา iCloud เทาให้สัญญานี้",
+    "ruleCompany": "กติกาบริษัท: เมนู iCloud เทาจนจ่ายครบ {{n}} งวด · จ่ายแล้ว {{paid}}",
+    "ruleCompanyZero": "บริษัทนี้ตั้งไว้ 0 งวด (ไม่เทา)",
+    "flagSetBy": "ธง {{n}} งวด ตั้งโดย {{user}}",
+    "reason": "เหตุผล",
+    "setFlag": "ตั้งธงเทาจนครบ N งวด",
+    "editFlag": "แก้ธง",
+    "clearFlag": "ถอนธง",
+    "details": "รายละเอียด",
+    "detailsTitle": "รายละเอียดเมนู iCloud",
+    "paidOf": "จ่ายแล้ว {{paid}} จาก {{total}} งวด",
+    "countLabel": "เทาจนจ่ายครบกี่งวด (0 - {{max}})",
+    "countRange": "กรอกได้ 0 ถึง {{max}} งวด",
+    "zeroHint": "0 = ปิดกติกาให้สัญญานี้ เมนู iCloud จะไม่เทา",
+    "explainGrey": "iCloud เทา = ลูกค้า sign out, เปลี่ยน Apple ID, ปิด Find My ไม่ได้ และถอด MDM เองไม่ได้ในช่วง 30 วันแรกของ Apple เครื่องยังใช้งานปกติทุกอย่าง",
+    "explainPaid": "จ่ายครบ N งวด เมนูเปิดเอง ยกเลิกบิลจนต่ำกว่า N เทากลับเอง ไม่ต้องถอนธงเมื่อจ่ายครบ",
+    "explainSwap": "ธงติดกับสัญญา เปลี่ยนเครื่องในสัญญาเดิมธงยังอยู่",
+    "explainClear": "ถอนแล้วกลับไปใช้กติกาของบริษัท",
+    "doneSet": "ตั้งธงแล้ว",
+    "doneClear": "ถอนธงแล้ว",
+    "doneUnchanged": "เลขเดิม ไม่มีอะไรเปลี่ยน",
+    "doneHint": "เครื่องที่ออนไลน์อยู่จะเปลี่ยนภายในประมาณ 1-2 นาที",
+    "flagRow": "ธงสัญญา",
+    "inForceRow": "ค่าที่ใช้จริง",
+    "paidRow": "จ่ายแล้ว / ทั้งหมด",
+    "stateRow": "เมนู iCloud ตอนนี้",
+    "untilCount": "เทาจนครบ {{n}} งวด",
+    "noRule": "ไม่มีกติกา",
+    "noteWaitingLogin": "รอลูกค้า login แอป NNF ก่อน เมนูจะเทาหลังจากนั้น",
+    "noteSwitching": "เครื่องยังไม่รับค่าล่าสุด กำลังเปลี่ยน",
+    "noteExempt": "ทีมระบบปลดเมนูเครื่องนี้ไว้ ({{flags}}) — ธงสัญญาไม่มีผลจนกว่าจะถอน",
+    "noteCutoff": "เครื่องนี้ผูกก่อน 25 ต.ค. กติกาบริษัทไม่ครอบ — ตั้งธงสัญญาได้",
+    "historyTitle": "ประวัติธงสัญญา",
+    "historyEmpty": "ยังไม่เคยตั้งธง",
+    "historyActive": "มีผลอยู่",
+    "historyCleared": "ถอนโดย",
+    "ruleOffWithFlag": "บริษัทนี้ยังไม่มีกติกา iCloud เทา ธงจะมีผลเมื่อบริษัทมีกติกา",
+    "notInMdm": "ยังไม่เข้า MDM",
+    "notInMdmHint": "เครื่องนี้ยังไม่เข้า MDM เมนู iCloud จึงยังไม่เทา — ธงจะมีผลเมื่อเครื่องเข้า MDM และลูกค้า login"
+  },
+  "locationAccess": {
+    "title": "สิทธิ์ดูตำแหน่งเครื่อง",
+    "hint": "คนที่ได้สิทธิ์รายคนจากหน้านี้ ดูพิกัดได้ทุกเครื่องในขอบเขตที่ตัวเองเห็น ส่วนกองทวง, ทีมยึดคืน, ผู้จัดการสาขา และ company admin ดูได้ตามงานของตัวเองอยู่แล้ว ไม่ต้องเพิ่มที่นี่",
+    "add": "ให้สิทธิ์",
+    "revoke": "ถอนสิทธิ์",
+    "empty": "ยังไม่มีคนได้สิทธิ์รายคน",
+    "notAllowed": "หน้านี้สำหรับ system dev และ holding admin เท่านั้น",
+    "userPlaceholder": "พิมพ์ชื่อผู้ใช้เพื่อค้นหา",
+    "doneAdd": "ให้สิทธิ์แล้ว",
+    "doneRevoke": "ถอนสิทธิ์แล้ว",
+    "col": {
+      "user": "ผู้ใช้",
+      "role": "บทบาท",
+      "note": "เหตุผล",
+      "grantedAt": "ให้สิทธิ์เมื่อ"
+    }
+  },
+  "customerMap": {
+    "title": "แผนที่ลูกค้า",
+    "refresh": "โหลดใหม่",
+    "allBranches": "ทุกสาขา · {{count}} สัญญา",
+    "branchOption": "{{name}} · {{pins}} สัญญา",
+    "withFix": "สัญญามีพิกัด",
+    "noFix": "ผูกแล้วยังไม่มีพิกัด",
+    "empty": "ยังไม่มีสัญญาที่มีพิกัด",
+    "fixesTotal": "มีพิกัด {{n}} ครั้ง",
+    "overdue": "ค้าง {{days}} วัน · {{amount}}",
+    "notOverdue": "ไม่ค้าง",
+    "resident": "ที่อยู่จริง",
+    "legend": {
+      "none": "ไม่ค้าง",
+      "some": "ค้าง 1–6 วัน",
+      "late": "ค้าง 7 วันขึ้นไป",
+      "repo": "รอยึด / รอกฎหมาย",
+      "resident": "ที่อยู่จริง",
+      "stale": "พิกัดเก่ากว่า {{days}} วัน"
     }
   }
 }

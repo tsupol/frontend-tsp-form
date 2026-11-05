@@ -448,33 +448,6 @@ export function repoLocateStop(contractId: number): Promise<RepoLocateStopResult
   return apiClient.rpc<RepoLocateStopResult>('ops_repo_locate_stop', { p_contract_id: contractId });
 }
 
-// Every call is logged as one look at the customer's location (who, which
-// contract, when). Call it when the user opens the list or when
-// mdm_last_location_at moves — never on a timer.
-export type RepoStalenessBand = 'FRESH' | 'OLDER_THAN_15M' | 'OLDER_THAN_24H' | string;
-
-export interface RepoLocationFix {
-  location_id: number;
-  lat: number;
-  lon: number;
-  accuracy_m: number | null;
-  reported_at: string;
-  received_at: string;
-  staleness_band: RepoStalenessBand;
-}
-
-export interface RepoLocationTrail {
-  contract_id: number;
-  asset_id: number | null;
-  limit: number;
-  count: number;
-  fixes: RepoLocationFix[];
-}
-
-export function repoLocationTrail(contractId: number): Promise<RepoLocationTrail> {
-  return apiClient.rpc<RepoLocationTrail>('ops_repo_location_trail', { p_contract_id: contractId });
-}
-
 // Why the job was sent here and when — typed by the collector when they sent it
 // (DELIVERY 2026-10-01 §2). The detail view doesn't carry it; the worklist row
 // does, and only while the job is in the pool.

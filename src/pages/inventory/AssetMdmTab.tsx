@@ -30,6 +30,7 @@ import { SubTabWallpaper } from './mdm/SubTabWallpaper';
 import { SubTabAppControl } from './mdm/SubTabAppControl';
 import { SubTabLostMode } from './mdm/SubTabLostMode';
 import { SubTabPause } from './mdm/SubTabPause';
+import { DeviceLocationButton } from '../../components/deviceLocation/DeviceLocationDialog';
 import type { AssetMdmStatus, MdmReliefStatus } from './mdm/mdmApi';
 
 type MdmSubTab = 'enroll' | 'status' | 'dunning' | 'wallpaper' | 'appControl' | 'lostMode' | 'pause';
@@ -122,7 +123,8 @@ export function AssetMdmTab({ assetId, onRefresh, onAddSerial }: {
         {/* Manual refresh — this data goes stale silently (§0.25). Labelled
             "all" so it reads distinctly from the per-section [pull] buttons,
             which fetch fresh data from the device rather than reloading. */}
-        <div className="flex-none flex items-center justify-end -mb-1">
+        <div className="flex-none flex items-center justify-end gap-2 -mb-1">
+          <DeviceLocationButton assetId={assetId} allowed={status.may_location} lastFixAt={status.last_location_at} />
           <Button
             variant="ghost"
             size="sm"

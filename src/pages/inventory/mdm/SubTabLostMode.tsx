@@ -2,7 +2,8 @@
 // Sub-tab 6 — โหมดสูญหาย & ตำแหน่ง (131 §8). Three clusters:
 //   Lost Mode: enable (template one-click — recommended — OR free-type;
 //              message + phone both required when free-typing) / disable / sound
-//   Location:  request once (only meaningful while lost mode is ON) + read latest
+//   Location:  request once (only meaningful while lost mode is ON). Looking at the
+//              fixes is the one location window (the button above the sub-tabs).
 //   Loop:      continuous location loop (§8.1) — start/stop, live status polled
 //              by next_poll_at (§8.2), guarded against double-fire by
 //              pending_intent_count
@@ -11,8 +12,6 @@
 //   - message + phone required for free-type enable (§8).
 //   - request-location gated on is_mdm_lost_mode_enabled — Apple only reports
 //     location in Lost Mode (§8).
-//   - read_locations uses enrollment_id; may return null (never reported), which
-//     is not an error. Staleness first — a stale fix that reads fresh is the trap.
 //   - after an action, poll with backoff (3·5·8·13·20·30s, ~2min ceiling, §8.3)
 //     for the value that action changes; then "device hasn't answered", never
 //     "error".
@@ -27,7 +26,7 @@ import { Button, TextArea, Select } from 'tsp-form';
 import { PhoneInput } from '../../../components/PhoneInput';
 import { formatTel } from '../../../lib/format';
 import {
-  MapPin, Bell, BellOff, Volume2, LocateFixed, ExternalLink, AlertTriangle,
+  MapPin, Bell, BellOff, Volume2, LocateFixed, AlertTriangle,
   Repeat, Square, Loader2, Smartphone,
 } from 'lucide-react';
 import { DateTime } from '../../../components/DateTime';
@@ -35,9 +34,9 @@ import { RelativeDateTime } from './RelativeDateTime';
 import { useAuth } from '../../../contexts/AuthContext';
 import {
   enableLostMode, enableLostModeFromTemplate, disableLostMode, playLostModeSound,
-  requestLocation, readLocations, signalLocationLoop, stopLocationLoop,
-  fetchLostModeCompliance, fetchActiveLoop, fetchLastLocationAt, fetchLockMessageOptions, parseMdmError,
-  type AssetMdmStatus, type MdmLocation, type MdmActiveLoop, type ParsedMdmError,
+  requestLocation, signalLocationLoop, stopLocationLoop,
+  fetchLostModeCompliance, fetchActiveLoop, fetchLastLocationAt, fetchLockMessageOptions,
+  type AssetMdmStatus, type MdmActiveLoop,
 } from './mdmApi';
 import { useMdmCommand } from './useMdmCommand';
 import { MDM_NO_CACHE } from './useMdmStatus';
@@ -137,30 +136,9 @@ export function SubTabLostMode({
   const lostBackoff = useBackoffPoll(refetchLost);
   const loopBackoff = useBackoffPoll(refetchLoop);
 
-  // Latest location — fetched on demand (button), PDPA-logged read.
-  const [loc, setLoc] = useState<MdmLocation | null>(null);
-  const [locFetched, setLocFetched] = useState(false);
-  const [locLoading, setLocLoading] = useState(false);
-  const [locError, setLocError] = useState<ParsedMdmError | null>(null);
-
-  const readLatest = async () => {
-    if (status.enrollment_id == null) return;
-    setLocLoading(true); setLocError(null);
-    try {
-      const r = await readLocations(status.enrollment_id);
-      setLoc(r);
-      setLocFetched(true);
-    } catch (err) {
-      setLocError(parseMdmError(err, t));
-    } finally {
-      setLocLoading(false);
-    }
-  };
-
-  // §8.3 row "ขอตำแหน่ง 1 ครั้ง", pattern per DONE 2026-08-30 §1: backoff-poll
-  // the FREE last_location_at timestamp (not a PDPA access), and fire the
-  // audited read exactly once when a fix newer than the press-time baseline
-  // lands. Audit log = 1 line per location the staffer actually saw.
+  // §8.3 row "ขอตำแหน่ง 1 ครั้ง": backoff-poll the FREE last_location_at timestamp
+  // (not a PDPA access) until a fix newer than the press-time baseline lands.
+  // Looking at the fix itself is the audited location window, opened by hand.
   const [probedFixAt, setProbedFixAt] = useState<string | null>(null);
   const locBackoff = useBackoffPoll(() => {
     void fetchLastLocationAt(status.asset_id).then(setProbedFixAt).catch(() => {});
@@ -192,23 +170,6 @@ export function SubTabLostMode({
     }
   }, [newestFixAt]);
   /* eslint-enable react-hooks/exhaustive-deps */
-
-  // Fetch coordinates once per new fix so the card follows the device instead
-  // of freezing at the last button press — but only when showing it is clearly
-  // the viewer's intent (a loop is running, they already viewed a location this
-  // session, or they just pressed ขอตำแหน่ง), so each audited read maps to a
-  // location that was really on their screen. Ref guards re-reads when ingest
-  // lag keeps read_locations behind the free timestamp for a beat.
-  const autoReadForRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!newestFixAt || locLoading) return;
-    if (!(loop != null || locFetched || locBackoff.active)) return;
-    if (autoReadForRef.current === newestFixAt) return;
-    autoReadForRef.current = newestFixAt;
-    if (loc && loc.reported_at >= newestFixAt) return; // already showing this fix
-    void readLatest();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [newestFixAt, locLoading, locBackoff.active]);
 
   const run = (fire: () => Promise<{ intent_id: number }>, after?: () => void) =>
     cmd.run(fire, (r) => [r.intent_id]).then((res) => { if (res) after?.(); return res; });
@@ -378,11 +339,6 @@ export function SubTabLostMode({
               })}>
               {t('asset.mdm.location.request')}
             </Button>
-            <Button variant="outline" size="sm" startIcon={<LocateFixed size={15} />}
-              disabled={locLoading || status.enrollment_id == null}
-              onClick={readLatest}>
-              {t('asset.mdm.location.readLatest')}
-            </Button>
           </div>
 
           {/* Continuous loop (§8.1). */}
@@ -415,8 +371,6 @@ export function SubTabLostMode({
             )}
           </div>
 
-          <MdmErrorAlert error={locError} />
-
           {locBackoff.active && (
             <div className="text-xs text-subtle flex items-center gap-1">
               <Loader2 size={12} className="animate-spin" />{t('asset.mdm.location.waitingFix')}
@@ -428,11 +382,11 @@ export function SubTabLostMode({
             </div>
           )}
 
-          {locFetched && !loc && !locError && (
-            <div className="text-xs text-subtle">{t('asset.mdm.location.none')}</div>
+          {newestFixAt && (
+            <div className="text-xs text-subtle">
+              {t('asset.mdm.location.lastFix')} <DateTime value={newestFixAt} showTime />
+            </div>
           )}
-
-          {loc && <LocationCard loc={loc} serial={status.serial_number} />}
         </div>
       )}
 
@@ -478,34 +432,6 @@ function LoopStatus({ loop }: { loop: MdmActiveLoop }) {
         )}
         {loop.ends_at && <span>{t('asset.mdm.location.loopEnds')} <RelativeDateTime value={loop.ends_at} staleAfterDays={9999} /></span>}
         {loop.last_location_at && <span>{t('asset.mdm.location.loopLast')} <RelativeDateTime value={loop.last_location_at} /></span>}
-      </div>
-    </div>
-  );
-}
-
-function LocationCard({ loc, serial }: { loc: MdmLocation; serial: string | null }) {
-  const { t } = useTranslation();
-  const gmaps = `https://www.google.com/maps?q=${loc.lat},${loc.lon}`;
-  const amaps = `https://maps.apple.com/?ll=${loc.lat},${loc.lon}${serial ? `&q=${encodeURIComponent(serial)}` : ''}`;
-  return (
-    <div className={`rounded-md border p-3 flex flex-col gap-2 ${loc.is_stale ? 'border-warning-border bg-warning-soft' : 'border-line'}`}>
-      {/* Staleness first — a stale fix that reads as current is the trap (§8). */}
-      <div className={`text-xs flex items-center gap-1 ${loc.is_stale ? 'text-warning-fg' : 'text-subtle'}`}>
-        {loc.is_stale && <AlertTriangle size={12} />}
-        {loc.is_stale ? t('asset.mdm.location.asOf') : t('asset.mdm.location.current')}{' '}
-        <DateTime value={loc.reported_at} showTime />
-      </div>
-      <div className="text-sm font-mono">
-        {loc.lat.toFixed(6)}, {loc.lon.toFixed(6)}
-        {loc.accuracy_m != null && <span className="text-subtler"> · ±{Math.round(loc.accuracy_m)}m</span>}
-      </div>
-      <div className="flex gap-3">
-        <a href={gmaps} target="_blank" rel="noreferrer" className="text-xs text-primary-fg underline inline-flex items-center gap-1">
-          {t('asset.mdm.location.googleMaps')} <ExternalLink size={11} />
-        </a>
-        <a href={amaps} target="_blank" rel="noreferrer" className="text-xs text-primary-fg underline inline-flex items-center gap-1">
-          {t('asset.mdm.location.appleMaps')} <ExternalLink size={11} />
-        </a>
       </div>
     </div>
   );

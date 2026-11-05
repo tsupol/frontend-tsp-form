@@ -77,6 +77,8 @@ import { NnfAppPage } from './pages/nnf-app/NnfAppPage';
 import { NnfMdmPage } from './pages/nnf-mdm/NnfMdmPage';
 import { MdmDevicesPage } from './pages/nnf-extra/MdmDevicesPage';
 import { NnfExtraLayout } from './pages/nnf-extra/NnfExtraLayout';
+import { LocationAccessPage } from './pages/nnf-extra/LocationAccessPage';
+import { CustomerMapPage } from './pages/nnf-extra/CustomerMapPage';
 import { PaymentSubmissionsPage } from './pages/PaymentSubmissionsPage';
 import { ContractsLayout } from './pages/contracts/ContractsLayout';
 import { ContractSearchPage } from './pages/contracts/ContractSearchPage';
@@ -1332,6 +1334,26 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <NnfExtraLayout><MdmDevicesPage /></NnfExtraLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/nnf-extra/customer-map"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <NnfExtraLayout><CustomerMapPage /></NnfExtraLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/nnf-extra/location-access"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <NnfExtraLayout><LocationAccessPage /></NnfExtraLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

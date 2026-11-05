@@ -1094,3 +1094,9 @@ div:has(> .checkbox-hidden) {
 
 .d-score-star-on { fill: var(--d-score-on); color: var(--d-score-on-line); }
 .d-score-star-off { fill: var(--d-score-off); color: var(--d-score-off-line); }
+
+/* On a fractional display scale the map's tiles land a hair apart. Behind them, the tiles' own land colour
+   hides the gap (Leaflet's default grey shows it as a grid of lines). */
+.leaflet-container {
+  background: #f2efe9 !important;
+}
