@@ -18,6 +18,9 @@ export interface Customer extends SeatedCustomer {
   code: string;
   age: number;
   months: number;
+  /** Model on the contract and AT- of its device; "" when there is none yet. */
+  product: string;
+  asset: string;
 }
 
 export function useCustomers(data: SimulationData | null): Customer[] {
@@ -51,7 +54,10 @@ export function useCustomers(data: SimulationData | null): Customer[] {
         seat = { station, spot };
         seats.current.set(w.id, seat);
       }
-      return { id: w.id, branchId: w.branch_id, code: w.code, state: w.state, age: w.age_min, months: w.months, station, spot: seat.spot };
+      return {
+        id: w.id, branchId: w.branch_id, code: w.code, state: w.state, age: w.age_min, months: w.months,
+        product: w.product ?? '', asset: w.asset ?? '', station, spot: seat.spot,
+      };
     });
   }, [data]);
 }

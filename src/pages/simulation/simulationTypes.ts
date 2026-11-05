@@ -84,6 +84,11 @@ export interface SimWaiting {
   state: string;
   age_min: number;
   months: number;
+  /** The model the contract was priced on, before any device is bound (mig 1624).
+   *  "" = no model chosen yet (a real value: print nothing, not a placeholder). */
+  product: string;
+  /** AT- of the bound or reserved device; "" when there is none. */
+  asset: string;
 }
 
 export interface SimulationData {

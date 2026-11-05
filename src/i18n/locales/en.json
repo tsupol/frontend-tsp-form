@@ -11031,7 +11031,8 @@
       "sold": "Shop that has sold",
       "guest": "Customers in shop",
       "pending_payout": "Payout-pending pile",
-      "payout": "Paid-out pile"
+      "payout": "Paid-out pile",
+      "cars": "1 car on the road = 1 contract opened today ({{n}})"
     },
     "collection": {
       "open": "View installment collection",

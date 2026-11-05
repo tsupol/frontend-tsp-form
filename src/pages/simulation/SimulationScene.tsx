@@ -272,7 +272,8 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
   if (focus.key?.startsWith('a')) {
     const c = customers.find(x => `a${x.id}` === focus.key);
     const at = c && world.current?.customerAt(c);
-    if (c && at) note = { text: `${codeOf(c.code, c.months)} · ${stateLabel(t, c.state)} · ${ageText(t, c.age)}`, color: stateColor(c.state), at: place(at[0], at[1] + 0.12, at[2]) };
+    // The model on the contract and the device's AT-, once either exists (mig 1624).
+    if (c && at) note = { text: [codeOf(c.code, c.months), stateLabel(t, c.state), ageText(t, c.age), c.product, c.asset].filter(Boolean).join(' · '), color: stateColor(c.state), at: place(at[0], at[1] + 0.12, at[2]) };
   } else if (focus.key?.startsWith('p')) {
     const p = piles.find(x => `p${x.branchId}:${x.key}` === focus.key);
     if (p) note = { text: `${t(`simulation.pile.${p.key}`)} ${baht(p.value)}`, color: p.color, at: place(p.x, p.h + 0.2, p.z) };
@@ -318,7 +319,13 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
         );
       })}
 
-      {note && <span className="sim__chip sim__chip--on" style={{ ...note.at, color: note.color, borderColor: note.color }}>{note.text}</span>}
+      {/* Kept inside the scene: the label is up to 320 px wide (86 vw on a narrow
+          screen, see .sim__chip--on) and centred on its customer, who may stand by an edge. */}
+      {note && (() => {
+        const half = Math.min(160, size.w * 0.43);
+        const left = Math.min(Math.max(note.at.left, half + 4), size.w - half - 4);
+        return <span className="sim__chip sim__chip--on" style={{ ...note.at, left, color: note.color, borderColor: note.color }}>{note.text}</span>;
+      })()}
     </div>
   );
 });

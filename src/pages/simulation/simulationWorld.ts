@@ -42,7 +42,9 @@ const STAND_H = 0.85;
 const DOOR: [number, number] = [6.6, 9.4];
 const CAR_LEN = 2.9;
 const CAR_FPS = 30;
-const CAR_GAP = 50; // road length per car in a lane
+const CAR_CAPACITY = 64; // instances made up front; grows when a busy day needs more
+const CAR_RUNOFF = 6; // road beyond the frontage the cars still use, each end
+const CAR_FADE = 3; // a car grows in / shrinks away over this much road at each end
 
 const PX = 30; // screen pixels per world unit at zoom 1
 const AZ = Math.PI / 4;
@@ -249,6 +251,11 @@ export class ShopWorld {
   private plan: Plan;
   private cars: Car[] = [];
   private carMeshes: InstancedMesh[] = [];
+  private carRoot: Group | null = null;
+  private carCapacity = 0;
+  private lanes: { z: number; dir: 1 | -1; speed: number }[] = [];
+  /** False under prefers-reduced-motion: the cars stand still (and can still be counted). */
+  private motion = true;
   private span = 1;
   private spanStart = 0;
   private raf = 0;
@@ -344,7 +351,9 @@ export class ShopWorld {
     slab(spanStart, roadZ + ROAD_D, span, FOOT, FOOT_Y, C.footLine, C.foot, C.kerb);
     box(boxes, spanStart, 0, roadZ, span, 0.04, ROAD_D, C.road);
     for (let x = spanStart; x < spanStart + span; x += 5) box(boxes, x, 0.04, roadZ + ROAD_D / 2 - 0.07, 2.6, 0.012, 0.14, C.dash);
-    this.buildCars(root, spanStart, span, roadZ);
+    // Cars run only along the shops' frontage (plus a little either side), so every
+    // one of them is on screen at once and the count can be read.
+    this.buildCars(root, -CAR_RUNOFF, fw + CAR_RUNOFF * 2, roadZ);
 
     const tree = (x: number, z: number, s: number, n: number) => {
       posts.add(x, 0.4 * s, z, 0.1 * s, 0.8 * s, 0.1 * s, C.trunk);
@@ -397,36 +406,64 @@ export class ShopWorld {
     return root;
   }
 
+  // The cars on the road in front are a count, not decoration (work order 2026-11-05 §2):
+  // one car per contract the company opened today, the figure on the "สัญญาวันนี้" card.
+  // No contract, empty road. They are spaced evenly, never at random, so the count
+  // can be read off the screen; the side roads carry none.
   // Thailand drives on the left: looking along +x the left is -z, so the lane by the plot runs +x.
   private buildCars(root: Group, spanStart: number, span: number, roadZ: number) {
     this.span = span;
     this.spanStart = spanStart;
-    const lanes = [
-      { z: roadZ + ROAD_D * 0.25, dir: 1 as const, speed: 5.2 },
-      { z: roadZ + ROAD_D * 0.75, dir: -1 as const, speed: 4.4 },
+    this.carRoot = root;
+    this.lanes = [
+      { z: roadZ + ROAD_D * 0.25, dir: 1, speed: 5.2 },
+      { z: roadZ + ROAD_D * 0.75, dir: -1, speed: 4.4 },
     ];
-    lanes.forEach(l => {
-      const count = Math.max(2, Math.round(span / CAR_GAP));
-      for (let i = 0; i < count; i++) this.cars.push({ lane: l.z, dir: l.dir, speed: l.speed, offset: ((i + (i * 0.37) % 0.6) * span) / count });
-    });
+    this.allocateCars(CAR_CAPACITY);
+  }
+
+  /** Instanced meshes for up to `capacity` cars; only `count` of them are drawn. */
+  private allocateCars(capacity: number) {
+    const root = this.carRoot;
+    if (!root) return;
+    this.carMeshes.forEach(m => { root.remove(m); m.dispose(); });
     const { paint, fixed } = carParts();
     const paintMat = new MeshLambertMaterial({ color: '#ffffff' });
     const fixedMat = new MeshLambertMaterial({ color: '#ffffff', vertexColors: true });
     // Moving cars are not in the static shadow map; each carries a soft patch under it instead.
     const patchGeo = new PlaneGeometry(CAR_LEN + 0.25, 1.5).rotateX(-Math.PI / 2);
     const patchMat = new MeshBasicMaterial({ color: '#10161a', transparent: true, opacity: 0.2, depthWrite: false });
-    const n = this.cars.length;
-    const painted = new InstancedMesh(paint, paintMat, n);
-    this.cars.forEach((_, i) => painted.setColorAt(i, new Color(pick(C.cars, i * 5 + 2))));
-    const meshes = [painted, new InstancedMesh(fixed, fixedMat, n), new InstancedMesh(patchGeo, patchMat, n)];
+    const painted = new InstancedMesh(paint, paintMat, capacity);
+    for (let i = 0; i < capacity; i++) painted.setColorAt(i, new Color(pick(C.cars, i * 5 + 2)));
+    const meshes = [painted, new InstancedMesh(fixed, fixedMat, capacity), new InstancedMesh(patchGeo, patchMat, capacity)];
     meshes.forEach(m => {
       m.frustumCulled = false;
       m.castShadow = false;
+      m.count = 0;
       root.add(m);
     });
     this.carMeshes = meshes;
+    this.carCapacity = capacity;
     this.owned.push(paint, fixed, patchGeo, paintMat, fixedMat, patchMat);
-    this.placeCars(0);
+  }
+
+  /** One car per contract opened today, split over the two lanes. */
+  private setCarCount(n: number) {
+    if (n === this.cars.length) return;
+    if (n > this.carCapacity) this.allocateCars(Math.max(n, this.carCapacity * 2));
+    this.cars = [];
+    this.lanes.forEach((l, lane) => {
+      // Lane 0 takes the odd one out.
+      const inLane = lane === 0 ? Math.ceil(n / 2) : Math.floor(n / 2);
+      for (let j = 0; j < inLane; j++) {
+        // Even gaps in each lane; the second lane is shifted half a gap so the two don't pair up.
+        const offset = ((j + (lane === 0 ? 0 : 0.5)) * this.span) / Math.max(inLane, 1);
+        this.cars.push({ lane: l.z, dir: l.dir, speed: l.speed, offset });
+      }
+    });
+    this.carMeshes.forEach(m => { m.count = this.cars.length; });
+    this.carsWereVisible = true;
+    this.placeCars(this.motion ? performance.now() / 1000 : 0);
   }
 
   private placeCars(seconds: number) {
@@ -438,6 +475,9 @@ export class ShopWorld {
     this.cars.forEach((c, i) => {
       const run = (c.offset + c.speed * seconds) % this.span;
       const x = this.spanStart + (c.dir > 0 ? run : this.span - run);
+      // Arriving at one end and leaving at the other, rather than popping in and out.
+      const s = Math.min(1, Math.max(0.001, Math.min(run, this.span - run) / CAR_FADE));
+      scale.set(s, s, s);
       this.carMeshes.forEach((m, k) => {
         pos.set(x, k === 2 ? 0.07 : 0.04, c.lane);
         m.setMatrixAt(i, mat.compose(pos, c.dir > 0 ? none : flip, scale));
@@ -460,7 +500,8 @@ export class ShopWorld {
 
   /** Starts the traffic. rAF stops by itself while the page is hidden. */
   start() {
-    if (this.raf || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    this.motion = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (this.raf || !this.motion) return;
     const frame = (t: number) => {
       this.raf = requestAnimationFrame(frame);
       if (t - this.lastFrame < 1000 / CAR_FPS - 2) return;
@@ -558,6 +599,7 @@ export class ShopWorld {
 
   /** Called when an answer arrives or the selection changes. */
   setLive({ branches, customers, picked }: LiveState) {
+    this.setCarCount(branches.reduce((s, b) => s + b.opened.length, 0));
     this.live.children.forEach(ch => (ch as InstancedMesh).dispose?.());
     this.live.clear();
     const y = LOT_Y + SLAB;
@@ -690,7 +732,7 @@ export class ShopWorld {
 
   /** The numbers a probe reads to check the scene, not the formula that built it. */
   stats() {
-    return { frames: this.renderer.info.render.frame, calls: this.renderer.info.render.calls, triangles: this.renderer.info.render.triangles, near: this.camera.near, far: this.camera.far, piles: this.pileList.length, customers: this.customerIds.length };
+    return { frames: this.renderer.info.render.frame, calls: this.renderer.info.render.calls, triangles: this.renderer.info.render.triangles, near: this.camera.near, far: this.camera.far, piles: this.pileList.length, customers: this.customerIds.length, cars: this.cars.length, carsDrawn: this.carMeshes[0]?.count ?? 0 };
   }
 
   dispose() {

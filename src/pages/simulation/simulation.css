@@ -161,3 +161,6 @@ button.sim__tabs-toggle:hover, .sim__company-min:hover .sim__tabs-toggle { color
   .sim__tag::after { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 44px; transform: translateY(-50%); }
   .sim__detail .btn { min-height: 44px; }
 }
+.sim__waiter-sub { display: block; margin-left: 13px; font-size: 11px; color: var(--color-subtle); }
+/* A tapped customer's label carries the model and AT- too: wrap rather than run off an iPad's edge. */
+.sim__chip--on { white-space: normal; max-width: min(320px, 86vw); width: max-content; text-align: center; }

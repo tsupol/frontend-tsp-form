@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button, DataTable, MobileHeader, PageNav, PageNavPanel, Skeleton, useSnackbarContext } from 'tsp-form';
-import { ArrowRightFromLine, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, House, Info, Minus, Plus, X, XCircle } from 'lucide-react';
+import { ArrowRightFromLine, CarFront, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, House, Info, Minus, Plus, X, XCircle } from 'lucide-react';
 import { ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { DateTime } from '../../components/DateTime';
@@ -253,6 +253,8 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
   const inRoom = (id: number) => customers.filter(c => c.branchId === id);
   const sum = (f: (b: SimBranch) => number | null) => branches.reduce((s, b) => s + (f(b) ?? 0), 0);
   const openedRows = branches.flatMap(b => b.opened);
+  // One car on the road per contract opened today (the scene draws the same count).
+  const openedToday = openedRows.length;
   const newCount = openedRows.filter(o => o.grade === 'NEW').length;
   const standing = branches.reduce((s, b) => s + inRoom(b.id).length, 0);
   const longest = Math.max(0, ...branches.flatMap(b => inRoom(b.id).map(c => c.age)));
@@ -492,7 +494,10 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
                   </div>
                 ))}
                 {inRoom(detail.id).map(a => (
-                  <div key={a.id} className="sim__waiter"><i style={{ background: stateColor(a.state) }} />{codeOf(a.code, a.months)} · {stateLabel(t, a.state)} · {ageText(t, a.age)}</div>
+                  <div key={a.id} className="sim__waiter">
+                    <i style={{ background: stateColor(a.state) }} />{codeOf(a.code, a.months)} · {stateLabel(t, a.state)} · {ageText(t, a.age)}
+                    {(a.product || a.asset) && <small className="sim__waiter-sub">{[a.product, a.asset].filter(Boolean).join(' · ')}</small>}
+                  </div>
                 ))}
               </div>
             )}
@@ -507,6 +512,7 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
               ))}
               <span className="sim__legend-floor"><i style={{ background: FLOOR.sold, borderColor: SOLD_EDGE }} />{t('simulation.legend.sold')}</span>
               <span className="sim__legend-floor"><i style={{ background: FLOOR.guest, borderColor: '#e2c98f' }} />{t('simulation.legend.guest')}</span>
+              <span className="sim__legend-icon" data-testid="sim-legend-cars"><CarFront size={13} />{t('simulation.legend.cars', { n: openedToday })}</span>
               {isFund && PILES.FINANCIER.map(p => (
                 <span key={p.key} className="sim__legend-icon"><PileIcon k={p.key} />{t(`simulation.legend.${p.key}`)}</span>
               ))}
