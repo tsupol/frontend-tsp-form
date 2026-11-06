@@ -3285,10 +3285,14 @@
     "action_unbind_loaner": "Unbind Loaner",
     "action_unbind_loaner_success": "Loaner unbound",
     "action_unbind_undo": "Undo unbind",
-    "action_void": "Void",
+    "action_void": "Void mistaken contract",
     "action_void_bill": "Void Bill",
     "action_void_bill_success": "Bill voided — contract returned to draft",
     "action_void_success": "Contract voided",
+    "action_void_done_headline": "Contract voided",
+    "action_void_done_reversedBill": "Credit note",
+    "action_void_done_reversedAmount": "Amount reversed",
+    "action_void_done_closeReason": "Reason",
     "activatedAt": "Activated",
     "addCoLessee": "Add co-lessee",
     "added_co_lessee": "Added {{customer}} as co-lessee",
@@ -3550,6 +3554,16 @@
     "lateFee": "Late Fee",
     "lateFeeAccruing": "accruing",
     "manageContract": "Manage contract",
+    "preStartVoid": {
+      "title": "Contract not started yet",
+      "hint": "Opened by mistake, or the customer changed their mind before it started? Void the whole contract here."
+    },
+    "voidEffects": {
+      "title": "When voided",
+      "bill": "The contract-opening bill is cancelled; if it was paid, a credit note is issued",
+      "signing": "All signing documents of this contract are voided",
+      "device": "The device picked for it stays in stock and can go on a new contract right away"
+    },
     "media": "Media",
     "moneySection_bills": "Bills",
     "moneySection_installments": "Installments",

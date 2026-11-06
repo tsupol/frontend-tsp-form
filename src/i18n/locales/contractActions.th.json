@@ -12,7 +12,7 @@
   "APPLY_NEGOTIATION": "เจรจาราคา",
   "REQUEST_NEGOTIATION": "ส่งขออนุมัติเจรจา",
   "OPEN_CONTRACT_BILL": "ออกบิลสัญญา",
-  "VOID_CONTRACT": "ยกเลิกสัญญาทั้งฉบับ",
+  "VOID_CONTRACT": "ยกเลิกสัญญาผิดพลาด",
   "COMPLETE_CONTRACT": "ปิดสัญญา (ผ่อนครบ)",
   "CANCEL_CONTRACT": "ยกเลิกสัญญา",
   "TERMINATE_CONTRACT": "เลิกสัญญา",

@@ -18,7 +18,7 @@
 //       VOIDED            → no actions, void reason inline
 //   - System-voided rows (voided_by=0) show a Bot icon for disambiguation.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, Switch, Tooltip } from 'tsp-form';
@@ -186,6 +186,7 @@ export function SigningTab({
   contractState,
   branchId,
   onRenderPdf,
+  topSlot,
 }: {
   contractId: number;
   contractCode: string | null;
@@ -194,6 +195,8 @@ export function SigningTab({
    *  stays neutral instead of saying groups are missing. */
   contractState?: string | null;
   onRenderPdf?: (target: SigningPdfTarget) => void;
+  /** Leads the tab, above the photo album (e.g. the pre-start void row). */
+  topSlot?: ReactNode;
 }) {
   const { t } = useTranslation();
   // A shop can't sign for the customer inside the app (it can't read the
@@ -350,6 +353,7 @@ export function SigningTab({
 
   return (
     <div className="p-4 flex flex-col gap-3">
+      {topSlot}
       {/* Contract photo album (delivery/handover evidence) — contract-scoped,
           works before and after signing. */}
       <ContractAttachments

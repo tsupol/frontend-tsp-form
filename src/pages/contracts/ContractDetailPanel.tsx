@@ -573,6 +573,13 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
             contractState={contract.state}
             branchId={contract.branch_id}
             onRenderPdf={(target) => { setPdfTarget(target); setPdfModalOpen(true); }}
+            topSlot={
+              <PreStartVoidStrip
+                contractId={contractId}
+                contractState={contract.state}
+                onRequestManageAction={setRequestedAction}
+              />
+            }
           />
         )}
       </div>
@@ -755,6 +762,107 @@ const MANAGE_ACTION_MAP: { code: string; action: ManageAction; icon: typeof Paus
   { code: 'VOID_CONTRACT',      action: 'void',      icon: Ban,    danger: true },
 ];
 
+/** The capability rows by action_code — same query (and cache) as the footer. */
+function useContractActionRows(contractId: number) {
+  const { data: actionsResp } = useQuery({
+    queryKey: ['contract-actions', contractId],
+    queryFn: () => apiClient.rpc<{ actions: ManageActionRow[] }>('fn_contract_available_actions', {
+      p_contract_id: contractId,
+    }),
+    staleTime: 30 * 1000,
+  });
+  return new Map((actionsResp?.actions ?? []).map(a => [a.action_code, a]));
+}
+
+function ManageActionButton({ row, cap, t, onRequestManageAction }: {
+  row: typeof MANAGE_ACTION_MAP[number];
+  cap: ManageActionRow;
+  t: ReturnType<typeof useTranslation>['t'];
+  onRequestManageAction: (action: ManageAction) => void;
+}) {
+  const { code, action, icon: Icon, danger } = row;
+  const label = t(code, { ns: 'contractActions', defaultValue: code });
+  // The shared resolver, so this tooltip says exactly what the footer's
+  // does — including the figure the backend sent, which we format but
+  // never compute.
+  const blockingText = !cap.is_available ? blockingReasonText(cap, t) : '';
+  const hint = !cap.is_available && typeof cap.blocking_params?.hint_code === 'string'
+    ? t(`contract.hint.${cap.blocking_params.hint_code}`, { defaultValue: '' })
+    : '';
+  const tipText = [blockingText, hint].filter(Boolean).join(' · ');
+  const btn = (
+    <Button
+      size="sm"
+      variant="outline"
+      color={danger ? 'danger' : undefined}
+      disabled={!cap.is_available}
+      startIcon={<Icon size={14} />}
+      onClick={() => onRequestManageAction(action)}
+      data-action={code}
+    >
+      {label}
+    </Button>
+  );
+  return tipText ? (
+    <Tooltip content={tipText} placement="top">
+      <span className="inline-flex">{btn}</span>
+    </Tooltip>
+  ) : (
+    <span className="inline-flex">{btn}</span>
+  );
+}
+
+// Before the contract starts (not signed and/or not paid), voiding the whole
+// contract is the main way out — opened by mistake, the customer changed their
+// mind, terms typed wrong. So in these states the void button leads the
+// Overview tab and the Signing tab instead of waiting in "Manage contract" at
+// the bottom, where the owner looked for it and gave up (BE REQUEST 2026-11-06).
+const PRE_START_STATES = new Set(['PENDING_SIGN', 'PENDING_PAYMENT', 'PENDING_PAYMENT_AND_SIGN']);
+const VOID_ROW = MANAGE_ACTION_MAP.find(m => m.code === 'VOID_CONTRACT')!;
+
+/** The void button for a not-yet-started contract, or null when it doesn't
+ *  apply. Hidden actions (mig 1623, e.g. the day is closed) aren't in
+ *  `actions[]`, so they draw nothing here either. Shops included: a deal
+ *  partner's manager voids with the branch PIN. */
+function PreStartVoidButton({ contractId, contractState, t, onRequestManageAction }: {
+  contractId: number;
+  contractState: string | null | undefined;
+  t: ReturnType<typeof useTranslation>['t'];
+  onRequestManageAction: (action: ManageAction) => void;
+}) {
+  const byCode = useContractActionRows(contractId);
+  const cap = byCode.get('VOID_CONTRACT');
+  if (!contractState || !PRE_START_STATES.has(contractState) || !cap) return null;
+  return <ManageActionButton row={VOID_ROW} cap={cap} t={t} onRequestManageAction={onRequestManageAction} />;
+}
+
+/** A row that carries the void button on its own, for where there is no
+ *  signing reminder to sit beside (the Signing tab, or a contract that is
+ *  only waiting for payment). */
+export function PreStartVoidStrip({ contractId, contractState, onRequestManageAction }: {
+  contractId: number;
+  contractState: string | null | undefined;
+  onRequestManageAction: (action: ManageAction) => void;
+}) {
+  const { t } = useTranslation();
+  const byCode = useContractActionRows(contractId);
+  if (!contractState || !PRE_START_STATES.has(contractState) || !byCode.has('VOID_CONTRACT')) return null;
+  return (
+    <div className="border border-line rounded-md px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+      <div className="min-w-0">
+        <div className="text-sm font-medium">{t('contract.preStartVoid.title')}</div>
+        <div className="text-xs text-subtle">{t('contract.preStartVoid.hint')}</div>
+      </div>
+      <PreStartVoidButton
+        contractId={contractId}
+        contractState={contractState}
+        t={t}
+        onRequestManageAction={onRequestManageAction}
+      />
+    </div>
+  );
+}
+
 function ManageContractSection({
   contractId,
   t,
@@ -764,15 +872,7 @@ function ManageContractSection({
   t: ReturnType<typeof useTranslation>['t'];
   onRequestManageAction: (action: ManageAction) => void;
 }) {
-  const { data: actionsResp } = useQuery({
-    queryKey: ['contract-actions', contractId],
-    queryFn: () => apiClient.rpc<{ actions: ManageActionRow[] }>('fn_contract_available_actions', {
-      p_contract_id: contractId,
-    }),
-    staleTime: 30 * 1000,
-  });
-
-  const byCode = new Map((actionsResp?.actions ?? []).map(a => [a.action_code, a]));
+  const byCode = useContractActionRows(contractId);
   // Only render actions the capability actually knows about for this contract
   // (e.g. RESUME only appears when paused). Hides the whole section if none apply.
   const rows = MANAGE_ACTION_MAP.filter(m => byCode.has(m.code));
@@ -785,37 +885,15 @@ function ManageContractSection({
         <h3 className="text-sm font-semibold">{t('contract.manageContract', { defaultValue: 'Manage contract' })}</h3>
       </div>
       <div className="flex flex-wrap gap-2">
-        {rows.map(({ code, action, icon: Icon, danger }) => {
-          const cap = byCode.get(code)!;
-          const label = t(code, { ns: 'contractActions', defaultValue: code });
-          // The shared resolver, so this tooltip says exactly what the footer's
-          // does — including the figure the backend sent, which we format but
-          // never compute.
-          const blockingText = !cap.is_available ? blockingReasonText(cap, t) : '';
-          const hint = !cap.is_available && typeof cap.blocking_params?.hint_code === 'string'
-            ? t(`contract.hint.${cap.blocking_params.hint_code}`, { defaultValue: '' })
-            : '';
-          const tipText = [blockingText, hint].filter(Boolean).join(' · ');
-          const btn = (
-            <Button
-              size="sm"
-              variant="outline"
-              color={danger ? 'danger' : undefined}
-              disabled={!cap.is_available}
-              startIcon={<Icon size={14} />}
-              onClick={() => onRequestManageAction(action)}
-            >
-              {label}
-            </Button>
-          );
-          return tipText ? (
-            <Tooltip key={code} content={tipText} placement="top">
-              <span className="inline-flex">{btn}</span>
-            </Tooltip>
-          ) : (
-            <span key={code} className="inline-flex">{btn}</span>
-          );
-        })}
+        {rows.map(row => (
+          <ManageActionButton
+            key={row.code}
+            row={row}
+            cap={byCode.get(row.code)!}
+            t={t}
+            onRequestManageAction={onRequestManageAction}
+          />
+        ))}
       </div>
     </div>
   );
@@ -921,16 +999,37 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
               </div>
             </div>
           </div>
-          <Button size="sm" color="primary" onClick={onNavigateSigning} className="shrink-0">
-            {t(isDealPartner ? 'contract.action_go_to_signing' : 'contract.goToSigning')}
-          </Button>
+          <div className="flex items-center gap-2 flex-wrap justify-end shrink-0">
+            <PreStartVoidButton
+              contractId={contract.id}
+              contractState={contract.state}
+              t={t}
+              onRequestManageAction={onRequestManageAction}
+            />
+            <Button size="sm" color="primary" onClick={onNavigateSigning} className="shrink-0">
+              {t(isDealPartner ? 'contract.action_go_to_signing' : 'contract.goToSigning')}
+            </Button>
+          </div>
         </div>
       </div>
   );
 
+  // Before the contract starts, signing (or voiding it) is the next step for
+  // staff too, so the reminder leads the tab for everyone; with nothing to
+  // sign, the void button leads it on its own row.
+  const preStart = PRE_START_STATES.has(contract.state);
+  const reminderOnTop = isDealPartner || preStart;
+
   return (
     <div className="p-4 flex flex-col gap-4">
-      {isDealPartner && signingReminder}
+      {reminderOnTop && signingReminder}
+      {preStart && !signingReminder && (
+        <PreStartVoidStrip
+          contractId={contract.id}
+          contractState={contract.state}
+          onRequestManageAction={onRequestManageAction}
+        />
+      )}
       {/* Deal-partner FIN1 credit request — renders nothing for every other
           shop/contract, and drops away once the contract goes active. */}
       <CreditSupportPhotosCard
@@ -985,7 +1084,7 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
 
       {/* Documents-need-signing reminder — live COLLECTING signing exists.
           (A shop gets it at the top of the tab instead — see signingReminder.) */}
-      {!isDealPartner && signingReminder}
+      {!reminderOnTop && signingReminder}
 
       {/* Bind device reminder — shown below signing; device can be bound even
           before signing/activation. */}

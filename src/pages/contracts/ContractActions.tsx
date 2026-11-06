@@ -1639,13 +1639,37 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
   const [errorReasons, setErrorReasons] = useState<string[]>([]);
   const [errorKey, setErrorKey] = useState(0);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
+  // The state the contract was in when the window opened. The page refetches
+  // the contract on success, so by the time the done view draws, contract.state
+  // is already the NEW state and the transition read "VOIDED → VOIDED".
+  const [stateAtOpen, setStateAtOpen] = useState<string>(contract.state);
   const config = action ? ACTION_CONFIGS[action] : null;
   const hasDoneView = !!action && DONE_VIEW_ACTIONS.has(action);
+
+  // Whether THIS user must type a PIN is the backend's per-user answer
+  // (`pin_required`, mig 600) — a company admin voids without one, a branch
+  // manager with one. Same query + cache as the footer. Until it answers, or
+  // for an action it doesn't list, fall back to the action's own rule.
+  const { data: actionsResp } = useQuery({
+    queryKey: ['contract-actions', contract.id],
+    queryFn: () => apiClient.rpc<ContractActionsResponse>('fn_contract_available_actions', {
+      p_contract_id: contract.id,
+    }),
+    staleTime: 30 * 1000,
+    enabled: open,
+  });
+  const backendRow = action
+    ? actionsResp?.actions.find(a => a.action_code === FE_TO_BACKEND_ACTION[action])
+    : undefined;
+  const [pinForced, setPinForced] = useState(false);
+  const pinNeeded = !!config?.needsPin && (pinForced || (backendRow?.pin_required ?? true));
 
   // Reset form on open
   useEffect(() => {
     if (open) {
       setView('form');
+      setStateAtOpen(contract.state);
+      setPinForced(false);
       setPin('');
       setNote('');
       setReason('');
@@ -1824,7 +1848,7 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
         p_contract_id: contract.id,
       };
 
-      if (config.needsPin && pin) params.p_pin = pin;
+      if (pinNeeded && pin) params.p_pin = pin;
       if (config.needsNote && note.trim()) params.p_note = note.trim();
       if (config.needsReason && reason.trim()) params.p_reason = reason.trim();
       if (config.needsCloseReason && closeReason) params.p_close_reason = closeReason;
@@ -1851,6 +1875,11 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
         setErrorCode(err.code ?? err.messageKey ?? null);
         setErrorParams(err.messageParams ?? null);
         setErrorReasons(bindDeniedReasons(err, t));
+        // TEMP (BE notice pending, 2026-11-06): for a deal-partner manager the
+        // capability says VOID_CONTRACT pin_required=false, yet fn_contract_void
+        // answers CORE.AUTH.PIN_REQUIRED — without this the window has no PIN
+        // field to fill. Drop once the capability's flag matches the RPC.
+        if (err.code === 'CORE.AUTH.PIN_REQUIRED' && config?.needsPin) setPinForced(true);
       } else {
         setError(String(err));
         setErrorCode(null);
@@ -1864,7 +1893,7 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
   // Validation
   const canSubmit = (() => {
     if (!config) return false;
-    if (config.needsPin && !pin) return false;
+    if (pinNeeded && !pin) return false;
     if (config.needsCloseReason && !closeReason) return false;
     if (config.needsBranch && !toBranchId) return false;
     if (config.needsDevice && !deviceId) return false;
@@ -1873,6 +1902,44 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
     // Holding refund is a negotiated payout — the reason must be recorded.
     if (action === 'settlement_refund' && !note.trim()) return false;
     return true;
+  })();
+
+  // The way out of a blocked action, shown in the error band.
+  const wayOutClass = 'text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer self-start';
+  const errorWayOut: ReactNode = (() => {
+    // Unbind blocked by a sealed BIND addendum → point the user at the
+    // Signing tab to void it first (BM + PIN).
+    if (errorCode === 'SALE.STATE.CANNOT_UNBIND_WITH_SEALED_BIND_ADDENDUM' && onNavigateTab) {
+      return (
+        <button type="button" onClick={() => { onClose(); onNavigateTab('signing'); }} className={wayOutClass}>
+          {t('contract.goToSigningTabToVoidAddendum', { defaultValue: 'Void the addendum in the Signing tab' })}
+          <ExternalLink size={12} />
+        </button>
+      );
+    }
+    // Unbind blocked by an open repair ticket (mig 1061). The BE answers 409 +
+    // repair_id/repair_code_display, so we can send the user straight to the
+    // ticket they have to close. Link keyed on repair_id — the display code
+    // isn't a lookup key. Not retryable: no "try again" button.
+    if (errorCode === 'SALE.STATE.DEVICE_IN_REPAIR' && errorParams?.repair_id != null) {
+      return (
+        <button type="button" onClick={() => { onClose(); navigate(`/admin/inventory/repairs/${errorParams.repair_id}`); }} className={wayOutClass}>
+          {t('contract.goToRepairTicket', { code: String(errorParams.repair_code_display ?? '') })}
+          <ExternalLink size={12} />
+        </button>
+      );
+    }
+    // Blocked while a device is still bound (holding refund, mig 711; void) →
+    // point the user at the Device tab to unbind it first.
+    if (errorCode === 'SALE.STATE.DEVICE_STILL_BOUND' && onNavigateTab) {
+      return (
+        <button type="button" onClick={() => { onClose(); onNavigateTab('device'); }} className={wayOutClass}>
+          {t('contract.goToDeviceTabToUnbind', { defaultValue: 'Unbind the device first' })}
+          <ExternalLink size={12} />
+        </button>
+      );
+    }
+    return null;
   })();
 
   return (
@@ -1888,7 +1955,7 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
               action={action}
               result={result}
               contractCode={contract.code_display ?? contract.code}
-              contractState={contract.state}
+              contractState={stateAtOpen}
               formCtx={{
                 toBranchName: branches?.find(b => b.id === Number(toBranchId))?.name,
                 fromBranchName: branches?.find(b => b.id === contract.branch_id)?.name,
@@ -1899,59 +1966,6 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
           )}
           {view === 'form' && <>
           <div className="modal-content">
-            {error && (
-              <div key={errorKey} className="alert alert-danger mb-4 animate-pop-in">
-                <XCircle size={16} />
-                <div className="flex flex-col gap-1">
-                  <span>{error}</span>
-                  {errorReasons.length > 0 && (
-                    <ul className="list-disc pl-4 text-sm">
-                      {errorReasons.map((r, i) => <li key={i}>{r}</li>)}
-                    </ul>
-                  )}
-                  {/* Unbind blocked by a sealed BIND addendum → point the user at
-                      the Signing tab to void it first (BM + PIN). */}
-                  {errorCode === 'SALE.STATE.CANNOT_UNBIND_WITH_SEALED_BIND_ADDENDUM' && onNavigateTab && (
-                    <button
-                      type="button"
-                      onClick={() => { onClose(); onNavigateTab('signing'); }}
-                      className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer self-start"
-                    >
-                      {t('contract.goToSigningTabToVoidAddendum', { defaultValue: 'Void the addendum in the Signing tab' })}
-                      <ExternalLink size={12} />
-                    </button>
-                  )}
-                  {/* Unbind blocked by an open repair ticket (mig 1061). The BE
-                      now answers 409 + repair_id/repair_code_display instead of a
-                      bare 500, so we can send the user straight to the ticket they
-                      have to close. Link keyed on repair_id — the display code
-                      isn't a lookup key. Not retryable: no "try again" button. */}
-                  {errorCode === 'SALE.STATE.DEVICE_IN_REPAIR' && errorParams?.repair_id != null && (
-                    <button
-                      type="button"
-                      onClick={() => { onClose(); navigate(`/admin/inventory/repairs/${errorParams.repair_id}`); }}
-                      className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer self-start"
-                    >
-                      {t('contract.goToRepairTicket', { code: String(errorParams.repair_code_display ?? '') })}
-                      <ExternalLink size={12} />
-                    </button>
-                  )}
-                  {/* Holding refund blocked while a device is still bound → point
-                      the user at the Device tab to unbind it first (mig 711). */}
-                  {errorCode === 'SALE.STATE.DEVICE_STILL_BOUND' && onNavigateTab && (
-                    <button
-                      type="button"
-                      onClick={() => { onClose(); onNavigateTab('device'); }}
-                      className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer self-start"
-                    >
-                      {t('contract.goToDeviceTabToUnbind', { defaultValue: 'Unbind the device first' })}
-                      <ExternalLink size={12} />
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
             {/* Contract info summary */}
             <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line flex items-start justify-between gap-3">
               <div className="shrink-0 whitespace-nowrap">
@@ -1975,6 +1989,23 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
                 </div>
               )}
             </div>
+
+            {/* What a void does — the first worry is the device (BE REQUEST
+                2026-11-06 ④). The device can't still be bound here: the backend
+                refuses the void until it's unbound. */}
+            {action === 'void' && (
+              <div className="alert alert-warning mb-4" data-testid="void-effects">
+                <AlertTriangle size={16} className="shrink-0" />
+                <div className="flex flex-col gap-1 min-w-0">
+                  <span className="font-medium">{t('contract.voidEffects.title')}</span>
+                  <ul className="list-disc pl-4 text-sm">
+                    <li>{t('contract.voidEffects.bill')}</li>
+                    <li>{t('contract.voidEffects.signing')}</li>
+                    <li>{t('contract.voidEffects.device')}</li>
+                  </ul>
+                </div>
+              </div>
+            )}
 
             <div className="form-grid">
               {config.needsCloseReason && (
@@ -2111,11 +2142,25 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
                 </div>
               )}
 
-              {config.needsPin && (
+              {pinNeeded && (
                 <BranchPinInput value={pin} onChange={setPin} required />
               )}
             </div>
           </div>
+          <ModalErrorBand
+            key={errorKey}
+            message={error}
+            action={(errorReasons.length > 0 || errorWayOut) ? (
+              <div className="flex flex-col gap-1">
+                {errorReasons.length > 0 && (
+                  <ul className="list-disc pl-4 text-sm">
+                    {errorReasons.map((r, i) => <li key={i}>{r}</li>)}
+                  </ul>
+                )}
+                {errorWayOut}
+              </div>
+            ) : undefined}
+          />
           <div className="modal-footer">
             <Button onClick={onClose}>{t('common.cancel')}</Button>
             <Button
@@ -2210,20 +2255,25 @@ function ContractActionDoneView({
       const reversedAmount = result.total_amount != null ? Number(result.total_amount) : null;
       const rows: ActionDoneDetailRow[] = [];
       if (creditNoteCode) {
-        rows.push({ label: t('contract.action_void_done_reversedBill', { defaultValue: 'Reversal note' }), value: creditNoteCode });
+        rows.push({ label: t('contract.action_void_done_reversedBill'), value: creditNoteCode });
       }
       if (reversedAmount != null) {
-        rows.push({ label: t('contract.action_void_done_reversedAmount', { defaultValue: 'Reversed amount' }), value: fmtCurrency(Math.abs(reversedAmount)), emphasis: true });
+        rows.push({ label: t('contract.action_void_done_reversedAmount'), value: fmtCurrency(Math.abs(reversedAmount)), emphasis: true });
       }
       if (result.reason) {
-        rows.push({ label: t('contract.action_void_done_closeReason', { defaultValue: 'Reason' }), value: String(result.reason) });
+        rows.push({ label: t('contract.action_void_done_closeReason'), value: String(result.reason) });
       }
+      const toState = String(result.contract_state ?? 'VOIDED');
       return (
         <ActionDoneView
-          headline={t('contract.action_void_done_headline', { defaultValue: 'Contract voided' })}
+          headline={t('contract.action_void_done_headline')}
           contractCode={contractCode}
           tone="danger"
-          stateTransition={{ from: contractState, to: String(result.contract_state ?? 'VOIDED'), toColor: 'danger' }}
+          stateTransition={{
+            from: t(`contract.state_${contractState}`, { defaultValue: contractState }),
+            to: t(`contract.state_${toState}`, { defaultValue: toState }),
+            toColor: 'danger',
+          }}
           detailRows={rows}
           billId={creditNoteId}
           onClose={onClose}

@@ -3282,10 +3282,14 @@
     "action_unbind_loaner": "ถอดเครื่องสำรอง",
     "action_unbind_loaner_success": "ถอดเครื่องสำรองสำเร็จ",
     "action_unbind_undo": "ยกเลิกการถอดเครื่อง",
-    "action_void": "Void",
+    "action_void": "ยกเลิกสัญญาผิดพลาด",
     "action_void_bill": "ยกเลิกบิล",
     "action_void_bill_success": "ยกเลิกบิลสำเร็จ — สัญญากลับเป็นร่าง",
-    "action_void_success": "Void สำเร็จ",
+    "action_void_success": "ยกเลิกสัญญาแล้ว",
+    "action_void_done_headline": "ยกเลิกสัญญาแล้ว",
+    "action_void_done_reversedBill": "ใบลดหนี้",
+    "action_void_done_reversedAmount": "ยอดที่คืน",
+    "action_void_done_closeReason": "เหตุผล",
     "activatedAt": "เปิดใช้เมื่อ",
     "addCoLessee": "เพิ่มผู้เช่าร่วม",
     "added_co_lessee": "เพิ่ม {{customer}} เป็นผู้เช่าร่วมแล้ว",
@@ -3546,6 +3550,16 @@
     "lateFee": "ค่าปรับ",
     "lateFeeAccruing": "กำลังคิดเพิ่ม",
     "manageContract": "จัดการสัญญา",
+    "preStartVoid": {
+      "title": "สัญญายังไม่เริ่ม",
+      "hint": "เปิดผิด หรือลูกค้าเปลี่ยนใจก่อนเริ่มสัญญา ยกเลิกทั้งฉบับได้ที่นี่"
+    },
+    "voidEffects": {
+      "title": "เมื่อยกเลิกแล้ว",
+      "bill": "บิลเปิดสัญญาถูกยกเลิก ถ้ารับเงินแล้วจะออกใบลดหนี้ให้",
+      "signing": "เอกสารเซ็นของสัญญานี้ถูกยกเลิกทั้งหมด",
+      "device": "เครื่องที่เลือกไว้ยังอยู่ในสต็อก เลือกเข้าสัญญาใหม่ได้ทันที"
+    },
     "media": "สื่อ",
     "moneySection_bills": "บิล",
     "moneySection_installments": "งวด",

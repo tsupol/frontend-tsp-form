@@ -12,7 +12,7 @@
   "APPLY_NEGOTIATION": "Apply negotiation",
   "REQUEST_NEGOTIATION": "Request negotiation",
   "OPEN_CONTRACT_BILL": "Open contract bill",
-  "VOID_CONTRACT": "Void contract (whole)",
+  "VOID_CONTRACT": "Void mistaken contract",
   "COMPLETE_CONTRACT": "Complete contract",
   "CANCEL_CONTRACT": "Cancel contract",
   "TERMINATE_CONTRACT": "Terminate contract",
