@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, type CSSProperties, type MouseEvent as RMouseEvent, type PointerEvent as RPointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PILE_ICON } from './simulationIcons';
-import { CHAT_COLOR, CHAT_LABEL, HQ_BACK_H, HQ_COLOR, HQ_RW, RW, ShopWorld, planOf, project, zoneLabels, type Hit, type HqMark, type PilePlace, type ShopRef } from './simulationWorld';
+import { CHAT_COLOR, CHAT_LABEL, HQ_BACK_H, HQ_COLOR, HQ_RW, RW, ShopWorld, planOf, project, zoneLabels, type Hit, type HqMark, type MoreMark, type PilePlace, type ShopRef, type StalePile } from './simulationWorld';
 import type { Chatter, Customer } from './useCustomers';
 import { ageText, baht, codeOf, compactBaht, stateColor, stateLabel, type SimBranch, type SimHq } from './simulationTypes';
 
@@ -43,10 +43,14 @@ interface SceneProps {
 }
 
 const hitKey = (h: Hit) => (h?.kind === 'customer' ? `a${h.id}` : h?.kind === 'pile' ? `p${h.branchId}:${h.key}`
-  : h?.kind === 'seat' ? `s${h.branchId}:${h.zone}:${h.x.toFixed(2)}:${h.z.toFixed(2)}` : null);
+  : h?.kind === 'seat' ? `s${h.branchId}:${h.zone}:${h.x.toFixed(2)}:${h.z.toFixed(2)}`
+  : h?.kind === 'stale' ? `t${h.branchId}:${h.station}` : null);
 
-export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function SimulationScene({ branches, customers, chatters, showChat, picked, focus, onPick, hq, companyName, pickedHq, onPickHq }, ref) {
+export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function SimulationScene({ branches, customers: all, chatters, showChat, picked, focus, onPick, hq, companyName, pickedHq, onPickHq }, ref) {
   const { t } = useTranslation();
+  // People are today's contracts; earlier days' are folders at their step (see world).
+  const customers = useMemo(() => all.filter(c => !c.stale), [all]);
+  const stale = useMemo(() => all.filter(c => c.stale).map(c => ({ branchId: c.branchId, station: c.station, age: c.age })), [all]);
   // The building's room count is part of the static scene: a new pool rebuilds it.
   const hqRooms = hq?.pools.length ?? 0;
   const idKey = `${branches.map(b => `${b.id}:${b.type}`).join(',')}|hq${hqRooms}`;
@@ -66,6 +70,8 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
   const [noGl, setNoGl] = useState(false);
   const [piles, setPiles] = useState<PilePlace[]>([]);
   const [marks, setMarks] = useState<HqMark[]>([]);
+  const [more, setMore] = useState<MoreMark[]>([]);
+  const [stalePiles, setStalePiles] = useState<StalePile[]>([]);
   const [size, setSize] = useState({ w: 1, h: 1 });
   const [view, setView] = useState({ k: 1, x: 0, y: 0 });
   const viewRef = useRef(view);
@@ -105,11 +111,13 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
 
   useEffect(() => {
     if (!ready || !world.current) return;
-    world.current.setLive({ branches, customers, picked, showChat, chatters, hq });
+    world.current.setLive({ branches, customers, picked, showChat, chatters, hq, stale });
     setPiles([...world.current.piles()]);
     setMarks([...world.current.hqMarks()]);
+    setMore([...world.current.moreMarks()]);
+    setStalePiles([...world.current.stalePiles()]);
     world.current.render();
-  }, [ready, branches, customers, picked, showChat, chatters, hq]);
+  }, [ready, branches, customers, picked, showChat, chatters, hq, stale]);
 
   useEffect(() => {
     if (!ready || !world.current || size.w <= 1) return;
@@ -306,6 +314,11 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
       color: zone === 'chat' ? CHAT_COLOR : '#5a7fb0',
       at: place(Number(x), 1.0, Number(z)),
     };
+  } else if (focus.key?.startsWith('t')) {
+    // A stack of files left from earlier days at one step.
+    const [bid, station] = focus.key.slice(1).split(':');
+    const p = stalePiles.find(x => x.branchId === Number(bid) && x.station === station);
+    if (p) note = { text: t('simulation.staleNote', { station: t(`simulation.station.${p.station}`), n: p.n, age: ageText(t, p.oldest) }), color: '#8a6d2b', at: place(p.x, p.y + 0.3, p.z) };
   } else if (focus.key?.startsWith('p')) {
     const p = piles.find(x => `p${x.branchId}:${x.key}` === focus.key);
     if (p) note = { text: `${t(`simulation.pile.${p.key}`)} ${baht(p.value)}`, color: p.color, at: place(p.x, p.h + 0.2, p.z) };
@@ -337,6 +350,16 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
         const at = place(pos[0], pos[1] + 0.05, pos[2]);
         return onScreen(at) ? <ChatBubble key={`c${c.id}`} n={c.unread} at={at} code={c.code} /> : null;
       })}
+      {/* Files left from earlier days: the count over each stack, at every zoom. */}
+      {stalePiles.map(p => {
+        const at = place(p.x, p.y + 0.25, p.z);
+        return onScreen(at) && focus.key !== `t${p.branchId}:${p.station}` ? <span key={`t${p.branchId}${p.station}`} className="sim__stale" style={at}>{t('simulation.staleChip', { n: p.n })}</span> : null;
+      })}
+      {/* More people than the line outside holds / more chatters than the corner shows. */}
+      {more.map(m => {
+        const at = place(m.x, m.y, m.z);
+        return onScreen(at) ? <span key={`m${m.branchId}${m.kind}`} className={`sim__more sim__more--${m.kind}`} style={at}>+{m.n}</span> : null;
+      })}
       {showIcons && piles.map(p => {
         const at = place(p.x, p.h + 0.3, p.z);
         const Icon = PILE_ICON[p.key];
@@ -350,6 +373,7 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
         const at = place(r.ox + RW * 0.3, 2.35, r.oz);
         const tagScale = Math.max(0.74, Math.min(1, view.k / 0.8));
         const n = customers.filter(c => c.branchId === b.id).length;
+        const staleN = stale.filter(c => c.branchId === b.id).length;
         const chatN = chatters.filter(c => c.branchId === b.id).length;
         return (
           <button key={r.id} type="button" className={`sim__tag${picked === b.id ? ' sim__tag--on' : ''}`} style={{ ...at, '--sim-tag-scale': tagScale } as CSSProperties}
@@ -357,6 +381,7 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
             <span className="sim__tag-row">
               <b>{b.name}</b>
               {n > 0 && <i className={`sim__count sim__count--${n >= 3 ? 'hi' : 'mid'}`}>{t('simulation.peopleCount', { n: n, count: n })}</i>}
+              {staleN > 0 && <i className="sim__count sim__count--stale">{t('simulation.staleChip', { n: staleN })}</i>}
               {chatN > 0 && <i className="sim__count sim__count--chat">{t('simulation.chatChip', { n: chatN })}</i>}
               {b.day_closed && <small className="sim__tag-sub">{t('simulation.dayClosed')}</small>}
             </span>

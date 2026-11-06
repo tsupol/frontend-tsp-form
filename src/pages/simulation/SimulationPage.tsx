@@ -272,7 +272,10 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
     setCollectOf(null);
   };
 
-  const inRoom = (id: number) => customers.filter(c => c.branchId === id);
+  // In the shop now = today's contracts; earlier days' are counted apart as files left.
+  const inRoom = (id: number) => customers.filter(c => c.branchId === id && !c.stale);
+  const staleIn = (id: number) => customers.filter(c => c.branchId === id && c.stale);
+  const staleTotal = customers.filter(c => c.stale).length;
   const sum = (f: (b: SimBranch) => number | null) => branches.reduce((s, b) => s + (f(b) ?? 0), 0);
   const openedRows = branches.flatMap(b => b.opened);
   // One car on the road per contract opened today (the scene draws the same count).
@@ -364,7 +367,9 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
               </button>
               {!panelClosed && <>
               <div className="sim__kpis">
-                <Kpi label={t('simulation.kpi.standing')} value={standing} unit={t('simulation.unit.people', { count: standing })} sub={standing > 0 ? t('simulation.kpi.longest', { age: ageText(t, longest) }) : undefined} />
+                <Kpi label={t('simulation.kpi.standing')} value={standing} unit={t('simulation.unit.people', { count: standing })}
+                  sub={standing > 0 ? t('simulation.kpi.longest', { age: ageText(t, longest) }) : undefined}
+                  sub2={staleTotal > 0 ? t('simulation.kpi.staleSub', { n: staleTotal }) : undefined} />
                 {canChat && (
                   <Kpi label={t('simulation.kpi.chat')} value={chat.length} unit={t('simulation.unit.people', { count: chat.length })}
                     sub={chat.length > 0 ? t('simulation.kpi.chatSub', { n: chatUnread, age: ageText(t, chatLongest), count: chatUnread }) : undefined} />
@@ -415,6 +420,7 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
                         <b><i className={`sim__rank${b.opened.length > 0 ? ' sim__rank--sold' : ''}`}>{rank}</i>{b.name}</b>
                         <em>
                           {t('simulation.contractCount', { n: b.opened.length, count: b.opened.length })} · {t('simulation.peopleCount', { n: n, count: n })}
+                          {staleIn(b.id).length > 0 && <i className="sim__chat-chip sim__stale-chip">{t('simulation.staleChip', { n: staleIn(b.id).length })}</i>}
                           {chatIn(b.id).length > 0 && <i className="sim__chat-chip">{t('simulation.chatChip', { n: chatIn(b.id).length })}</i>}
                         </em>
                       </span>
@@ -543,6 +549,13 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
                     {(a.product || a.asset) && <small className="sim__waiter-sub">{[a.product, a.asset].filter(Boolean).join(' · ')}</small>}
                   </div>
                 ))}
+                {staleIn(detail.id).length > 0 && <h4 className="sim__sub">{t('simulation.staleHeading', { n: staleIn(detail.id).length })}</h4>}
+                {staleIn(detail.id).map(a => (
+                  <div key={a.id} className="sim__waiter">
+                    <i style={{ background: stateColor(a.state) }} />{codeOf(a.code, a.months)} · {stateLabel(t, a.state)} · {ageText(t, a.age)}
+                    {(a.product || a.asset) && <small className="sim__waiter-sub">{[a.product, a.asset].filter(Boolean).join(' · ')}</small>}
+                  </div>
+                ))}
               </div>
             )}
 
@@ -570,6 +583,8 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
                 <span className="sim__legend-floor"><i style={{ background: HQ_COLOR.money }} />{t('simulation.legend.hqMoney')}</span>
                 <span className="sim__legend-floor">{t('simulation.legend.hqDesks')}</span>
               </>}
+              <span className="sim__legend-floor"><i style={{ background: '#e3d3a8' }} />{t('simulation.legend.stale')}</span>
+              <span className="sim__legend-floor">{t('simulation.legend.outside')}</span>
               <span className="sim__legend-icon" data-testid="sim-legend-cars"><CarFront size={13} />{t('simulation.legend.cars', { n: openedToday })}</span>
               {isFund && PILES.FINANCIER.map(p => (
                 <span key={p.key} className="sim__legend-icon"><PileIcon k={p.key} />{t(`simulation.legend.${p.key}`)}</span>

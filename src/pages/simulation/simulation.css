@@ -184,3 +184,9 @@ button.sim__tabs-toggle:hover, .sim__company-min:hover .sim__tabs-toggle { color
 .sim__sub { margin: 10px 0 2px; font-size: 12px; font-weight: 600; }
 @keyframes sim-bob { 0%, 100% { margin-top: 0; } 50% { margin-top: -4px; } }
 @media (prefers-reduced-motion: reduce) { .sim__hq-bubble { animation: none; } }
+/* Crowds: files left from earlier days, and the "+n" past what is drawn. */
+.sim__stale { position: absolute; transform: translate(-50%, -100%); pointer-events: none; white-space: nowrap; padding: 0 6px; border: 1.5px solid #b3943f; border-radius: 8px; background: #fff8e6; color: #7a5d16; font-size: 10.5px; font-weight: 700; line-height: 15px; }
+.sim__more { position: absolute; transform: translate(-50%, -100%); pointer-events: none; white-space: nowrap; min-width: 26px; padding: 1px 7px; border-radius: 10px; background: #1f2a33; color: #fff; font-size: 12px; font-weight: 700; text-align: center; }
+.sim__more--chat { background: #11707a; }
+.sim__count--stale { background: #fff1cc; color: #7a5d16; }
+.sim__stale-chip { background: #fff1cc; color: #7a5d16; }

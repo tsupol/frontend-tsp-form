@@ -235,6 +235,9 @@ export function monthStart(year: number, month: number, delta: number): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-01`;
 }
 
+/** `YYYY-MM-DD` of an instant in Thai time. */
+export const bangkokDay = (ms: number) => new Intl.DateTimeFormat('en-CA', { timeZone: BANGKOK, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
+
 export function bangkokClock(d: Date): string {
   return new Intl.DateTimeFormat('en-GB', { timeZone: BANGKOK, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(d);
 }

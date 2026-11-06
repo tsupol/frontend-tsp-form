@@ -10954,6 +10954,9 @@
   },
   "simulation": {
     "title": "Simulation",
+    "staleChip": "Left {{n}}",
+    "staleNote": "Left from earlier days · {{station}} {{n}} · oldest {{age}}",
+    "staleHeading": "Left from earlier days ({{n}})",
     "seat": {
       "wait": "Approval waiting seat · free",
       "waitTaken_one": "Approval waiting seat · free · {{n}} waiting now",
@@ -11068,6 +11071,7 @@
     },
     "kpi": {
       "standing": "Customers in shop now",
+      "staleSub": "{{n}} left from earlier days",
       "chat": "Chats awaiting reply",
       "chatSub_one": "{{n}} message · longest {{age}}",
       "chatSub_other": "{{n}} messages · longest {{age}}",
@@ -11124,6 +11128,8 @@
     },
     "legend": {
       "sold": "Shop that has sold",
+      "stale": "Folder stack at a desk = contracts left from earlier days, 1 folder = 1 contract",
+      "outside": "Queue outside = today's customers the shop can't hold",
       "hqFolder": "1 yellow folder = 1 document to check",
       "hqApproved": "Approved",
       "hqReturned": "Returned",

@@ -1,6 +1,6 @@
 import { useMemo, useRef } from 'react';
 import type { ChatSeat, SeatedCustomer, Station } from './simulationWorld';
-import type { SimulationData, SimWaiting } from './simulationTypes';
+import { bangkokDay, type SimulationData, type SimWaiting } from './simulationTypes';
 
 // Customers on screen are the contracts in `waiting`. Each one keeps their seat between
 // answers while their station stays the same, so the picture does not reshuffle every 15 s.
@@ -21,6 +21,8 @@ export interface Customer extends SeatedCustomer {
   /** Model on the contract and AT- of its device; "" when there is none yet. */
   product: string;
   asset: string;
+  /** Created before today (Thai time): a file left at its step, drawn as a folder, not a person. */
+  stale: boolean;
 }
 
 export function useCustomers(data: SimulationData | null): Customer[] {
@@ -32,20 +34,29 @@ export function useCustomers(data: SimulationData | null): Customer[] {
     if (companyId.current !== data.company_id) seats.current.clear();
     companyId.current = data.company_id;
 
-    const live = new Set(data.waiting.map((w: SimWaiting) => w.id));
+    // Today = the data's own day (generated_at), never the device clock. A contract's
+    // creation is generated_at − age_min.
+    const genAt = new Date(data.generated_at).getTime();
+    const today = bangkokDay(genAt);
+    const isStale = (w: SimWaiting) => bangkokDay(genAt - w.age_min * 60_000) !== today;
+    const live = new Set(data.waiting.filter(w => !isStale(w)).map((w: SimWaiting) => w.id));
     seats.current.forEach((_, id) => { if (!live.has(id)) seats.current.delete(id); });
 
     const stationOf = (w: SimWaiting): Station => STATION_OF[w.state] ?? 'wait';
     const key = (branchId: number, station: Station, spot: number) => `${branchId}:${station}:${spot}`;
     const taken = new Set<string>();
     // Everyone who stays put claims their seat first; only then do the others look for a free one.
-    data.waiting.forEach(w => {
+    const todays = data.waiting.filter(w => !isStale(w));
+    todays.forEach(w => {
       const had = seats.current.get(w.id);
       if (had && had.station === stationOf(w)) taken.add(key(w.branch_id, had.station, had.spot));
       else seats.current.delete(w.id);
     });
     return data.waiting.map(w => {
       const station = stationOf(w);
+      if (isStale(w)) {
+        return { id: w.id, branchId: w.branch_id, code: w.code, state: w.state, age: w.age_min, months: w.months, product: w.product ?? '', asset: w.asset ?? '', station, spot: -1, stale: true };
+      }
       let seat = seats.current.get(w.id);
       if (!seat) {
         let spot = 0;
@@ -56,7 +67,7 @@ export function useCustomers(data: SimulationData | null): Customer[] {
       }
       return {
         id: w.id, branchId: w.branch_id, code: w.code, state: w.state, age: w.age_min, months: w.months,
-        product: w.product ?? '', asset: w.asset ?? '', station, spot: seat.spot,
+        product: w.product ?? '', asset: w.asset ?? '', station, spot: seat.spot, stale: false,
       };
     });
   }, [data]);

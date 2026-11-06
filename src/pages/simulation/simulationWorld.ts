@@ -118,8 +118,32 @@ export const zoneLabels = (type: BranchType, _chat = false): [Station, number, n
   ['desk', type === 'DEAL_PARTNER' ? 2.2 : 4, 1.15, 0.24], ['wait', 3.0, 0.12, 4.1], ['sign', 8.5, 0.12, 6.75], ['pay', 9, 1.15, 0.24],
 ];
 
+const zoneLimit = (type: BranchType, st: Station) => (type === 'DEAL_PARTNER' && st === 'desk' ? PARTNER_DESKS : SPOTS[st].length);
+const STATION_ORDER: Station[] = ['desk', 'wait', 'sign', 'pay'];
+
+// Today's customers past a station's own seats AND queue: out of the door, a line along the
+// shop front facing in, like a shop with a queue outside — a crowd you see from afar.
+// Two lines from the door leftwards; past those, a "+n" at the end of the line.
+const OUTSIDE: [number, number][] = [RD + 0.65, RD + 1.3].flatMap(z => Array.from({ length: 13 }, (_, i): [number, number] => [8.0 - i * 0.62, z]));
+
+// Contracts created before today are not people in the shop: they are files left at their
+// step — a stack of folders, one per contract, with the count over it.
+const STALE_AT: Record<Station, { x: number; z: number; w: number; d: number; base: number }> = {
+  desk: { x: 0.4, z: 2.5, w: 0.5, d: 0.6, base: 0 }, // floor, left of the desk queue
+  wait: { x: 0.4, z: 3.75, w: 0.5, d: 0.6, base: 0 }, // floor, in front of the approval block
+  sign: { x: 8.25, z: 4.75, w: 0.5, d: 0.5, base: 0.68 }, // on the signing table
+  pay: { x: 9.4, z: 1.1, w: 0.45, d: 0.45, base: 0.85 }, // on the cashier's desk
+};
+const STALE_CAP = 20;
+
+/** A contract created before today, at its step (§ crowd: files, not people). */
+export interface StaleRow { branchId: number; station: Station; age: number }
+export interface StalePile { branchId: number; station: Station; n: number; oldest: number; x: number; y: number; z: number }
+/** Where a "+n" goes: people past the outside line, or chatters past the chat corner. */
+export interface MoreMark { branchId: number; kind: 'outside' | 'chat'; n: number; x: number; y: number; z: number }
+
 function spotOf(type: BranchType, st: Station, i: number): Spot {
-  const limit = type === 'DEAL_PARTNER' && st === 'desk' ? PARTNER_DESKS : SPOTS[st].length;
+  const limit = zoneLimit(type, st);
   if (i < limit) return SPOTS[st][i];
   const k = i - limit;
   const q = QUEUE[st];
@@ -149,6 +173,8 @@ const CHAT_PATCH = { x: 0.55, z: RD - 1.95, w: 5.1, d: 1.65 };
 export const CHAT_COLOR = '#1fa3ad';
 const CHAT_SEAT = { seat: '#5cc6cb', base: '#3aa3a9', floor: '#d3f0f1' };
 const CHAT_ALWAYS = CHAT_SEATS.length;
+/** Chatters drawn: the row and the line behind it; the rest are a "+n" on the corner. */
+const CHAT_DRAWN = CHAT_SEATS.length + CHAT_OVERFLOW.length;
 
 function chatSpotOf(i: number): Spot {
   if (i < CHAT_SEATS.length) return CHAT_SEATS[i];
@@ -319,7 +345,7 @@ function tileTexture(line: string, base: string, cells: number) {
 /** An empty chair someone could sit in — pointing at it says which zone it belongs to. */
 export interface EmptySeat { branchId: number; zone: 'wait' | 'chat'; x: number; z: number }
 
-export type Hit = { kind: 'customer'; id: number } | { kind: 'pile'; branchId: number; key: PileKey } | { kind: 'room'; id: number } | { kind: 'hq'; index: number } | ({ kind: 'seat' } & EmptySeat) | null;
+export type Hit = { kind: 'customer'; id: number } | { kind: 'pile'; branchId: number; key: PileKey } | { kind: 'room'; id: number } | { kind: 'hq'; index: number } | ({ kind: 'seat' } & EmptySeat) | { kind: 'stale'; branchId: number; station: Station } | null;
 
 export interface PilePlace { branchId: number; key: PileKey; x: number; z: number; h: number; value: number; color: string }
 
@@ -334,6 +360,8 @@ export interface LiveState {
   chatters?: ChatSeat[];
   /** can_see_hq's building contents; null/absent = nothing in the rooms. */
   hq?: SimHq | null;
+  /** Contracts created before today: folder stacks at their step, not people. */
+  stale?: StaleRow[];
 }
 
 /** A number or word the page prints over the building (Thai stays sharp as HTML). */
@@ -373,6 +401,11 @@ export class ShopWorld {
   private customerIds: number[] = [];
   private hqMarkList: HqMark[] = [];
   private emptySeats: EmptySeat[] = [];
+  private posById = new Map<number, [number, number, number]>();
+  private moreList: MoreMark[] = [];
+  private staleList: StalePile[] = [];
+  private staleMesh: InstancedMesh | null = null;
+  private staleOwner: number[] = [];
   private seatPlane = new Plane(new Vector3(0, 1, 0), -(LOT_Y + SLAB + 0.42));
   private pileList: PilePlace[] = [];
   private ray = new Raycaster();
@@ -784,7 +817,7 @@ export class ShopWorld {
   }
 
   /** Called when an answer arrives or the selection changes. */
-  setLive({ branches, customers, picked, showChat = false, chatters = [], hq = null }: LiveState) {
+  setLive({ branches, customers, picked, showChat = false, chatters = [], hq = null, stale = [] }: LiveState) {
     this.setCarCount(branches.reduce((s, b) => s + b.opened.length, 0));
     this.live.children.forEach(ch => (ch as InstancedMesh).dispose?.());
     this.live.clear();
@@ -824,11 +857,29 @@ export class ShopWorld {
     const heads = new Batch(UNIT_BALL, this.lambert);
     const hair = new Batch(UNIT_BALL, this.lambert);
     this.customerIds = [];
+    this.posById = new Map();
+    this.moreList = [];
     const chairs = new Batch(UNIT_BOX, this.lambert);
-    customers.forEach((c, i) => {
+    // Station by station, so the outside line fills in the order a contract moves.
+    const ordered = [...customers].sort((a, b) => a.branchId - b.branchId
+      || STATION_ORDER.indexOf(a.station) - STATION_ORDER.indexOf(b.station) || a.spot - b.spot);
+    const outsideNext = new Map<number, number>();
+    const outsideMore = new Map<number, number>();
+    ordered.forEach((c, i) => {
       const r = byId.get(c.branchId);
       if (!r) return;
-      const s = spotOf(r.type, c.station, c.spot);
+      let s: Spot;
+      if (c.spot < zoneLimit(r.type, c.station) + QUEUE[c.station].length) {
+        s = spotOf(r.type, c.station, c.spot);
+      } else {
+        const k = outsideNext.get(r.id) ?? 0;
+        outsideNext.set(r.id, k + 1);
+        if (k >= OUTSIDE.length) {
+          outsideMore.set(r.id, (outsideMore.get(r.id) ?? 0) + 1);
+          return;
+        }
+        s = { x: OUTSIDE[k][0], z: OUTSIDE[k][1], seated: false, face: 'back' };
+      }
       // Approval seats exist only while taken (the counters' chairs are furniture, drawn always).
       if (c.station === 'wait' && s.seated && c.spot >= waitAlways(r.type)) this.seat(chairs, r.ox + s.x, r.oz + s.z, s.face);
       const base = s.seated ? y + 0.42 : y;
@@ -840,6 +891,11 @@ export class ShopWorld {
       heads.add(x, headY, z, HEAD_R, HEAD_R, HEAD_R, pick(C.skin, c.id + i));
       hair.add(x, headY + HEAD_R * 0.3, z - 0.015, HEAD_R * 1.05, HEAD_R * 0.85, HEAD_R * 1.05, pick(C.hair, c.id * 3 + 1));
       this.customerIds.push(c.id);
+      this.posById.set(c.id, [x, headY + HEAD_R * 1.1, r.oz + s.z]);
+    });
+    outsideMore.forEach((n, id) => {
+      const r = byId.get(id);
+      if (r) this.moreList.push({ branchId: id, kind: 'outside', n, x: r.ox + 0.25, y: 1.3, z: r.oz + RD + 1.0 });
     });
 
     // Chat corner (§6g): not counted as standing and doesn't colour the floor.
@@ -849,9 +905,14 @@ export class ShopWorld {
         box(corner, r.ox + CHAT_PATCH.x, y, r.oz + CHAT_PATCH.z, CHAT_PATCH.w, 0.015, CHAT_PATCH.d, CHAT_SEAT.floor);
         for (const s of CHAT_SEATS.slice(0, CHAT_ALWAYS)) this.seat(corner, r.ox + s.x, r.oz + s.z, s.face, CHAT_SEAT.seat, CHAT_SEAT.base);
       });
+      const chatMore = new Map<number, number>();
       chatters.forEach((c, i) => {
         const r = byId.get(c.branchId);
         if (!r) return;
+        if (c.spot >= CHAT_DRAWN) {
+          chatMore.set(r.id, (chatMore.get(r.id) ?? 0) + 1);
+          return;
+        }
         const s = chatSpotOf(c.spot);
         if (s.seated && c.spot >= CHAT_ALWAYS) this.seat(corner, r.ox + s.x, r.oz + s.z, s.face, CHAT_SEAT.seat, CHAT_SEAT.base);
         const base = s.seated ? y + 0.42 : y;
@@ -867,7 +928,38 @@ export class ShopWorld {
         this.customerIds.push(-c.id);
       });
       if (corner.size) corner.build(this.live);
+      chatMore.forEach((n, id) => {
+        const r = byId.get(id);
+        if (r) this.moreList.push({ branchId: id, kind: 'chat', n, x: r.ox + CHAT_PATCH.x + CHAT_PATCH.w + 0.35, y: 1.3, z: r.oz + RD - 1.15 });
+      });
     }
+
+    // Contracts left from earlier days: a stack of folders at their step (one per contract).
+    this.staleList = [];
+    this.staleOwner = [];
+    const staleBatch = new Batch(UNIT_BOX, this.lambert);
+    const groups = new Map<string, StaleRow[]>();
+    stale.forEach(s => {
+      const key = `${s.branchId}:${s.station}`;
+      groups.set(key, [...(groups.get(key) ?? []), s]);
+    });
+    groups.forEach(rows => {
+      const r = byId.get(rows[0].branchId);
+      if (!r) return;
+      const at = STALE_AT[rows[0].station];
+      const base = y + at.base;
+      const k = Math.min(rows.length, STALE_CAP);
+      const owner = this.staleList.length;
+      for (let i = 0; i < k; i++) {
+        box(staleBatch, r.ox + at.x, base + i * FOLDER_H, r.oz + at.z, at.w, FOLDER_H * 0.82, at.d, i % 2 ? '#e3d3a8' : '#cdb98a');
+        this.staleOwner.push(owner);
+      }
+      this.staleList.push({
+        branchId: r.id, station: rows[0].station, n: rows.length, oldest: Math.max(...rows.map(x => x.age)),
+        x: r.ox + at.x + at.w / 2, y: base + k * FOLDER_H, z: r.oz + at.z + at.d / 2,
+      });
+    });
+    this.staleMesh = staleBatch.size ? staleBatch.build(this.live) : null;
     if (chairs.size) chairs.build(this.live);
     this.bodies = bodies.size ? bodies.build(this.live) : null;
     this.heads = heads.size ? heads.build(this.live) : null;
@@ -914,6 +1006,8 @@ export class ShopWorld {
   }
 
   hqMarks() { return this.hqMarkList; }
+  moreMarks() { return this.moreList; }
+  stalePiles() { return this.staleList; }
 
   // What sits in each pool's room (156 par. 6h). Counted things are the real numbers: a desk per
   // member, someone at it for each who acted today, a folder per document, a bubble per
@@ -1006,16 +1100,15 @@ export class ShopWorld {
 
   /** Head-top position of a customer, for a label. */
   customerAt(c: SeatedCustomer): [number, number, number] | null {
-    const r = this.plan.rooms.find(p => p.id === c.branchId);
-    if (!r) return null;
-    const s = spotOf(r.type, c.station, c.spot);
-    return [r.ox + s.x, 0.11 + (s.seated ? 0.42 + SIT_H : STAND_H) + HEAD_R * 2, r.oz + s.z];
+    // Where setLive actually put them — inside, in the queue, or out of the door; null = in a "+n".
+    return this.posById.get(c.id) ?? null;
   }
 
   /** Head-top position of someone in the chat corner, for the unread bubble. */
   chatAt(c: ChatSeat): [number, number, number] | null {
     const r = this.plan.rooms.find(p => p.id === c.branchId);
     if (!r) return null;
+    if (c.spot >= CHAT_DRAWN) return null;
     const s = chatSpotOf(c.spot);
     return [r.ox + s.x, 0.11 + (s.seated ? 0.42 + SIT_H : STAND_H) + HEAD_R * 2, r.oz + s.z];
   }
@@ -1054,6 +1147,10 @@ export class ShopWorld {
     test(this.bodies, customer);
     test(this.heads, customer);
     test(this.pileMesh, i => ({ kind: 'pile', branchId: this.pileList[i].branchId, key: this.pileList[i].key }));
+    test(this.staleMesh, i => {
+      const p = this.staleList[this.staleOwner[i]];
+      return { kind: 'stale', branchId: p.branchId, station: p.station };
+    });
     if (best) return (best as { hit: Hit }).hit;
     // An empty chair: test at seat height, where the eye sees it, not on the floor below.
     const sp = this.ray.ray.intersectPlane(this.seatPlane, new Vector3());
