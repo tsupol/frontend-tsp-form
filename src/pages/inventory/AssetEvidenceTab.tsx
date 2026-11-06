@@ -9,6 +9,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { QRCodeSVG } from 'qrcode.react';
 import { XCircle, Plus, Smartphone, ImageOff, MoreHorizontal, Star, FolderInput, RefreshCw, Trash2, X, GripVertical } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { capturePollInterval } from '../../lib/capturePoll';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMediaUrl } from '../../hooks/useMediaUrl';
 import {
@@ -121,13 +122,7 @@ export function AssetEvidenceTab({ assetId, assetCode, embedded = false }: {
       `/v_asset_evidence?asset_id=eq.${assetId}&order=slot_order`,
     ),
     staleTime: 30 * 1000,
-    refetchInterval: () => {
-      if (captureSince == null) return false;
-      const elapsed = Date.now() - captureSince;
-      if (elapsed < 2 * 60 * 1000) return 3_000;
-      if (elapsed < 5 * 60 * 1000) return 15_000;
-      return false;
-    },
+    refetchInterval: () => capturePollInterval(captureSince),
     refetchIntervalInBackground: false,
   });
 

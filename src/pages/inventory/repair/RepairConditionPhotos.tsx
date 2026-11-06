@@ -6,6 +6,7 @@ import type { UploadedImage } from 'tsp-form';
 import { QRCodeSVG } from 'qrcode.react';
 import { XCircle, Plus, X, Smartphone, ImageOff, AlertTriangle } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
+import { capturePollInterval } from '../../../lib/capturePoll';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useMediaUrl } from '../../../hooks/useMediaUrl';
 import { mimeFromKey } from '../../../lib/upload';
@@ -113,13 +114,7 @@ export function RepairConditionPhotos({
     staleTime: 30 * 1000,
     // fast-then-quiet: 3s for the first 2 min after a capture window opens,
     // 15s until 5 min, then stop.
-    refetchInterval: () => {
-      if (captureSince == null) return false;
-      const elapsed = Date.now() - captureSince;
-      if (elapsed < 2 * 60 * 1000) return 3_000;
-      if (elapsed < 5 * 60 * 1000) return 15_000;
-      return false;
-    },
+    refetchInterval: () => capturePollInterval(captureSince),
     refetchIntervalInBackground: false,
   });
 

@@ -168,6 +168,39 @@ the index addresses a different photo than the one clicked.
 on touch): repair condition photos, buyback wizard photos, contract attachments
 (two strips).
 
+### QR phone capture (Mobile Capture Bridge)
+
+A phone uploads into an album by scanning a QR (or opening a link) — no login.
+Use `useMobileCaptureSession` (`src/pages/contracts/workspace/`); never mint the
+session by hand.
+
+- **The session outlives the window.** Put the hook in the component that stays
+  on the page, not inside the Modal. Closing the window must not cancel the
+  session or stop the album from updating.
+- **The album must keep updating after the window closes** — there is no push
+  channel; the phone's photos land server-side. Poll from the moment the QR
+  window opens, fast then fading — `capturePollInterval(openedAt, tail)` in
+  `src/lib/capturePoll.ts`, the one copy of this rule:
+
+  | since the window opened | poll |
+  |---|---|
+  | 0–2 min | every 3 s |
+  | 2–5 min | every 15 s |
+  | after 5 min | stop (staff's own phone) · every 60 s until the link ends (customer link — they open it hours later) |
+
+  Reopening the window restarts the clock. Nothing polls while the browser tab
+  is hidden. Two ways to wire it: a React Query album →
+  `refetchInterval: () => capturePollInterval(captureSince)` +
+  `refetchIntervalInBackground: false` (`AssetEvidenceTab`, `SellOutPhotos`,
+  `RepairConditionPhotos`); the hook itself → `pollSince: openedAt`
+  (+ `pollTail`) and refresh the album when `uploadCount` changes
+  (`ContractAttachments`, `CustomerCaptureLink`). Without `pollSince` the hook
+  polls every 3 s while the session is active — only for a QR that lives and
+  dies inside its modal (the modal calls `stop()` on close).
+- Shipped wrong 2026-11-06: the customer link polled only while its window was
+  open, so a photo sent after closing never showed until reload; the contract
+  album's QR polled every 3 s for the session's whole hour.
+
 ### HEIC input
 
 `isHeicFile` / `isImageFile` / `convertHeicToJpeg` live in `src/lib/beMedia.ts`.

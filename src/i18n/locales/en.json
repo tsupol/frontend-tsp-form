@@ -3917,6 +3917,22 @@
     "timeline": "What happened",
     "toBranch": "to shop"
   },
+  "customerCapture": {
+    "button": "Send link for customer photos",
+    "title": "Send link for customer photos",
+    "target": "Photos go to the \"Taken by customer\" group",
+    "copyLink": "Copy link",
+    "copyWithMessage": "Copy link with message",
+    "expires": "Link expires",
+    "received": "Photos received",
+    "receivedCount": "{{count}} / {{max}}",
+    "messageLabel": "Message copied with the link",
+    "message": "Tap this link to take a photo to confirm it's you. When your phone asks to \"Allow location\", tap Allow · If it won't open from LINE, open the link in Chrome/Safari",
+    "hint": "The customer opens the link on their own phone, no login. Location is required and the photo is taken live with the front camera. Closing this window keeps the link working.",
+    "endedFull": "This link has received its {{max}} photos and no longer works.",
+    "endedExpired": "This link has expired or was cancelled and no longer works.",
+    "newLink": "Create a new link"
+  },
   "contractPhotos": {
     "title": "Contract photos",
     "addPhoto": "Add",

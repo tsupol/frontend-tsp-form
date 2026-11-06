@@ -52,6 +52,9 @@ export function useContractPhotoStatus(contractId: number) {
   return useQuery({
     queryKey: statusKey(contractId),
     queryFn: () => apiClient.rpc<PhotoStatus>('fn_contract_photo_status', { p_contract_id: contractId }),
+    // 0 = "not applicable" (CreditSupportPhotosCard on a non-shop contract) —
+    // without this every contract overview fired a 400 CONTRACT_NOT_FOUND.
+    enabled: contractId > 0,
     staleTime: 15 * 1000,
   });
 }

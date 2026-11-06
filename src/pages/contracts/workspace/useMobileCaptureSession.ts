@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiClient, ApiError } from '../../../lib/api';
+import { capturePollInterval } from '../../../lib/capturePoll';
 
 /**
  * Mobile Capture Bridge — Device-A (staff) session controller.
@@ -75,8 +76,23 @@ export interface MobileCaptureSession {
 export interface CaptureSessionOptions {
   /** Bridge entity_type to mint. Defaults to CONTRACT_ATTACHMENT. */
   entityType?: string;
-  /** Extra meta merged into the session request. */
+  /** Extra meta merged into the session request. Pass a stable object. */
   meta?: Record<string, unknown>;
+  /** Session lifetime in minutes (backend max 1440). null = backend default. */
+  ttlMinutes?: number | null;
+  /** Photo cap for the session (backend max 50). null = backend default. */
+  maxUploads?: number | null;
+  /** p_note override. Defaults to "Contract <code>". */
+  note?: string | null;
+  /**
+   * Fast-then-fading polling (`capturePollInterval`), for a session that lives
+   * on the page after its window closes. Pass the time the QR window last
+   * opened (null before it ever opened). Omit = a fixed 3 s while active —
+   * right for a QR that only exists inside an open modal.
+   */
+  pollSince?: number | null;
+  /** What fading polling settles to after 5 min: false = stop, or a ms rate. */
+  pollTail?: number | false;
 }
 
 export function useMobileCaptureSession(
@@ -86,6 +102,12 @@ export function useMobileCaptureSession(
 ): MobileCaptureSession {
   const entityType = options?.entityType ?? 'CONTRACT_ATTACHMENT';
   const extraMeta = options?.meta;
+  const ttlMinutes = options?.ttlMinutes ?? null;
+  const maxUploads = options?.maxUploads ?? null;
+  const note = options?.note;
+  const adaptive = options?.pollSince !== undefined;
+  const pollSince = options?.pollSince ?? null;
+  const pollTail = options?.pollTail ?? false;
   const [phase, setPhase] = useState<Phase>('idle');
   const [session, setSession] = useState<RequestSessionData | null>(null);
   const [status, setStatus] = useState<StatusData | null>(null);
@@ -94,11 +116,11 @@ export function useMobileCaptureSession(
   // Hold the active session id in a ref so the unmount cleanup can cancel it
   // without re-subscribing the effect on every render.
   const sessionIdRef = useRef<number | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const stopPolling = useCallback(() => {
     if (pollRef.current) {
-      clearInterval(pollRef.current);
+      clearTimeout(pollRef.current);
       pollRef.current = null;
     }
   }, []);
@@ -119,10 +141,10 @@ export function useMobileCaptureSession(
       .rpc<RequestSessionData>('fn_mobile_capture_request_session', {
         p_entity_type: entityType,
         p_entity_id: contractId,
-        p_ttl_minutes: null,
-        p_max_uploads: null,
+        p_ttl_minutes: ttlMinutes,
+        p_max_uploads: maxUploads,
         p_meta: { source: 'contract-wizard-documents', ...extraMeta },
-        p_note: contractCode ? `Contract ${contractCode}` : null,
+        p_note: note !== undefined ? note : (contractCode ? `Contract ${contractCode}` : null),
       })
       .then((data) => {
         sessionIdRef.current = data.session_id;
@@ -133,34 +155,52 @@ export function useMobileCaptureSession(
         setError(messageOf(err));
         setPhase('error');
       });
-  }, [contractId, contractCode, phase, entityType, extraMeta]);
+  }, [contractId, contractCode, phase, entityType, extraMeta, ttlMinutes, maxUploads, note]);
 
-  // Poll while active.
+  // Poll while active. Each tick schedules the next one, so a fading rate is
+  // re-read as time passes. Nothing runs while the browser tab is hidden; on
+  // return it checks at once and carries on (even after fading has stopped).
   useEffect(() => {
     if (phase !== 'active' || !session) return;
     let cancelled = false;
-    const poll = () => {
+    const nextDelay = (): number | false =>
+      adaptive ? capturePollInterval(pollSince, pollTail) : POLL_INTERVAL_MS;
+    const schedule = () => {
+      if (cancelled || document.hidden) return;
+      const delay = nextDelay();
+      if (delay === false) return;
+      pollRef.current = setTimeout(tick, delay);
+    };
+    const tick = () => {
+      pollRef.current = null;
       apiClient
         .rpc<StatusData>('fn_mobile_capture_session_status', { p_session_id: session.session_id })
         .then((data) => {
           if (cancelled) return;
           setStatus(data);
           if (data.status !== 'ACTIVE') {
-            stopPolling();
             setPhase('done');
+            return;
           }
+          schedule();
         })
         .catch(() => {
           // Transient poll failure — keep the last known state and retry next tick.
+          schedule();
         });
     };
-    poll();
-    pollRef.current = setInterval(poll, POLL_INTERVAL_MS);
+    const onVisibility = () => {
+      stopPolling();
+      if (!document.hidden) tick();
+    };
+    tick();
+    document.addEventListener('visibilitychange', onVisibility);
     return () => {
       cancelled = true;
       stopPolling();
+      document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [phase, session, stopPolling]);
+  }, [phase, session, stopPolling, adaptive, pollSince, pollTail]);
 
   // Local-only teardown: forget the session client-side, leave it running on
   // the backend (TTL-expired). Does NOT clear sessionIdRef so a later cancel()

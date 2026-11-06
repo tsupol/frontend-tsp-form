@@ -31,6 +31,7 @@ import { normalizeKey } from '../../lib/mediaPath';
 import { MediaLightboxKeyGallery } from '../../components/MediaLightbox';
 import { useMobileCaptureSession, type MobileCaptureSession } from './workspace/useMobileCaptureSession';
 import { ContractPhotoGroups, ChecklistSummary } from './ContractPhotoGroups';
+import { CustomerCaptureLinkButton } from './CustomerCaptureLink';
 import {
   useContractPhotoStatus, useContractAlbumPhotos, photosKey, statusKey, isCreditPhotoSlot, CREDIT_PHOTO_SLOTS,
   type ContractPhoto, type PhotoStatusSlot,
@@ -106,8 +107,12 @@ export function ContractAttachments({
   // Phone capture lives here, not in the window: closing the window must not
   // end it. One QR per visit — reopening shows the same code until the session
   // expires or is used up, and photos the phone sends meanwhile still land.
-  const capture = useMobileCaptureSession(contractId, contractCode);
+  // Polls fast then fading from each opening and stops after 5 min
+  // (lib/capturePoll) — it used to poll every 3 s until the session expired.
+  const [manageOpenedAt, setManageOpenedAt] = useState<number | null>(null);
+  const capture = useMobileCaptureSession(contractId, contractCode, { pollSince: manageOpenedAt });
   useEffect(() => {
+    if (manageOpen) setManageOpenedAt(Date.now());
     if (manageOpen && (capture.phase === 'idle' || capture.phase === 'done' || capture.phase === 'error')) capture.start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [manageOpen]);
@@ -146,15 +151,18 @@ export function ContractAttachments({
             )
           )}
         </h3>
-        <Button
-          variant="outline"
-          size="sm"
-          className="shrink-0 whitespace-nowrap"
-          startIcon={<Plus size={14} />}
-          onClick={() => setManageOpen(true)}
-        >
-          {t('contract.attachmentsManage', { defaultValue: 'Add / manage' })}
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          <CustomerCaptureLinkButton contractId={contractId} contractCode={contractCode} onUploaded={refresh} />
+          <Button
+            variant="outline"
+            size="sm"
+            className="shrink-0 whitespace-nowrap"
+            startIcon={<Plus size={14} />}
+            onClick={() => setManageOpen(true)}
+          >
+            {t('contract.attachmentsManage', { defaultValue: 'Add / manage' })}
+          </Button>
+        </div>
       </div>
 
       {draft && draftNote && (
