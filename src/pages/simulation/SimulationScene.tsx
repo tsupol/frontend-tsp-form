@@ -1,9 +1,9 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, type CSSProperties, type MouseEvent as RMouseEvent, type PointerEvent as RPointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PILE_ICON } from './simulationIcons';
-import { RW, ShopWorld, planOf, project, zoneLabels, type Hit, type PilePlace, type ShopRef } from './simulationWorld';
-import type { Customer } from './useCustomers';
-import { ageText, baht, codeOf, stateColor, stateLabel, type SimBranch } from './simulationTypes';
+import { CHAT_COLOR, CHAT_LABEL, HQ_BACK_H, HQ_COLOR, HQ_RW, RW, ShopWorld, planOf, project, zoneLabels, type Hit, type HqMark, type PilePlace, type ShopRef } from './simulationWorld';
+import type { Chatter, Customer } from './useCustomers';
+import { ageText, baht, codeOf, compactBaht, stateColor, stateLabel, type SimBranch, type SimHq } from './simulationTypes';
 
 // The still picture of the shops (156 §6). One shop per branch, each customer in it is a
 // real contract. simulationWorld draws it; this file owns pan and zoom and the HTML
@@ -28,20 +28,32 @@ export interface SceneHandle {
 interface SceneProps {
   branches: SimBranch[];
   customers: Customer[];
+  /** chat[] seated in the chat corners; [] when can_see_chat is false. */
+  chatters: Chatter[];
+  /** can_see_chat — draws the corner's chairs even when nobody waits. */
+  showChat: boolean;
   picked: number | null;
   focus: Focus;
   onPick: (id: number) => void;
+  /** can_see_hq's building (§6h); null = no building at all. */
+  hq: SimHq | null;
+  companyName: string;
+  pickedHq: number | null;
+  onPickHq: (index: number) => void;
 }
 
 const hitKey = (h: Hit) => (h?.kind === 'customer' ? `a${h.id}` : h?.kind === 'pile' ? `p${h.branchId}:${h.key}` : null);
 
-export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function SimulationScene({ branches, customers, picked, focus, onPick }, ref) {
+export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function SimulationScene({ branches, customers, chatters, showChat, picked, focus, onPick, hq, companyName, pickedHq, onPickHq }, ref) {
   const { t } = useTranslation();
-  const idKey = branches.map(b => `${b.id}:${b.type}`).join(',');
+  // The building's room count is part of the static scene: a new pool rebuilds it.
+  const hqRooms = hq?.pools.length ?? 0;
+  const idKey = `${branches.map(b => `${b.id}:${b.type}`).join(',')}|hq${hqRooms}`;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const shops = useMemo<ShopRef[]>(() => branches.map(b => ({ id: b.id, type: b.type })), [idKey]);
-  const plan = useMemo(() => planOf(shops), [shops]);
-  const { fw, fd, rooms } = plan;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const plan = useMemo(() => planOf(shops, hqRooms), [shops, hqRooms]);
+  const { fw, fd, rooms, extent } = plan;
   const byId = useMemo(() => new Map(branches.map(b => [b.id, b])), [branches]);
   const companyType = branches[0]?.company_type;
 
@@ -52,6 +64,7 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
   const [ready, setReady] = useState(false);
   const [noGl, setNoGl] = useState(false);
   const [piles, setPiles] = useState<PilePlace[]>([]);
+  const [marks, setMarks] = useState<HqMark[]>([]);
   const [size, setSize] = useState({ w: 1, h: 1 });
   const [view, setView] = useState({ k: 1, x: 0, y: 0 });
   const viewRef = useRef(view);
@@ -71,7 +84,7 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
     canvas.current = el;
     let w: ShopWorld;
     try {
-      w = new ShopWorld(el, shops, companyType);
+      w = new ShopWorld(el, shops, companyType, hqRooms);
     } catch {
       el.remove();
       setNoGl(true);
@@ -91,10 +104,11 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
 
   useEffect(() => {
     if (!ready || !world.current) return;
-    world.current.setLive({ branches, customers, picked });
+    world.current.setLive({ branches, customers, picked, showChat, chatters, hq });
     setPiles([...world.current.piles()]);
+    setMarks([...world.current.hqMarks()]);
     world.current.render();
-  }, [ready, branches, customers, picked]);
+  }, [ready, branches, customers, picked, showChat, chatters, hq]);
 
   useEffect(() => {
     if (!ready || !world.current || size.w <= 1) return;
@@ -118,10 +132,11 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
     const right = side ? panel!.offsetWidth + 28 : 16;
     const top = stack ? stack.bottom - box.top + 12 : 176;
     const bottom = below ? panel!.offsetHeight + 24 : 16;
-    const fx0 = project(0, 0, fd)[0];
-    const fx1 = project(fw, 0, 0)[0];
-    const fy0 = project(0, 3, 0)[1];
-    const fy1 = project(fw, 0, fd + 4)[1];
+    // Everything drawn: the shops' plot and, when there is one, the company building.
+    const fx0 = project(0, 0, extent.z1)[0];
+    const fx1 = project(extent.x1, 0, extent.z0)[0];
+    const fy0 = project(0, 3, extent.z0)[1];
+    const fy1 = project(extent.x1, 0, extent.z1 + 4)[1];
     const k = Math.min(1.3, (el.clientWidth - left - right) / (fx1 - fx0), (el.clientHeight - top - bottom) / (fy1 - fy0));
     setView({ k, x: left + (el.clientWidth - left - right - (fx1 - fx0) * k) / 2 - fx0 * k, y: top + (el.clientHeight - top - bottom - (fy1 - fy0) * k) / 2 - fy0 * k });
   };
@@ -257,6 +272,7 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
     const key = hitKey(h);
     if (key) focus.set(key);
     else if (h?.kind === 'room') onPick(h.id);
+    else if (h?.kind === 'hq') onPickHq(h.index);
   };
 
   const place = (x: number, y: number, z: number) => {
@@ -269,7 +285,12 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
 
   // What the tapped or pointed-at thing says, placed just above it.
   let note: { text: string; color: string; at: { left: number; top: number } } | null = null;
-  if (focus.key?.startsWith('a')) {
+  if (focus.key?.startsWith('a-')) {
+    // Someone in the chat corner (hits carry the contract id negated).
+    const c = chatters.find(x => `a-${x.id}` === focus.key);
+    const at = c && world.current?.chatAt(c);
+    if (c && at) note = { text: t('simulation.chatNote', { code: c.code, n: c.unread, age: ageText(t, c.age), count: c.unread }), color: CHAT_COLOR, at: place(at[0], at[1] + 0.35, at[2]) };
+  } else if (focus.key?.startsWith('a')) {
     const c = customers.find(x => `a${x.id}` === focus.key);
     const at = c && world.current?.customerAt(c);
     // The model on the contract and the device's AT-, once either exists (mig 1624).
@@ -284,7 +305,7 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
       <div ref={host} className="sim__canvas-host" onClick={clickScene} />
       {noGl && <div className="alert alert-warning sim__no-gl">{t('simulation.noWebgl')}</div>}
 
-      {showDetail && rooms.flatMap(r => zoneLabels(r.type).map(([key, x, y, z]) => {
+      {showDetail && rooms.flatMap(r => zoneLabels(r.type, showChat).map(([key, x, y, z]) => {
         const at = place(r.ox + x, y, r.oz + z);
         return onScreen(at) ? <span key={`${r.id}${key}`} className="sim__spot" style={at}>{t(`simulation.station.${key}`)}</span> : null;
       }))}
@@ -293,6 +314,17 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
         if (!pos || focus.key === `a${c.id}`) return null;
         const at = place(pos[0], pos[1] + 0.12, pos[2]);
         return onScreen(at) ? <span key={c.id} className="sim__chip" style={{ ...at, color: stateColor(c.state), borderColor: stateColor(c.state) }} data-customer={c.code}>{ageText(t, c.age)}</span> : null;
+      })}
+      {showDetail && showChat && rooms.map(r => {
+        const at = place(r.ox + CHAT_LABEL[0], CHAT_LABEL[1], r.oz + CHAT_LABEL[2]);
+        return onScreen(at) ? <span key={`${r.id}chat`} className="sim__spot sim__spot--chat" style={at}>{t('simulation.station.chat')}</span> : null;
+      })}
+      {/* The unread count on each chatter's head (owner 11-06) — at every zoom, it is the number this corner exists for. */}
+      {chatters.map(c => {
+        const pos = world.current?.chatAt(c);
+        if (!pos || focus.key === `a-${c.id}`) return null;
+        const at = place(pos[0], pos[1] + 0.05, pos[2]);
+        return onScreen(at) ? <span key={`c${c.id}`} className="sim__bubble" style={at} data-chat={c.code}>{c.unread}</span> : null;
       })}
       {showIcons && piles.map(p => {
         const at = place(p.x, p.h + 0.3, p.z);
@@ -307,15 +339,67 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
         const at = place(r.ox + RW * 0.3, 2.35, r.oz);
         const tagScale = Math.max(0.74, Math.min(1, view.k / 0.8));
         const n = customers.filter(c => c.branchId === b.id).length;
+        const chatN = chatters.filter(c => c.branchId === b.id).length;
         return (
           <button key={r.id} type="button" className={`sim__tag${picked === b.id ? ' sim__tag--on' : ''}`} style={{ ...at, '--sim-tag-scale': tagScale } as CSSProperties}
             data-room={b.id} onClick={() => onPick(b.id)}>
             <span className="sim__tag-row">
               <b>{b.name}</b>
               {n > 0 && <i className={`sim__count sim__count--${n >= 3 ? 'hi' : 'mid'}`}>{t('simulation.peopleCount', { n: n, count: n })}</i>}
+              {chatN > 0 && <i className="sim__count sim__count--chat">{t('simulation.chatChip', { n: chatN })}</i>}
               {b.day_closed && <small className="sim__tag-sub">{t('simulation.dayClosed')}</small>}
             </span>
           </button>
+        );
+      })}
+
+      {/* The company building (§6h): a tag per pool room, the numbers over its stacks. */}
+      {plan.hq && hq && (() => {
+        const at = place(plan.hq.x + 1.2, HQ_BACK_H + 0.9, plan.hq.z);
+        return onScreen(at) ? (
+          <span className="sim__hq-sign" style={at}>
+            {t('simulation.hq.office', { company: companyName })}
+            {hq.no_pool > 0 && <i className="sim__hq-warn">{t('simulation.hq.noPool', { n: hq.no_pool, count: hq.no_pool })}</i>}
+          </span>
+        ) : null;
+      })()}
+      {plan.hq && hq?.pools.map((p, i) => {
+        const r = plan.hq!.rooms[i];
+        if (!r) return null;
+        const at = place(r.ox + HQ_RW * 0.35, HQ_BACK_H + 0.15, r.oz);
+        const tagScale = Math.max(0.74, Math.min(1, view.k / 0.8));
+        return (
+          <button key={`hq${p.id}`} type="button" className={`sim__tag sim__tag--hq${pickedHq === i ? ' sim__tag--on' : ''}`} style={{ ...at, '--sim-tag-scale': tagScale } as CSSProperties}
+            data-pool={p.kind} onClick={() => onPickHq(i)}>
+            <span className="sim__tag-row">
+              <b>{p.name}</b>
+              {p.kind === 'CUSTOMER_SERVICE'
+                ? (p.unread != null && <i className="sim__count sim__count--chat">{t('simulation.hq.unreadChip', { n: p.unread })}</i>)
+                : <i className="sim__count sim__count--mid">{t('simulation.hq.waitingChip', { n: p.waiting ?? 0 })}</i>}
+            </span>
+            <small className="sim__tag-sub">{hqTagLine(t, p)} · {t('simulation.hq.people', { a: p.active_today, m: p.members })}</small>
+          </button>
+        );
+      })}
+      {marks.map((m, i) => {
+        // Counts over stacks show once zoomed in; bubbles and the "nothing waiting" note always.
+        const always = m.kind === 'bubble' || m.kind === 'bubbleMore' || m.kind === 'clear' || m.kind === 'tray';
+        if (!always && !showIcons) return null;
+        const at = place(m.x, m.y, m.z);
+        if (!onScreen(at)) return null;
+        if (m.kind === 'bubble') return <span key={i} className="sim__hq-bubble" style={at} />;
+        const text =
+          m.kind === 'money' ? compactBaht(m.value)
+          : m.kind === 'day' ? (m.day ? m.day.slice(5).split('-').reverse().join('/') : t('simulation.hq.older'))
+          : m.kind === 'deskMore' || m.kind === 'bubbleMore' ? `+${m.value}`
+          : m.kind === 'clear' ? t('simulation.hq.clear')
+          : String(m.value);
+        const color = m.kind === 'tray' ? '#a07b1c' : m.kind === 'credit' || m.kind === 'money' ? HQ_COLOR.approved : m.kind === 'returned' ? HQ_COLOR.returned
+          : m.kind === 'checked' ? HQ_COLOR.checked : m.kind === 'payout' ? HQ_COLOR.inPayout : undefined;
+        return (
+          <span key={i} className={`sim__hq-mark sim__hq-mark--${m.kind}${m.today ? ' sim__hq-mark--today' : ''}`} style={{ ...at, color, borderColor: color }}>
+            {text}
+          </span>
         );
       })}
 
@@ -329,3 +413,19 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
     </div>
   );
 });
+
+type Tr = (key: string, opts?: Record<string, unknown>) => string;
+
+/** A pool room's small line (§6h): credit — today's approved/returned · payout — waiting
+ *  to pay / paid · service — chat rooms / longest wait. Numbers as the RPC gives them. */
+function hqTagLine(t: Tr, p: SimHq['pools'][number]): string {
+  if (p.kind === 'CREDIT') {
+    const d = p.days[p.days.length - 1] as { approved?: number; returned?: number } | undefined;
+    return t('simulation.hq.creditLine', { a: d?.approved ?? 0, r: d?.returned ?? 0 });
+  }
+  if (p.kind === 'PAYOUT') return t('simulation.hq.payoutLine', { pending: baht(p.pending), paid: baht(p.paid) });
+  if (p.unread == null) return '';
+  return p.unread_threads
+    ? t('simulation.hq.serviceLine', { n: p.unread_threads, age: ageText(t, p.oldest_unread_min ?? 0) })
+    : t('simulation.hq.clear');
+}

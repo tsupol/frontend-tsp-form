@@ -4,7 +4,7 @@ import {
   SRGBColorSpace, Scene, ShadowMaterial, SphereGeometry, Vector2, Vector3, WebGLRenderer, type BufferGeometry, type Material,
 } from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { FLOOR, PILES, SOLD_EDGE, companyEdge, stateColor, type CompanyType, type PileKey, type SimBranch } from './simulationTypes';
+import { FLOOR, PILES, SOLD_EDGE, companyEdge, stateColor, type CompanyType, type HqCreditDay, type HqPayoutDay, type PileKey, type SimBranch, type SimHq } from './simulationTypes';
 
 type BranchType = SimBranch['type'];
 
@@ -82,12 +82,16 @@ const SPOTS: Record<Station, Spot[]> = {
 };
 // A deal-partner shop is smaller inside: two desks and two rows of chairs, the rest is the phone counter.
 const PARTNER_DESKS = 2;
+/** Approval chairs drawn even when empty; seats past these appear only when taken. */
+const WAIT_ALWAYS = 4;
 const PARTNER_WAIT = 10;
 const OVERFLOW: [number, number][] = [[6.9, 7.5], [7.6, 7.5], [8.3, 7.5], [9, 7.5], [9.7, 7.5], [10.4, 7.5], [10.4, 6.7], [10.4, 5.9]];
 
 // Zone names: the two counters' on the back wall above them, the other two on the floor.
-export const zoneLabels = (type: BranchType): [Station, number, number, number][] => [
-  ['desk', type === 'DEAL_PARTNER' ? 2.2 : 4, 1.15, 0.24], ['wait', 3.4, 0.12, 7.25], ['sign', 8.5, 0.12, 7.3], ['pay', 9, 1.15, 0.24],
+// With the chat corner drawn, the waiting rows' sign moves from the front (where the
+// corner now is) to the aisle between the desk chairs and the first row.
+export const zoneLabels = (type: BranchType, chat = false): [Station, number, number, number][] => [
+  ['desk', type === 'DEAL_PARTNER' ? 2.2 : 4, 1.15, 0.24], ['wait', 3.4, 0.12, chat ? 3.0 : 7.25], ['sign', 8.5, 0.12, 7.3], ['pay', 9, 1.15, 0.24],
 ];
 
 function spotOf(type: BranchType, st: Station, i: number): Spot {
@@ -107,19 +111,86 @@ export interface SeatedCustomer {
   spot: number;
 }
 
+// ── Waiting for a chat reply (156 §6g, mig 1628) ────────────────────────────
+// One row of five along the front wall, left of the door, facing into the shop, on a teal
+// patch with teal chairs: its own zone, not more seats in the approval rows. An aisle
+// stays between this row and the last approval row (ends z 6.47); the row clears the
+// plant in the corner (x <= 1.18) and stops before the door (x 6.6). Three chairs always,
+// the other two only under someone sitting.
+const CHAT_SEATS: Spot[] = [1.6, 2.65, 3.7, 4.75, 5.8].map(x => ({ x, z: 7.65, seated: true, face: 'back' as Face }));
+// More than five: stand in the aisle behind the row, stepping along each lap.
+const CHAT_OVERFLOW: [number, number][] = [1.6, 2.65, 3.7, 4.75, 5.8].map(x => [x, 6.85]);
+const CHAT_PATCH = { x: 1.25, z: 7.15, w: 4.9, d: 0.95 };
+export const CHAT_COLOR = '#1fa3ad';
+const CHAT_SEAT = { seat: '#5cc6cb', base: '#3aa3a9', floor: '#d3f0f1' };
+const CHAT_ALWAYS = 3;
+
+function chatSpotOf(i: number): Spot {
+  if (i < CHAT_SEATS.length) return CHAT_SEATS[i];
+  const k = i - CHAT_SEATS.length;
+  const [x, z] = CHAT_OVERFLOW[k % CHAT_OVERFLOW.length];
+  const lap = Math.floor(k / CHAT_OVERFLOW.length) * 0.3;
+  return { x: x + lap, z: z - lap, seated: false, face: 'back' };
+}
+
+/** One row of chat[]: a seat in the chat corner of its shop. */
+export interface ChatSeat {
+  /** Contract id. Hits report it negated, so it can't collide with a waiting customer's. */
+  id: number;
+  branchId: number;
+  spot: number;
+}
+
+/** Where the chat corner's sign goes: on the patch, under the row's middle. */
+export const CHAT_LABEL: [number, number, number] = [CHAT_PATCH.x + CHAT_PATCH.w / 2, 0.12, CHAT_PATCH.z + CHAT_PATCH.d / 2];
+
 // ── Layout ───────────────────────────────────────────────────────────────────
 export interface ShopRef { id: number; type: BranchType }
 export interface RoomPlace extends ShopRef { ox: number; oz: number }
-export interface Plan { fw: number; fd: number; rooms: RoomPlace[] }
+/** The company building (156 §6h): its lot and one room per pool, in hq.pools order. */
+export interface HqPlace { x: number; z: number; w: number; d: number; rooms: { ox: number; oz: number }[] }
+export interface Plan {
+  fw: number;
+  fd: number;
+  rooms: RoomPlace[];
+  hq: HqPlace | null;
+  /** Everything drawn: the shops' plot plus the building, for fitting the view. */
+  extent: { x1: number; z0: number; z1: number };
+}
 
-export function planOf(shops: ShopRef[]): Plan {
+// The company building: rooms side by side along x, at most three a row; past three it
+// gets a second row. Across a walkway on the right of the shops, set at the middle of
+// the plot's depth and never past its front, so the road in front stays clear.
+export const HQ_RW = 9;
+export const HQ_RD = 6.4;
+const HQ_PAD = 1.0;
+const HQ_GAP = 0.5;
+const HQ_WALK = 6;
+export const HQ_BACK_H = 2.6;
+
+export function planOf(shops: ShopRef[], hqRooms = 0): Plan {
   const n = shops.length;
   const cols = Math.max(1, Math.min(5, Math.ceil(Math.sqrt(n))));
   const rows = Math.max(1, Math.ceil(n / cols));
+  const fw = cols * RW + (cols - 1) * GAP + PAD * 2;
+  const fd = rows * RD + (rows - 1) * GAP + PAD * 2;
+  let hq: HqPlace | null = null;
+  if (hqRooms > 0) {
+    const hc = Math.min(3, hqRooms);
+    const hr = Math.ceil(hqRooms / hc);
+    const w = hc * HQ_RW + (hc - 1) * HQ_GAP + HQ_PAD * 2;
+    const d = hr * HQ_RD + (hr - 1) * HQ_GAP + HQ_PAD * 2;
+    const z = d <= fd ? (fd - d) / 2 : fd - d;
+    const x = fw + HQ_WALK;
+    hq = {
+      x, z, w, d,
+      rooms: Array.from({ length: hqRooms }, (_, i) => ({ ox: x + HQ_PAD + (i % hc) * (HQ_RW + HQ_GAP), oz: z + HQ_PAD + Math.floor(i / hc) * (HQ_RD + HQ_GAP) })),
+    };
+  }
   return {
-    fw: cols * RW + (cols - 1) * GAP + PAD * 2,
-    fd: rows * RD + (rows - 1) * GAP + PAD * 2,
+    fw, fd, hq,
     rooms: shops.map((sh, i) => ({ ...sh, ox: PAD + (i % cols) * (RW + GAP), oz: PAD + Math.floor(i / cols) * (RD + GAP) })),
+    extent: { x1: hq ? hq.x + hq.w : fw, z0: hq ? Math.min(0, hq.z) : 0, z1: fd },
   };
 }
 
@@ -134,6 +205,8 @@ const C = {
 };
 
 const pick = <T,>(list: T[], n: number) => list[Math.abs(Math.floor(n)) % list.length];
+/** A slightly darker tone, so stacked folders read as separate sheets. */
+const shade = (hex: string) => '#' + new Color(hex).multiplyScalar(0.86).getHexString();
 
 // One geometry, one material and a colour per instance, so a whole company is a handful of draw calls.
 const UNIT_BOX = new BoxGeometry(1, 1, 1);
@@ -218,7 +291,7 @@ function tileTexture(line: string, base: string, cells: number) {
   return tex;
 }
 
-export type Hit = { kind: 'customer'; id: number } | { kind: 'pile'; branchId: number; key: PileKey } | { kind: 'room'; id: number } | null;
+export type Hit = { kind: 'customer'; id: number } | { kind: 'pile'; branchId: number; key: PileKey } | { kind: 'room'; id: number } | { kind: 'hq'; index: number } | null;
 
 export interface PilePlace { branchId: number; key: PileKey; x: number; z: number; h: number; value: number; color: string }
 
@@ -228,7 +301,32 @@ export interface LiveState {
   branches: SimBranch[];
   customers: SeatedCustomer[];
   picked: number | null;
+  /** can_see_chat: draw the chat corner (chairs even when empty) and who sits in it. */
+  showChat?: boolean;
+  chatters?: ChatSeat[];
+  /** can_see_hq's building contents; null/absent = nothing in the rooms. */
+  hq?: SimHq | null;
 }
+
+/** A number or word the page prints over the building (Thai stays sharp as HTML). */
+export interface HqMark {
+  room: number;
+  x: number;
+  y: number;
+  z: number;
+  /** What it is, so the page picks the words and the look. */
+  kind: 'tray' | 'credit' | 'returned' | 'checked' | 'payout' | 'money' | 'day' | 'deskMore' | 'bubble' | 'bubbleMore' | 'clear';
+  value: number;
+  /** The day column's date ("" = older backlog), for 'day'. */
+  day?: string;
+  today?: boolean;
+}
+
+// Folder colours: waiting yellow, approved/paid green, returned red, checked blue, in a payout run purple.
+export const HQ_COLOR = { waiting: '#e9c46a', approved: '#4aa25e', returned: '#d1495b', checked: '#4d8ed2', inPayout: '#9478c9', money: '#3f9153' };
+const FOLDER_H = 0.05;
+const FOLDER_CAP = 24; // a taller stack says nothing more; the number over it does
+const HQ_DESKS = 8;
 
 interface Car { lane: number; dir: 1 | -1; speed: number; offset: number }
 
@@ -245,6 +343,7 @@ export class ShopWorld {
   private heads: InstancedMesh | null = null;
   private pileMesh: InstancedMesh | null = null;
   private customerIds: number[] = [];
+  private hqMarkList: HqMark[] = [];
   private pileList: PilePlace[] = [];
   private ray = new Raycaster();
   private floorPlane = new Plane(new Vector3(0, 1, 0), -SLAB);
@@ -267,10 +366,10 @@ export class ShopWorld {
   private type: CompanyType | undefined;
   private onRestored = () => { this.renderer.shadowMap.needsUpdate = true; this.render(); };
 
-  constructor(canvas: HTMLCanvasElement, shops: ShopRef[], type: CompanyType | undefined) {
+  constructor(canvas: HTMLCanvasElement, shops: ShopRef[], type: CompanyType | undefined, hqRooms = 0) {
     this.canvas = canvas;
     this.type = type;
-    this.plan = planOf(shops);
+    this.plan = planOf(shops, hqRooms);
     this.renderer = new WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.setClearColor(C.grass);
@@ -289,9 +388,11 @@ export class ShopWorld {
   }
 
   private lights() {
-    const { fw, fd } = this.plan;
+    const { extent } = this.plan;
+    const fw = extent.x1;
+    const fd = extent.z1 - extent.z0;
     const cx = fw / 2;
-    const cz = fd / 2;
+    const cz = extent.z0 + fd / 2;
     this.scene.add(new HemisphereLight('#ffffff', '#cfd4d6', 1.75));
     const sun = new DirectionalLight('#fff6ea', 1.75);
     sun.position.set(cx + 24, 48, cz + 12);
@@ -369,7 +470,12 @@ export class ShopWorld {
       const side = i % 3;
       const x = side === 0 ? edge * fw : side === 1 ? -d : fw + d;
       const z = side === 0 ? -d : edge * (fd - 2);
-      tree(x + Math.cos(a), z + Math.sin(a), s, i);
+      const tx = x + Math.cos(a);
+      const tz = z + Math.sin(a);
+      // Clear of the company building and the walkway to it.
+      const h = this.plan.hq;
+      if (h && tx > fw - 1 && tx < h.x + h.w + 1.5 && tz > h.z - 1.5 && tz < h.z + h.d + 1.5) continue;
+      tree(tx, tz, s, i);
     }
     rooms.forEach((r, i) => {
       const onRight = r.ox + RW + GAP < fw;
@@ -398,12 +504,61 @@ export class ShopWorld {
       this.shop(boxes, bodies, balls, posts, crowns, r, accent, i);
     });
 
+    if (this.plan.hq) this.buildHq(root, boxes, slab, accent);
+
     boxes.build(root);
     bodies.build(root);
     balls.build(root);
     posts.build(root);
     crowns.build(root);
     return root;
+  }
+
+  // The company building's shell (156 §6h): a lot, a walkway from the shops, tall back and
+  // left walls with windows (proud of the wall, never on its face), low front and right
+  // walls and low partitions so every room can be seen into. What is IN the rooms is
+  // live data and is drawn by setLive.
+  private buildHq(
+    root: Group,
+    boxes: Batch,
+    slab: (x: number, z: number, w: number, d: number, h: number, line: string, base: string, side: string) => void,
+    accent: string,
+  ) {
+    const h = this.plan.hq!;
+    const { fw } = this.plan;
+    const y = LOT_Y + SLAB;
+    slab(h.x, h.z, h.w, h.d, LOT_Y, C.lotLine, C.lot, C.kerb);
+    // Walkway between the plot and the building, half-way down the building's depth.
+    const wz = h.z + h.d / 2 - FOOT;
+    slab(fw, wz, h.x - fw, FOOT * 2, FOOT_Y, C.footLine, C.foot, C.kerb);
+    // Zebra across the walkway's middle: stripes ON the footpath, lifted clear of its top.
+    const stripes = 5;
+    for (let i = 0; i < stripes; i++) box(boxes, fw + 1.2 + i * ((h.x - fw - 2.4) / stripes), FOOT_Y, wz + 0.25, 0.45, 0.012, FOOT * 2 - 0.5, '#ffffff');
+
+    const floorGeo = new BoxGeometry(HQ_RW, SLAB, HQ_RD);
+    const side = new MeshLambertMaterial({ color: C.slabSide });
+    this.owned.push(floorGeo, side);
+    h.rooms.forEach(r => {
+      const top = new MeshLambertMaterial({ color: '#f7f8fa' });
+      this.owned.push(top);
+      const floor = new Mesh(floorGeo, [side, side, top, side, side, side]);
+      floor.position.set(r.ox + HQ_RW / 2, LOT_Y + SLAB / 2, r.oz + HQ_RD / 2);
+      floor.receiveShadow = true;
+      root.add(floor);
+      // Partitions round each room: tall at the back and left, low at the front and right.
+      box(boxes, r.ox, y, r.oz, HQ_RW, HQ_BACK_H, WALL, C.wall);
+      box(boxes, r.ox, y, r.oz + WALL, WALL, HQ_BACK_H, HQ_RD - WALL, C.wall);
+      box(boxes, r.ox + HQ_RW - WALL, y, r.oz + WALL, WALL, LOW_H, HQ_RD - WALL, C.wall);
+      // Front: low wall with a doorway in the middle.
+      const door = 1.6;
+      const half = (HQ_RW - door) / 2;
+      box(boxes, r.ox + WALL, y, r.oz + HQ_RD - WALL, half - WALL, LOW_H, WALL, C.wall);
+      box(boxes, r.ox + half + door, y, r.oz + HQ_RD - WALL, half - WALL, LOW_H, WALL, C.wall);
+      // Windows on the back wall: glass panes standing proud of the wall's face.
+      for (let i = 0; i < 4; i++) box(boxes, r.ox + 0.8 + i * 2.1, y + 1.35, r.oz + WALL, 1.3, 0.85, 0.04, C.glass);
+      // The company's colour along the top of the back wall, with its own top face.
+      box(boxes, r.ox + 0.3, y + HQ_BACK_H - 0.22, r.oz + WALL, HQ_RW - 0.6, 0.16, 0.06, accent);
+    });
   }
 
   // The cars on the road in front are a count, not decoration (work order 2026-11-05 §2):
@@ -523,11 +678,11 @@ export class ShopWorld {
     balls.add(x, headY + HEAD_R * 0.3, z - 0.015, HEAD_R * 1.05, HEAD_R * 0.85, HEAD_R * 1.05, pick(C.hair, n * 3 + 1));
   }
 
-  private seat(b: Batch, x: number, z: number, face: Face) {
+  private seat(b: Batch, x: number, z: number, face: Face, seat = C.seat, base = C.seatBase) {
     const y = LOT_Y + SLAB;
-    box(b, x - 0.2, y, z - 0.2, 0.4, 0.3, 0.4, C.seatBase);
-    box(b, x - 0.32, y + 0.3, z - 0.32, 0.64, 0.12, 0.64, C.seat);
-    box(b, x - 0.32, y + 0.42, face === 'back' ? z + 0.22 : z - 0.32, 0.64, face === 'back' ? 0.24 : 0.52, 0.1, C.seat);
+    box(b, x - 0.2, y, z - 0.2, 0.4, 0.3, 0.4, base);
+    box(b, x - 0.32, y + 0.3, z - 0.32, 0.64, 0.12, 0.64, seat);
+    box(b, x - 0.32, y + 0.42, face === 'back' ? z + 0.22 : z - 0.32, 0.64, face === 'back' ? 0.24 : 0.52, 0.1, seat);
   }
 
   private shop(boxes: Batch, bodies: Batch, balls: Batch, posts: Batch, crowns: Batch, r: RoomPlace, accent: string, n: number) {
@@ -567,8 +722,9 @@ export class ShopWorld {
     box(boxes, ox + 8.72, y + 0.85, oz + 1.2, 0.56, 0.32, 0.05, C.screen);
     staff(9, 0.65, 7);
 
-    // Waiting for approval.
-    for (const s of WAIT_SEATS.slice(0, partner ? PARTNER_WAIT : WAIT_SEATS.length)) this.seat(boxes, ox + s.x, oz + s.z, s.face);
+    // Waiting for approval: a few chairs always, so an empty room still reads as a place to
+    // wait; the rest appear only under someone sitting (setLive) — 15 empty seats were noise.
+    for (const s of WAIT_SEATS.slice(0, WAIT_ALWAYS)) this.seat(boxes, ox + s.x, oz + s.z, s.face);
 
     if (partner) {
       // What makes it a phone shop: display counters with phones on them, and an awning over the door.
@@ -598,7 +754,7 @@ export class ShopWorld {
   }
 
   /** Called when an answer arrives or the selection changes. */
-  setLive({ branches, customers, picked }: LiveState) {
+  setLive({ branches, customers, picked, showChat = false, chatters = [], hq = null }: LiveState) {
     this.setCarCount(branches.reduce((s, b) => s + b.opened.length, 0));
     this.live.children.forEach(ch => (ch as InstancedMesh).dispose?.());
     this.live.clear();
@@ -638,10 +794,13 @@ export class ShopWorld {
     const heads = new Batch(UNIT_BALL, this.lambert);
     const hair = new Batch(UNIT_BALL, this.lambert);
     this.customerIds = [];
+    const chairs = new Batch(UNIT_BOX, this.lambert);
     customers.forEach((c, i) => {
       const r = byId.get(c.branchId);
       if (!r) return;
       const s = spotOf(r.type, c.station, c.spot);
+      // Approval seats exist only while taken (the counters' chairs are furniture, drawn always).
+      if (c.station === 'wait' && s.seated && c.spot >= WAIT_ALWAYS) this.seat(chairs, r.ox + s.x, r.oz + s.z, s.face);
       const base = s.seated ? y + 0.42 : y;
       const h = s.seated ? SIT_H : STAND_H;
       const x = r.ox + s.x;
@@ -652,6 +811,34 @@ export class ShopWorld {
       hair.add(x, headY + HEAD_R * 0.3, z - 0.015, HEAD_R * 1.05, HEAD_R * 0.85, HEAD_R * 1.05, pick(C.hair, c.id * 3 + 1));
       this.customerIds.push(c.id);
     });
+
+    // Chat corner (§6g): not counted as standing and doesn't colour the floor.
+    if (showChat) {
+      const corner = new Batch(UNIT_BOX, this.lambert);
+      this.plan.rooms.forEach(r => {
+        box(corner, r.ox + CHAT_PATCH.x, y, r.oz + CHAT_PATCH.z, CHAT_PATCH.w, 0.015, CHAT_PATCH.d, CHAT_SEAT.floor);
+        for (const s of CHAT_SEATS.slice(0, CHAT_ALWAYS)) this.seat(corner, r.ox + s.x, r.oz + s.z, s.face, CHAT_SEAT.seat, CHAT_SEAT.base);
+      });
+      chatters.forEach((c, i) => {
+        const r = byId.get(c.branchId);
+        if (!r) return;
+        const s = chatSpotOf(c.spot);
+        if (s.seated && c.spot >= CHAT_ALWAYS) this.seat(corner, r.ox + s.x, r.oz + s.z, s.face, CHAT_SEAT.seat, CHAT_SEAT.base);
+        const base = s.seated ? y + 0.42 : y;
+        const h = s.seated ? SIT_H : STAND_H;
+        const x = r.ox + s.x;
+        const z = r.oz + s.z - (s.seated ? 0.03 : 0);
+        bodies.add(x, base + h / 2, z, BODY_R, h, BODY_R, CHAT_COLOR);
+        const headY = base + h + HEAD_R * 0.85;
+        heads.add(x, headY, z, HEAD_R, HEAD_R, HEAD_R, pick(C.skin, c.id + i));
+        hair.add(x, headY + HEAD_R * 0.3, z - 0.015, HEAD_R * 1.05, HEAD_R * 0.85, HEAD_R * 1.05, pick(C.hair, c.id * 3 + 2));
+        // The phone in their hand, held at the side the viewer sees.
+        box(corner, x + BODY_R - 0.02, base + h * 0.62, z - 0.07, 0.04, 0.22, 0.14, C.phone);
+        this.customerIds.push(-c.id);
+      });
+      if (corner.size) corner.build(this.live);
+    }
+    if (chairs.size) chairs.build(this.live);
     this.bodies = bodies.size ? bodies.build(this.live) : null;
     this.heads = heads.size ? heads.build(this.live) : null;
     if (hair.size) hair.build(this.live);
@@ -676,7 +863,99 @@ export class ShopWorld {
     this.pileMesh = piles.size ? piles.build(this.live) : null;
     if (bands.size) bands.build(this.live);
 
+    this.hqMarkList = [];
+    if (hq && this.plan.hq) this.drawHq(hq);
+
     this.renderer.shadowMap.needsUpdate = true;
+  }
+
+  hqMarks() { return this.hqMarkList; }
+
+  // What sits in each pool's room (156 par. 6h). Counted things are the real numbers: a desk per
+  // member, someone at it for each who acted today, a folder per document, a bubble per
+  // unread message. Past what fits, the number over it carries the rest.
+  private drawHq(hq: SimHq) {
+    const place = this.plan.hq!;
+    const y = LOT_Y + SLAB;
+    const things = new Batch(UNIT_BOX, this.lambert);
+    const bodies = new Batch(UNIT_BODY, this.lambert);
+    const balls = new Batch(UNIT_BALL, this.lambert);
+    const today = hq.days[hq.days.length - 1] ?? '';
+    const mark = (m: HqMark) => this.hqMarkList.push(m);
+    const stack = (x: number, z: number, n: number, color: string, w = 0.5, d = 0.62, base = y) => {
+      const k = Math.min(n, FOLDER_CAP);
+      for (let i = 0; i < k; i++) box(things, x, base + i * FOLDER_H, z, w, FOLDER_H * 0.82, d, i % 2 ? color : shade(color));
+      return base + k * FOLDER_H;
+    };
+
+    hq.pools.forEach((pool, ri) => {
+      const r = place.rooms[ri];
+      if (!r) return;
+      const { ox, oz } = r;
+
+      // Desks along the back wall, staff facing the viewer.
+      const desks = Math.min(pool.members, HQ_DESKS);
+      const active = Math.min(pool.active_today, desks);
+      for (let j = 0; j < desks; j++) {
+        const cx = ox + 0.75 + j * 1.05;
+        box(things, cx - 0.42, y, oz + 0.95, 0.84, 0.7, 0.5, C.desk);
+        box(things, cx - 0.2, y + 0.7, oz + 1.0, 0.4, 0.26, 0.04, C.screen);
+        this.seat(things, cx, oz + 0.62, 'front');
+        if (j < active) this.person(bodies, balls, cx, y + 0.42, oz + 0.6, SIT_H, C.coat, ri * 11 + j);
+      }
+      if (pool.members > HQ_DESKS) mark({ room: ri, x: ox + 0.75 + (HQ_DESKS - 1) * 1.05, y: 1.4, z: oz + 1.2, kind: 'deskMore', value: pool.members - HQ_DESKS });
+
+      // The tray of documents waiting to be checked, on the left.
+      if (pool.waiting != null) {
+        box(things, ox + 0.55, y, oz + 2.05, 1.0, 0.45, 0.8, C.shelf);
+        const top = stack(ox + 0.8, oz + 2.14, pool.waiting, HQ_COLOR.waiting, 0.5, 0.62, y + 0.45);
+        mark({ room: ri, x: ox + 1.05, y: top + 0.25, z: oz + 2.45, kind: 'tray', value: pool.waiting });
+      }
+
+      if (pool.kind === 'CREDIT') {
+        (pool.days as HqCreditDay[]).forEach((d, di) => {
+          const cx = ox + 2.4 + di * 1.6;
+          const isToday = d.day === today;
+          box(things, cx - 0.6, y, oz + 3.5, 1.2, 0.012, 1.7, isToday ? '#cdeccf' : '#e9ecee');
+          const g = stack(cx - 0.55, oz + 3.75, d.approved, HQ_COLOR.approved);
+          const rd = stack(cx + 0.05, oz + 3.75, d.returned, HQ_COLOR.returned);
+          if (d.approved > 0) mark({ room: ri, x: cx - 0.3, y: g + 0.18, z: oz + 4.05, kind: 'credit', value: d.approved });
+          if (d.returned > 0) mark({ room: ri, x: cx + 0.3, y: rd + 0.18, z: oz + 4.05, kind: 'returned', value: d.returned });
+          mark({ room: ri, x: cx, y: 0.12, z: oz + 5.45, kind: 'day', value: d.submitted, day: d.day, today: isToday });
+        });
+      } else if (pool.kind === 'PAYOUT') {
+        const days = pool.days as HqPayoutDay[];
+        const maxPaid = Math.max(1, ...days.map(d => d.paid));
+        days.forEach((d, di) => {
+          const cx = ox + 1.95 + di * 1.4;
+          const isToday = d.day === today;
+          box(things, cx - 0.55, y, oz + 3.5, 1.1, 0.012, 1.7, d.day === '' ? '#f6d9dc' : isToday ? '#cdeccf' : '#e9ecee');
+          const b = stack(cx - 0.5, oz + 3.65, d.checked, HQ_COLOR.checked, 0.42, 0.5);
+          const p = stack(cx + 0.06, oz + 3.65, d.in_payout, HQ_COLOR.inPayout, 0.42, 0.5);
+          if (d.checked > 0) mark({ room: ri, x: cx - 0.29, y: b + 0.18, z: oz + 3.9, kind: 'checked', value: d.checked });
+          if (d.in_payout > 0) mark({ room: ri, x: cx + 0.27, y: p + 0.18, z: oz + 3.9, kind: 'payout', value: d.in_payout });
+          if (d.paid > 0) {
+            // Money paid out: a green box, taller by the square root so small days still show.
+            const h = 0.15 + 0.9 * Math.sqrt(d.paid / maxPaid);
+            box(things, cx - 0.35, y, oz + 4.4, 0.7, h, 0.55, HQ_COLOR.money);
+            box(things, cx - 0.37, y + h * 0.45, oz + 4.38, 0.74, Math.min(0.12, h * 0.25), 0.59, '#f8f6ef');
+            mark({ room: ri, x: cx, y: y + h + 0.2, z: oz + 4.65, kind: 'money', value: d.paid });
+          }
+          mark({ room: ri, x: cx, y: 0.12, z: oz + 5.45, kind: 'day', value: d.pending, day: d.day, today: isToday });
+        });
+      } else if (pool.unread != null) {
+        // Customer service: one floating bubble per unread message (the page draws them), at most 18.
+        const shown = Math.min(pool.unread, 18);
+        for (let i = 0; i < shown; i++) {
+          mark({ room: ri, x: ox + 1.6 + (i % 6) * 1.15, y: 1.5 + Math.floor(i / 6) * 0.55 + ((i * 37) % 5) * 0.06, z: oz + 3.2 + Math.floor(i / 6) * 0.7, kind: 'bubble', value: i });
+        }
+        if (pool.unread > shown) mark({ room: ri, x: ox + 1.6 + 6 * 1.15, y: 1.6, z: oz + 3.9, kind: 'bubbleMore', value: pool.unread - shown });
+        if (pool.unread === 0) mark({ room: ri, x: ox + HQ_RW / 2, y: 0.12, z: oz + 4.2, kind: 'clear', value: 0 });
+      }
+    });
+    if (things.size) things.build(this.live);
+    if (bodies.size) bodies.build(this.live);
+    if (balls.size) balls.build(this.live);
   }
 
   piles() { return this.pileList; }
@@ -686,6 +965,14 @@ export class ShopWorld {
     const r = this.plan.rooms.find(p => p.id === c.branchId);
     if (!r) return null;
     const s = spotOf(r.type, c.station, c.spot);
+    return [r.ox + s.x, 0.11 + (s.seated ? 0.42 + SIT_H : STAND_H) + HEAD_R * 2, r.oz + s.z];
+  }
+
+  /** Head-top position of someone in the chat corner, for the unread bubble. */
+  chatAt(c: ChatSeat): [number, number, number] | null {
+    const r = this.plan.rooms.find(p => p.id === c.branchId);
+    if (!r) return null;
+    const s = chatSpotOf(c.spot);
     return [r.ox + s.x, 0.11 + (s.seated ? 0.42 + SIT_H : STAND_H) + HEAD_R * 2, r.oz + s.z];
   }
 
@@ -727,7 +1014,9 @@ export class ShopWorld {
     const p = this.ray.ray.intersectPlane(this.floorPlane, new Vector3());
     if (!p) return null;
     const room = this.plan.rooms.find(r => p.x >= r.ox && p.x <= r.ox + RW && p.z >= r.oz && p.z <= r.oz + RD);
-    return room ? { kind: 'room', id: room.id } : null;
+    if (room) return { kind: 'room', id: room.id };
+    const hqIndex = this.plan.hq?.rooms.findIndex(r => p.x >= r.ox && p.x <= r.ox + HQ_RW && p.z >= r.oz && p.z <= r.oz + HQ_RD) ?? -1;
+    return hqIndex >= 0 ? { kind: 'hq', index: hqIndex } : null;
   }
 
   /** The numbers a probe reads to check the scene, not the formula that built it. */

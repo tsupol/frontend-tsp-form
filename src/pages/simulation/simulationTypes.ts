@@ -33,6 +33,91 @@ export interface SimOpened {
   down: number;
   device_price: number;
   down_pct: number | null;
+  // mig 1630 — the contract's terms. Optional until the migration is live on
+  // every server; once live they're never null (0 / "" = none). Not flag-hidden.
+  /** Per-installment amount; 0 = none → fall back to `{code} ({months}m)`. */
+  installment?: number;
+  /** Serial of the device issued; "" = none → no serial part. */
+  serial?: string;
+  /** The shop's selling price (FINANCIER line "ขาย … + อัพ …"). */
+  sale_price?: number;
+  /** Uplift; FINANCIER sale_price + uplift = device_price. Never worked out here. */
+  uplift?: number;
+}
+
+/** chat[] — one seated customer = one contract with unread messages (§2e, mig 1628). */
+export interface SimChat {
+  /** Contract id — a different set from waiting[].id; the same contract can be in both. */
+  id: number;
+  branch_id: number;
+  code: string;
+  /** Customer messages staff haven't read yet. */
+  unread: number;
+  /** Minutes since the oldest unread message. */
+  age_min: number;
+}
+
+export type HqPoolKind = 'CREDIT' | 'PAYOUT' | 'CUSTOMER_SERVICE';
+
+export interface HqCreditDay { day: string; submitted: number; approved: number; returned: number }
+export interface HqPayoutDay { day: string; unchecked: number; checked: number; in_payout: number; pending: number; paid: number }
+
+/** hq.pools[] — one room per company pool, ordered CREDIT → PAYOUT → CUSTOMER_SERVICE (§2f). */
+export interface HqPool {
+  id: number;
+  kind: HqPoolKind;
+  name: string;
+  members: number;
+  active_today: number;
+  branch_ids: number[];
+  /** CREDIT: requests to check · PAYOUT: close-outs to check · CUSTOMER_SERVICE: null. */
+  waiting: number | null;
+  /** PAYOUT only (฿). */
+  pending: number | null;
+  paid: number | null;
+  /** CUSTOMER_SERVICE only; null when can_see_chat is false. */
+  unread: number | null;
+  unread_threads: number | null;
+  oldest_unread_min: number | null;
+  /** CREDIT: HqCreditDay · PAYOUT: HqPayoutDay (a day "" row = older backlog, first) · CS: []. */
+  days: (HqCreditDay | HqPayoutDay)[];
+}
+
+export interface HqCase {
+  id: number;
+  pool_id: number;
+  branch_id: number;
+  code: string;
+  status: 'SUBMITTED' | 'APPROVED' | 'RETURNED' | 'WITHDRAWN';
+  seq: number;
+  age_min: number;
+  product: string;
+}
+
+export interface HqSettlement {
+  id: number;
+  /** 0 = the shop isn't tied to a payout pool. */
+  pool_id: number;
+  branch_id: number;
+  code: string;
+  status: string;
+  checked: boolean;
+  /** The payout bill it went out on; 0 = not in a payout run yet. */
+  bill_id: number;
+  amount: number;
+  /** Day the shop submitted the close-out. */
+  day: string;
+  age_min: number;
+}
+
+export interface SimHq {
+  /** The last 4 days, oldest → today. */
+  days: string[];
+  /** Open close-outs of shops not tied to a payout pool; > 0 → a warning. */
+  no_pool: number;
+  pools: HqPool[];
+  cases: HqCase[];
+  settlements: HqSettlement[];
 }
 
 export interface SimPayoutDay {
@@ -102,7 +187,25 @@ export interface SimulationData {
   companies: SimCompany[];
   branches: SimBranch[];
   waiting: SimWaiting[];
+  /** false → chat is [] and nothing about chat is drawn (§3). */
+  can_see_chat?: boolean;
+  chat?: SimChat[];
+  /** false → hq is null: no company building at all (§3). */
+  can_see_hq?: boolean;
+  hq?: SimHq | null;
 }
+
+/** `12,345` / `2,770.5` — the contract-terms lines carry no ฿ (NOTICE 1630). */
+export const plainNum = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 2 });
+
+/** `CT-… • 4,200 + 2,770 x 13m`; without a per-installment amount, the old `CT-… (13m)` (§6d). */
+export function termsOf(o: Pick<SimOpened, 'code' | 'months' | 'down' | 'installment'>) {
+  if (!o.installment || !o.months) return codeOf(o.code, o.months);
+  return `${o.code} • ${plainNum(o.down)} + ${plainNum(o.installment)} x ${o.months}m`;
+}
+
+/** `AT-… • M9VM2NJLWX`; no serial → just the asset. */
+export const assetOf = (asset: string, serial?: string) => (asset && serial ? `${asset} • ${serial}` : asset || serial || '');
 
 /** fn_installments_collection_monthly — a plain array (older RPC, no envelope). §7 */
 export interface CollectionMonth {

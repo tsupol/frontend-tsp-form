@@ -10,12 +10,14 @@ import { DateTime } from '../../components/DateTime';
 import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { useSimulationLive } from './useSimulationLive';
 import type { Focus, SceneHandle } from './SimulationScene';
-import { useCustomers } from './useCustomers';
+import { useChatters, useCustomers } from './useCustomers';
 import { PILE_ICON } from './simulationIcons';
 import { SimulationCollection } from './SimulationCollection';
+import { HqPoolCard } from './HqPoolCard';
+import { HQ_COLOR } from './simulationWorld';
 import {
   AMBER, BLUE, FLOOR, GREEN, PILES, PURPLE, SIMULATION_PERMISSION, SOLD_EDGE,
-  ageText, annualAtRate, annualPct, baht, bangkokClock, codeOf, companyEdge, downPct, downPctOf, gradeLabel, stateColor, stateLabel,
+  ageText, annualAtRate, annualPct, assetOf, baht, bangkokClock, codeOf, companyEdge, downPct, downPctOf, gradeLabel, plainNum, stateColor, stateLabel, termsOf,
   type PileKey, type SimBranch,
 } from './simulationTypes';
 import './simulation.css';
@@ -196,6 +198,8 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
   const [company, setCompany] = useState<number | null>(readCompany);
   const [picked, setPicked] = useState<number | null>(null);
   const [collectOf, setCollectOf] = useState<number | null>(null);
+  // The company building's room whose card is open (§6h); a shop and a pool card never both.
+  const [pickedHq, setPickedHq] = useState<number | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
   const [panelClosed, setPanelClosed] = useClosed(PANEL_KEY);
   const [tabsClosed, setTabsClosed] = useClosed(TABS_KEY);
@@ -209,6 +213,7 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
   };
   const { data, failed } = useSimulationLive(company, ready, onForbidden);
   const customers = useCustomers(data);
+  const chatters = useChatters(data);
 
   const [focusKey, setFocusKey] = useState<string | null>(null);
   const focusTimer = useRef(0);
@@ -230,22 +235,39 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
   const canFuture = !!data?.can_see_future;
   const canCollect = !!data?.can_see_collection;
   const showTabs = data?.viewer_scope === 'HOLDING' || data?.viewer_scope === 'GLOBAL';
+  // Chat waiting (§2e, mig 1628): the flag alone decides; false draws nothing about chat.
+  const canChat = !!data?.can_see_chat;
+  const chat = useMemo(() => (canChat ? data?.chat ?? [] : []), [canChat, data]);
+  const chatIn = (id: number) => chat.filter(c => c.branch_id === id);
+  const chatUnread = chat.reduce((s, c) => s + c.unread, 0);
+  const chatLongest = Math.max(0, ...chat.map(c => c.age_min));
+  // The company building (§2f): the flag alone decides; false = no building, no room kept for it.
+  const hq = data?.can_see_hq ? data.hq ?? null : null;
+  const hqPool = hq && pickedHq != null ? hq.pools[pickedHq] ?? null : null;
 
   // Tap a branch: tapping the same one again deselects and closes the collection
   // window; an open window follows the new selection (§7).
   const pick = (id: number) => {
     const next = id === picked ? null : id;
     setPicked(next);
+    setPickedHq(null);
     if (collectOf != null) setCollectOf(next);
   };
   // Arrow keys in the list move the selection, so they must never toggle it off.
   const pickRow = (id: number) => {
     setPicked(id);
+    setPickedHq(null);
     if (collectOf != null) setCollectOf(id);
   };
   const switchCompany = (id: number) => {
     setCompany(id);
     saveCompany(id);
+    setPicked(null);
+    setCollectOf(null);
+    setPickedHq(null);
+  };
+  const pickHq = (i: number) => {
+    setPickedHq(v => (v === i ? null : i));
     setPicked(null);
     setCollectOf(null);
   };
@@ -272,7 +294,8 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
     <div className="sim">
       {data && !empty && (
         <Suspense fallback={null}>
-          <SimulationScene key={data.company_id} ref={scene} branches={branches} customers={customers} picked={picked} focus={focus} onPick={pick} />
+          <SimulationScene key={data.company_id} ref={scene} branches={branches} customers={customers} chatters={chatters} showChat={!!data.can_see_chat} picked={picked} focus={focus} onPick={pick}
+            hq={hq} companyName={current?.name ?? ''} pickedHq={pickedHq} onPickHq={pickHq} />
         </Suspense>
       )}
 
@@ -342,6 +365,10 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
               {!panelClosed && <>
               <div className="sim__kpis">
                 <Kpi label={t('simulation.kpi.standing')} value={standing} unit={t('simulation.unit.people', { count: standing })} sub={standing > 0 ? t('simulation.kpi.longest', { age: ageText(t, longest) }) : undefined} />
+                {canChat && (
+                  <Kpi label={t('simulation.kpi.chat')} value={chat.length} unit={t('simulation.unit.people', { count: chat.length })}
+                    sub={chat.length > 0 ? t('simulation.kpi.chatSub', { n: chatUnread, age: ageText(t, chatLongest), count: chatUnread }) : undefined} />
+                )}
                 <Kpi label={t('simulation.kpi.contracts')} value={openedRows.length} unit={t('simulation.unit.contracts', { count: openedRows.length })} sub={grades} />
                 {isFund ? (
                   <>
@@ -386,7 +413,10 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
                     <button type="button" className="sim__row" onClick={() => pick(b.id)}>
                       <span className="sim__row-top">
                         <b><i className={`sim__rank${b.opened.length > 0 ? ' sim__rank--sold' : ''}`}>{rank}</i>{b.name}</b>
-                        <em>{t('simulation.contractCount', { n: b.opened.length, count: b.opened.length })} · {t('simulation.peopleCount', { n: n, count: n })}</em>
+                        <em>
+                          {t('simulation.contractCount', { n: b.opened.length, count: b.opened.length })} · {t('simulation.peopleCount', { n: n, count: n })}
+                          {chatIn(b.id).length > 0 && <i className="sim__chat-chip">{t('simulation.chatChip', { n: chatIn(b.id).length })}</i>}
+                        </em>
                       </span>
                       {isFund ? (
                         <>
@@ -482,15 +512,29 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
                     </tbody>
                   </table>
                 )}
-                {detail.opened.map(o => (
-                  <div key={o.code} className="sim__opened">
-                    <b>{o.product || '—'}</b>
-                    <span>{gradeLabel(t, o.grade)}{isFund ? ` · ${baht(o.financed)}` : ''}</span>
-                    <small>{[
-                      isFund ? `${codeOf(o.code, o.months)} ${t('simulation.downShort')} ${downPct(o.down_pct)}` : codeOf(o.code, o.months),
-                      o.asset,
-                      isFund && canProfit ? `${t('simulation.annualShort')} ${annualPct(o.profit ?? 0, ((o.investment ?? 0) * o.months) / 12)}` : '',
-                    ].filter(Boolean).join(' · ')}</small>
+                {/* Contract lines (§6d, NOTICE 1630): the terms as the shop sold them.
+                    "จัด" names the financed amount — without it the figure reads as
+                    the device price. sale_price/uplift come as given, never derived. */}
+                {detail.opened.map(o => {
+                  const asset = assetOf(o.asset, o.serial);
+                  const annual = isFund && canProfit
+                    ? `${t('simulation.annualShort')} ${annualPct(o.profit ?? 0, ((o.investment ?? 0) * o.months) / 12)}`
+                    : '';
+                  return (
+                    <div key={o.code} className="sim__opened" data-testid="sim-opened">
+                      <b>{o.product || '—'}</b>
+                      <span>{gradeLabel(t, o.grade)}{isFund ? ` · ${t('simulation.financedShort')} ${baht(o.financed)}` : ''}</span>
+                      {isFund && o.sale_price != null && (
+                        <small>{t('simulation.saleUplift', { sale: plainNum(o.sale_price), uplift: plainNum(o.uplift ?? 0) })}</small>
+                      )}
+                      <small>{isFund ? `${termsOf(o)} · ${t('simulation.downShort')} ${downPct(o.down_pct)}` : termsOf(o)}</small>
+                      {(asset || annual) && <small>{[asset, annual].filter(Boolean).join(' · ')}</small>}
+                    </div>
+                  );
+                })}
+                {chatIn(detail.id).map(c => (
+                  <div key={`chat-${c.id}`} className="sim__waiter" data-testid="sim-chat-row">
+                    <i className="sim__chat-dot" />{t('simulation.chatRow', { code: c.code, n: c.unread, age: ageText(t, c.age_min), count: c.unread })}
                   </div>
                 ))}
                 {inRoom(detail.id).map(a => (
@@ -500,6 +544,10 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
                   </div>
                 ))}
               </div>
+            )}
+
+            {hq && hqPool && (
+              <HqPoolCard hq={hq} pool={hqPool} branches={branches} canChat={canChat} onClose={() => setPickedHq(null)} />
             )}
 
             {collectBranch && canCollect && (
@@ -512,6 +560,16 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
               ))}
               <span className="sim__legend-floor"><i style={{ background: FLOOR.sold, borderColor: SOLD_EDGE }} />{t('simulation.legend.sold')}</span>
               <span className="sim__legend-floor"><i style={{ background: FLOOR.guest, borderColor: '#e2c98f' }} />{t('simulation.legend.guest')}</span>
+              {canChat && <span className="sim__legend-floor"><i className="sim__chat-dot" />{t('simulation.legend.chat', { n: chat.length })}</span>}
+              {hq && <>
+                <span className="sim__legend-floor"><i style={{ background: HQ_COLOR.waiting }} />{t('simulation.legend.hqFolder')}</span>
+                <span className="sim__legend-floor"><i style={{ background: HQ_COLOR.approved }} />{t('simulation.legend.hqApproved')}</span>
+                <span className="sim__legend-floor"><i style={{ background: HQ_COLOR.returned }} />{t('simulation.legend.hqReturned')}</span>
+                <span className="sim__legend-floor"><i style={{ background: HQ_COLOR.checked }} />{t('simulation.legend.hqChecked')}</span>
+                <span className="sim__legend-floor"><i style={{ background: HQ_COLOR.inPayout }} />{t('simulation.legend.hqInPayout')}</span>
+                <span className="sim__legend-floor"><i style={{ background: HQ_COLOR.money }} />{t('simulation.legend.hqMoney')}</span>
+                <span className="sim__legend-floor">{t('simulation.legend.hqDesks')}</span>
+              </>}
               <span className="sim__legend-icon" data-testid="sim-legend-cars"><CarFront size={13} />{t('simulation.legend.cars', { n: openedToday })}</span>
               {isFund && PILES.FINANCIER.map(p => (
                 <span key={p.key} className="sim__legend-icon"><PileIcon k={p.key} />{t(`simulation.legend.${p.key}`)}</span>

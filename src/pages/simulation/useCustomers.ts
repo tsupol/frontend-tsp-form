@@ -1,5 +1,5 @@
 import { useMemo, useRef } from 'react';
-import type { SeatedCustomer, Station } from './simulationWorld';
+import type { ChatSeat, SeatedCustomer, Station } from './simulationWorld';
 import type { SimulationData, SimWaiting } from './simulationTypes';
 
 // Customers on screen are the contracts in `waiting`. Each one keeps their seat between
@@ -58,6 +58,40 @@ export function useCustomers(data: SimulationData | null): Customer[] {
         id: w.id, branchId: w.branch_id, code: w.code, state: w.state, age: w.age_min, months: w.months,
         product: w.product ?? '', asset: w.asset ?? '', station, spot: seat.spot,
       };
+    });
+  }, [data]);
+}
+
+export interface Chatter extends ChatSeat {
+  code: string;
+  unread: number;
+  age: number;
+}
+
+/** chat[] seated in each shop's chat corner (§6g). A chatter keeps their chair between
+ *  answers; a new one takes the first free chair. Empty unless can_see_chat. */
+export function useChatters(data: SimulationData | null): Chatter[] {
+  const seats = useRef(new Map<number, number>());
+  const companyId = useRef<number | null>(null);
+
+  return useMemo(() => {
+    if (!data || !data.can_see_chat) return [];
+    const rows = data.chat ?? [];
+    if (companyId.current !== data.company_id) seats.current.clear();
+    companyId.current = data.company_id;
+    const live = new Set(rows.map(r => r.id));
+    seats.current.forEach((_, id) => { if (!live.has(id)) seats.current.delete(id); });
+    const taken = new Set<string>();
+    rows.forEach(r => { const s = seats.current.get(r.id); if (s != null) taken.add(`${r.branch_id}:${s}`); });
+    return rows.map(r => {
+      let spot = seats.current.get(r.id);
+      if (spot == null) {
+        spot = 0;
+        while (taken.has(`${r.branch_id}:${spot}`)) spot++;
+        taken.add(`${r.branch_id}:${spot}`);
+        seats.current.set(r.id, spot);
+      }
+      return { id: r.id, branchId: r.branch_id, spot, code: r.code, unread: r.unread, age: r.age_min };
     });
   }, [data]);
 }
