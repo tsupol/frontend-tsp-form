@@ -4,6 +4,7 @@ import {
   SRGBColorSpace, Scene, ShadowMaterial, SphereGeometry, Vector2, Vector3, WebGLRenderer, type BufferGeometry, type Material,
 } from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import type { FlightLayer } from './simulationFlights';
 import { FLOOR, PILES, SOLD_EDGE, companyEdge, stateColor, type CompanyType, type HqCreditDay, type HqPayoutDay, type PileKey, type SimBranch, type SimHq } from './simulationTypes';
 
 type BranchType = SimBranch['type'];
@@ -425,6 +426,9 @@ export class ShopWorld {
   private carsWereVisible = true;
   private canvas: HTMLCanvasElement;
   private type: CompanyType | undefined;
+  /** Envelopes and bank notes in the air (HTML), moved in the cars' frame loop. */
+  private flights: FlightLayer | null = null;
+  private hqData: SimHq | null = null;
   private onRestored = () => { this.renderer.shadowMap.needsUpdate = true; this.render(); };
 
   constructor(canvas: HTMLCanvasElement, shops: ShopRef[], type: CompanyType | undefined, hqRooms = 0) {
@@ -720,6 +724,8 @@ export class ShopWorld {
     if (this.raf || !this.motion) return;
     const frame = (t: number) => {
       this.raf = requestAnimationFrame(frame);
+      // Flights are DOM over the canvas: moving them needs no WebGL redraw.
+      this.flights?.tick(t, this.view);
       // Every display frame: a 30 fps cap chosen by elapsed time skipped frames unevenly
       // (one, then two), so the cars moved in uneven steps and the road looked jerky.
       // No car on screen: nothing has changed, so don't draw at all.
@@ -998,6 +1004,7 @@ export class ShopWorld {
     });
 
     this.hqMarkList = [];
+    this.hqData = hq;
     if (hq && this.plan.hq) this.drawHq(hq);
 
     this.renderer.shadowMap.needsUpdate = true;
@@ -1096,6 +1103,40 @@ export class ShopWorld {
 
   piles() { return this.pileList; }
 
+  /** The flight layer this world moves each frame (it outlives a rebuilt world). */
+  setFlights(layer: FlightLayer | null) { this.flights = layer; }
+
+  /** Where a flight leaves or lands in a shop: approval chairs, cashier's desk, or the "paid out" pile. */
+  shopPoint(branchId: number, at: 'approval' | 'cashier' | 'paid'): [number, number, number] | null {
+    const r = this.plan.rooms.find(p => p.id === branchId);
+    if (!r) return null;
+    if (at === 'paid') {
+      const p = this.pileList.find(x => x.branchId === branchId && x.key === 'payout');
+      if (p) return [p.x, p.h + 0.3, p.z];
+    }
+    if (at === 'approval') return [r.ox + WAIT_COLS[2], 1.3, r.oz + 5.6];
+    return [r.ox + 9, LOT_Y + SLAB + 1.1, r.oz + 1.35];
+  }
+
+  /** Where a flight leaves or lands in a pool room: the tray, or a day column's folders / money box.
+   *  A date not among the columns goes to the older-backlog column ("") when there is one, else the tray. */
+  hqPoint(poolId: number, at: 'tray' | 'folders' | 'money', day?: string): [number, number, number] | null {
+    const place = this.plan.hq;
+    const ri = this.hqData?.pools.findIndex(p => p.id === poolId) ?? -1;
+    const pool = this.hqData?.pools[ri];
+    const r = place?.rooms[ri];
+    if (!pool || !r) return null;
+    const y = LOT_Y + SLAB;
+    const tray: [number, number, number] = [r.ox + 1.05, y + 0.8, r.oz + 2.45];
+    if (at === 'tray' || day == null) return tray;
+    let di = pool.days.findIndex(d => d.day === day);
+    if (di < 0 && pool.kind === 'PAYOUT') di = pool.days.findIndex(d => d.day === '');
+    if (di < 0) return tray;
+    if (pool.kind === 'CREDIT') return [r.ox + 2.4 + di * 1.6, y + 0.5, r.oz + 4.05];
+    const cx = r.ox + 1.95 + di * 1.4;
+    return at === 'money' ? [cx, y + 0.8, r.oz + 4.65] : [cx, y + 0.5, r.oz + 3.9];
+  }
+
   /** Head-top position of a customer, for a label. */
   customerAt(c: SeatedCustomer): [number, number, number] | null {
     // Where setLive actually put them — inside, in the queue, or out of the door; null = in a "+n".
@@ -1172,6 +1213,7 @@ export class ShopWorld {
   dispose() {
     cancelAnimationFrame(this.raf);
     this.raf = 0;
+    this.flights = null;
     this.canvas.removeEventListener('webglcontextrestored', this.onRestored);
     this.live.children.forEach(ch => (ch as InstancedMesh).dispose?.());
     this.owned.forEach(o => o.dispose());

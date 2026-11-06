@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button, DataTable, MobileHeader, PageNav, PageNavPanel, Skeleton, useSnackbarContext } from 'tsp-form';
-import { ArrowRightFromLine, CarFront, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, House, Info, Minus, Plus, X, XCircle } from 'lucide-react';
+import { ArrowRightFromLine, CarFront, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, House, Minus, Plus, X, XCircle } from 'lucide-react';
 import { ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { DateTime } from '../../components/DateTime';
@@ -15,6 +15,7 @@ import { PILE_ICON } from './simulationIcons';
 import { SimulationCollection } from './SimulationCollection';
 import { HqPoolCard } from './HqPoolCard';
 import { HQ_COLOR } from './simulationWorld';
+import { flightSvg, type FlightKind } from './simulationFlights';
 import {
   AMBER, BLUE, FLOOR, GREEN, PILES, PURPLE, SIMULATION_PERMISSION, SOLD_EDGE,
   ageText, annualAtRate, annualPct, assetOf, baht, bangkokClock, codeOf, companyEdge, downPct, downPctOf, gradeLabel, plainNum, stateColor, stateLabel, termsOf,
@@ -33,6 +34,7 @@ const SimulationScene = lazy(() => import('./SimulationScene').then(m => ({ defa
 const COMPANY_KEY = 'nnf.simulation.company';
 const PANEL_KEY = 'nnf.simulation.panelClosed';
 const TABS_KEY = 'nnf.simulation.tabsClosed';
+const LEGEND_KEY = 'nnf.simulation.legendClosed';
 const LEGEND_STATES = ['DRAFT', 'PENDING_APPROVAL', 'PENDING_SIGN', 'PENDING_PAYMENT'];
 const PHONE_QUERY = '(max-width: 743.98px)';
 
@@ -53,12 +55,13 @@ function saveCompany(id: number) {
 }
 
 // Whether a floating part is minimized is this viewer's own convenience, kept per browser.
-function useClosed(key: string) {
+function useClosed(key: string, initial = false) {
   const [closed, setClosed] = useState(() => {
     try {
-      return localStorage.getItem(key) === '1';
+      const v = localStorage.getItem(key);
+      return v == null ? initial : v === '1';
     } catch {
-      return false;
+      return initial;
     }
   });
   const set = (next: boolean) => {
@@ -106,6 +109,16 @@ function Kpi({ label, value, unit, sub, sub2, icon }: { label: string; value: Re
 const PILE_SHADE: Record<PileKey, string> = {
   cash: GREEN[1], transfer: BLUE[1], wallet: AMBER[1], other: PURPLE[1], pending_payout: AMBER[1], payout: GREEN[1],
 };
+/** A legend swatch: a flat colour block (a floor, a stack of folders). */
+function Folder({ color, edge }: { color: string; edge?: string }) {
+  return <i className="sim__legend-swatch" style={{ background: color, borderColor: edge ?? 'rgba(0,0,0,.25)' }} />;
+}
+
+/** A legend swatch: the envelope or bank note that flies (fixed SVG, no data in it). */
+function Flight({ k }: { k: FlightKind }) {
+  return <span className="sim__legend-flight" dangerouslySetInnerHTML={{ __html: flightSvg(k) }} />;
+}
+
 function PileIcon({ k, size = 14 }: { k: PileKey; size?: number }) {
   const Icon = PILE_ICON[k];
   return <Icon size={size} color={PILE_SHADE[k]} className="sim__icon" aria-hidden="true" />;
@@ -200,7 +213,7 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
   const [collectOf, setCollectOf] = useState<number | null>(null);
   // The company building's room whose card is open (§6h); a shop and a pool card never both.
   const [pickedHq, setPickedHq] = useState<number | null>(null);
-  const [legendOpen, setLegendOpen] = useState(false);
+  const [legendClosed, setLegendClosed] = useClosed(LEGEND_KEY, true);
   const [panelClosed, setPanelClosed] = useClosed(PANEL_KEY);
   const [tabsClosed, setTabsClosed] = useClosed(TABS_KEY);
   const scene = useRef<SceneHandle>(null);
@@ -357,7 +370,6 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
               <Button variant="ghost" size="sm" startIcon={<Plus size={14} />} aria-label={t('simulation.zoomIn')} onClick={() => scene.current?.zoom(1.2)} />
               <Button variant="ghost" size="sm" startIcon={<Minus size={14} />} aria-label={t('simulation.zoomOut')} onClick={() => scene.current?.zoom(0.83)} />
               <Button variant="ghost" size="sm" startIcon={<House size={14} />} aria-label={t('simulation.zoomFit')} onClick={() => scene.current?.fit()} />
-              <Button variant={legendOpen ? 'outline' : 'ghost'} size="sm" startIcon={<Info size={14} />} aria-label={t('simulation.legendToggle')} aria-expanded={legendOpen} onClick={() => setLegendOpen(v => !v)} />
             </div>
 
             <aside className={`sim__card sim__panel${panelClosed ? ' sim__panel--closed' : ''}`}>
@@ -567,29 +579,47 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
               <SimulationCollection branch={collectBranch} generatedAt={data.generated_at} onClose={() => setCollectOf(null)} />
             )}
 
-            {legendOpen && <div className="sim__card sim__legend">
-              {LEGEND_STATES.map(s => (
-                <span key={s}><i style={{ background: stateColor(s) }} />{stateLabel(t, s)}</span>
-              ))}
-              <span className="sim__legend-floor"><i style={{ background: FLOOR.sold, borderColor: SOLD_EDGE }} />{t('simulation.legend.sold')}</span>
-              <span className="sim__legend-floor"><i style={{ background: FLOOR.guest, borderColor: '#e2c98f' }} />{t('simulation.legend.guest')}</span>
-              {canChat && <span className="sim__legend-floor"><i className="sim__chat-dot" />{t('simulation.legend.chat', { n: chat.length })}</span>}
-              {hq && <>
-                <span className="sim__legend-floor"><i style={{ background: HQ_COLOR.waiting }} />{t('simulation.legend.hqFolder')}</span>
-                <span className="sim__legend-floor"><i style={{ background: HQ_COLOR.approved }} />{t('simulation.legend.hqApproved')}</span>
-                <span className="sim__legend-floor"><i style={{ background: HQ_COLOR.returned }} />{t('simulation.legend.hqReturned')}</span>
-                <span className="sim__legend-floor"><i style={{ background: HQ_COLOR.checked }} />{t('simulation.legend.hqChecked')}</span>
-                <span className="sim__legend-floor"><i style={{ background: HQ_COLOR.inPayout }} />{t('simulation.legend.hqInPayout')}</span>
-                <span className="sim__legend-floor"><i style={{ background: HQ_COLOR.money }} />{t('simulation.legend.hqMoney')}</span>
-                <span className="sim__legend-floor">{t('simulation.legend.hqDesks')}</span>
-              </>}
-              <span className="sim__legend-floor"><i style={{ background: '#e3d3a8' }} />{t('simulation.legend.stale')}</span>
-              <span className="sim__legend-floor">{t('simulation.legend.outside')}</span>
-              <span className="sim__legend-icon" data-testid="sim-legend-cars"><CarFront size={13} />{t('simulation.legend.cars', { n: openedToday })}</span>
-              {isFund && PILES.FINANCIER.map(p => (
-                <span key={p.key} className="sim__legend-icon"><PileIcon k={p.key} />{t(`simulation.legend.${p.key}`)}</span>
-              ))}
-            </div>}
+            {/* What the picture's colours and things mean, in three groups. Folds down to its bar
+                like the overview panel folds up; minimized by default, remembered per browser. */}
+            <section className={`sim__card sim__legend${legendClosed ? ' sim__legend--closed' : ''}`} data-testid="sim-legend">
+              <button type="button" className="sim__legend-toggle" aria-expanded={!legendClosed} aria-label={t(legendClosed ? 'simulation.legend.show' : 'simulation.legend.hide')} onClick={() => setLegendClosed(!legendClosed)}>
+                <span>{t('simulation.legend.title')}</span>
+                {legendClosed ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </button>
+              {!legendClosed && <div className="sim__legend-groups">
+                <div className="sim__legend-group">
+                  <h4>{t('simulation.legend.groupCustomers')}</h4>
+                  {LEGEND_STATES.map(s => (
+                    <span key={s}><i style={{ background: stateColor(s) }} />{stateLabel(t, s)}</span>
+                  ))}
+                  {canChat && <span className="sim__legend-wide"><i className="sim__chat-dot" />{t('simulation.legend.chat', { n: chat.length })}</span>}
+                  <span className="sim__legend-wide">{t('simulation.legend.outside')}</span>
+                  <span className="sim__legend-wide"><Folder color="#e3d3a8" />{t('simulation.legend.stale')}</span>
+                  <small className="sim__legend-wide">{t('simulation.legend.customersNote')}</small>
+                </div>
+                <div className="sim__legend-group">
+                  <h4>{t('simulation.legend.groupShops')}</h4>
+                  <span><Folder color={FLOOR.sold} edge={SOLD_EDGE} />{t('simulation.legend.sold')}</span>
+                  <span><Folder color={FLOOR.guest} edge="#e2c98f" />{t('simulation.legend.guest')}</span>
+                  {isFund && PILES.FINANCIER.map(p => (
+                    <span key={p.key}><PileIcon k={p.key} />{t(`simulation.legend.${p.key}`)}</span>
+                  ))}
+                  <span className="sim__legend-wide" data-testid="sim-legend-cars"><CarFront size={13} />{t('simulation.legend.cars', { n: openedToday })}</span>
+                </div>
+                {hq && <div className="sim__legend-group">
+                  <h4>{t('simulation.legend.groupCompany')}</h4>
+                  <span><Folder color={HQ_COLOR.waiting} /><Flight k="submit" />{t('simulation.legend.hqWaiting')}</span>
+                  <span><Folder color={HQ_COLOR.approved} /><Flight k="approve" />{t('simulation.legend.hqApproved')}</span>
+                  <span><Folder color={HQ_COLOR.returned} /><Flight k="return" />{t('simulation.legend.hqReturned')}</span>
+                  <span><Flight k="withdraw" />{t('simulation.legend.flightWithdraw')}</span>
+                  <span><Folder color={HQ_COLOR.checked} />{t('simulation.legend.hqChecked')}</span>
+                  <span><Folder color={HQ_COLOR.inPayout} />{t('simulation.legend.hqInPayout')}</span>
+                  <span><Folder color={HQ_COLOR.money} /><Flight k="money" />{t('simulation.legend.hqMoney')}</span>
+                  <span className="sim__legend-wide">{t('simulation.legend.hqDesks')}</span>
+                  <small className="sim__legend-wide">{t('simulation.legend.hqNote')}</small>
+                </div>}
+              </div>}
+            </section>
           </>
         )}
       </div>

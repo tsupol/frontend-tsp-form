@@ -125,12 +125,24 @@ button.sim__tabs-toggle:hover, .sim__company-min:hover .sim__tabs-toggle { color
 .sim__tip small { color: var(--color-subtle); font-size: 11px; }
 .sim__muted { margin: 6px 0 0; font-size: 11px; color: var(--color-subtle); }
 
-.sim__legend { position: absolute; left: 12px; right: 324px; bottom: 12px; margin-inline: auto; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 12px; width: fit-content; padding: 6px 12px; font-size: 12px; }
-.sim__legend > span { white-space: nowrap; }
-.sim__legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin: 0 4px 0 0; }
-.sim__legend .sim__legend-floor i { width: 12px; height: 9px; border: 1.5px solid; box-sizing: border-box; }
-.sim__legend-icon { display: inline-flex; align-items: center; }
-.sim__body--panel-closed .sim__legend { right: 12px; }
+/* Legend: a bar that folds down (like the overview panel folds up), three groups side by side,
+   each a two-column grid; long lines span both columns. */
+.sim__legend { position: absolute; left: 12px; right: 324px; bottom: 12px; margin-inline: auto; display: flex; flex-direction: column; width: fit-content; max-width: calc(100% - 336px); overflow: hidden; font-size: 12px; }
+.sim__legend-toggle { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; height: 30px; padding: 0 8px 0 12px; border: 0; border-bottom: 1px solid var(--color-line); background: var(--color-surface-hover); color: var(--color-subtle); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.sim__legend-toggle:hover { color: var(--color-fg); }
+.sim__legend--closed .sim__legend-toggle { border-bottom: 0; }
+.sim__legend-groups { display: flex; flex-wrap: wrap; gap: 8px 28px; padding: 8px 14px 10px; max-height: 45vh; overflow: auto; }
+.sim__legend-group { display: grid; min-width: 230px; grid-template-columns: repeat(2, minmax(max-content, 1fr)); gap: 3px 14px; align-content: start; }
+.sim__legend-group h4 { grid-column: 1 / -1; margin: 0 0 2px; font-size: 11px; font-weight: 700; color: var(--color-subtle); text-transform: uppercase; letter-spacing: .02em; }
+.sim__legend-group > span, .sim__legend-group > small { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.sim__legend-group > small { color: var(--color-subtle); font-size: 11px; }
+/* A long line spans the group's two columns and wraps inside them; width 0 + min-width 100%
+   keeps it from widening the group (its columns are sized by the short entries). */
+.sim__legend-group > .sim__legend-wide { grid-column: 1 / -1; width: 0; min-width: 100%; white-space: normal; align-items: flex-start; line-height: 1.35; }
+.sim__legend-wide > i, .sim__legend-wide > svg { margin-top: 3px; }
+.sim__legend i { display: inline-block; flex: none; width: 8px; height: 8px; border-radius: 2px; }
+.sim__legend .sim__legend-swatch { width: 12px; height: 9px; border: 1.5px solid; box-sizing: border-box; }
+.sim__body--panel-closed .sim__legend { right: 12px; max-width: calc(100% - 24px); }
 
 /* Portrait iPad (744–1023 wide): the branch list becomes a bottom panel and is never
    hidden, the shop card covers it at full width, zoom and legend sit above it. */
@@ -139,7 +151,8 @@ button.sim__tabs-toggle:hover, .sim__company-min:hover .sim__tabs-toggle { color
   .sim__kpis { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
   .sim__detail { left: 12px; right: 12px; width: auto; max-height: 55%; }
   .sim__zoom { top: auto; bottom: calc(42% + 24px); }
-  .sim__legend { left: 72px; right: 12px; bottom: calc(42% + 24px); margin-inline: auto 0; justify-content: flex-end; }
+  .sim__legend { left: 72px; right: 12px; bottom: calc(42% + 24px); margin-inline: auto 0; max-width: calc(100% - 84px); }
+  .sim__legend-groups { max-height: 30vh; }
   /* Down here the panel sits at the bottom and folds downwards, so its chevron points the other way. */
   .sim__panel-toggle svg { transform: rotate(180deg); }
   .sim__panel--closed { top: auto; bottom: 12px; left: auto; height: auto; width: auto; }
@@ -152,7 +165,7 @@ button.sim__tabs-toggle:hover, .sim__company-min:hover .sim__tabs-toggle { color
 @media (pointer: coarse) {
   .sim__zoom .btn { width: 44px; height: 44px; }
   .sim__tabs-toggle { width: 44px; }
-  .sim__panel-toggle { height: 44px; }
+  .sim__panel-toggle, .sim__legend-toggle { height: 44px; }
   .sim__company-min { min-height: 44px; }
   .sim__close.btn { width: 44px; height: 44px; right: -10px; top: -10px; }
   .sim__row { padding: 10px 12px; min-height: 44px; }
@@ -190,3 +203,11 @@ button.sim__tabs-toggle:hover, .sim__company-min:hover .sim__tabs-toggle { color
 .sim__more--chat { background: #11707a; }
 .sim__count--stale { background: #fff1cc; color: #7a5d16; }
 .sim__stale-chip { background: #fff1cc; color: #7a5d16; }
+/* Envelopes and bank notes flying between a shop and the company building (§3). Moved by
+   simulationFlights.ts writing transform each frame; above the tags, under the open label. */
+.sim__flights { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.sim__flight { position: absolute; left: 0; top: 0; display: flex; flex-direction: column-reverse; align-items: center; will-change: transform, opacity; filter: drop-shadow(0 2px 2px rgba(20, 40, 50, .3)); }
+.sim__flight svg { display: block; }
+.sim__flight-label { margin-bottom: 1px; padding: 0 6px; border: 1.5px solid #3f9153; border-radius: 8px; background: #fff; color: #2e7d40; font-size: 12px; font-weight: 700; line-height: 16px; white-space: nowrap; }
+.sim__legend-flight { display: inline-flex; flex: none; }
+.sim__legend-flight svg { width: 20px; height: auto; }

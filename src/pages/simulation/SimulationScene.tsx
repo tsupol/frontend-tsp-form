@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { PILE_ICON } from './simulationIcons';
 import { CHAT_COLOR, CHAT_LABEL, HQ_BACK_H, HQ_COLOR, HQ_RW, RW, ShopWorld, planOf, project, zoneLabels, type Hit, type HqMark, type MoreMark, type PilePlace, type ShopRef, type StalePile } from './simulationWorld';
 import type { Chatter, Customer } from './useCustomers';
+import { FlightLayer, flightsBetween, snapshotOf, type HqSnapshot } from './simulationFlights';
 import { ageText, baht, codeOf, compactBaht, stateColor, stateLabel, type SimBranch, type SimHq } from './simulationTypes';
 
 // The still picture of the shops (156 §6). One shop per branch, each customer in it is a
@@ -81,6 +82,11 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
   const gesture = useRef<{ pinch: boolean; x: number; y: number; d: number; vx: number; vy: number; k: number } | null>(null);
   const moved = useRef(false);
   const hovered = useRef<string | null>(null);
+  // Envelopes / bank notes (§3). The page keys this scene by company, so a company switch —
+  // and coming back from another company — starts with no previous answer: nothing flies.
+  const flightHost = useRef<HTMLDivElement>(null);
+  const flights = useRef<FlightLayer | null>(null);
+  const lastHq = useRef<HqSnapshot | null>(null);
 
   useEffect(() => {
     if (!host.current) return;
@@ -98,6 +104,8 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
       return;
     }
     world.current = w;
+    if (!flights.current && flightHost.current) flights.current = new FlightLayer(flightHost.current);
+    w.setFlights(flights.current);
     if (import.meta.env.DEV) (window as unknown as { __simWorld?: ShopWorld }).__simWorld = w;
     setReady(true);
     return () => {
@@ -118,6 +126,22 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
     setStalePiles([...world.current.stalePiles()]);
     world.current.render();
   }, [ready, branches, customers, picked, showChat, chatters, hq, stale]);
+
+  // After setLive above, so the shop piles the bank notes land on are this answer's.
+  useEffect(() => {
+    if (!hq) {
+      lastHq.current = null;
+      return;
+    }
+    const w = world.current;
+    const prev = lastHq.current;
+    lastHq.current = snapshotOf(hq);
+    // The first answer after load lays things out by status; only changes after it fly.
+    if (!prev || !ready || !w) return;
+    flights.current?.add(flightsBetween(prev, hq, { shopPoint: (b, at) => w.shopPoint(b, at), hqPoint: (p, at, day) => w.hqPoint(p, at, day) }));
+  }, [ready, hq]);
+
+  useEffect(() => () => flights.current?.clear(), []);
 
   useEffect(() => {
     if (!ready || !world.current || size.w <= 1) return;
@@ -438,6 +462,8 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
           </span>
         );
       })}
+
+      <div ref={flightHost} className="sim__flights" />
 
       {/* Kept inside the scene: the label is up to 320 px wide (86 vw on a narrow
           screen, see .sim__chip--on) and centred on its customer, who may stand by an edge. */}
