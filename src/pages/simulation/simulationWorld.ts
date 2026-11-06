@@ -41,7 +41,6 @@ const SIT_H = 0.5;
 const STAND_H = 0.85;
 const DOOR: [number, number] = [6.6, 9.4];
 const CAR_LEN = 2.9;
-const CAR_FPS = 30;
 const CAR_CAPACITY = 64; // instances made up front; grows when a busy day needs more
 const CAR_RUNOFF = 6; // road beyond the frontage the cars still use, each end
 const CAR_FADE = 3; // a car grows in / shrinks away over this much road at each end
@@ -421,7 +420,6 @@ export class ShopWorld {
   private span = 1;
   private spanStart = 0;
   private raf = 0;
-  private lastFrame = 0;
   private sized = false;
   private view = { k: 1, x: 0, y: 0, w: 1, h: 1 };
   private carsWereVisible = true;
@@ -722,8 +720,8 @@ export class ShopWorld {
     if (this.raf || !this.motion) return;
     const frame = (t: number) => {
       this.raf = requestAnimationFrame(frame);
-      if (t - this.lastFrame < 1000 / CAR_FPS - 2) return;
-      this.lastFrame = t;
+      // Every display frame: a 30 fps cap chosen by elapsed time skipped frames unevenly
+      // (one, then two), so the cars moved in uneven steps and the road looked jerky.
       // No car on screen: nothing has changed, so don't draw at all.
       const visible = this.carsVisible(t / 1000);
       if (!visible && !this.carsWereVisible) return;

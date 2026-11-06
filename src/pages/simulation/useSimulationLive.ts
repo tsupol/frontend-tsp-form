@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiClient, ApiError } from '../../lib/api';
 import type { SimulationData } from './simulationTypes';
+import { busyDemo, simulationDemoOn } from './simulationDemo';
 
 // Polling rules — UI_SUMMARY/156_SIMULATION.md §4:
 //   1. re-fetch `refresh_sec` seconds after the LAST ANSWER, never overlapping;
@@ -33,7 +34,8 @@ export function useSimulationLive(companyId: number | null, enabled: boolean, on
     try {
       const d = await apiClient.rpc<SimulationData>('fn_simulation_live', companyId == null ? {} : { p_company_id: companyId });
       if (my !== seq.current) return;
-      setData(d);
+      // Local dev only: ?demo=busy swaps in made-up busy shops to try the page's speed.
+      setData(simulationDemoOn() ? busyDemo(d) : d);
       setFailed(false);
       next = Math.max(5, d.refresh_sec || 15) * 1000;
     } catch (err) {
