@@ -1178,7 +1178,8 @@
         "wallpaper": "Wallpaper",
         "appControl": "App control",
         "lostMode": "Lost mode & location",
-        "pause": "Pause enforcement"
+        "pause": "Pause enforcement",
+        "danger": "Removal & unlock codes"
       },
       "goToEnroll": "This device isn't in MDM yet — enroll it first",
       "ack": {
@@ -1457,6 +1458,8 @@
       },
       "danger": {
         "heading": "Remove from enforcement",
+        "revealOnlyHeading": "Activation Lock codes",
+        "revealOnlyIntro": "For a device stuck on Activation Lock, e.g. after an erase or after the customer took it out of MDM. Viewing the codes is logged with your name.",
         "intro": "Company-level actions. Each one asks you to confirm the serial and retype a code.",
         "noSerial": "This asset has no serial number, so these actions are unavailable.",
         "nothingToRemove": "There is no enforcement profile on this device to remove.",

@@ -51,8 +51,11 @@ export function MdmDangerZone({ status, onChanged }: {
   // (NOTICE 2026-10-30 — company inventory holds all three since mig 1532).
   const { hasPermission } = useMyPermissions();
 
-  const mayRemove = hasPermission('MDM.PROFILE_REMOVE');
-  const mayErase = hasPermission('MDM.ERASE');
+  // Removing the profile and erasing are commands sent to the device, so they
+  // need it enrolled. The unlock codes don't — a device the customer pulled out
+  // of MDM and that came back Activation-Locked is when they're needed most.
+  const mayRemove = status.in_mdm && hasPermission('MDM.PROFILE_REMOVE');
+  const mayErase = status.in_mdm && hasPermission('MDM.ERASE');
   const mayReveal = hasPermission('MDM.ACTIVATION_LOCK_REVEAL');
 
   const [flow, setFlow] = useState<Flow | null>(null);
@@ -151,8 +154,20 @@ export function MdmDangerZone({ status, onChanged }: {
   return (
     <div className="border border-danger-border rounded-md p-4 flex flex-col gap-3">
       <div>
-        <h3 className="text-sm font-semibold text-danger-fg">{t('asset.mdm.danger.heading')}</h3>
-        <p className="text-xs text-subtle mt-0.5">{t('asset.mdm.danger.intro')}</p>
+        {/* Only the codes to offer (off the MDM, or no remove/erase right):
+            the remove/erase heading and its "every button asks for the serial
+            and a code" line would describe buttons that aren't there. */}
+        {mayRemove || mayErase ? (
+          <>
+            <h3 className="text-sm font-semibold text-danger-fg">{t('asset.mdm.danger.heading')}</h3>
+            <p className="text-xs text-subtle mt-0.5">{t('asset.mdm.danger.intro')}</p>
+          </>
+        ) : (
+          <>
+            <h3 className="text-sm font-semibold text-danger-fg">{t('asset.mdm.danger.revealOnlyHeading')}</h3>
+            <p className="text-xs text-subtle mt-0.5">{t('asset.mdm.danger.revealOnlyIntro')}</p>
+          </>
+        )}
       </div>
 
       {pageError && <div className="alert alert-danger"><span>{pageError}</span></div>}

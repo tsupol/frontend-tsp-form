@@ -30,17 +30,30 @@ import { SubTabWallpaper } from './mdm/SubTabWallpaper';
 import { SubTabAppControl } from './mdm/SubTabAppControl';
 import { SubTabLostMode } from './mdm/SubTabLostMode';
 import { SubTabPause } from './mdm/SubTabPause';
+import { MdmDangerZone } from './mdm/MdmDangerZone';
+import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { DeviceLocationButton } from '../../components/deviceLocation/DeviceLocationDialog';
 import type { AssetMdmStatus, MdmReliefStatus } from './mdm/mdmApi';
 
-type MdmSubTab = 'enroll' | 'status' | 'dunning' | 'wallpaper' | 'appControl' | 'lostMode' | 'pause';
+type MdmSubTab = 'enroll' | 'status' | 'dunning' | 'wallpaper' | 'appControl' | 'lostMode' | 'pause' | 'danger';
 
 /** Which sub-tabs to show, given enrollment + per-device permissions (§12). */
-function visibleSubTabs(status: AssetMdmStatus | null, relief: MdmReliefStatus | null | undefined): MdmSubTab[] {
+function visibleSubTabs(
+  status: AssetMdmStatus | null,
+  relief: MdmReliefStatus | null | undefined,
+  danger: { reveal: boolean; deviceCommands: boolean },
+): MdmSubTab[] {
   // Pause (§9) is DB-only and allowed even before enrollment (§12 exception).
   if (!status) return ['enroll'];
+  // Remove / erase / unlock codes have their own sub-tab, shown on the user's
+  // own permissions alone (NOTICE 1626: the unlock-code right is now given to
+  // single people, any role, and most needed on a device that LEFT the MDM —
+  // it can't hide behind may_pause or in_mdm). Remove/erase are device
+  // commands, so off the MDM only the codes count.
   if (!status.in_mdm) {
-    return status.may_pause ? ['enroll', 'pause'] : ['enroll'];
+    const tabs: MdmSubTab[] = status.may_pause ? ['enroll', 'pause'] : ['enroll'];
+    if (danger.reveal) tabs.push('danger');
+    return tabs;
   }
   const tabs: MdmSubTab[] = ['enroll', 'status'];
   // The 24-hour relief lives with dunning, and more roles may press it than
@@ -50,6 +63,7 @@ function visibleSubTabs(status: AssetMdmStatus | null, relief: MdmReliefStatus |
   if (status.may_app_control) tabs.push('appControl');
   if (status.may_lost_mode || status.may_location) tabs.push('lostMode');
   if (status.may_pause) tabs.push('pause');
+  if (danger.reveal || danger.deviceCommands) tabs.push('danger');
   return tabs;
 }
 
@@ -81,7 +95,14 @@ export function AssetMdmTab({ assetId, onRefresh, onAddSerial }: {
   };
 
   const { data: relief, refetch: refetchRelief } = useMdmRelief(status?.serial_number ?? null, !!status?.in_mdm);
-  const tabs = useMemo(() => visibleSubTabs(status ?? null, relief), [status, relief]);
+  // v_my_permissions (per-person grants included), never role_code.
+  const { hasPermission } = useMyPermissions();
+  const mayReveal = hasPermission('MDM.ACTIVATION_LOCK_REVEAL');
+  const mayDeviceCommands = hasPermission('MDM.ERASE') || hasPermission('MDM.PROFILE_REMOVE');
+  const tabs = useMemo(
+    () => visibleSubTabs(status ?? null, relief, { reveal: mayReveal, deviceCommands: mayDeviceCommands }),
+    [status, relief, mayReveal, mayDeviceCommands],
+  );
 
   // Land on status when enrolled, enroll otherwise (§0). Kept in state so the
   // user can move between sub-tabs; clamped to the visible set below.
@@ -202,6 +223,10 @@ export function AssetMdmTab({ assetId, onRefresh, onAddSerial }: {
             canIndefinite={status.may_pause_indefinite}
             onChanged={() => refetch()}
           />
+        )}
+
+        {effectiveActive === 'danger' && (
+          <MdmDangerZone status={status} onChanged={() => refetch()} />
         )}
       </div>
     </div>
