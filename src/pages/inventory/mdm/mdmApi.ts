@@ -49,6 +49,8 @@ export type MdmPrepareStatus = 'PENDING' | 'READY' | 'NOT_ON_SERVER' | 'ERROR' |
 
 // Baseline-lock badge (mig 935) — the single answer to "ล็อคไปหรือยัง".
 // NONE / WALLPAPER_ONLY are NOT locked (button shows); LIGHT/MEDIUM/HARD are.
+export type IcloudMenuState = 'LOCKED' | 'OPEN' | 'APPLYING' | 'RELEASING' | 'OPEN_MISMATCH' | 'UNKNOWN';
+
 export type MdmEnforcementBadge =
   | 'NOT_IN_MDM' | 'APPLYING' | 'NONE' | 'WALLPAPER_ONLY'
   | 'LIGHT' | 'MEDIUM' | 'HARD' | 'PAUSED';
@@ -213,6 +215,25 @@ export interface AssetMdmStatus {
   //    rule so it can change without an FE release. Just read it.
   lock_ready: boolean;
   lock_verdict_code: MdmLockVerdictCode | null;
+
+  // ── iCloud (Apple ID) menu — the DEVICE's real state (134 §3b, nnf-mdm migs
+  // 438-440). Same values as fn_contract_account_lock_get → device.menu_*; one
+  // source (mdm.fn_asset_icloud_menu) so tab 1 and the contract box agree.
+  // ⛔ Never answer "is the menu greyed" from enforcement_badge: LIGHT covers
+  //    both light (greyed) and light_open (open).
+  /** null = not in MDM. */
+  icloud_menu_state: IcloudMenuState | null;
+  /** The rule (company / contract flag) says it SHOULD be greyed now. */
+  icloud_menu_rule_locked: boolean | null;
+  /** The device reported it greyed (null = never reported). */
+  icloud_menu_observed_locked: boolean | null;
+  icloud_menu_observed_at: string | null;
+  /** ENFORCEMENT_LIGHT (lock) / ENFORCEMENT_LIGHT_OPEN (release) on its way; null = none. */
+  icloud_menu_pending_template: string | null;
+  /** N installments in force · 0 = this company doesn't lock (MNT) · null = no rule. */
+  icloud_lock_until_paid: number | null;
+  icloud_lock_source: 'OFF' | 'COMPANY' | 'CONTRACT' | 'DEVICE_ALLOWANCE' | null;
+  icloud_paid_count: number | null;
 
   // Baseline-lock decision columns (mig 935, UI_SUMMARY 134). The DB decides
   // "is it locked?" and "can this user lock it?" so the FE never re-derives them.

@@ -35,6 +35,7 @@ export interface PollSignals {
   lock_ready?: boolean;
   lock_verdict_code?: string | null;
   in_mdm_since?: string | null;
+  icloud_menu_state?: string | null;
 }
 
 // HOT = "something is genuinely about to change", NOT "not finished yet"
@@ -58,6 +59,9 @@ export function isHot(s: PollSignals | null | undefined): boolean {
   if (s.prepare_status === 'READY' && !s.in_mdm && recent(s.prepare_requested_at, 10)) return true;
   // A lock/unlock command is in flight; the button un-disables when it settles.
   if (s.enforcement_badge === 'APPLYING') return true;
+  // The iCloud-menu lock/release is on its way to the device (134 §3b) — it
+  // flips to LOCKED/OPEN within about a minute of the device checking in.
+  if (s.icloud_menu_state === 'APPLYING' || s.icloud_menu_state === 'RELEASING') return true;
   // Enrolled but not yet safe to hand over, and the org key is genuinely on its
   // way (30s–6min). This is the window where staff stand waiting to hand the
   // device over, so it is the one that most needs 5s.

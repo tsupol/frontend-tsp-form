@@ -47,6 +47,7 @@ import { EnrollChecklist } from './shared/EnrollChecklist';
 import { EnrollReadinessSteps } from './shared/EnrollReadinessSteps';
 import { SerialZoomModal } from './shared/SerialDisplay';
 import { MdmReadinessBox } from './MdmReadinessBox';
+import { IcloudMenuStatusBox } from './IcloudMenuStatus';
 import { fromAssetStatus } from './shared/enrollView';
 import { EnrollDelegationPanel } from './EnrollDelegationPanel';
 
@@ -143,6 +144,10 @@ export function SubTabEnroll({
           it is the branch's handover decision, phrased for someone with the
           asset record in front of them. Shared with finance's close-out review. */}
       <MdmReadinessBox status={status} />
+
+      {/* Is the Apple ID menu actually greyed on the phone, what's in flight,
+          what the company's rule says (134 §3b). Nothing for a device outside MDM. */}
+      <IcloudMenuStatusBox status={status} />
 
       {/* All 7 steps from shared/ — the same components the token page renders. */}
       <EnrollChecklist

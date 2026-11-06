@@ -11124,10 +11124,25 @@
     },
     "showAll": "แสดงทั้งหมด"
   },
+  "icloudMenu": {
+    "title": "เมนู iCloud (Apple ID)",
+    "locked": "เมนู iCloud ล็อกอยู่",
+    "applying": "กำลังส่งคำสั่งล็อก",
+    "releasing": "กำลังส่งคำสั่งปลด",
+    "waitOnline": "รอเครื่องต่อเน็ต สถานะจะเปลี่ยนเองเมื่อเครื่องรับคำสั่ง",
+    "mismatch": "ควรล็อกแต่เครื่องยังเปิด",
+    "mismatchHint": "ระบบจะซ่อมให้คืนนี้ ถ้าพรุ่งนี้ยังค้างให้แจ้ง IT",
+    "unknown": "ยังไม่ได้รับรายงานจากเครื่อง",
+    "companyOff": "บริษัทนี้ไม่ล็อกเมนู iCloud",
+    "contractOff": "สัญญานี้ปิดการล็อกเมนู iCloud",
+    "released": "ปลดแล้ว",
+    "releasedByOps": "ทีมระบบปลดให้เครื่องนี้",
+    "paidOf": "จ่ายแล้ว {{paid}}/{{n}} งวด",
+    "byContractFlag": "ตามธงสัญญา",
+    "reportedAt": "เครื่องรายงาน"
+  },
   "icloudLock": {
     "title": "เมนู iCloud",
-    "stateGrey": "เทา",
-    "stateOpen": "เปิด",
     "noDevice": "ยังไม่มีเครื่อง",
     "noDeviceHint": "ยังไม่มีเครื่องผูก — ธงจะมีผลเมื่อผูกเครื่องและลูกค้า login",
     "ruleOff": "บริษัทนี้ไม่มีกติกา iCloud เทา",

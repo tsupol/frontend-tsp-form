@@ -11152,10 +11152,25 @@
     },
     "showAll": "Show all"
   },
+  "icloudMenu": {
+    "title": "iCloud (Apple ID) menu",
+    "locked": "iCloud menu locked",
+    "applying": "Sending the lock",
+    "releasing": "Sending the release",
+    "waitOnline": "Waiting for the phone to come online; this changes by itself once it takes the command",
+    "mismatch": "Should be locked, but the phone is still open",
+    "mismatchHint": "The system repairs it tonight. If it is still open tomorrow, tell IT",
+    "unknown": "No report from the phone yet",
+    "companyOff": "This company does not lock the iCloud menu",
+    "contractOff": "iCloud menu lock turned off for this contract",
+    "released": "Released",
+    "releasedByOps": "Released for this phone by the systems team",
+    "paidOf": "Paid {{paid}}/{{n}} installments",
+    "byContractFlag": "by contract flag",
+    "reportedAt": "Phone reported"
+  },
   "icloudLock": {
     "title": "iCloud menu",
-    "stateGrey": "Greyed out",
-    "stateOpen": "Open",
     "noDevice": "No device",
     "noDeviceHint": "No device bound — the flag takes effect once one is bound and the customer logs in",
     "ruleOff": "This company has no iCloud grey-out rule",

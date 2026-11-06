@@ -18,6 +18,9 @@ import { useAuth } from '../../contexts/AuthContext';
 import { DateTime } from '../../components/DateTime';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { ActionDoneView } from './ActionDoneView';
+import { useMdmStatus } from '../inventory/mdm/useMdmStatus';
+import { IcloudMenuBadge, useIcloudMenuView, type IcloudMenuFields } from '../inventory/mdm/IcloudMenuStatus';
+import type { IcloudMenuState } from '../inventory/mdm/mdmApi';
 
 export interface ContractIcloudLockFields {
   // Absent on the shop's contract view, by design.
@@ -51,6 +54,8 @@ interface LockState {
     preset_observed: string | null;
     device_exempt_flags: string[];
     locked_now: boolean;
+    /** The phone's real menu state (160 §1b, migs 438-440). */
+    menu_state?: IcloudMenuState | null;
   } | null;
   may_set: boolean;
   history: {
@@ -78,13 +83,21 @@ export function IcloudLockBox({ contract }: { contract: ContractIcloudLockFields
   const source = contract.icloud_lock_source;
   const until = contract.icloud_lock_until_paid ?? null;
   const overrideN = contract.icloud_lock_override_until_paid ?? null;
-  const lockedNow = contract.icloud_locked_now;
   const maySet = contract.icloud_lock_may_set === true && !isReadOnlyViewer;
   const paid = contract.paid_installment_count ?? 0;
-  // No verdict has two causes: no phone on the contract, or a phone MDM does not
-  // manage yet (doc 160 only names the first). The contract row tells them apart.
-  const noVerdictLabel = contract.device_id != null ? t('icloudLock.notInMdm') : t('icloudLock.noDevice');
-  const noVerdictHint = contract.device_id != null ? t('icloudLock.notInMdmHint') : t('icloudLock.noDeviceHint');
+
+  // The badge is the PHONE's real menu state, read from the same row MDM tab 1
+  // draws from (160 §1b → 134 §3b), so the two screens say the same thing.
+  // icloud_locked_now is only the rule's verdict — on 11-06 it said "greyed"
+  // while the phone was open — so it no longer drives the badge.
+  const deviceId = contract.device_id ?? null;
+  const { data: mdmStatus, isLoading: mdmLoading } = useMdmStatus(deviceId ?? 0, deviceId != null);
+  const menuView = useIcloudMenuView(mdmStatus);
+  // No state has two causes: no phone on the contract, or a phone MDM does not
+  // manage. The contract row tells them apart.
+  const noStateLabel = deviceId != null ? t('icloudLock.notInMdm') : t('icloudLock.noDevice');
+  const noStateHint = deviceId != null ? t('icloudLock.notInMdmHint') : t('icloudLock.noDeviceHint');
+  const showNoState = !menuView && !(deviceId != null && mdmLoading);
 
   const rule =
     source === 'OFF' ? (overrideN != null ? t('icloudLock.ruleOffWithFlag') : t('icloudLock.ruleOff'))
@@ -101,17 +114,22 @@ export function IcloudLockBox({ contract }: { contract: ContractIcloudLockFields
           <Cloud size={16} className="text-subtle" />
           <h3 className="text-sm font-semibold">{t('icloudLock.title')}</h3>
         </div>
-        {lockedNow == null ? (
-          <Badge size="xs" color="default">{noVerdictLabel}</Badge>
-        ) : (
-          <Badge size="xs" color={lockedNow ? 'warning' : 'success'}>
-            {lockedNow ? t('icloudLock.stateGrey') : t('icloudLock.stateOpen')}
-          </Badge>
-        )}
+        {menuView ? (
+          <IcloudMenuBadge view={menuView} />
+        ) : showNoState ? (
+          <Badge size="xs" color="default">{noStateLabel}</Badge>
+        ) : null}
       </header>
 
       <div className="px-4 py-3 flex flex-col gap-2">
         <div className="text-sm">{rule}</div>
+
+        {menuView?.hint && <div className="text-sm">{menuView.hint}</div>}
+        {mdmStatus?.icloud_menu_observed_at && (
+          <div className="text-xs text-subtle">
+            {t('icloudMenu.reportedAt')} <DateTime value={mdmStatus.icloud_menu_observed_at} showTime />
+          </div>
+        )}
 
         {overrideN != null && (
           <div className="text-xs text-subtle">
@@ -123,7 +141,7 @@ export function IcloudLockBox({ contract }: { contract: ContractIcloudLockFields
           </div>
         )}
 
-        {lockedNow == null && <div className="text-xs text-subtle">{noVerdictHint}</div>}
+        {showNoState && <div className="text-xs text-subtle">{noStateHint}</div>}
 
         <div className="flex flex-wrap gap-2 pt-1">
           {maySet && (overrideN == null ? (
@@ -190,6 +208,18 @@ function IcloudLockDialog({ open, mode, contract, onClose }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  // The phone's state after the change, worded exactly as the box and tab 1 word it.
+  const doneMenuView = useIcloudMenuView(result?.device?.menu_state ? {
+    icloud_menu_state: result.device.menu_state,
+    icloud_lock_until_paid: result.effective_until_paid,
+    icloud_lock_source: result.effective_source as IcloudMenuFields['icloud_lock_source'],
+    icloud_paid_count: result.contract.paid_count,
+    icloud_menu_rule_locked: null,
+    icloud_menu_observed_locked: null,
+    icloud_menu_observed_at: null,
+    icloud_menu_pending_template: null,
+  } : null);
+
   const n = count === '' ? null : Number(count);
   const inRange = n != null && n >= 0 && n <= total;
   const canSubmit = !saving && reason.trim().length > 0 && (!isSet || inRange);
@@ -255,7 +285,9 @@ function IcloudLockDialog({ open, mode, contract, onClose }: {
                     : t('icloudLock.noRule'),
                 },
                 { label: t('icloudLock.paidRow'), value: `${result.contract.paid_count} / ${result.contract.total_installments}` },
-                ...(result.device ? [{ label: t('icloudLock.stateRow'), value: result.device.locked_now ? t('icloudLock.stateGrey') : t('icloudLock.stateOpen') }] : []),
+                // The phone's real state, not the rule's verdict (locked_now) —
+                // that one said "greyed" for an open phone on 11-06.
+                ...(doneMenuView ? [{ label: t('icloudLock.stateRow'), value: doneMenuView.label }] : []),
               ]}
               extras={result.changed !== false && result.device
                 ? <div className="text-xs text-subtle">{t('icloudLock.doneHint')}</div>

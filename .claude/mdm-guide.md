@@ -34,6 +34,10 @@ src/pages/inventory/
     MdmDeviceAppsSection.tsx      ← sub-tab 5: the installed-app list + the per-row remove ritual
     MdmAppGatePanel.tsx           ← sub-tab 5, top: "ให้ลูกค้าลบแอปเอง" (the time-boxed window)
     MdmChallengeDialog.tsx        ← the shared 5s-countdown + 4-digit-OTP gate for destructive acts
+    IcloudMenuStatus.tsx          ← the iCloud (Apple ID) menu's REAL state (134 §3b, icloud_* columns):
+                                    tab 1 box + the contract iCloud box badge — one wording for both.
+                                    Never enforcement_badge or icloud_locked_now (the rule's verdict).
+                                    Company with no lock (OFF / N=0) = grey, never a warning.
     MdmDangerZone.tsx             ← sub-tab 8 "ถอดออก & รหัสปลดล็อก": remove enforcement · erase · reveal
                                     activation lock. Shown on v_my_permissions alone (REVEAL / ERASE /
                                     PROFILE_REMOVE), never may_pause or role — the reveal right is given to

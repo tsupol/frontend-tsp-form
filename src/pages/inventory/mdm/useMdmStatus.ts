@@ -31,9 +31,11 @@ export const MDM_NO_CACHE = {
 // This hook keeps its signature: tab-1 never stops polling (no `stop`), since a
 // wait that lasts all day is still a correct wait and the row also changes from
 // elsewhere (nnf-ops, cron, another staffer).
-export function useMdmStatus(assetId: number) {
+/** `enabled: false` for a caller that may have no device (the contract's iCloud box). */
+export function useMdmStatus(assetId: number, enabled = true) {
   return useEnrollPoll<AssetMdmStatus>({
     queryKey: ['asset-mdm-status', assetId],
     queryFn: () => fetchMdmStatus(assetId),
+    enabled,
   });
 }
