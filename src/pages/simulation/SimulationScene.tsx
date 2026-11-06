@@ -42,7 +42,8 @@ interface SceneProps {
   onPickHq: (index: number) => void;
 }
 
-const hitKey = (h: Hit) => (h?.kind === 'customer' ? `a${h.id}` : h?.kind === 'pile' ? `p${h.branchId}:${h.key}` : null);
+const hitKey = (h: Hit) => (h?.kind === 'customer' ? `a${h.id}` : h?.kind === 'pile' ? `p${h.branchId}:${h.key}`
+  : h?.kind === 'seat' ? `s${h.branchId}:${h.zone}:${h.x.toFixed(2)}:${h.z.toFixed(2)}` : null);
 
 export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function SimulationScene({ branches, customers, chatters, showChat, picked, focus, onPick, hq, companyName, pickedHq, onPickHq }, ref) {
   const { t } = useTranslation();
@@ -295,6 +296,16 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
     const at = c && world.current?.customerAt(c);
     // The model on the contract and the device's AT-, once either exists (mig 1624).
     if (c && at) note = { text: [codeOf(c.code, c.months), stateLabel(t, c.state), ageText(t, c.age), c.product, c.asset].filter(Boolean).join(' · '), color: stateColor(c.state), at: place(at[0], at[1] + 0.12, at[2]) };
+  } else if (focus.key?.startsWith('s')) {
+    // An empty chair: which zone it is, and how many wait in that zone now.
+    const [bid, zone, x, z] = focus.key.slice(1).split(':');
+    const branchId = Number(bid);
+    const n = zone === 'chat' ? chatters.filter(c => c.branchId === branchId).length : customers.filter(c => c.branchId === branchId && c.station === 'wait').length;
+    note = {
+      text: t(n > 0 ? `simulation.seat.${zone}Taken` : `simulation.seat.${zone}`, { n, count: n }),
+      color: zone === 'chat' ? CHAT_COLOR : '#5a7fb0',
+      at: place(Number(x), 1.0, Number(z)),
+    };
   } else if (focus.key?.startsWith('p')) {
     const p = piles.find(x => `p${x.branchId}:${x.key}` === focus.key);
     if (p) note = { text: `${t(`simulation.pile.${p.key}`)} ${baht(p.value)}`, color: p.color, at: place(p.x, p.h + 0.2, p.z) };
@@ -324,7 +335,7 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
         const pos = world.current?.chatAt(c);
         if (!pos || focus.key === `a-${c.id}`) return null;
         const at = place(pos[0], pos[1] + 0.05, pos[2]);
-        return onScreen(at) ? <span key={`c${c.id}`} className="sim__bubble" style={at} data-chat={c.code}>{c.unread}</span> : null;
+        return onScreen(at) ? <ChatBubble key={`c${c.id}`} n={c.unread} at={at} code={c.code} /> : null;
       })}
       {showIcons && piles.map(p => {
         const at = place(p.x, p.h + 0.3, p.z);
@@ -428,4 +439,21 @@ function hqTagLine(t: Tr, p: SimHq['pools'][number]): string {
   return p.unread_threads
     ? t('simulation.hq.serviceLine', { n: p.unread_threads, age: ageText(t, p.oldest_unread_min ?? 0) })
     : t('simulation.hq.clear');
+}
+
+/** The unread count over a chatter's head: one speech-bubble outline, body and tail drawn
+ *  as a single path so the border runs unbroken into the tail that points at the head. */
+function ChatBubble({ n, at, code }: { n: number; at: { left: number; top: number }; code: string }) {
+  const text = String(n);
+  const w = 14 + text.length * 7;
+  const h = 17;
+  const r = 5;
+  const tail = 5;
+  const d = `M${r},1 H${w - r} Q${w - 1},1 ${w - 1},${r} V${h - r} Q${w - 1},${h} ${w - r},${h} H${w / 2 + 4} L${w / 2},${h + tail} L${w / 2 - 4},${h} H${r} Q1,${h} 1,${h - r} V${r} Q1,1 ${r},1 Z`;
+  return (
+    <svg className="sim__bubble" style={at} width={w} height={h + tail + 1} viewBox={`0 0 ${w} ${h + tail + 1}`} data-chat={code} aria-hidden="true">
+      <path d={d} fill="#fff" stroke="#e5484d" strokeWidth={1.5} strokeLinejoin="round" />
+      <text x={w / 2} y={h / 2 + 4} textAnchor="middle" fontSize={11} fontWeight={700} fill="#d63a40">{text}</text>
+    </svg>
+  );
 }

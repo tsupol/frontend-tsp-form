@@ -18,7 +18,7 @@ type BranchType = SimBranch['type'];
 // orthographic frustum sliding and scaling over it.
 
 export const RW = 12;
-export const RD = 8.4;
+export const RD = 10.2;
 const GAP = 2.6;
 const PAD = 1.8;
 const PAVE_CELL = 1.5;
@@ -68,39 +68,65 @@ const BOOTH_W = 1.75;
 const BOOTH_X = 0.5;
 const BOOTH_COUNT = 4;
 const boothCentre = (i: number) => BOOTH_X + i * BOOTH_W + BOOTH_W / 2;
-const WAIT_SEATS: Spot[] = Array.from({ length: 15 }, (_, i) => ({ x: 1.05 + (i % 5) * 1.18, z: 3.75 + Math.floor(i / 5) * 1.2, seated: true, face: 'front' as Face }));
+// The room in the order a contract moves, left to right: contract desks (back left) →
+// approval rows (middle left) → signing table (middle right) → cashier (back right). The
+// front strip is the chat corner on the left and a clear way in from the door on the right.
+// When a station is full, its customers queue INSIDE that station's own area (QUEUE), so a
+// crowd always shows where it is stuck — never one shared heap by the door.
+// Approval: 2 × 5 chairs, always there, facing the counters on the back wall (Ton 11-06).
+// Set about 2 m in front of the desks' chairs, so the contract-desk queue and the approval
+// sign sit in between and the two zones never read as one line. Columns 1.2 apart keep
+// the block clear of the signing chairs (x >= 7.63), leaving two standing columns on its right.
+export const WAIT_COLS = [1.0, 2.2, 3.4, 4.6, 5.8];
+const WAIT_SEATS: Spot[] = Array.from({ length: 10 }, (_, i) => ({ x: WAIT_COLS[i % 5], z: 5.0 + Math.floor(i / 5) * 1.2, seated: true, face: 'back' as Face }));
+const SIGN_TABLE = { x: 7.4, z: 4.6, w: 2.2, d: 0.8 };
 const SPOTS: Record<Station, Spot[]> = {
   desk: Array.from({ length: BOOTH_COUNT }, (_, i) => ({ x: boothCentre(i), z: 2.15, seated: true, face: 'back' as Face })),
   wait: WAIT_SEATS,
   sign: [
-    { x: 7.95, z: 4.35, seated: true, face: 'front' },
-    { x: 9.05, z: 4.35, seated: true, face: 'front' },
-    { x: 7.95, z: 6.45, seated: true, face: 'back' },
-    { x: 9.05, z: 6.45, seated: true, face: 'back' },
+    { x: 7.95, z: 3.95, seated: true, face: 'front' },
+    { x: 9.05, z: 3.95, seated: true, face: 'front' },
+    { x: 7.95, z: 6.05, seated: true, face: 'back' },
+    { x: 9.05, z: 6.05, seated: true, face: 'back' },
   ],
   pay: [{ x: 8.5, z: 2.1, seated: false, face: 'back' }, { x: 9.5, z: 2.1, seated: false, face: 'back' }],
 };
+const row = (xs: number[], z: number): [number, number][] => xs.map(x => [x, z]);
+const QUEUE: Record<Station, [number, number][]> = {
+  // In front of the booths, before the approval rows.
+  desk: row([1.3, 2.15, 3.0, 3.85, 4.7, 5.55, 6.4], 3.0),
+  // Standing round the chairs (standing takes less room): behind the rows first, then down
+  // their right side, then a second row behind — all inside the approval zone.
+  wait: [
+    ...row(WAIT_COLS, 7.0),
+    ...[5.0, 5.6, 6.2, 6.8].flatMap(z => row([6.55, 7.1], z)),
+    ...row(WAIT_COLS, 7.6),
+  ],
+  // Down the right wall beside the table, below the money piles.
+  sign: [4.9, 5.6, 6.3, 7.0, 7.7].flatMap(z => row([10.5, 11.2], z)),
+  // In front of the till, short of the signing chairs.
+  pay: [...row([8.2, 9.0, 9.8], 2.8), ...row([8.2, 9.0, 9.8], 3.35)],
+};
 // A deal-partner shop is smaller inside: two desks and two rows of chairs, the rest is the phone counter.
 const PARTNER_DESKS = 2;
-/** Approval chairs drawn even when empty; seats past these appear only when taken. */
-const WAIT_ALWAYS = 4;
-const PARTNER_WAIT = 10;
-const OVERFLOW: [number, number][] = [[6.9, 7.5], [7.6, 7.5], [8.3, 7.5], [9, 7.5], [9.7, 7.5], [10.4, 7.5], [10.4, 6.7], [10.4, 5.9]];
+/** All eight approval chairs are always drawn, in every shop; past them people stand. */
+const waitAlways = (_type: BranchType) => WAIT_SEATS.length;
 
-// Zone names: the two counters' on the back wall above them, the other two on the floor.
-// With the chat corner drawn, the waiting rows' sign moves from the front (where the
-// corner now is) to the aisle between the desk chairs and the first row.
-export const zoneLabels = (type: BranchType, chat = false): [Station, number, number, number][] => [
-  ['desk', type === 'DEAL_PARTNER' ? 2.2 : 4, 1.15, 0.24], ['wait', 3.4, 0.12, chat ? 3.0 : 7.25], ['sign', 8.5, 0.12, 7.3], ['pay', 9, 1.15, 0.24],
+// Zone names: the two counters' on the back wall above them, the other two on the floor
+// (approval: just in front of its rows · signing: between its chairs and the door).
+export const zoneLabels = (type: BranchType, _chat = false): [Station, number, number, number][] => [
+  ['desk', type === 'DEAL_PARTNER' ? 2.2 : 4, 1.15, 0.24], ['wait', 3.0, 0.12, 4.1], ['sign', 8.5, 0.12, 6.75], ['pay', 9, 1.15, 0.24],
 ];
 
 function spotOf(type: BranchType, st: Station, i: number): Spot {
-  const limit = type !== 'DEAL_PARTNER' ? SPOTS[st].length : st === 'desk' ? PARTNER_DESKS : st === 'wait' ? PARTNER_WAIT : SPOTS[st].length;
+  const limit = type === 'DEAL_PARTNER' && st === 'desk' ? PARTNER_DESKS : SPOTS[st].length;
   if (i < limit) return SPOTS[st][i];
   const k = i - limit;
-  const [x, z] = OVERFLOW[k % OVERFLOW.length];
-  const lap = Math.floor(k / OVERFLOW.length) * 0.3;
-  return { x: x - lap, z: z - lap, seated: false, face: 'back' };
+  const q = QUEUE[st];
+  const [x, z] = q[k % q.length];
+  // A queue longer than its area doubles up, half a body to the side.
+  const lap = Math.floor(k / q.length) * 0.3;
+  return { x: x + lap, z, seated: false, face: 'back' };
 }
 
 export interface SeatedCustomer {
@@ -112,18 +138,17 @@ export interface SeatedCustomer {
 }
 
 // ── Waiting for a chat reply (156 §6g, mig 1628) ────────────────────────────
-// One row of five along the front wall, left of the door, facing into the shop, on a teal
-// patch with teal chairs: its own zone, not more seats in the approval rows. An aisle
-// stays between this row and the last approval row (ends z 6.47); the row clears the
-// plant in the corner (x <= 1.18) and stops before the door (x 6.6). Three chairs always,
-// the other two only under someone sitting.
-const CHAT_SEATS: Spot[] = [1.6, 2.65, 3.7, 4.75, 5.8].map(x => ({ x, z: 7.65, seated: true, face: 'back' as Face }));
-// More than five: stand in the aisle behind the row, stepping along each lap.
-const CHAT_OVERFLOW: [number, number][] = [1.6, 2.65, 3.7, 4.75, 5.8].map(x => [x, 6.85]);
-const CHAT_PATCH = { x: 1.25, z: 7.15, w: 4.9, d: 0.95 };
+// A fixed row of four teal chairs along the front wall, left of the door, facing the
+// counters — in the same four columns as the approval chairs, so the room reads as one
+// grid. Always drawn; past four, people stand just behind the row on the same patch.
+// Clear of the approval standing rows (end z 7.86) and of the door (x 6.6).
+const CHAT_COLS = WAIT_COLS.slice(0, 4);
+const CHAT_SEATS: Spot[] = CHAT_COLS.map(x => ({ x, z: RD - 0.75, seated: true, face: 'back' as Face }));
+const CHAT_OVERFLOW: [number, number][] = CHAT_COLS.map(x => [x, RD - 1.55]);
+const CHAT_PATCH = { x: 0.55, z: RD - 1.95, w: 5.1, d: 1.65 };
 export const CHAT_COLOR = '#1fa3ad';
 const CHAT_SEAT = { seat: '#5cc6cb', base: '#3aa3a9', floor: '#d3f0f1' };
-const CHAT_ALWAYS = 3;
+const CHAT_ALWAYS = CHAT_SEATS.length;
 
 function chatSpotOf(i: number): Spot {
   if (i < CHAT_SEATS.length) return CHAT_SEATS[i];
@@ -291,7 +316,10 @@ function tileTexture(line: string, base: string, cells: number) {
   return tex;
 }
 
-export type Hit = { kind: 'customer'; id: number } | { kind: 'pile'; branchId: number; key: PileKey } | { kind: 'room'; id: number } | { kind: 'hq'; index: number } | null;
+/** An empty chair someone could sit in — pointing at it says which zone it belongs to. */
+export interface EmptySeat { branchId: number; zone: 'wait' | 'chat'; x: number; z: number }
+
+export type Hit = { kind: 'customer'; id: number } | { kind: 'pile'; branchId: number; key: PileKey } | { kind: 'room'; id: number } | { kind: 'hq'; index: number } | ({ kind: 'seat' } & EmptySeat) | null;
 
 export interface PilePlace { branchId: number; key: PileKey; x: number; z: number; h: number; value: number; color: string }
 
@@ -344,6 +372,8 @@ export class ShopWorld {
   private pileMesh: InstancedMesh | null = null;
   private customerIds: number[] = [];
   private hqMarkList: HqMark[] = [];
+  private emptySeats: EmptySeat[] = [];
+  private seatPlane = new Plane(new Vector3(0, 1, 0), -(LOT_Y + SLAB + 0.42));
   private pileList: PilePlace[] = [];
   private ray = new Raycaster();
   private floorPlane = new Plane(new Vector3(0, 1, 0), -SLAB);
@@ -724,7 +754,7 @@ export class ShopWorld {
 
     // Waiting for approval: a few chairs always, so an empty room still reads as a place to
     // wait; the rest appear only under someone sitting (setLive) — 15 empty seats were noise.
-    for (const s of WAIT_SEATS.slice(0, WAIT_ALWAYS)) this.seat(boxes, ox + s.x, oz + s.z, s.face);
+    for (const s of WAIT_SEATS.slice(0, waitAlways(r.type))) this.seat(boxes, ox + s.x, oz + s.z, s.face);
 
     if (partner) {
       // What makes it a phone shop: display counters with phones on them, and an awning over the door.
@@ -741,13 +771,13 @@ export class ShopWorld {
     }
 
     // Signing table.
-    box(boxes, ox + 7.4, y, oz + 5, 2.2, 0.68, 0.8, C.desk);
-    box(boxes, ox + 7.68, y + 0.68, oz + 5.15, 0.5, 0.012, 0.5, C.paper);
-    box(boxes, ox + 8.82, y + 0.68, oz + 5.15, 0.5, 0.012, 0.5, C.paper);
+    box(boxes, ox + SIGN_TABLE.x, y, oz + SIGN_TABLE.z, SIGN_TABLE.w, 0.68, SIGN_TABLE.d, C.desk);
+    box(boxes, ox + SIGN_TABLE.x + 0.28, y + 0.68, oz + SIGN_TABLE.z + 0.15, 0.5, 0.012, 0.5, C.paper);
+    box(boxes, ox + SIGN_TABLE.x + 1.42, y + 0.68, oz + SIGN_TABLE.z + 0.15, 0.5, 0.012, 0.5, C.paper);
     for (const s of SPOTS.sign) this.seat(boxes, ox + s.x, oz + s.z, s.face);
 
-    // Plants in the front corners.
-    for (const [px, pz] of [[0.8, 7.5], [11.2, 7.5]]) {
+    // A plant in the front-right corner (the front-left one is the chat row's now).
+    for (const [px, pz] of [[11.2, RD - 0.9]]) {
       posts.add(ox + px, y + 0.2, oz + pz, 0.22, 0.4, 0.22, C.pot);
       crowns.add(ox + px, y + 0.72, oz + pz, 0.38, 0.46, 0.38, pick(C.leaf, n + px));
     }
@@ -800,7 +830,7 @@ export class ShopWorld {
       if (!r) return;
       const s = spotOf(r.type, c.station, c.spot);
       // Approval seats exist only while taken (the counters' chairs are furniture, drawn always).
-      if (c.station === 'wait' && s.seated && c.spot >= WAIT_ALWAYS) this.seat(chairs, r.ox + s.x, r.oz + s.z, s.face);
+      if (c.station === 'wait' && s.seated && c.spot >= waitAlways(r.type)) this.seat(chairs, r.ox + s.x, r.oz + s.z, s.face);
       const base = s.seated ? y + 0.42 : y;
       const h = s.seated ? SIT_H : STAND_H;
       const x = r.ox + s.x;
@@ -862,6 +892,20 @@ export class ShopWorld {
     });
     this.pileMesh = piles.size ? piles.build(this.live) : null;
     if (bands.size) bands.build(this.live);
+
+    // The always-drawn chairs nobody sits in right now, for pointing at (§ empty chairs).
+    this.emptySeats = [];
+    const taken = new Set<string>();
+    customers.forEach(c => { if (c.station === 'wait') taken.add(`${c.branchId}:wait:${c.spot}`); });
+    chatters.forEach(c => taken.add(`${c.branchId}:chat:${c.spot}`));
+    this.plan.rooms.forEach(r => {
+      WAIT_SEATS.slice(0, waitAlways(r.type)).forEach((s, i) => {
+        if (!taken.has(`${r.id}:wait:${i}`)) this.emptySeats.push({ branchId: r.id, zone: 'wait', x: r.ox + s.x, z: r.oz + s.z });
+      });
+      if (showChat) CHAT_SEATS.slice(0, CHAT_ALWAYS).forEach((s, i) => {
+        if (!taken.has(`${r.id}:chat:${i}`)) this.emptySeats.push({ branchId: r.id, zone: 'chat', x: r.ox + s.x, z: r.oz + s.z });
+      });
+    });
 
     this.hqMarkList = [];
     if (hq && this.plan.hq) this.drawHq(hq);
@@ -1011,6 +1055,12 @@ export class ShopWorld {
     test(this.heads, customer);
     test(this.pileMesh, i => ({ kind: 'pile', branchId: this.pileList[i].branchId, key: this.pileList[i].key }));
     if (best) return (best as { hit: Hit }).hit;
+    // An empty chair: test at seat height, where the eye sees it, not on the floor below.
+    const sp = this.ray.ray.intersectPlane(this.seatPlane, new Vector3());
+    if (sp) {
+      const seat = this.emptySeats.find(e => Math.abs(sp.x - e.x) < 0.36 && Math.abs(sp.z - e.z) < 0.36);
+      if (seat) return { kind: 'seat', ...seat };
+    }
     const p = this.ray.ray.intersectPlane(this.floorPlane, new Vector3());
     if (!p) return null;
     const room = this.plan.rooms.find(r => p.x >= r.ox && p.x <= r.ox + RW && p.z >= r.oz && p.z <= r.oz + RD);
