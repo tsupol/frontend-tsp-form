@@ -14,6 +14,7 @@ import { useChatters, useCustomers } from './useCustomers';
 import { PILE_ICON } from './simulationIcons';
 import { SimulationCollection } from './SimulationCollection';
 import { HqPoolCard } from './HqPoolCard';
+import { SimTile } from './SimTile';
 import { HQ_COLOR } from './simulationWorld';
 import { flightSvg, type FlightKind } from './simulationFlights';
 import {
@@ -432,8 +433,8 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
                         <b><i className={`sim__rank${b.opened.length > 0 ? ' sim__rank--sold' : ''}`}>{rank}</i>{b.name}</b>
                         <em>
                           {t('simulation.contractCount', { n: b.opened.length, count: b.opened.length })} · {t('simulation.peopleCount', { n: n, count: n })}
-                          {staleIn(b.id).length > 0 && <i className="sim__chat-chip sim__stale-chip"><span>{t('simulation.staleChip', { n: staleIn(b.id).length })}</span></i>}
-                          {chatIn(b.id).length > 0 && <i className="sim__chat-chip"><span>{t('simulation.chatChip', { n: chatIn(b.id).length })}</span></i>}
+                          {staleIn(b.id).length > 0 && <SimTile kind="stale" n={staleIn(b.id).length} label={v => t('simulation.staleChip', { n: v })} />}
+                          {chatIn(b.id).length > 0 && <SimTile kind="chat" n={chatIn(b.id).length} label={v => t('simulation.chatChip', { n: v })} />}
                         </em>
                       </span>
                       {isFund ? (

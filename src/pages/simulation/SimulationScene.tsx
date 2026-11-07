@@ -4,7 +4,7 @@ import { PILE_ICON } from './simulationIcons';
 import { CHAT_COLOR, CHAT_LABEL, HQ_BACK_H, HQ_COLOR, HQ_RW, RW, ShopWorld, planOf, project, zoneLabels, type Hit, type HqMark, type MoreMark, type PilePlace, type ShopRef, type StalePile } from './simulationWorld';
 import type { Chatter, Customer } from './useCustomers';
 import { FlightLayer, flightsBetween, snapshotOf, type HqSnapshot } from './simulationFlights';
-import { Badge } from 'tsp-form';
+import { SimScore, SimTile } from './SimTile';
 import { ageText, baht, codeOf, compactBaht, stateColor, stateLabel, type SimBranch, type SimHq } from './simulationTypes';
 
 // The still picture of the shops (156 §6). One shop per branch, each customer in it is a
@@ -408,14 +408,16 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
           : showProfit ? `${t('simulation.profitShort')} ${baht(b.profit)}` : null;
         const sub = [money, t('simulation.peopleCount', { n: n, count: n }), b.day_closed ? t('simulation.dayClosed') : null].filter(Boolean).join(' · ');
         return (
-          <button key={r.id} type="button" className={`sim__tag${picked === b.id ? ' sim__tag--on' : ''}`} style={{ ...at, '--sim-tag-scale': tagScale } as CSSProperties}
+          <button key={r.id} type="button" className={`sim__tag sim__tag--shop${picked === b.id ? ' sim__tag--on' : ''}`} style={{ ...at, '--sim-tag-scale': tagScale } as CSSProperties}
             data-room={b.id} onClick={() => onPick(b.id)}>
-            <span className="sim__tag-row">
-              <b>{b.name}</b>
-              <Badge variant="outline" color={deals > 0 ? 'success' : 'default'} className="sim__deals" data-deals={deals}>{t('simulation.contractCount', { n: deals, count: deals })}</Badge>
-              {staleN > 0 && <i className="sim__count sim__count--stale"><span>{t('simulation.staleChip', { n: staleN })}</span></i>}
+            <SimScore n={deals} label={v => t('simulation.contractCount', { n: v, count: deals })} />
+            <span className="sim__tag-body">
+              <span className="sim__tag-row">
+                <b>{b.name}</b>
+                {staleN > 0 && <SimTile kind="stale" n={staleN} label={v => t('simulation.staleChip', { n: v })} />}
+              </span>
+              <span className="sim__tag-sub">{sub}</span>
             </span>
-            <span className="sim__tag-sub">{sub}</span>
           </button>
         );
       })}
@@ -441,8 +443,8 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
             <span className="sim__tag-row">
               <b>{p.name}</b>
               {p.kind === 'CUSTOMER_SERVICE'
-                ? (p.unread != null && <i className="sim__count sim__count--chat"><span>{t('simulation.hq.unreadChip', { n: p.unread })}</span></i>)
-                : <i className="sim__count sim__count--mid"><span>{t('simulation.hq.waitingChip', { n: p.waiting ?? 0 })}</span></i>}
+                ? (p.unread != null && <SimTile kind="chat" n={p.unread} label={v => t('simulation.hq.unreadChip', { n: v })} />)
+                : <SimTile kind="wait" n={p.waiting ?? 0} label={v => t('simulation.hq.waitingChip', { n: v })} />}
             </span>
             <small className="sim__tag-sub">{hqTagLine(t, p)} · {t('simulation.hq.people', { a: p.active_today, m: p.members })}</small>
           </button>

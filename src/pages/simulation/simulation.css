@@ -22,17 +22,36 @@
 .sim__tag--on { outline: 2px solid var(--color-primary); }
 .sim__tag-row { display: flex; align-items: center; gap: 7px; }
 .sim__tag-sub { font-size: 11px; color: var(--color-subtle); }
-/* Chips centre Thai text the way tsp-form's .badge does: a fixed-height flex box, the text in an
-   inner <span> nudged down (Thai glyphs sit high in the line box otherwise). .03em, not the app's
-   --text-shift-y (.06em): at these 11px chips .06em reads too low — Ton picked .03em by eye 11-07. */
-.sim__count { display: inline-flex; align-items: center; height: 16px; font-style: normal; font-size: 11px; font-weight: 600; line-height: normal; padding: 0 6px; border-radius: 999px; }
-.sim__count > span, .sim__chat-chip > span { transform: translateY(.03em); }
-/* Today's contract count — the loudest thing on a shop tag (owner 11-07 · §6a): tsp-form's outline
-   Badge, default when 0, success when > 0; bold so it out-weighs the name. */
-.sim__deals { font-weight: 700; font-variant-numeric: tabular-nums; }
-.sim__count--lo { background: var(--color-success-soft); color: var(--color-success-fg); }
-.sim__count--mid { background: var(--color-warning-soft); color: var(--color-warning-fg); }
-.sim__count--hi { background: var(--color-danger-soft); color: var(--color-danger-fg); }
+/* Simulation-only number marks (SimTile.tsx · owner 11-07). Not tsp-form's Badge: a badge pads its
+   text, so a bigger number made a bigger, louder pill.
+   B · score column: today's contract count, a fixed 42px column on the shop tag's left edge —
+   the loudest thing on the tag, same place on every tag. Green above 0, slate at 0 (solid, so 0
+   is as easy to spot as a sale). */
+.sim__tag--shop { flex-direction: row; align-items: stretch; gap: 0; padding: 0; overflow: hidden; }
+.sim__tag-body { display: flex; flex-direction: column; justify-content: center; gap: 1px; padding: 3px 9px; }
+.sim__tag--shop .sim__tag-row { gap: 6px; }
+.sim__score { flex: none; width: 42px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #2f9e57; color: #fff; }
+.sim__score b { font-size: 19px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.sim__score b[data-d="3"], .sim__score b[data-d="4"] { font-size: 14px; }
+.sim__score i { font-style: normal; font-size: 9.5px; line-height: 1.2; opacity: .9; }
+.sim__score--zero { background: #6b7785; }
+/* A1 · number tile: a small solid box that hugs its digits (square at one digit), the word beside
+   it in plain text of the same colour. Thai sits high in its line box, so the digits are nudged down
+   .03em and the word .13em — both picked by eye 11-07. 0 turns slate whatever the kind. */
+.sim__tile { display: inline-flex; align-items: center; gap: 3px; font-style: normal; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.sim__tile > b { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; height: 16px; min-width: 16px; padding: 0 4px; border-radius: 4px;
+  font-size: 11px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; color: #fff; }
+.sim__tile > b > span { transform: translateY(.03em); }
+.sim__tile-w { transform: translateY(.13em); }
+.sim__tile--stale { color: #9a6b00; } .sim__tile--stale > b { background: #e0a21b; }
+.sim__tile--chat { color: #11707a; }  .sim__tile--chat > b { background: #1a9aa5; }
+.sim__tile--wait { color: #a85a12; }  .sim__tile--wait > b { background: #d9822b; }
+.sim__tile--zero { color: #6b7785; }  .sim__tile--zero > b { background: #6b7785; }
+[data-theme="dark"] .sim__tile--stale { color: #ffd27a; }
+[data-theme="dark"] .sim__tile--chat { color: #7fe0e8; }
+[data-theme="dark"] .sim__tile--wait { color: #ffb877; }
+[data-theme="dark"] .sim__tile--zero { color: #9aa7b3; }
+.sim__row-top em .sim__tile { margin-left: 6px; vertical-align: middle; }
 
 .sim__card { background: var(--color-surface-elevated); color: var(--color-fg); border-radius: 14px; box-shadow: 0 2px 8px rgba(20, 40, 50, .14); }
 .sim__stack { position: relative; flex: none; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 0; pointer-events: none; }
@@ -185,12 +204,10 @@ button.sim__tabs-toggle:hover, .sim__company-min:hover .sim__tabs-toggle { color
 /* A tapped customer's label carries the model and AT- too: wrap rather than run off an iPad's edge. */
 .sim__chip--on { white-space: normal; max-width: min(320px, 86vw); width: max-content; text-align: center; }
 /* Chat waiting (§6g): the seated customers' teal, a chip after the people count. */
-.sim__chat-chip { display: inline-flex; align-items: center; height: 15px; line-height: normal; vertical-align: middle; margin-left: 6px; padding: 0 6px; border-radius: 9px; background: #d7f1f2; color: #11707a; font-style: normal; font-size: 10.5px; font-weight: 600; }
 .sim__chat-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; background: #1fa3ad; }
 /* Chat corner: its floor sign, the unread bubble on each head, the chip on the shop tag. */
 .sim__spot--chat { background: rgba(212, 236, 247, .92); color: #11707a; }
 .sim__bubble { position: absolute; transform: translate(-50%, -100%); pointer-events: none; overflow: visible; filter: drop-shadow(0 1px 1px rgba(0,0,0,.2)); }
-.sim__count--chat { background: #d7f1f2; color: #11707a; }
 /* Company building (§6h): its sign, room numbers, chat bubbles. */
 .sim__hq-sign { position: absolute; transform: translate(-10%, -100%); pointer-events: none; white-space: nowrap; padding: 2px 10px; border-radius: 6px; background: #1f2a33; color: #fff; font-size: 12px; font-weight: 700; }
 .sim__hq-warn { display: block; font-style: normal; font-weight: 600; font-size: 10.5px; color: #ffd27a; }
@@ -208,8 +225,6 @@ button.sim__tabs-toggle:hover, .sim__company-min:hover .sim__tabs-toggle { color
 .sim__stale { position: absolute; transform: translate(-50%, -100%); pointer-events: none; white-space: nowrap; padding: 0 6px; border: 1.5px solid #b3943f; border-radius: 8px; background: #fff8e6; color: #7a5d16; font-size: 10.5px; font-weight: 700; line-height: 15px; }
 .sim__more { position: absolute; transform: translate(-50%, -100%); pointer-events: none; white-space: nowrap; min-width: 26px; padding: 1px 7px; border-radius: 10px; background: #1f2a33; color: #fff; font-size: 12px; font-weight: 700; text-align: center; }
 .sim__more--chat { background: #11707a; }
-.sim__count--stale { background: #fff1cc; color: #7a5d16; }
-.sim__stale-chip { background: #fff1cc; color: #7a5d16; }
 /* Envelopes and bank notes flying between a shop and the company building (§3). Moved by
    simulationFlights.ts writing transform each frame; above the tags, under the open label. */
 .sim__flights { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
