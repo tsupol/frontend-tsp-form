@@ -4,6 +4,7 @@ import { PILE_ICON } from './simulationIcons';
 import { CHAT_COLOR, CHAT_LABEL, HQ_BACK_H, HQ_COLOR, HQ_RW, RW, ShopWorld, planOf, project, zoneLabels, type Hit, type HqMark, type MoreMark, type PilePlace, type ShopRef, type StalePile } from './simulationWorld';
 import type { Chatter, Customer } from './useCustomers';
 import { FlightLayer, flightsBetween, snapshotOf, type HqSnapshot } from './simulationFlights';
+import { Badge } from 'tsp-form';
 import { ageText, baht, codeOf, compactBaht, stateColor, stateLabel, type SimBranch, type SimHq } from './simulationTypes';
 
 // The still picture of the shops (156 §6). One shop per branch, each customer in it is a
@@ -33,6 +34,8 @@ interface SceneProps {
   chatters: Chatter[];
   /** can_see_chat — draws the corner's chairs even when nobody waits. */
   showChat: boolean;
+  /** can_see_profit — an operating shop's tag shows "กำไร ฿…" only with it (§3 · §6a). */
+  showProfit: boolean;
   picked: number | null;
   focus: Focus;
   onPick: (id: number) => void;
@@ -47,7 +50,7 @@ const hitKey = (h: Hit) => (h?.kind === 'customer' ? `a${h.id}` : h?.kind === 'p
   : h?.kind === 'seat' ? `s${h.branchId}:${h.zone}:${h.x.toFixed(2)}:${h.z.toFixed(2)}`
   : h?.kind === 'stale' ? `t${h.branchId}:${h.station}` : null);
 
-export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function SimulationScene({ branches, customers: all, chatters, showChat, picked, focus, onPick, hq, companyName, pickedHq, onPickHq }, ref) {
+export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function SimulationScene({ branches, customers: all, chatters, showChat, showProfit, picked, focus, onPick, hq, companyName, pickedHq, onPickHq }, ref) {
   const { t } = useTranslation();
   // People are today's contracts; earlier days' are folders at their step (see world).
   const customers = useMemo(() => all.filter(c => !c.stale), [all]);
@@ -398,17 +401,21 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
         const tagScale = Math.max(0.74, Math.min(1, view.k / 0.8));
         const n = customers.filter(c => c.branchId === b.id).length;
         const staleN = stale.filter(c => c.branchId === b.id).length;
-        const chatN = chatters.filter(c => c.branchId === b.id).length;
+        // Owner 11-07 (§6a): the tag leads with today's contract count; no chat chip — the
+        // chatters seated in the corner already show it. Money + people move to a small line 2.
+        const deals = b.opened.length;
+        const money = b.company_type === 'FINANCIER' ? `${t('simulation.financed')} ${baht(b.financed)}`
+          : showProfit ? `${t('simulation.profitShort')} ${baht(b.profit)}` : null;
+        const sub = [money, t('simulation.peopleCount', { n: n, count: n }), b.day_closed ? t('simulation.dayClosed') : null].filter(Boolean).join(' · ');
         return (
           <button key={r.id} type="button" className={`sim__tag${picked === b.id ? ' sim__tag--on' : ''}`} style={{ ...at, '--sim-tag-scale': tagScale } as CSSProperties}
             data-room={b.id} onClick={() => onPick(b.id)}>
             <span className="sim__tag-row">
               <b>{b.name}</b>
-              {n > 0 && <i className={`sim__count sim__count--${n >= 3 ? 'hi' : 'mid'}`}>{t('simulation.peopleCount', { n: n, count: n })}</i>}
-              {staleN > 0 && <i className="sim__count sim__count--stale">{t('simulation.staleChip', { n: staleN })}</i>}
-              {chatN > 0 && <i className="sim__count sim__count--chat">{t('simulation.chatChip', { n: chatN })}</i>}
-              {b.day_closed && <small className="sim__tag-sub">{t('simulation.dayClosed')}</small>}
+              <Badge variant="outline" color={deals > 0 ? 'success' : 'default'} className="sim__deals" data-deals={deals}>{t('simulation.contractCount', { n: deals, count: deals })}</Badge>
+              {staleN > 0 && <i className="sim__count sim__count--stale"><span>{t('simulation.staleChip', { n: staleN })}</span></i>}
             </span>
+            <span className="sim__tag-sub">{sub}</span>
           </button>
         );
       })}
@@ -434,8 +441,8 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
             <span className="sim__tag-row">
               <b>{p.name}</b>
               {p.kind === 'CUSTOMER_SERVICE'
-                ? (p.unread != null && <i className="sim__count sim__count--chat">{t('simulation.hq.unreadChip', { n: p.unread })}</i>)
-                : <i className="sim__count sim__count--mid">{t('simulation.hq.waitingChip', { n: p.waiting ?? 0 })}</i>}
+                ? (p.unread != null && <i className="sim__count sim__count--chat"><span>{t('simulation.hq.unreadChip', { n: p.unread })}</span></i>)
+                : <i className="sim__count sim__count--mid"><span>{t('simulation.hq.waitingChip', { n: p.waiting ?? 0 })}</span></i>}
             </span>
             <small className="sim__tag-sub">{hqTagLine(t, p)} · {t('simulation.hq.people', { a: p.active_today, m: p.members })}</small>
           </button>

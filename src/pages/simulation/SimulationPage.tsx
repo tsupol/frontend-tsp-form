@@ -310,7 +310,7 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
     <div className="sim">
       {data && !empty && (
         <Suspense fallback={null}>
-          <SimulationScene key={data.company_id} ref={scene} branches={branches} customers={customers} chatters={chatters} showChat={!!data.can_see_chat} picked={picked} focus={focus} onPick={pick}
+          <SimulationScene key={data.company_id} ref={scene} branches={branches} customers={customers} chatters={chatters} showChat={!!data.can_see_chat} showProfit={canProfit} picked={picked} focus={focus} onPick={pick}
             hq={hq} companyName={current?.name ?? ''} pickedHq={pickedHq} onPickHq={pickHq} />
         </Suspense>
       )}
@@ -432,8 +432,8 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
                         <b><i className={`sim__rank${b.opened.length > 0 ? ' sim__rank--sold' : ''}`}>{rank}</i>{b.name}</b>
                         <em>
                           {t('simulation.contractCount', { n: b.opened.length, count: b.opened.length })} · {t('simulation.peopleCount', { n: n, count: n })}
-                          {staleIn(b.id).length > 0 && <i className="sim__chat-chip sim__stale-chip">{t('simulation.staleChip', { n: staleIn(b.id).length })}</i>}
-                          {chatIn(b.id).length > 0 && <i className="sim__chat-chip">{t('simulation.chatChip', { n: chatIn(b.id).length })}</i>}
+                          {staleIn(b.id).length > 0 && <i className="sim__chat-chip sim__stale-chip"><span>{t('simulation.staleChip', { n: staleIn(b.id).length })}</span></i>}
+                          {chatIn(b.id).length > 0 && <i className="sim__chat-chip"><span>{t('simulation.chatChip', { n: chatIn(b.id).length })}</span></i>}
                         </em>
                       </span>
                       {isFund ? (
