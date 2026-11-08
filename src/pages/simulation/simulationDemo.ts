@@ -40,7 +40,12 @@ export function busyDemo(d: SimulationData): SimulationData {
     }));
     STATES.forEach(([state], s) => {
       for (let k = 0; k < m[1 + s]; k++) {
-        waiting.push({ id: id++, branch_id: bid, code: `CT-DEMO-W${id}`, state, age_min: Math.min(today, 3 + k * 4 + s * 7), months: 12, product: 'Apple iPhone 16 128GB', asset: '' });
+        const priced = k % 2 === 0; // half priced (mig 1635 terms), half a bare DRAFT-like row
+        waiting.push({
+          id: id++, branch_id: bid, code: `CT-DEMO-W${id}`, state, age_min: Math.min(today, 3 + k * 4 + s * 7), months: 12, product: 'Apple iPhone 16 128GB',
+          asset: priced ? `AT-DEMO-W${id}` : '',
+          ...(priced ? { grade: 'USED_A', down: 9250, installment: 4110, serial: `HN${id}`, sale_price: 34000, uplift: 3000, financed: 27750, device_price: 37000, down_pct: 25 } : {}),
+        });
       }
     });
     for (let k = 0; k < m[5]; k++) {
@@ -56,10 +61,23 @@ export function busyDemo(d: SimulationData): SimulationData {
       cash: 5000 + i * 2500, transfer: 8000 + i * 1800, wallet: 1200 * (i % 3), other: 0, received: 0,
       financed: opened.length * 18000, commission: opened.length * 500, down: opened.length * 3000, device_price: opened.length * 21000,
       down_pct: opened.length ? 14.3 : null, pending_payout: 4000 * (i % 3), payout: 3000 * (i % 2),
+      // ~21 motorcycles and ~18 people on the footpath across the twelve shops.
+      retail: template.company_type === 'FINANCIER' ? 0 : (i % 4) * 120, service: template.company_type === 'FINANCIER' ? 0 : (i % 3) * 150, // a fund has neither
     };
   });
+  // A fund's building: the first six demo shops are the customer-service pool's, and its
+  // unread figures are the sums of those shops' chat rows — the same sums BE sends.
+  const csShops = branches.slice(0, 6).map(b => b.id);
+  const csChat = chat.filter(c => csShops.includes(c.branch_id));
+  const hq = d.hq && {
+    ...d.hq,
+    pools: d.hq.pools.map(p => (p.kind === 'CUSTOMER_SERVICE'
+      ? { ...p, branch_ids: csShops, unread: csChat.reduce((n, c) => n + c.unread, 0), unread_threads: csChat.length }
+      : { ...p, branch_ids: branches.slice(6).map(b => b.id) })),
+  };
   return {
     ...d,
+    hq,
     branches,
     waiting,
     chat,

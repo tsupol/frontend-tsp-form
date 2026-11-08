@@ -79,8 +79,10 @@ export interface Chatter extends ChatSeat {
   age: number;
 }
 
-/** chat[] seated in each shop's chat corner (§6g). A chatter keeps their chair between
- *  answers; a new one takes the first free chair. Empty unless can_see_chat. */
+/** chat[] seated in each shop's chat corner (§6g) — or, when the building is shown and the
+ *  shop is in a customer-service pool, in that pool's room (NOTICE 2026-11-07 tag §2): one
+ *  person per row, never in both places. A chatter keeps their chair between answers; a new
+ *  one takes the first free chair. Empty unless can_see_chat. */
 export function useChatters(data: SimulationData | null): Chatter[] {
   const seats = useRef(new Map<number, number>());
   const companyId = useRef<number | null>(null);
@@ -92,17 +94,24 @@ export function useChatters(data: SimulationData | null): Chatter[] {
     companyId.current = data.company_id;
     const live = new Set(rows.map(r => r.id));
     seats.current.forEach((_, id) => { if (!live.has(id)) seats.current.delete(id); });
+    // Shop → customer-service room, only while the building is drawn (can_see_hq).
+    const roomOf = new Map<number, number>();
+    if (data.can_see_hq && data.hq) {
+      data.hq.pools.forEach((p, i) => { if (p.kind === 'CUSTOMER_SERVICE') p.branch_ids.forEach(b => roomOf.set(b, i)); });
+    }
+    const where = (branchId: number) => (roomOf.has(branchId) ? `room${roomOf.get(branchId)}` : `shop${branchId}`);
     const taken = new Set<string>();
-    rows.forEach(r => { const s = seats.current.get(r.id); if (s != null) taken.add(`${r.branch_id}:${s}`); });
+    rows.forEach(r => { const s = seats.current.get(r.id); if (s != null) taken.add(`${where(r.branch_id)}:${s}`); });
     return rows.map(r => {
+      const at = where(r.branch_id);
       let spot = seats.current.get(r.id);
       if (spot == null) {
         spot = 0;
-        while (taken.has(`${r.branch_id}:${spot}`)) spot++;
-        taken.add(`${r.branch_id}:${spot}`);
+        while (taken.has(`${at}:${spot}`)) spot++;
+        taken.add(`${at}:${spot}`);
         seats.current.set(r.id, spot);
       }
-      return { id: r.id, branchId: r.branch_id, spot, code: r.code, unread: r.unread, age: r.age_min };
+      return { id: r.id, branchId: r.branch_id, spot, room: roomOf.get(r.branch_id), code: r.code, unread: r.unread, age: r.age_min };
     });
   }, [data]);
 }

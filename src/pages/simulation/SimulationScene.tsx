@@ -443,10 +443,13 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
       {plan.hq && hq?.pools.map((p, i) => {
         const r = plan.hq!.rooms[i];
         if (!r) return null;
-        const at = place(r.ox + HQ_RW * 0.35, HQ_BACK_H + 0.15, r.oz);
+        // Customer service: the tag stands off the room's right wall, at its back end, at every
+        // zoom — on the back wall it covered the customers seated in rows 2–3 (NOTICE 11-07 §2).
+        const side = p.kind === 'CUSTOMER_SERVICE';
+        const at = side ? place(r.ox + HQ_RW + 0.15, HQ_BACK_H * 0.55, r.oz + 1.2) : place(r.ox + HQ_RW * 0.35, HQ_BACK_H + 0.15, r.oz);
         const tagScale = Math.max(0.74, Math.min(1, view.k / 0.8));
         return (
-          <button key={`hq${p.id}`} type="button" className={`sim__tag sim__tag--hq${pickedHq === i ? ' sim__tag--on' : ''}`} style={{ ...at, '--sim-tag-scale': tagScale } as CSSProperties}
+          <button key={`hq${p.id}`} type="button" className={`sim__tag sim__tag--hq${side ? ' sim__tag--side' : ''}${pickedHq === i ? ' sim__tag--on' : ''}`} style={{ ...at, '--sim-tag-scale': tagScale } as CSSProperties}
             data-pool={p.kind} onClick={() => onPickHq(i)}>
             <span className="sim__tag-row">
               <b>{p.name}</b>

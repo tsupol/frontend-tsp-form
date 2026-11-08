@@ -174,6 +174,18 @@ export interface SimWaiting {
   product: string;
   /** AT- of the bound or reserved device; "" when there is none. */
   asset: string;
+  // mig 1635 — the same terms opened[] carries, for a contract not signed yet. Optional
+  // until it is live everywhere; 0 / "" = not set yet (a DRAFT before pricing) → drop that part.
+  grade?: string;
+  down?: number;
+  installment?: number;
+  serial?: string;
+  sale_price?: number;
+  uplift?: number;
+  /** FINANCIER only (operating: 0 / 0 / null). Never worked out here. */
+  financed?: number;
+  device_price?: number;
+  down_pct?: number | null;
 }
 
 export interface SimulationData {
@@ -291,6 +303,18 @@ export const STATE_COLOR: Record<string, string> = {
   PENDING_PAYMENT_AND_SIGN: '#c2478f',
 };
 export const stateColor = (state: string) => STATE_COLOR[state] ?? '#7b8794';
+
+/** A status colour darkened just enough for white text at 4.5:1 — the same hue as the person,
+ *  readable as a filled flag (owner 11-09 picked darker boxes with white digits for tiles). */
+export function flagColor(hex: string): string {
+  const lum = (r: number, g: number, b: number) => {
+    const ch = (v: number) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+    return 0.2126 * ch(r) + 0.7152 * ch(g) + 0.0722 * ch(b);
+  };
+  let [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+  for (let i = 0; i < 12 && 1.05 / (lum(r, g, b) + 0.05) < 4.5; i++) [r, g, b] = [r, g, b].map(v => Math.round(v * 0.92));
+  return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+}
 export const SOLD_EDGE = '#4aa25e';
 export const FLOOR = { idle: '#fbfdfb', guest: '#fff4d8', busy: '#fde8e4', sold: '#d6f0da', closed: '#eef0f2' };
 export const companyEdge = (type?: CompanyType) => (type === 'FINANCIER' ? '#4f46b8' : '#0f8f7a');

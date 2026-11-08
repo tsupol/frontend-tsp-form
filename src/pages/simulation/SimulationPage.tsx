@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button, DataTable, MobileHeader, PageNav, PageNavPanel, Skeleton, useSnackbarContext } from 'tsp-form';
-import { ArrowRightFromLine, CarFront, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, House, Minus, Plus, X, XCircle } from 'lucide-react';
+import { ArrowRightFromLine, Bike, CarFront, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, House, Minus, PersonStanding, Plus, X, XCircle } from 'lucide-react';
 import { ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { DateTime } from '../../components/DateTime';
@@ -15,11 +15,11 @@ import { PILE_ICON } from './simulationIcons';
 import { SimulationCollection } from './SimulationCollection';
 import { HqPoolCard } from './HqPoolCard';
 import { SimTile } from './SimTile';
-import { HQ_COLOR } from './simulationWorld';
+import { HQ_COLOR, trafficCounts } from './simulationWorld';
 import { flightSvg, type FlightKind } from './simulationFlights';
 import {
   AMBER, BLUE, FLOOR, GREEN, PILES, PURPLE, SIMULATION_PERMISSION, SOLD_EDGE,
-  ageText, annualAtRate, annualPct, assetOf, baht, bangkokClock, codeOf, companyEdge, downPct, downPctOf, gradeLabel, plainNum, stateColor, stateLabel, termsOf,
+  ageText, annualAtRate, annualPct, assetOf, baht, bangkokClock, codeOf, companyEdge, downPct, downPctOf, flagColor, gradeLabel, plainNum, stateColor, stateLabel, termsOf,
   type PileKey, type SimBranch,
 } from './simulationTypes';
 import './simulation.css';
@@ -288,12 +288,16 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
 
   // In the shop now = today's contracts; earlier days' are counted apart as files left.
   const inRoom = (id: number) => customers.filter(c => c.branchId === id && !c.stale);
+  // waiting[] rows by contract id: the card prints their terms like an opened contract's (mig 1635).
+  const waitingById = useMemo(() => new Map((data?.waiting ?? []).map(w => [w.id, w])), [data]);
   const staleIn = (id: number) => customers.filter(c => c.branchId === id && c.stale);
   const staleTotal = customers.filter(c => c.stale).length;
   const sum = (f: (b: SimBranch) => number | null) => branches.reduce((s, b) => s + (f(b) ?? 0), 0);
   const openedRows = branches.flatMap(b => b.opened);
   // One car on the road per contract opened today (the scene draws the same count).
   const openedToday = openedRows.length;
+  // Motorcycles / people on the footpath: the scene draws exactly these (NOTICE 1635 §2).
+  const traffic = trafficCounts(branches);
   const newCount = openedRows.filter(o => o.grade === 'NEW').length;
   const standing = branches.reduce((s, b) => s + inRoom(b.id).length, 0);
   const longest = Math.max(0, ...branches.flatMap(b => inRoom(b.id).map(c => c.age)));
@@ -429,13 +433,15 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
                   const n = inRoom(b.id).length;
                   return (
                     <button type="button" className="sim__row" onClick={() => pick(b.id)}>
-                      <span className="sim__row-top">
-                        <b><i className={`sim__rank${b.opened.length > 0 ? ' sim__rank--sold' : ''}`}>{rank}</i>{b.name}</b>
-                        <em>
-                          {t('simulation.contractCount', { n: b.opened.length, count: b.opened.length })} · <span className={n > 0 ? 'sim__people--on' : undefined}>{t('simulation.peopleCount', { n: n, count: n })}</span>
-                          {staleIn(b.id).length > 0 && <SimTile kind="stale" n={staleIn(b.id).length} label={v => t('simulation.staleChip', { n: v })} />}
-                          {chatIn(b.id).length > 0 && <SimTile kind="chat" n={chatIn(b.id).length} label={v => t('simulation.chatChip', { n: v })} />}
-                        </em>
+                      {/* One grid: the rank in its own column, every line after it in one
+                          column under the name — the name gets the full width (one line), and
+                          the facts start at the same x in every row. */}
+                      <i className={`sim__rank${b.opened.length > 0 ? ' sim__rank--sold' : ''}`}>{rank}</i>
+                      <b className="sim__row-name">{b.name}</b>
+                      <span className="sim__row-facts">
+                        <span>{t('simulation.contractCount', { n: b.opened.length, count: b.opened.length })} · <span className={n > 0 ? 'sim__people--on' : undefined}>{t('simulation.peopleCount', { n: n, count: n })}</span></span>
+                        {staleIn(b.id).length > 0 && <SimTile kind="stale" n={staleIn(b.id).length} label={v => t('simulation.staleChip', { n: v })} />}
+                        {chatIn(b.id).length > 0 && <SimTile kind="chat" n={chatIn(b.id).length} label={v => t('simulation.chatChip', { n: v })} />}
                       </span>
                       {isFund ? (
                         <>
@@ -556,12 +562,27 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
                     <i className="sim__chat-dot" />{t('simulation.chatRow', { code: c.code, n: c.unread, age: ageText(t, c.age_min), count: c.unread })}
                   </div>
                 ))}
-                {inRoom(detail.id).map(a => (
-                  <div key={a.id} className="sim__waiter">
-                    <i style={{ background: stateColor(a.state) }} />{codeOf(a.code, a.months)} · {stateLabel(t, a.state)} · {ageText(t, a.age)}
-                    {(a.product || a.asset) && <small className="sim__waiter-sub">{[a.product, a.asset].filter(Boolean).join(' · ')}</small>}
-                  </div>
-                ))}
+                {/* Not signed yet (NOTICE 1635 §1): the same lines as an opened contract,
+                    led by a flag in the person's status colour, ending with how long it has
+                    waited. A part whose field is 0 / "" (not priced yet) is left out. */}
+                {inRoom(detail.id).map(a => {
+                  const w = waitingById.get(a.id);
+                  const asset = assetOf(a.asset, w?.serial ?? '');
+                  const grade = w?.grade ? gradeLabel(t, w.grade) : '';
+                  const financed = isFund && w?.financed ? `${t('simulation.financedShort')} ${baht(w.financed)}` : '';
+                  const terms = termsOf({ code: a.code, months: a.months, down: w?.down ?? 0, installment: w?.installment ?? 0 });
+                  return (
+                    <div key={a.id} className="sim__opened sim__opened--wait" data-testid="sim-waiting-row">
+                      <b><span className="sim__flag" style={{ background: flagColor(stateColor(a.state)) }}>{stateLabel(t, a.state)}</span>{a.product || '—'}</b>
+                      <span>{[grade, financed].filter(Boolean).join(' · ')}</span>
+                      {isFund && !!w?.sale_price && (
+                        <small>{t('simulation.saleUplift', { sale: plainNum(w.sale_price), uplift: plainNum(w.uplift ?? 0) })}</small>
+                      )}
+                      <small>{isFund && w?.down_pct != null ? `${terms} · ${t('simulation.downShort')} ${downPct(w.down_pct)}` : terms}</small>
+                      <small>{[asset, t('simulation.waitedFor', { age: ageText(t, a.age) })].filter(Boolean).join(' · ')}</small>
+                    </div>
+                  );
+                })}
                 {staleIn(detail.id).length > 0 && <h4 className="sim__sub">{t('simulation.staleHeading', { n: staleIn(detail.id).length })}</h4>}
                 {staleIn(detail.id).map(a => (
                   <div key={a.id} className="sim__waiter">
@@ -606,6 +627,9 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
                     <span key={p.key}><PileIcon k={p.key} />{t(`simulation.legend.${p.key}`)}</span>
                   ))}
                   <span className="sim__legend-wide" data-testid="sim-legend-cars"><CarFront size={13} />{t('simulation.legend.cars', { n: openedToday })}</span>
+                  {/* A fund has no retail or service figures, so neither line nor traffic. */}
+                  {!isFund && <span className="sim__legend-wide" data-testid="sim-legend-motos"><Bike size={13} />{t('simulation.legend.motos', { n: traffic.motos })}</span>}
+                  {!isFund && <span className="sim__legend-wide" data-testid="sim-legend-walkers"><PersonStanding size={13} />{t('simulation.legend.walkers', { n: traffic.walkers })}</span>}
                 </div>
                 {hq && <div className="sim__legend-group">
                   <h4>{t('simulation.legend.groupCompany')}</h4>

@@ -11152,7 +11152,9 @@
       "guest": "Customers in shop",
       "pending_payout": "Payout-pending pile",
       "payout": "Paid-out pile",
-      "cars": "1 car = 1 contract opened today ({{n}})"
+      "cars": "1 car = 1 contract opened today ({{n}})",
+      "motos": "Motorcycle = ฿100 of retail sales ({{n}})",
+      "walkers": "Person on the footpath = ฿100 of service fees ({{n}})"
     },
     "collection": {
       "open": "View installment collection",
@@ -11171,7 +11173,8 @@
       "futureCount": "{{due}} installments · {{paid}} paid",
       "paidCount": "Fully paid {{paid}}/{{due}} installments",
       "note": "* This month isn't over, so Billed includes installments not yet due · ↗ A month ahead = installments of running contracts that will fall due; Collected there means paid in advance · On time = paid by the due date plus the company's grace days"
-    }
+    },
+    "waitedFor": "waiting {{age}}"
   },
   "deviceLocation": {
     "button": "View location",

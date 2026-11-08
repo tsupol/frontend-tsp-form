@@ -1,5 +1,5 @@
 import {
-  BoxGeometry, CanvasTexture, Color, CylinderGeometry, DirectionalLight, Float32BufferAttribute, Group, HemisphereLight, IcosahedronGeometry, InstancedMesh,
+  BoxGeometry, CanvasTexture, CircleGeometry, Color, CylinderGeometry, DirectionalLight, Float32BufferAttribute, Group, HemisphereLight, IcosahedronGeometry, InstancedMesh,
   Matrix4, Mesh, MeshBasicMaterial, MeshLambertMaterial, OrthographicCamera, PCFShadowMap, Plane, PlaneGeometry, Quaternion, Raycaster, RepeatWrapping,
   SRGBColorSpace, Scene, ShadowMaterial, SphereGeometry, Vector2, Vector3, WebGLRenderer, type BufferGeometry, type Material,
 } from 'three';
@@ -45,6 +45,9 @@ const CAR_LEN = 2.9;
 const CAR_CAPACITY = 64; // instances made up front; grows when a busy day needs more
 const CAR_RUNOFF = 6; // road beyond the frontage the cars still use, each end
 const CAR_FADE = 3; // a car grows in / shrinks away over this much road at each end
+const MOTO_LEN = 1.7;
+const MOTO_IN = 0.4; // a motorcycle lane's centre, in from each kerb — clear of the car lanes (bodies start 0.71 in)
+const WALKER_LEN = 0.6;
 
 const PX = 30; // screen pixels per world unit at zoom 1
 const AZ = Math.PI / 4;
@@ -184,12 +187,30 @@ function chatSpotOf(i: number): Spot {
   return { x: x + lap, z: z - lap, seated: false, face: 'back' };
 }
 
-/** One row of chat[]: a seat in the chat corner of its shop. */
+/** One row of chat[]: a seat in the chat corner of its shop, or in the company's
+ *  customer-service room when its shop is in that pool (`room` = index in hq.pools). */
 export interface ChatSeat {
   /** Contract id. Hits report it negated, so it can't collide with a waiting customer's. */
   id: number;
   branchId: number;
+  /** Seat number in the shop's corner, or in the room when `room` is set. */
   spot: number;
+  room?: number;
+}
+
+// ── Waiting for a chat reply in the customer-service room (NOTICE 2026-11-07 tag §2) ──
+// A fund's chats wait on its customer-service team, so a shop in that pool has its waiting
+// customers sit in the company building, not the shop: 3 rows × 7 in front of the staff
+// desks, facing them. The front row is always drawn; a further row's chair only when someone
+// sits in it; past 21 they sit half a body over (still one each, all counted).
+const CS_COLS = Array.from({ length: 7 }, (_, i) => 1.0 + i * 1.15);
+const CS_SEATS: Spot[] = [2.3, 3.3, 4.3].flatMap(z => CS_COLS.map(x => ({ x, z, seated: true, face: 'back' as Face })));
+const CS_ALWAYS = CS_COLS.length;
+
+function csSpotOf(i: number): Spot {
+  const s = CS_SEATS[i % CS_SEATS.length];
+  const lap = Math.floor(i / CS_SEATS.length) * 0.3;
+  return { ...s, x: s.x + lap, z: s.z - lap };
 }
 
 /** Where the chat corner's sign goes: on the patch, under the row's middle. */
@@ -253,6 +274,9 @@ const C = {
   skin: ['#f1cdb0', '#e7b996', '#d9a67f'], hair: ['#3b2d24', '#5a4232', '#26211e', '#6b5a48'],
   cars: ['#e8ecef', '#5f7f9e', '#c9544d', '#3f4750', '#d9b44a', '#8fa3ad'], glass: '#6d8091', tyre: '#23272b', hub: '#aeb5ba',
   shelf: '#d9c7a3', phone: '#2f3640', awning: '#ffffff',
+  // Six motorcycle colours, like the cars: pick(i * 5 + seed) only cycles over a count coprime to 5.
+  motos: ['#c9544d', '#2f5d8a', '#e8ecef', '#3f4750', '#d9b44a', '#4f8a5b'], helmet: '#f2f4f5', trousers: '#3c4a5c',
+  shirts: ['#e07a5f', '#3d85c6', '#81b29a', '#f2cc8f', '#9c89b8', '#5c677d'],
 };
 
 const pick = <T,>(list: T[], n: number) => list[Math.abs(Math.floor(n)) % list.length];
@@ -266,14 +290,47 @@ const UNIT_POST = new CylinderGeometry(1, 1, 1, 12);
 const UNIT_BALL = new SphereGeometry(1, 20, 14);
 const UNIT_CROWN = new IcosahedronGeometry(1, 1);
 
+/** One colour baked into a geometry, so parts that keep their own colour merge into one mesh. */
+function coloured(geo: BufferGeometry, color: string) {
+  const c = new Color(color);
+  const n = geo.getAttribute('position').count;
+  geo.setAttribute('color', new Float32BufferAttribute(Array.from({ length: n * 3 }, (_, i) => [c.r, c.g, c.b][i % 3]), 3));
+  return geo;
+}
+
+// A motorcycle and its rider along +x, wheels on y = 0. Paint (per instance) = the bike's body
+// and the rider's shirt; tyres, seat, handlebar and helmet keep their own colour.
+function motoParts() {
+  const wheel = (r: number, w: number) => new CylinderGeometry(r, r, w, 14).rotateX(Math.PI / 2);
+  const paint = mergeGeometries([
+    new BoxGeometry(1.15, 0.26, 0.3).translate(0, 0.42, 0),
+    new BoxGeometry(0.26, 0.44, 0.34).translate(-0.14, 0.88, 0),
+  ]);
+  const fixed = mergeGeometries([
+    coloured(wheel(0.26, 0.1).translate(0.6, 0.26, 0), C.tyre),
+    coloured(wheel(0.26, 0.1).translate(-0.6, 0.26, 0), C.tyre),
+    coloured(new BoxGeometry(0.52, 0.08, 0.28).translate(-0.18, 0.6, 0), '#2a2f35'),
+    coloured(new BoxGeometry(0.08, 0.3, 0.52).translate(0.44, 0.72, 0), '#3a4048'),
+    coloured(new BoxGeometry(0.36, 0.12, 0.12).translate(0.02, 0.64, 0.14), C.trousers),
+    coloured(new BoxGeometry(0.36, 0.12, 0.12).translate(0.02, 0.64, -0.14), C.trousers),
+    coloured(new SphereGeometry(0.17, 12, 10).translate(-0.1, 1.27, 0), C.helmet),
+  ]);
+  return { paint, fixed };
+}
+
+// Someone walking, facing +x, feet on y = 0. Paint (per instance) = the shirt.
+function walkerParts() {
+  const paint = new CylinderGeometry(0.15, 0.19, 0.6, 12).translate(0, 0.66, 0);
+  const fixed = mergeGeometries([
+    coloured(new BoxGeometry(0.16, 0.36, 0.26).translate(0, 0.18, 0), C.trousers),
+    coloured(new SphereGeometry(0.16, 12, 10).translate(0, 1.13, 0), C.skin[1]),
+    coloured(new SphereGeometry(0.17, 12, 10).scale(1, 0.75, 1).translate(-0.02, 1.2, 0), C.hair[0]),
+  ]);
+  return { paint, fixed };
+}
+
 // A car along +x, wheels on y = 0. Paint is per car; glass, tyres and hubs keep their own colour.
 function carParts() {
-  const coloured = (geo: BufferGeometry, color: string) => {
-    const c = new Color(color);
-    const n = geo.getAttribute('position').count;
-    geo.setAttribute('color', new Float32BufferAttribute(Array.from({ length: n * 3 }, (_, i) => [c.r, c.g, c.b][i % 3]), 3));
-    return geo;
-  };
   const wheel = (r: number, w: number) => new CylinderGeometry(r, r, w, 18).rotateX(Math.PI / 2);
   const paint = mergeGeometries([
     new BoxGeometry(CAR_LEN, 0.38, 1.28).translate(0, 0.41, 0),
@@ -384,7 +441,33 @@ const FOLDER_H = 0.05;
 const FOLDER_CAP = 24; // a taller stack says nothing more; the number over it does
 const HQ_DESKS = 8;
 
-interface Car { lane: number; dir: 1 | -1; speed: number; offset: number }
+/** One thing moving along a lane: a car, a motorcycle or someone walking. */
+interface Mover { lane: number; dir: 1 | -1; speed: number; offset: number }
+interface Lane { z: number; dir: 1 | -1; speed: number }
+type FleetKind = 'car' | 'moto' | 'walker';
+interface Fleet {
+  lanes: Lane[];
+  items: Mover[];
+  meshes: InstancedMesh[];
+  capacity: number;
+  /** Length along the lane: the on-screen margin when testing whether any is visible. */
+  len: number;
+  /** Height of each mesh's origin: body, fixed parts, shadow patch just above the ground. */
+  ys: number[];
+  make: (capacity: number) => InstancedMesh[];
+}
+
+/** What the road carries, each a real figure (NOTICE 1635 §2 · work order 2026-11-05 §2):
+ *  a car per contract opened today, a motorcycle per ฿100 of retail sales, someone walking
+ *  per ฿100 of service fees (rounded down). The legend prints the same numbers. */
+export function trafficCounts(branches: SimBranch[]) {
+  const sum = (f: (b: SimBranch) => number) => branches.reduce((s, b) => s + (f(b) || 0), 0);
+  return {
+    cars: sum(b => b.opened.length),
+    motos: Math.floor(sum(b => b.retail) / 100),
+    walkers: Math.floor(sum(b => b.service) / 100),
+  };
+}
 
 export class ShopWorld {
   private renderer: WebGLRenderer;
@@ -411,19 +494,16 @@ export class ShopWorld {
   private ray = new Raycaster();
   private floorPlane = new Plane(new Vector3(0, 1, 0), -SLAB);
   private plan: Plan;
-  private cars: Car[] = [];
-  private carMeshes: InstancedMesh[] = [];
-  private carRoot: Group | null = null;
-  private carCapacity = 0;
-  private lanes: { z: number; dir: 1 | -1; speed: number }[] = [];
-  /** False under prefers-reduced-motion: the cars stand still (and can still be counted). */
+  private fleets = {} as Record<FleetKind, Fleet>;
+  private trafficRoot: Group | null = null;
+  /** False under prefers-reduced-motion: the traffic stands still (and can still be counted). */
   private motion = true;
   private span = 1;
   private spanStart = 0;
   private raf = 0;
   private sized = false;
   private view = { k: 1, x: 0, y: 0, w: 1, h: 1 };
-  private carsWereVisible = true;
+  private trafficWasVisible = true;
   private canvas: HTMLCanvasElement;
   private type: CompanyType | undefined;
   /** Envelopes and bank notes in the air (HTML), moved in the cars' frame loop. */
@@ -519,7 +599,7 @@ export class ShopWorld {
     for (let x = spanStart; x < spanStart + span; x += 5) box(boxes, x, 0.04, roadZ + ROAD_D / 2 - 0.07, 2.6, 0.012, 0.14, C.dash);
     // Cars run only along the shops' frontage (plus a little either side), so every
     // one of them is on screen at once and the count can be read.
-    this.buildCars(root, -CAR_RUNOFF, fw + CAR_RUNOFF * 2, roadZ);
+    this.buildTraffic(root, -CAR_RUNOFF, fw + CAR_RUNOFF * 2, roadZ, fd);
 
     const tree = (x: number, z: number, s: number, n: number) => {
       posts.add(x, 0.4 * s, z, 0.1 * s, 0.8 * s, 0.1 * s, C.trunk);
@@ -626,95 +706,127 @@ export class ShopWorld {
     });
   }
 
-  // The cars on the road in front are a count, not decoration (work order 2026-11-05 §2):
-  // one car per contract the company opened today, the figure on the "สัญญาวันนี้" card.
-  // No contract, empty road. They are spaced evenly, never at random, so the count
-  // can be read off the screen; the side roads carry none.
-  // Thailand drives on the left: looking along +x the left is -z, so the lane by the plot runs +x.
-  private buildCars(root: Group, spanStart: number, span: number, roadZ: number) {
+  // What moves on the road is a count, not decoration: each thing is a real figure
+  // (trafficCounts), spaced evenly — never at random — so it can be counted off the screen,
+  // and only along the shops' frontage so all of it is on screen at once. No figure, none.
+  // Cars in the two middle lanes, motorcycles in a lane hugging each kerb, people on the
+  // two footpaths. Thailand drives on the left: looking along +x the left is -z, so the
+  // near side runs +x.
+  private buildTraffic(root: Group, spanStart: number, span: number, roadZ: number, fd: number) {
     this.span = span;
     this.spanStart = spanStart;
-    this.carRoot = root;
-    this.lanes = [
-      { z: roadZ + ROAD_D * 0.25, dir: 1, speed: 5.2 },
-      { z: roadZ + ROAD_D * 0.75, dir: -1, speed: 4.4 },
-    ];
-    this.allocateCars(CAR_CAPACITY);
+    this.trafficRoot = root;
+    const fleet = (lanes: Lane[], len: number, ys: number[], make: (cap: number) => InstancedMesh[]): Fleet =>
+      ({ lanes, items: [], meshes: [], capacity: 0, len, ys, make });
+    this.fleets = {
+      car: fleet([{ z: roadZ + ROAD_D * 0.25, dir: 1, speed: 5.2 }, { z: roadZ + ROAD_D * 0.75, dir: -1, speed: 4.4 }],
+        CAR_LEN, [0.04, 0.04, 0.07], cap => this.carMeshes(cap)),
+      moto: fleet([{ z: roadZ + MOTO_IN, dir: 1, speed: 6.4 }, { z: roadZ + ROAD_D - MOTO_IN, dir: -1, speed: 5.8 }],
+        MOTO_LEN, [0.04, 0.04, 0.07], cap => this.motoMeshes(cap)),
+      walker: fleet([{ z: fd + FOOT / 2, dir: 1, speed: 1.15 }, { z: roadZ + ROAD_D + FOOT / 2, dir: -1, speed: 1.0 }],
+        WALKER_LEN, [FOOT_Y, FOOT_Y, FOOT_Y + 0.02], cap => this.walkerMeshes(cap)),
+    };
+    this.allocate('car', CAR_CAPACITY);
+    this.allocate('moto', 32);
+    this.allocate('walker', 32);
   }
 
-  /** Instanced meshes for up to `capacity` cars; only `count` of them are drawn. */
-  private allocateCars(capacity: number) {
-    const root = this.carRoot;
-    if (!root) return;
-    this.carMeshes.forEach(m => { root.remove(m); m.dispose(); });
-    const { paint, fixed } = carParts();
-    const paintMat = new MeshLambertMaterial({ color: '#ffffff' });
-    const fixedMat = new MeshLambertMaterial({ color: '#ffffff', vertexColors: true });
-    // Moving cars are not in the static shadow map; each carries a soft patch under it instead.
-    const patchGeo = new PlaneGeometry(CAR_LEN + 0.25, 1.5).rotateX(-Math.PI / 2);
-    const patchMat = new MeshBasicMaterial({ color: '#10161a', transparent: true, opacity: 0.2, depthWrite: false });
-    const painted = new InstancedMesh(paint, paintMat, capacity);
-    for (let i = 0; i < capacity; i++) painted.setColorAt(i, new Color(pick(C.cars, i * 5 + 2)));
-    const meshes = [painted, new InstancedMesh(fixed, fixedMat, capacity), new InstancedMesh(patchGeo, patchMat, capacity)];
-    meshes.forEach(m => {
+  /** Instanced meshes for up to `capacity` of a fleet; only as many as it has are drawn. */
+  private allocate(kind: FleetKind, capacity: number) {
+    const root = this.trafficRoot;
+    const f = this.fleets[kind];
+    if (!root || !f) return;
+    f.meshes.forEach(m => { root.remove(m); m.dispose(); });
+    f.meshes = f.make(capacity);
+    f.meshes.forEach(m => {
       m.frustumCulled = false;
       m.castShadow = false;
-      m.count = 0;
+      m.count = f.items.length;
       root.add(m);
     });
-    this.carMeshes = meshes;
-    this.carCapacity = capacity;
-    this.owned.push(paint, fixed, patchGeo, paintMat, fixedMat, patchMat);
+    f.capacity = capacity;
   }
 
-  /** One car per contract opened today, split over the two lanes. */
-  private setCarCount(n: number) {
-    if (n === this.cars.length) return;
-    if (n > this.carCapacity) this.allocateCars(Math.max(n, this.carCapacity * 2));
-    this.cars = [];
-    this.lanes.forEach((l, lane) => {
+  /** Painted part (a colour per instance), fixed parts (vertex colours), a soft patch under it —
+   *  moving things are not in the static shadow map, so each carries its own. */
+  private moverMeshes(capacity: number, paint: BufferGeometry, fixed: BufferGeometry, patch: BufferGeometry, colours: string[], seed: number) {
+    const paintMat = new MeshLambertMaterial({ color: '#ffffff' });
+    const fixedMat = new MeshLambertMaterial({ color: '#ffffff', vertexColors: true });
+    const patchMat = new MeshBasicMaterial({ color: '#10161a', transparent: true, opacity: 0.2, depthWrite: false });
+    const painted = new InstancedMesh(paint, paintMat, capacity);
+    for (let i = 0; i < capacity; i++) painted.setColorAt(i, new Color(pick(colours, i * 5 + seed)));
+    this.owned.push(paint, fixed, patch, paintMat, fixedMat, patchMat);
+    return [painted, new InstancedMesh(fixed, fixedMat, capacity), new InstancedMesh(patch, patchMat, capacity)];
+  }
+
+  private carMeshes(capacity: number) {
+    const { paint, fixed } = carParts();
+    return this.moverMeshes(capacity, paint, fixed, new PlaneGeometry(CAR_LEN + 0.25, 1.5).rotateX(-Math.PI / 2), C.cars, 2);
+  }
+
+  private motoMeshes(capacity: number) {
+    const { paint, fixed } = motoParts();
+    return this.moverMeshes(capacity, paint, fixed, new PlaneGeometry(MOTO_LEN, 0.55).rotateX(-Math.PI / 2), C.motos, 1);
+  }
+
+  private walkerMeshes(capacity: number) {
+    const { paint, fixed } = walkerParts();
+    return this.moverMeshes(capacity, paint, fixed, new CircleGeometry(0.28, 16).rotateX(-Math.PI / 2), C.shirts, 3);
+  }
+
+  /** n of a fleet, split over its two lanes with even gaps. */
+  private setCount(kind: FleetKind, n: number) {
+    const f = this.fleets[kind];
+    if (!f || n === f.items.length) return;
+    f.items = [];
+    f.lanes.forEach((l, lane) => {
       // Lane 0 takes the odd one out.
       const inLane = lane === 0 ? Math.ceil(n / 2) : Math.floor(n / 2);
       for (let j = 0; j < inLane; j++) {
         // Even gaps in each lane; the second lane is shifted half a gap so the two don't pair up.
         const offset = ((j + (lane === 0 ? 0 : 0.5)) * this.span) / Math.max(inLane, 1);
-        this.cars.push({ lane: l.z, dir: l.dir, speed: l.speed, offset });
+        f.items.push({ lane: l.z, dir: l.dir, speed: l.speed, offset });
       }
     });
-    this.carMeshes.forEach(m => { m.count = this.cars.length; });
-    this.carsWereVisible = true;
-    this.placeCars(this.motion ? performance.now() / 1000 : 0);
+    if (n > f.capacity) this.allocate(kind, Math.max(n, f.capacity * 2));
+    f.meshes.forEach(m => { m.count = f.items.length; });
+    this.trafficWasVisible = true;
+    this.placeTraffic(this.motion ? performance.now() / 1000 : 0);
   }
 
-  private placeCars(seconds: number) {
+  private placeTraffic(seconds: number) {
     const mat = new Matrix4();
     const pos = new Vector3();
     const scale = new Vector3(1, 1, 1);
     const flip = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), Math.PI);
     const none = new Quaternion();
-    this.cars.forEach((c, i) => {
-      const run = (c.offset + c.speed * seconds) % this.span;
-      const x = this.spanStart + (c.dir > 0 ? run : this.span - run);
-      // Arriving at one end and leaving at the other, rather than popping in and out.
-      const s = Math.min(1, Math.max(0.001, Math.min(run, this.span - run) / CAR_FADE));
-      scale.set(s, s, s);
-      this.carMeshes.forEach((m, k) => {
-        pos.set(x, k === 2 ? 0.07 : 0.04, c.lane);
-        m.setMatrixAt(i, mat.compose(pos, c.dir > 0 ? none : flip, scale));
-        m.instanceMatrix.needsUpdate = true;
+    Object.values(this.fleets).forEach(f => {
+      f.items.forEach((c, i) => {
+        const run = (c.offset + c.speed * seconds) % this.span;
+        const x = this.spanStart + (c.dir > 0 ? run : this.span - run);
+        // Arriving at one end and leaving at the other, rather than popping in and out.
+        const s = Math.min(1, Math.max(0.001, Math.min(run, this.span - run) / CAR_FADE));
+        scale.set(s, s, s);
+        f.meshes.forEach((m, k) => {
+          pos.set(x, f.ys[k], c.lane);
+          m.setMatrixAt(i, mat.compose(pos, c.dir > 0 ? none : flip, scale));
+          m.instanceMatrix.needsUpdate = true;
+        });
       });
     });
   }
 
-  private carsVisible(seconds: number) {
+  private trafficVisible(seconds: number) {
     const { k, x, y, w, h } = this.view;
-    const margin = CAR_LEN * PX * k;
-    return this.cars.some(c => {
-      const run = (c.offset + c.speed * seconds) % this.span;
-      const [px, py] = project(this.spanStart + (c.dir > 0 ? run : this.span - run), 0, c.lane);
-      const sx = x + px * k;
-      const sy = y + py * k;
-      return sx > -margin && sx < w + margin && sy > -margin && sy < h + margin;
+    return Object.values(this.fleets).some(f => {
+      const margin = f.len * PX * k;
+      return f.items.some(c => {
+        const run = (c.offset + c.speed * seconds) % this.span;
+        const [px, py] = project(this.spanStart + (c.dir > 0 ? run : this.span - run), 0, c.lane);
+        const sx = x + px * k;
+        const sy = y + py * k;
+        return sx > -margin && sx < w + margin && sy > -margin && sy < h + margin;
+      });
     });
   }
 
@@ -728,11 +840,11 @@ export class ShopWorld {
       this.flights?.tick(t, this.view);
       // Every display frame: a 30 fps cap chosen by elapsed time skipped frames unevenly
       // (one, then two), so the cars moved in uneven steps and the road looked jerky.
-      // No car on screen: nothing has changed, so don't draw at all.
-      const visible = this.carsVisible(t / 1000);
-      if (!visible && !this.carsWereVisible) return;
-      this.carsWereVisible = visible;
-      this.placeCars(t / 1000);
+      // Nothing moving on screen: nothing has changed, so don't draw at all.
+      const visible = this.trafficVisible(t / 1000);
+      if (!visible && !this.trafficWasVisible) return;
+      this.trafficWasVisible = visible;
+      this.placeTraffic(t / 1000);
       this.render();
     };
     this.raf = requestAnimationFrame(frame);
@@ -822,7 +934,10 @@ export class ShopWorld {
 
   /** Called when an answer arrives or the selection changes. */
   setLive({ branches, customers, picked, showChat = false, chatters = [], hq = null, stale = [] }: LiveState) {
-    this.setCarCount(branches.reduce((s, b) => s + b.opened.length, 0));
+    const traffic = trafficCounts(branches);
+    this.setCount('car', traffic.cars);
+    this.setCount('moto', traffic.motos);
+    this.setCount('walker', traffic.walkers);
     this.live.children.forEach(ch => (ch as InstancedMesh).dispose?.());
     this.live.clear();
     const y = LOT_Y + SLAB;
@@ -909,8 +1024,31 @@ export class ShopWorld {
         box(corner, r.ox + CHAT_PATCH.x, y, r.oz + CHAT_PATCH.z, CHAT_PATCH.w, 0.015, CHAT_PATCH.d, CHAT_SEAT.floor);
         for (const s of CHAT_SEATS.slice(0, CHAT_ALWAYS)) this.seat(corner, r.ox + s.x, r.oz + s.z, s.face, CHAT_SEAT.seat, CHAT_SEAT.base);
       });
+      // The customer-service rooms' front row, always there (only once there is a building).
+      const hqRooms = this.plan.hq?.rooms ?? [];
+      hq?.pools.forEach((p, ri) => {
+        const room = hqRooms[ri];
+        if (p.kind !== 'CUSTOMER_SERVICE' || !room) return;
+        for (const s of CS_SEATS.slice(0, CS_ALWAYS)) this.seat(corner, room.ox + s.x, room.oz + s.z, s.face, CHAT_SEAT.seat, CHAT_SEAT.base);
+      });
       const chatMore = new Map<number, number>();
       chatters.forEach((c, i) => {
+        const room = c.room != null ? hqRooms[c.room] : undefined;
+        if (room) {
+          const s = csSpotOf(c.spot);
+          if (c.spot >= CS_ALWAYS && c.spot < CS_SEATS.length) this.seat(corner, room.ox + s.x, room.oz + s.z, s.face, CHAT_SEAT.seat, CHAT_SEAT.base);
+          const base = y + 0.42;
+          const x = room.ox + s.x;
+          const z = room.oz + s.z - 0.03;
+          bodies.add(x, base + SIT_H / 2, z, BODY_R, SIT_H, BODY_R, CHAT_COLOR);
+          const headY = base + SIT_H + HEAD_R * 0.85;
+          heads.add(x, headY, z, HEAD_R, HEAD_R, HEAD_R, pick(C.skin, c.id + i));
+          hair.add(x, headY + HEAD_R * 0.3, z - 0.015, HEAD_R * 1.05, HEAD_R * 0.85, HEAD_R * 1.05, pick(C.hair, c.id * 3 + 2));
+          box(corner, x + BODY_R - 0.02, base + SIT_H * 0.62, z - 0.07, 0.04, 0.22, 0.14, C.phone);
+          this.customerIds.push(-c.id);
+          return;
+        }
+        if (c.room != null) return; // a room that isn't drawn: nowhere to sit, never back in the shop
         const r = byId.get(c.branchId);
         if (!r) return;
         if (c.spot >= CHAT_DRAWN) {
@@ -993,7 +1131,7 @@ export class ShopWorld {
     this.emptySeats = [];
     const taken = new Set<string>();
     customers.forEach(c => { if (c.station === 'wait') taken.add(`${c.branchId}:wait:${c.spot}`); });
-    chatters.forEach(c => taken.add(`${c.branchId}:chat:${c.spot}`));
+    chatters.forEach(c => { if (c.room == null) taken.add(`${c.branchId}:chat:${c.spot}`); });
     this.plan.rooms.forEach(r => {
       WAIT_SEATS.slice(0, waitAlways(r.type)).forEach((s, i) => {
         if (!taken.has(`${r.id}:wait:${i}`)) this.emptySeats.push({ branchId: r.id, zone: 'wait', x: r.ox + s.x, z: r.oz + s.z });
@@ -1054,7 +1192,6 @@ export class ShopWorld {
         stack(ox + 0.8, oz + 2.14, pool.waiting, HQ_COLOR.waiting, 0.5, 0.62, y + 0.45);
         // No count over the tray: the room tag already shows the same number ('n รอตรวจ'),
         // and from the camera the tray sits right under the tag, so the count covered it.
-        void top;
       }
 
       if (pool.kind === 'CREDIT') {
@@ -1088,14 +1225,10 @@ export class ShopWorld {
           }
           mark({ room: ri, x: cx, y: 0.12, z: oz + 5.45, kind: 'day', value: d.pending, day: d.day, today: isToday });
         });
-      } else if (pool.unread != null) {
-        // Customer service: one floating bubble per unread message (the page draws them), at most 18.
-        const shown = Math.min(pool.unread, 18);
-        for (let i = 0; i < shown; i++) {
-          mark({ room: ri, x: ox + 1.6 + (i % 6) * 1.15, y: 1.5 + Math.floor(i / 6) * 0.55 + ((i * 37) % 5) * 0.06, z: oz + 3.2 + Math.floor(i / 6) * 0.7, kind: 'bubble', value: i });
-        }
-        if (pool.unread > shown) mark({ room: ri, x: ox + 1.6 + 6 * 1.15, y: 1.6, z: oz + 3.9, kind: 'bubbleMore', value: pool.unread - shown });
-        if (pool.unread === 0) mark({ room: ri, x: ox + HQ_RW / 2, y: 0.12, z: oz + 4.2, kind: 'clear', value: 0 });
+      } else if (pool.unread === 0) {
+        // Customer service: the customers waiting sit in the room with their unread count
+        // over their heads (setLive) — the floating bubbles are gone. Nothing unread: say so.
+        mark({ room: ri, x: ox + HQ_RW / 2, y: 0.12, z: oz + 5.2, kind: 'clear', value: 0 });
       }
     });
     if (things.size) things.build(this.live);
@@ -1147,6 +1280,12 @@ export class ShopWorld {
 
   /** Head-top position of someone in the chat corner, for the unread bubble. */
   chatAt(c: ChatSeat): [number, number, number] | null {
+    if (c.room != null) {
+      const room = this.plan.hq?.rooms[c.room];
+      if (!room) return null;
+      const s = csSpotOf(c.spot);
+      return [room.ox + s.x, 0.11 + 0.42 + SIT_H + HEAD_R * 2, room.oz + s.z];
+    }
     const r = this.plan.rooms.find(p => p.id === c.branchId);
     if (!r) return null;
     if (c.spot >= CHAT_DRAWN) return null;
@@ -1158,7 +1297,7 @@ export class ShopWorld {
   setView(k: number, x: number, y: number, width: number, height: number) {
     this.renderer.setSize(width, height, false);
     this.view = { k, x, y, w: width, h: height };
-    this.carsWereVisible = true;
+    this.trafficWasVisible = true;
     const s = k * PX;
     this.camera.left = -x / s;
     this.camera.right = (width - x) / s;
@@ -1209,7 +1348,7 @@ export class ShopWorld {
 
   /** The numbers a probe reads to check the scene, not the formula that built it. */
   stats() {
-    return { frames: this.renderer.info.render.frame, calls: this.renderer.info.render.calls, triangles: this.renderer.info.render.triangles, near: this.camera.near, far: this.camera.far, piles: this.pileList.length, customers: this.customerIds.length, cars: this.cars.length, carsDrawn: this.carMeshes[0]?.count ?? 0 };
+    return { frames: this.renderer.info.render.frame, calls: this.renderer.info.render.calls, triangles: this.renderer.info.render.triangles, near: this.camera.near, far: this.camera.far, piles: this.pileList.length, customers: this.customerIds.length, cars: this.fleets.car?.items.length ?? 0, carsDrawn: this.fleets.car?.meshes[0]?.count ?? 0, motos: this.fleets.moto?.items.length ?? 0, walkers: this.fleets.walker?.items.length ?? 0 };
   }
 
   dispose() {
@@ -1219,7 +1358,7 @@ export class ShopWorld {
     this.canvas.removeEventListener('webglcontextrestored', this.onRestored);
     this.live.children.forEach(ch => (ch as InstancedMesh).dispose?.());
     this.owned.forEach(o => o.dispose());
-    this.carMeshes.forEach(m => m.dispose());
+    Object.values(this.fleets).forEach(f => f.meshes.forEach(m => m.dispose()));
     this.lambert.dispose();
     this.crown.dispose();
     this.renderer.dispose();
