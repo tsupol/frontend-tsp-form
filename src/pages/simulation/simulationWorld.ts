@@ -371,7 +371,7 @@ export interface HqMark {
   y: number;
   z: number;
   /** What it is, so the page picks the words and the look. */
-  kind: 'tray' | 'credit' | 'returned' | 'checked' | 'payout' | 'money' | 'day' | 'deskMore' | 'bubble' | 'bubbleMore' | 'clear';
+  kind: 'credit' | 'returned' | 'checked' | 'payout' | 'money' | 'day' | 'deskMore' | 'bubble' | 'bubbleMore' | 'clear';
   value: number;
   /** The day column's date ("" = older backlog), for 'day'. */
   day?: string;
@@ -1051,8 +1051,10 @@ export class ShopWorld {
       // The tray of documents waiting to be checked, on the left.
       if (pool.waiting != null) {
         box(things, ox + 0.55, y, oz + 2.05, 1.0, 0.45, 0.8, C.shelf);
-        const top = stack(ox + 0.8, oz + 2.14, pool.waiting, HQ_COLOR.waiting, 0.5, 0.62, y + 0.45);
-        mark({ room: ri, x: ox + 1.05, y: top + 0.25, z: oz + 2.45, kind: 'tray', value: pool.waiting });
+        stack(ox + 0.8, oz + 2.14, pool.waiting, HQ_COLOR.waiting, 0.5, 0.62, y + 0.45);
+        // No count over the tray: the room tag already shows the same number ('n รอตรวจ'),
+        // and from the camera the tray sits right under the tag, so the count covered it.
+        void top;
       }
 
       if (pool.kind === 'CREDIT') {

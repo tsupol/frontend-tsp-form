@@ -452,7 +452,7 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
       })}
       {marks.map((m, i) => {
         // Counts over stacks show once zoomed in; bubbles and the "nothing waiting" note always.
-        const always = m.kind === 'bubble' || m.kind === 'bubbleMore' || m.kind === 'clear' || m.kind === 'tray';
+        const always = m.kind === 'bubble' || m.kind === 'bubbleMore' || m.kind === 'clear';
         if (!always && !showIcons) return null;
         const at = place(m.x, m.y, m.z);
         if (!onScreen(at)) return null;
@@ -463,7 +463,7 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
           : m.kind === 'deskMore' || m.kind === 'bubbleMore' ? `+${m.value}`
           : m.kind === 'clear' ? t('simulation.hq.clear')
           : String(m.value);
-        const color = m.kind === 'tray' ? '#a07b1c' : m.kind === 'credit' || m.kind === 'money' ? HQ_COLOR.approved : m.kind === 'returned' ? HQ_COLOR.returned
+        const color = m.kind === 'credit' || m.kind === 'money' ? HQ_COLOR.approved : m.kind === 'returned' ? HQ_COLOR.returned
           : m.kind === 'checked' ? HQ_COLOR.checked : m.kind === 'payout' ? HQ_COLOR.inPayout : undefined;
         return (
           <span key={i} className={`sim__hq-mark sim__hq-mark--${m.kind}${m.today ? ' sim__hq-mark--today' : ''}`} style={{ ...at, color, borderColor: color }}>
