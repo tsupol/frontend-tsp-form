@@ -133,7 +133,9 @@ export function PartnerRemitAccounts({ only, className }: PartnerRemitAccountsPr
                 // The bank name can be empty when the record keeps it as text.
                 bank_name: row.bank_name || row.bank_code,
                 account_name: row.account_name,
-                account_number_display: row.account_no ?? '—',
+                // null = a QR-only account → the line says "QR", not "—". The view
+                // has no QR picture yet, so there is nothing to open (owner 11-07 #7).
+                account_number: row.account_no,
               }}
             />
             {/* What each account is for. The remittance one is the one people get
