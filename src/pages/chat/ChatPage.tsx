@@ -262,17 +262,22 @@ export function ChatPage() {
     });
   }, [searchQuery.data, unreadOnly, awaitingOnly, statusFilter, mineOnly]);
 
-  // "Waiting for a reply" per side of the switch, from the per-shop counts the
-  // view already keeps — mine = the rows flagged mine, whole fund = all rows.
-  const waitingCounts = useQuery({
-    queryKey: ['chat-inbox', 'fund-waiting'],
-    queryFn: () => apiClient.get<{ branch_id: number; waiting_reply_count: number; is_mine: boolean | null }[]>(
-      '/v_branch_chat_status_summary?select=branch_id,waiting_reply_count,is_mine',
-    ),
-    enabled: isFundCompany,
-  });
-  const waitingMine = (waitingCounts.data ?? []).filter(r => r.is_mine).reduce((n, r) => n + r.waiting_reply_count, 0);
-  const waitingAll = (waitingCounts.data ?? []).reduce((n, r) => n + r.waiting_reply_count, 0);
+  // Rooms still needing a reply, per side of the switch: the rooms that show
+  // "ยังไม่ได้ตอบ" (awaiting_staff_reply + the badge's recent-or-overdue rule), so a
+  // reply clears them. Not the summary's waiting_reply_count — that counts the
+  // WAITING_REPLY status staff set by hand, which a reply never clears (LINE 11-08 #8).
+  // Under ['chat-inbox'] so every chat event refreshes them with the list.
+  const awaitingCount = (mine: boolean) => {
+    const fresh = new Date(Date.now() - AWAITING_FRESH_MS).toISOString();
+    return apiClient.getPaginated<{ contract_id: number }>(
+      `/v_branch_chat_list?select=contract_id&awaiting_staff_reply=is.true&or=(is_overdue.is.true,last_message_at.gte.${fresh})${mine ? '&is_mine=is.true' : ''}`,
+      { page: 1, pageSize: 1 },
+    );
+  };
+  const awaitingMineQ = useQuery({ queryKey: ['chat-inbox', 'awaiting-count', 'mine'], queryFn: () => awaitingCount(true), enabled: isFundCompany });
+  const awaitingAllQ = useQuery({ queryKey: ['chat-inbox', 'awaiting-count', 'all'], queryFn: () => awaitingCount(false), enabled: isFundCompany });
+  const waitingMine = awaitingMineQ.data?.totalCount ?? 0;
+  const waitingAll = awaitingAllQ.data?.totalCount ?? 0;
 
   const rows = useMemo(() => {
     if (isSearchMode) {
