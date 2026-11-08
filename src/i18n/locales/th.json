@@ -2648,14 +2648,13 @@
     "icloudHide": "ซ่อน",
     "icloudHidesIn": "ซ่อนใน {{n}} วิ",
     "icloudAuditNote": "การดูรหัสถูกบันทึกทุกครั้ง (ใคร / เมื่อไหร่ / บัญชีไหน)",
-    "lastTouched": "แตะล่าสุด: {{rel}}",
-    "neverTouched": "ยังไม่เคยแตะ",
+    "lastTouched": "ติดต่อล่าสุด: {{rel}}",
+    "neverTouched": "ยังไม่เคยติดต่อ",
     "copyCode": "คัดลอกรหัสสัญญา",
     "codeCopied": "คัดลอกแล้ว",
     "pendingTransferTo": "รอโอน → {{name}}",
-    "neglectNever": "ยังไม่เคยแตะ",
-    "neglectStale7": "ไม่ได้แตะเกิน 7 วัน",
-    "neglectNotToday": "วันนี้ยังไม่ได้แตะ",
+    "neglectStale7": "ไม่ได้ติดต่อเกิน 7 วัน",
+    "neglectNotToday": "วันนี้ยังไม่ได้ติดต่อ",
     "logAction": "บันทึกการทำงาน",
     "action": "กิจกรรม",
     "result": "ผลลัพธ์",
@@ -2786,7 +2785,9 @@
       "sent": "ส่งทีมยึดแล้ว",
       "takenBack": "ดึงกลับมาติดตามเองแล้ว",
       "unchanged": "อยู่ในสถานะนี้อยู่แล้ว ไม่มีอะไรเปลี่ยน"
-    }
+    },
+    "untouchedBadge": "ยังไม่ได้ติดต่อ",
+    "neglectUntouched": "ยังไม่ได้ติดต่อ ({{count}})"
   },
   "channel": {
     "PURCHASE": "ซื้อจาก supplier",
@@ -2942,7 +2943,9 @@
     "readReceipt": {
       "noRecord": "ยังไม่มีบันทึกว่าเปิดอ่าน",
       "openedHint": "แอปลูกค้าเปิดห้องแชทนี้แล้ว — ไม่ได้แปลว่าลูกค้ารับรู้เนื้อหาแล้ว"
-    }
+    },
+    "awaitingReply": "ยังไม่ได้ตอบ",
+    "awaitingReplyHint": "ลูกค้าส่งข้อความล่าสุด ยังไม่มีพนักงานตอบ"
   },
   "collectionMonthly": {
     "title": "รายงานเรียกเก็บ vs เก็บได้จริง",

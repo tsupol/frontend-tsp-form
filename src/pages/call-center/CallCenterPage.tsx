@@ -26,7 +26,7 @@ type SortKey =
   | 'work_priority.desc'
   | 'overdue_days.desc'
   | 'overdue_amount.desc'
-  | 'last_action_at.asc.nullsfirst';
+  | 'last_touch_at.asc.nullsfirst';
 
 export function CallCenterPage() {
   const { t, i18n } = useTranslation();
@@ -46,8 +46,10 @@ export function CallCenterPage() {
   const [showAllInBook, setShowAllInBook] = useState(false);
   const [sortBy, setSortBy] = useState<SortKey>('work_priority.desc');
   const [redOnly, setRedOnly] = useState(false);
-  // last_action_at neglect filter (§8.2, chip 3 revised round 3). '' = off.
-  const [neglect, setNeglect] = useState<'' | 'never' | 'stale7' | 'notToday'>('');
+  // Contact filter chips. Read last_touch_at / untouched (mig 1636), not
+  // last_action_at — that one counts dunning-log buttons only, so a collector
+  // who works by chat looked like they had done nothing. '' = off.
+  const [neglect, setNeglect] = useState<'' | 'untouched' | 'stale7' | 'notToday'>('');
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [searchInput, setSearchInput] = useState('');
@@ -77,9 +79,11 @@ export function CallCenterPage() {
     });
   }, [setSearchParams]);
 
-  // Build the v_my_book query for the active view.
-  const buildEndpoint = useCallback(() => {
+  // Build the v_my_book query for the active view. `forCount` swaps in the
+  // untouched chip and drops the order, so the same tab/search can count them.
+  const buildEndpoint = useCallback((forCount?: 'untouched') => {
     const params: string[] = [];
+    const chip = forCount ?? neglect;
     if (view === 'focus') {
       params.push('on_focus=eq.true');
     } else if (!showAllInBook) {
@@ -91,15 +95,15 @@ export function CallCenterPage() {
     // PostgREST allows only one, so collect them and nest under a single `and`
     // when more than one is present.
     const orClauses: string[] = [];
-    if (neglect === 'never') {
-      params.push('last_action_at=is.null');
-    } else if (neglect === 'stale7') {
+    if (chip === 'untouched') {
+      params.push('untouched=is.true');
+    } else if (chip === 'stale7') {
       const cutoff = new Date(Date.now() - 7 * 86_400_000).toISOString();
-      orClauses.push(`or(last_action_at.is.null,last_action_at.lt.${cutoff})`);
-    } else if (neglect === 'notToday') {
+      orClauses.push(`or(last_touch_at.is.null,last_touch_at.lt.${cutoff})`);
+    } else if (chip === 'notToday') {
       // "Not touched today" = never touched OR last touched before today 00:00.
       const start = new Date(); start.setHours(0, 0, 0, 0);
-      orClauses.push(`or(last_action_at.is.null,last_action_at.lt.${start.toISOString()})`);
+      orClauses.push(`or(last_touch_at.is.null,last_touch_at.lt.${start.toISOString()})`);
     }
     if (search.trim()) {
       const q = encodeURIComponent(search.trim());
@@ -112,7 +116,8 @@ export function CallCenterPage() {
       params.push(`and=(${orClauses.join(',')})`);
     }
 
-    params.push(`order=${sortBy}`);
+    if (forCount) params.push('select=contract_id');
+    else params.push(`order=${sortBy}`);
     return `/v_my_book?${params.join('&')}`;
   }, [view, showAllInBook, redOnly, neglect, search, sortBy]);
 
@@ -124,6 +129,19 @@ export function CallCenterPage() {
 
   const rows = data?.data ?? [];
   const totalCount = data?.totalCount ?? 0;
+
+  // Untouched rows in what the collector is looking at (same tab, search and
+  // red filter) — the number on the "not contacted" chip, red while above 0 so
+  // new uncontacted work can't sit unnoticed (owner 11-07). Under ['cc','book']
+  // so logging an action refreshes it with the list.
+  const untouchedEndpoint = buildEndpoint('untouched');
+  const { data: untouchedData } = useQuery({
+    queryKey: ['cc', 'book', 'untouched-count', untouchedEndpoint],
+    queryFn: () => apiClient.getPaginated<{ contract_id: number }>(untouchedEndpoint, { page: 1, pageSize: 1 }),
+    refetchInterval: 60_000,
+    placeholderData: keepPreviousData,
+  });
+  const untouchedCount = untouchedData?.totalCount ?? 0;
 
   // Count of focused rows hidden from the default book view (for the "N hidden" hint).
   const { data: focusCountData } = useQuery({
@@ -196,7 +214,7 @@ export function CallCenterPage() {
     { value: 'work_priority.desc', label: t('callCenter.sortPriority') },
     { value: 'overdue_days.desc', label: t('callCenter.sortLongestOverdue') },
     { value: 'overdue_amount.desc', label: t('callCenter.sortHighestDebt') },
-    { value: 'last_action_at.asc.nullsfirst', label: t('callCenter.sortMostNeglected') },
+    { value: 'last_touch_at.asc.nullsfirst', label: t('callCenter.sortMostNeglected') },
   ];
 
   const selectedRow = selectedId ? rows.find(r => r.contract_id === selectedId) : null;
@@ -335,8 +353,23 @@ export function CallCenterPage() {
                 </div>
                 {/* Neglect chips (§8.2) — last_action_at based, mutually exclusive */}
                 <div className="flex flex-wrap items-center gap-1.5">
+                  {/* "Not contacted" leads, red while there is any — the one chip
+                      that is a to-do rather than a lens (owner 11-07). */}
+                  <button
+                    type="button"
+                    data-testid="cc-chip-untouched"
+                    onClick={() => { setNeglect(neglect === 'untouched' ? '' : 'untouched'); setPageIndex(0); }}
+                    className={`px-2.5 py-1 rounded-full text-xs border transition-colors cursor-pointer ${
+                      neglect === 'untouched'
+                        ? 'border-danger bg-danger text-danger-contrast font-medium'
+                        : untouchedCount > 0
+                          ? 'border-danger-border bg-danger-soft text-danger-fg font-medium hover:bg-surface-hover'
+                          : 'border-line text-subtle hover:bg-surface-hover'
+                    }`}
+                  >
+                    {t('callCenter.neglectUntouched', { count: untouchedCount })}
+                  </button>
                   {([
-                    ['never', 'callCenter.neglectNever'],
                     ['stale7', 'callCenter.neglectStale7'],
                     ['notToday', 'callCenter.neglectNotToday'],
                   ] as const).map(([key, labelKey]) => {
@@ -401,6 +434,10 @@ export function CallCenterPage() {
                     return (
                       <div
                         className="px-4 py-3 transition-colors cursor-pointer flex flex-col gap-1.5"
+                        // Untouched: a red edge down the row's left side, readable
+                        // while scanning the list without reading any badge.
+                        style={c.untouched ? { boxShadow: 'inset 4px 0 0 var(--color-danger)' } : undefined}
+                        data-untouched={c.untouched || undefined}
                         onClick={() => { selectContract(c.contract_id); if (isMobile) goTo('detail'); }}
                       >
                         {/* Row 1 — contract code + copy, due badge, transfer + focus star pinned right */}
@@ -457,6 +494,10 @@ export function CallCenterPage() {
                         {/* Row 2 — customer name + fact badges, overdue amount pinned right */}
                         <div className="flex items-center gap-1.5 min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                            {/* Row 2, not row 1: row 1 has no room left and truncated the code. */}
+                            {c.untouched && (
+                              <Badge size="sm" color="danger" data-testid="cc-untouched-badge">{t('callCenter.untouchedBadge')}</Badge>
+                            )}
                             <span className="text-xs text-subtle truncate min-w-0">{c.customer_name}</span>
                             {pendingTradeByContract.has(c.contract_id) && (
                               <Badge size="sm" color="info">
@@ -487,9 +528,9 @@ export function CallCenterPage() {
                         {/* Row 4 — flags (auto / manual) + last touched */}
                         <div className="flex items-center gap-2 flex-wrap">
                           <FlagPair auto={c.auto_flag_level} manual={c.manual_flag_level} divergent={c.flag_divergent} levels={flagLevels} compact />
-                          <span className="ml-auto shrink-0 text-[11px] text-subtler">
-                            {c.last_action_at
-                              ? t('callCenter.lastTouched', { rel: formatRelativeAgo(c.last_action_at, i18n.language).rel })
+                          <span className={`ml-auto shrink-0 text-[11px] ${c.untouched ? 'text-danger-fg font-medium' : 'text-subtler'}`}>
+                            {c.last_touch_at
+                              ? t('callCenter.lastTouched', { rel: formatRelativeAgo(c.last_touch_at, i18n.language).rel })
                               : t('callCenter.neverTouched')}
                           </span>
                         </div>

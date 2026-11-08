@@ -55,7 +55,15 @@ export interface BookRow {
   has_loaner: boolean;
   device_deposited: boolean;
   is_paused: boolean;
+  /** Dunning-log buttons only — chat and appointments don't count (mig 1636 ⚠️).
+   *  For "contacted yet?" use last_touch_at / untouched instead. */
   last_action_at: string | null;
+  /** Last time STAFF touched the contract: a staff chat message (not auto-replies),
+   *  a dunning log, or an appointment. null = never (mig 1636). */
+  last_touch_at: string | null;
+  /** Overdue and nobody has touched it since its oldest overdue due date.
+   *  Always false when not overdue. Shown as-is — never worked out here (mig 1636). */
+  untouched: boolean;
   attempts_today: number;
   attempts_7d: number;
   on_focus: boolean;

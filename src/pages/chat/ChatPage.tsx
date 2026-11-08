@@ -15,7 +15,7 @@ import { ChatThreadPanel } from './ChatThreadPanel';
 import { ChatListRow } from './ChatListRow';
 import { useChatDock } from '../../contexts/ChatDockContext';
 import { CHAT_STATUS_VALUES, type ChatInboxRow, type ChatStatus } from './chatTypes';
-import { sortChatRowsByStatusThenRecency } from './chatStatus';
+import { AWAITING_FRESH_MS, showsAwaitingReply, sortChatRowsByStatusThenRecency } from './chatStatus';
 import { isSearchable } from '../../lib/searchKeyword';
 import { SearchInput } from '../../components/SearchInput';
 
@@ -141,6 +141,9 @@ export function ChatPage() {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [unreadOnly, setUnreadOnly] = useState(false);
+  // Rooms where the customer is waiting on staff — the same rule as the row's
+  // "ยังไม่ได้ตอบ" badge, so the filtered list and the badges always agree (mig 1636).
+  const [awaitingOnly, setAwaitingOnly] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(25);
@@ -149,7 +152,7 @@ export function ChatPage() {
   const [filterOpen, setFilterOpen] = useState(false);
   const activeFilterCount = statusFilter ? 1 : 0;
 
-  useEffect(() => { setPageIndex(0); }, [search, unreadOnly, statusFilter, scope]);
+  useEffect(() => { setPageIndex(0); }, [search, unreadOnly, awaitingOnly, statusFilter, scope]);
   useEffect(() => { setMobileDetailsOpen(false); }, [selectedContractId]);
   // Debounce + floor both live in SearchInput. Only fire once the keyword can
   // actually be searched — a keyword under the floor makes fn_contract_search
@@ -171,13 +174,19 @@ export function ChatPage() {
     const params: string[] = ['order=last_message_at.desc.nullslast'];
     if (mineOnly) params.push('is_mine=is.true');
     if (unreadOnly) params.push('unread_count=gt.0');
+    if (awaitingOnly) {
+      // awaiting_staff_reply is BE's; the "recent or overdue" cut is the badge's
+      // display rule, mirrored here (showsAwaitingReply).
+      const fresh = new Date(Date.now() - AWAITING_FRESH_MS).toISOString();
+      params.push('awaiting_staff_reply=is.true', `or=(is_overdue.is.true,last_message_at.gte.${fresh})`);
+    }
     if (statusFilter === 'NONE') {
       params.push('chat_status=is.null');
     } else if (statusFilter) {
       params.push(`chat_status=eq.${statusFilter}`);
     }
     return `/v_branch_chat_list?${params.join('&')}`;
-  }, [unreadOnly, statusFilter, mineOnly]);
+  }, [unreadOnly, awaitingOnly, statusFilter, mineOnly]);
 
   // No refetchInterval: new messages arrive on `chat:contract:<id>` and status
   // changes on `chat:branch:<id>`, both of which invalidate ['chat-inbox'], and
@@ -185,7 +194,7 @@ export function ChatPage() {
   // A timer on top of that was a third poller on this same view (with ChatPage's
   // own roster hook and the nav badge) — different query keys, so nothing deduped.
   const inbox = useQuery({
-    queryKey: ['chat-inbox', mineOnly, unreadOnly, statusFilter, pageIndex, pageSize],
+    queryKey: ['chat-inbox', mineOnly, unreadOnly, awaitingOnly, statusFilter, pageIndex, pageSize],
     queryFn: () => apiClient.getPaginated<ChatInboxRow>(
       queryUrl,
       { page: pageIndex + 1, pageSize },
@@ -240,17 +249,18 @@ export function ChatPage() {
   // memory. Inbox rows are server-paged and only re-sorted within the page.
   const allSearchRows = useMemo(() => {
     const found = searchQuery.data ?? [];
-    if (!unreadOnly && !statusFilter && !mineOnly) return found;
+    if (!unreadOnly && !awaitingOnly && !statusFilter && !mineOnly) return found;
     // The filter chips still apply on top of a search. A never-chatted stub
     // has no is_mine yet — keep it, so "mine" can still start a first chat.
     return found.filter(r => {
       if (mineOnly && r.is_mine === false) return false;
       if (unreadOnly && r.unread_count <= 0) return false;
+      if (awaitingOnly && !showsAwaitingReply(r)) return false;
       if (statusFilter === 'NONE') return r.chat_status === null;
       if (statusFilter) return r.chat_status === statusFilter;
       return true;
     });
-  }, [searchQuery.data, unreadOnly, statusFilter, mineOnly]);
+  }, [searchQuery.data, unreadOnly, awaitingOnly, statusFilter, mineOnly]);
 
   // "Waiting for a reply" per side of the switch, from the per-shop counts the
   // view already keeps — mine = the rows flagged mine, whole fund = all rows.
@@ -464,6 +474,19 @@ export function ChatPage() {
                 aria-pressed={unreadOnly}
               >
                 {t('chat.unread')}
+              </Button>
+              <Button
+                size="sm"
+                variant={awaitingOnly ? 'solid' : 'outline'}
+                color={awaitingOnly ? 'danger' : undefined}
+                startIcon={awaitingOnly
+                  ? <CheckCircle2 size={14} />
+                  : <Circle size={14} className="text-subtle" />}
+                onClick={() => setAwaitingOnly(v => !v)}
+                aria-pressed={awaitingOnly}
+                data-testid="chat-filter-awaiting"
+              >
+                {t('chat.awaitingReply')}
               </Button>
               <div className="hidden sm:block w-48 shrink-0">
                 <Select

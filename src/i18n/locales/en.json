@@ -2651,14 +2651,13 @@
     "icloudHide": "Hide",
     "icloudHidesIn": "Hides in {{n}}s",
     "icloudAuditNote": "Every reveal is logged (who / when / which account).",
-    "lastTouched": "Last touched: {{rel}}",
-    "neverTouched": "Never touched",
+    "lastTouched": "Last contacted: {{rel}}",
+    "neverTouched": "Never contacted",
     "copyCode": "Copy contract code",
     "codeCopied": "Copied",
     "pendingTransferTo": "Pending transfer → {{name}}",
-    "neglectNever": "Never touched",
-    "neglectStale7": "Untouched 7+ days",
-    "neglectNotToday": "Not touched today",
+    "neglectStale7": "Not contacted 7+ days",
+    "neglectNotToday": "Not contacted today",
     "logAction": "Log activity",
     "action": "Activity",
     "result": "Result",
@@ -2789,7 +2788,9 @@
       "sent": "Sent to the repo team",
       "takenBack": "Back with you to follow up",
       "unchanged": "Already in that status — nothing changed"
-    }
+    },
+    "untouchedBadge": "Not contacted",
+    "neglectUntouched": "Not contacted ({{count}})"
   },
   "channel": {
     "PURCHASE": "Purchase",
@@ -2945,7 +2946,9 @@
     "readReceipt": {
       "noRecord": "No record of it being opened yet",
       "openedHint": "The customer's app opened this chat — not proof they read the message"
-    }
+    },
+    "awaitingReply": "Not replied",
+    "awaitingReplyHint": "The customer wrote last and no staff member has replied"
   },
   "collectionMonthly": {
     "title": "Billed vs Collected",
