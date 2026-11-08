@@ -74,26 +74,44 @@ export function HqPoolCard({ hq, pool, branches, canChat, onClose }: {
           </tbody>
         </table>
       )}
+      {/* Two tables, not one: six columns (three counts + two baht figures) don't fit
+          the 300px card — at ฿1,000,000+ the table ran ~110px past it and scrolled sideways. */}
       {pool.kind === 'PAYOUT' && pool.days.length > 0 && (
-        <table className="sim__days">
-          <thead className="table-header">
-            <tr className="table-row">
-              <th className="table-head">{t('simulation.hq.submitDay')}</th>
-              <th className="table-head">{t('simulation.hq.unchecked')}</th>
-              <th className="table-head">{t('simulation.hq.checked')}</th>
-              <th className="table-head">{t('simulation.hq.inPayout')}</th>
-              <th className="table-head">{t('simulation.pendingShort')}</th>
-              <th className="table-head">{t('simulation.hq.paid')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(pool.days as HqPayoutDay[]).map(d => (
-              <tr key={d.day || 'older'}>
-                <td>{dayCell(d.day)}</td><td>{d.unchecked}</td><td>{d.checked}</td><td>{d.in_payout}</td><td>{baht(d.pending)}</td><td>{baht(d.paid)}</td>
+        <>
+          <table className="sim__days" data-testid="sim-hq-payout-counts">
+            <thead className="table-header">
+              <tr className="table-row">
+                <th className="table-head">{t('simulation.hq.submitDay')}</th>
+                <th className="table-head">{t('simulation.hq.unchecked')}</th>
+                <th className="table-head">{t('simulation.hq.checked')}</th>
+                <th className="table-head">{t('simulation.hq.inPayout')}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {(pool.days as HqPayoutDay[]).map(d => (
+                <tr key={d.day || 'older'}>
+                  <td>{dayCell(d.day)}</td><td>{d.unchecked}</td><td>{d.checked}</td><td>{d.in_payout}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <table className="sim__days" data-testid="sim-hq-payout-money">
+            <thead className="table-header">
+              <tr className="table-row">
+                <th className="table-head">{t('simulation.hq.submitDay')}</th>
+                <th className="table-head">{t('simulation.pendingShort')}</th>
+                <th className="table-head">{t('simulation.hq.paid')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(pool.days as HqPayoutDay[]).map(d => (
+                <tr key={d.day || 'older'}>
+                  <td>{dayCell(d.day)}</td><td>{baht(d.pending)}</td><td>{baht(d.paid)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
       )}
 
       {pool.kind === 'CREDIT' && (
