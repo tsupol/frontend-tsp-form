@@ -30,23 +30,25 @@
 .sim__tag--shop { flex-direction: row; align-items: stretch; gap: 0; padding: 0; overflow: hidden; }
 .sim__tag-body { display: flex; flex-direction: column; justify-content: center; gap: 1px; padding: 3px 9px; }
 .sim__tag--shop .sim__tag-row { gap: 6px; }
-.sim__score { flex: none; width: 42px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #2f9e57; color: #fff; }
+.sim__score { flex: none; width: 42px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #25814a; color: #fff; }
 .sim__score b { font-size: 19px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
 .sim__score b[data-d="3"], .sim__score b[data-d="4"] { font-size: 14px; }
 .sim__score i { font-style: normal; font-size: 9.5px; line-height: 1.2; opacity: .9; }
 .sim__score--zero { background: #6b7785; }
 /* A1 · number tile: a small solid box that hugs its digits (square at one digit), the word beside
    it in plain text of the same colour. Thai sits high in its line box, so the digits are nudged down
-   .03em and the word .13em — both picked by eye 11-07. 0 turns slate whatever the kind. */
+   .03em and the word .13em — both picked by eye 11-07. 0 turns slate whatever the kind.
+   Boxes are dark enough for white digits at 4.9–5.4:1 (owner 11-09: the old amber box read
+   2.2:1); same box in both themes, only the word lightens in dark. */
 .sim__tile { display: inline-flex; align-items: center; gap: 3px; font-style: normal; font-size: 11px; font-weight: 600; white-space: nowrap; }
 .sim__tile > b { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; height: 16px; min-width: 16px; padding: 0 4px; border-radius: 4px;
   font-size: 11px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; color: #fff; }
 .sim__tile > b > span { transform: translateY(.03em); }
 .sim__tile-w { transform: translateY(.13em); }
-.sim__tile--stale { color: #9a6b00; } .sim__tile--stale > b { background: #e0a21b; }
-.sim__tile--chat { color: #11707a; }  .sim__tile--chat > b { background: #1a9aa5; }
-.sim__tile--wait { color: #a85a12; }  .sim__tile--wait > b { background: #d9822b; }
-.sim__tile--zero { color: #6b7785; }  .sim__tile--zero > b { background: #6b7785; }
+.sim__tile--stale { color: #9a5b00; } .sim__tile--stale > b { background: #9a5b00; }
+.sim__tile--chat { color: #0f7a84; }  .sim__tile--chat > b { background: #0f7a84; }
+.sim__tile--wait { color: #c2410c; }  .sim__tile--wait > b { background: #c2410c; }
+.sim__tile--zero { color: #5f6b78; }  .sim__tile--zero > b { background: #5f6b78; }
 [data-theme="dark"] .sim__tile--stale { color: #ffd27a; }
 [data-theme="dark"] .sim__tile--chat { color: #7fe0e8; }
 [data-theme="dark"] .sim__tile--wait { color: #ffb877; }
