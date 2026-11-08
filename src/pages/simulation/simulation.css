@@ -51,6 +51,9 @@
 [data-theme="dark"] .sim__tile--chat { color: #7fe0e8; }
 [data-theme="dark"] .sim__tile--wait { color: #ffb877; }
 [data-theme="dark"] .sim__tile--zero { color: #9aa7b3; }
+/* People in the shop, above 0: green like the contract-count column. */
+.sim__people--on { color: #23874a; font-weight: 700; }
+[data-theme="dark"] .sim__people--on { color: #6fdc95; }
 .sim__row-top em .sim__tile { margin-left: 6px; vertical-align: middle; }
 
 .sim__card { background: var(--color-surface-elevated); color: var(--color-fg); border-radius: 14px; box-shadow: 0 2px 8px rgba(20, 40, 50, .14); }

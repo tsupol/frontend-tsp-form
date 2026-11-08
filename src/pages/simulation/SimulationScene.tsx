@@ -406,7 +406,15 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
         const deals = b.opened.length;
         const money = b.company_type === 'FINANCIER' ? `${t('simulation.financed')} ${baht(b.financed)}`
           : showProfit ? `${t('simulation.profitShort')} ${baht(b.profit)}` : null;
-        const sub = [money, t('simulation.peopleCount', { n: n, count: n }), b.day_closed ? t('simulation.dayClosed') : null].filter(Boolean).join(' · ');
+        // People in the shop go green above 0 (owner 11-09): shops about to sell stand out
+        // the way the green contract count marks shops that sold.
+        const sub = (
+          <>
+            {money && <>{money} · </>}
+            <span className={n > 0 ? 'sim__people--on' : undefined}>{t('simulation.peopleCount', { n: n, count: n })}</span>
+            {b.day_closed && <> · {t('simulation.dayClosed')}</>}
+          </>
+        );
         return (
           <button key={r.id} type="button" className={`sim__tag sim__tag--shop${picked === b.id ? ' sim__tag--on' : ''}`} style={{ ...at, '--sim-tag-scale': tagScale } as CSSProperties}
             data-room={b.id} onClick={() => onPick(b.id)}>

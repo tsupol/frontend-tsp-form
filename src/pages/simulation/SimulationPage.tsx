@@ -432,7 +432,7 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
                       <span className="sim__row-top">
                         <b><i className={`sim__rank${b.opened.length > 0 ? ' sim__rank--sold' : ''}`}>{rank}</i>{b.name}</b>
                         <em>
-                          {t('simulation.contractCount', { n: b.opened.length, count: b.opened.length })} · {t('simulation.peopleCount', { n: n, count: n })}
+                          {t('simulation.contractCount', { n: b.opened.length, count: b.opened.length })} · <span className={n > 0 ? 'sim__people--on' : undefined}>{t('simulation.peopleCount', { n: n, count: n })}</span>
                           {staleIn(b.id).length > 0 && <SimTile kind="stale" n={staleIn(b.id).length} label={v => t('simulation.staleChip', { n: v })} />}
                           {chatIn(b.id).length > 0 && <SimTile kind="chat" n={chatIn(b.id).length} label={v => t('simulation.chatChip', { n: v })} />}
                         </em>
