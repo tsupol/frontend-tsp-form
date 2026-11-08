@@ -437,27 +437,27 @@ export const AppSideNav = () => {
             // Toggle for the floating dock, alongside the unread count. Hidden
             // when collapsed (no room) and on mobile (no dock there — chat is
             // a full page). stopPropagation so it never triggers navigation.
-            badge: (
+            // Collapsed: no wrapper — an empty one is an extra child in the
+            // button and pushed the icon 4px off-centre.
+            badge: menuCollapsed || isMobile ? base.badge : (
               <span key="chat-nav-actions" className="inline-flex items-center gap-1">
-                {!menuCollapsed && !isMobile && (
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    aria-label={t('chat.dock.toggle')}
-                    title={t('chat.dock.toggle')}
-                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); toggleDock(); }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.stopPropagation(); e.preventDefault(); toggleDock();
-                      }
-                    }}
-                    className={`inline-flex items-center justify-center w-5 h-5 rounded transition-colors cursor-pointer hover:bg-surface-hover ${
-                      dockVisible ? 'text-primary-fg' : 'text-subtle'
-                    }`}
-                  >
-                    <PictureInPicture2 size={13} />
-                  </span>
-                )}
+                <span
+                  role="button"
+                  tabIndex={0}
+                  aria-label={t('chat.dock.toggle')}
+                  title={t('chat.dock.toggle')}
+                  onClick={(e) => { e.stopPropagation(); e.preventDefault(); toggleDock(); }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.stopPropagation(); e.preventDefault(); toggleDock();
+                    }
+                  }}
+                  className={`inline-flex items-center justify-center w-5 h-5 rounded transition-colors cursor-pointer hover:bg-surface-hover ${
+                    dockVisible ? 'text-primary-fg' : 'text-subtle'
+                  }`}
+                >
+                  <PictureInPicture2 size={13} />
+                </span>
                 {base.badge}
               </span>
             ),
