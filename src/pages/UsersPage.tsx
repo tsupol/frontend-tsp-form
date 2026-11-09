@@ -1219,16 +1219,33 @@ function ChangeRoleModal({ user, open, onClose }: { user: VUser | null; open: bo
   const roleCode = watch('role_code');
 
   const { roleOptions, rolesLoading } = useRoleOptions(user?.role_code);
+  const { data: roles = [] } = useRoles();
 
   const onSubmit = async (data: ChangeRoleFormData) => {
     if (!user) return;
     setIsPending(true);
     const start = Date.now();
     try {
-      await apiClient.rpc('user_change_role', {
-        p_user_id: user.id,
-        p_new_role_code: data.role_code,
-      });
+      // A role above branch level carries no branch (and a holding/global one no company).
+      // user_change_role keeps the user's current branch, which the database refuses for
+      // such a role ("Role scope does not match the user org scope") — so those go through
+      // user_change_role_and_scope with the levels below the role cleared (NOTICE 1631 §3.1).
+      // A branch role keeps the plain call: the user's own branch stays.
+      const scope = roles.find(r => r.code === data.role_code)?.scope;
+      if (scope && scope !== 'BRANCH') {
+        await apiClient.rpc('user_change_role_and_scope', {
+          p_user_id: user.id,
+          p_new_role_code: data.role_code,
+          p_holding_id: user.holding_id,
+          p_company_id: scope === 'COMPANY' ? user.company_id : null,
+          p_branch_id: null,
+        });
+      } else {
+        await apiClient.rpc('user_change_role', {
+          p_user_id: user.id,
+          p_new_role_code: data.role_code,
+        });
+      }
       addSnackbar({
         message: (
           <div className="alert alert-success">
