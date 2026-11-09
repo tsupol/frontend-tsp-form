@@ -24,6 +24,8 @@ type StatusFilter = ChatStatus | 'NONE' | null;
 // Search results page in memory, so this caps how many matches are reachable.
 // fn_contract_search ranks by relevance, so the tail is the least likely to be
 // wanted; a collector who doesn't see their contract types more characters.
+/** This device's last branch pick on the chat list (company / holding users). */
+const BRANCH_FILTER_KEY = 'chat.branchFilter';
 const SEARCH_FETCH_LIMIT = 100;
 
 /** The subset of fn_contract_search's contract shape this page needs. */
@@ -142,14 +144,34 @@ export function ChatPage() {
   const [search, setSearch] = useState('');
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(null);
+  // Branch filter — only for a user with no branch of their own (company / holding
+  // level), who otherwise sees every branch's rooms in one list (IMPLEMENT 2026-11-07
+  // chat_list_branch_filter). Remembered on this device; the database keeps nothing.
+  const canFilterBranch = user?.branch_id == null;
+  const [branchFilter, setBranchFilterState] = useState<number | null>(() => {
+    try { const v = localStorage.getItem(BRANCH_FILTER_KEY); return v ? Number(v) || null : null; } catch { return null; }
+  });
+  const setBranchFilter = (id: number | null) => {
+    setBranchFilterState(id);
+    try { if (id == null) localStorage.removeItem(BRANCH_FILTER_KEY); else localStorage.setItem(BRANCH_FILTER_KEY, String(id)); } catch { /* private mode */ }
+  };
+  const branchId = canFilterBranch ? branchFilter : null;
+  const { data: branchOptions = [] } = useQuery({
+    queryKey: ['chat-branch-options'],
+    // Only the branches this user can see (the view's own scope); a fund's list may hold
+    // branches with no chat yet — picking one gives an empty list, which is correct.
+    queryFn: () => apiClient.get<{ id: number; code: string; name: string }[]>('/v_branches?select=id,code,name&order=code'),
+    enabled: canFilterBranch,
+    staleTime: 10 * 60_000,
+  });
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [lightboxKey, setLightboxKey] = useState<string | null>(null);
   const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
-  const activeFilterCount = statusFilter ? 1 : 0;
+  const activeFilterCount = (statusFilter ? 1 : 0) + (branchId != null ? 1 : 0);
 
-  useEffect(() => { setPageIndex(0); }, [search, unreadOnly, statusFilter, scope]);
+  useEffect(() => { setPageIndex(0); }, [search, unreadOnly, statusFilter, scope, branchId]);
   useEffect(() => { setMobileDetailsOpen(false); }, [selectedContractId]);
   // Debounce + floor both live in SearchInput. Only fire once the keyword can
   // actually be searched — a keyword under the floor makes fn_contract_search
@@ -171,13 +193,14 @@ export function ChatPage() {
     const params: string[] = ['order=last_message_at.desc.nullslast'];
     if (mineOnly) params.push('is_mine=is.true');
     if (unreadOnly) params.push('unread_count=gt.0');
+    if (branchId != null) params.push(`branch_id=eq.${branchId}`);
     if (statusFilter === 'NONE') {
       params.push('chat_status=is.null');
     } else if (statusFilter) {
       params.push(`chat_status=eq.${statusFilter}`);
     }
     return `/v_branch_chat_list?${params.join('&')}`;
-  }, [unreadOnly, statusFilter, mineOnly]);
+  }, [unreadOnly, statusFilter, mineOnly, branchId]);
 
   // No refetchInterval: new messages arrive on `chat:contract:<id>` and status
   // changes on `chat:branch:<id>`, both of which invalidate ['chat-inbox'], and
@@ -185,7 +208,7 @@ export function ChatPage() {
   // A timer on top of that was a third poller on this same view (with ChatPage's
   // own roster hook and the nav badge) — different query keys, so nothing deduped.
   const inbox = useQuery({
-    queryKey: ['chat-inbox', mineOnly, unreadOnly, statusFilter, pageIndex, pageSize],
+    queryKey: ['chat-inbox', mineOnly, unreadOnly, statusFilter, branchId, pageIndex, pageSize],
     queryFn: () => apiClient.getPaginated<ChatInboxRow>(
       queryUrl,
       { page: pageIndex + 1, pageSize },
@@ -240,17 +263,18 @@ export function ChatPage() {
   // memory. Inbox rows are server-paged and only re-sorted within the page.
   const allSearchRows = useMemo(() => {
     const found = searchQuery.data ?? [];
-    if (!unreadOnly && !statusFilter && !mineOnly) return found;
+    if (!unreadOnly && !statusFilter && !mineOnly && branchId == null) return found;
     // The filter chips still apply on top of a search. A never-chatted stub
     // has no is_mine yet — keep it, so "mine" can still start a first chat.
     return found.filter(r => {
       if (mineOnly && r.is_mine === false) return false;
+      if (branchId != null && r.branch_id !== branchId) return false;
       if (unreadOnly && r.unread_count <= 0) return false;
       if (statusFilter === 'NONE') return r.chat_status === null;
       if (statusFilter) return r.chat_status === statusFilter;
       return true;
     });
-  }, [searchQuery.data, unreadOnly, statusFilter, mineOnly]);
+  }, [searchQuery.data, unreadOnly, statusFilter, mineOnly, branchId]);
 
   // "รอตอบ" per side of the switch: rooms whose status is WAITING_REPLY, from the
   // per-shop counts the view already keeps — mine = the rows flagged mine, whole
@@ -264,8 +288,10 @@ export function ChatPage() {
     ),
     enabled: isFundCompany,
   });
-  const waitingMine = (waitingCounts.data ?? []).filter(r => r.is_mine).reduce((n, r) => n + r.waiting_reply_count, 0);
-  const waitingAll = (waitingCounts.data ?? []).reduce((n, r) => n + r.waiting_reply_count, 0);
+  // With a branch picked, the counts are that branch's, like the list under them.
+  const waitingRows = (waitingCounts.data ?? []).filter(r => branchId == null || r.branch_id === branchId);
+  const waitingMine = waitingRows.filter(r => r.is_mine).reduce((n, r) => n + r.waiting_reply_count, 0);
+  const waitingAll = waitingRows.reduce((n, r) => n + r.waiting_reply_count, 0);
 
   const rows = useMemo(() => {
     if (isSearchMode) {
@@ -332,6 +358,18 @@ export function ChatPage() {
   // (mig 1185) also gets rooms from the other branches the pool covers — tag
   // those rows so a cross-branch room is recognisable in the mixed list.
   const ownBranchId = user?.branch_id ?? null;
+  // Same control as the payment-submissions page's branch filter: cleared = every branch.
+  const branchSelect = (
+    <Select
+      size="sm"
+      options={branchOptions.map(b => ({ value: String(b.id), label: b.name }))}
+      value={branchId != null ? String(branchId) : null}
+      onChange={(v) => setBranchFilter(v ? Number(v) : null)}
+      placeholder={t('chat.allBranches')}
+      showChevron
+      clearable
+    />
+  );
 
   return (
     <PageNav
@@ -468,6 +506,11 @@ export function ChatPage() {
               >
                 {t('chat.unread')}
               </Button>
+              {canFilterBranch && (
+                <div className="hidden sm:block w-48 shrink-0" data-testid="chat-branch-filter">
+                  {branchSelect}
+                </div>
+              )}
               <div className="hidden sm:block w-48 shrink-0">
                 <Select
                   size="sm"
@@ -506,6 +549,7 @@ export function ChatPage() {
                     <div className="text-xs font-medium text-subtle uppercase tracking-wide">
                       {t('common.filters')}
                     </div>
+                    {canFilterBranch && branchSelect}
                     <Select
                       size="sm"
                       options={statusFilterOptions}

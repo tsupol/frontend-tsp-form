@@ -905,14 +905,19 @@ export function ChatThreadPanel({
           setAwayFromBottom(fromBottom > SHOW_JUMP_BUTTON_PX);
           if (el.scrollTop <= LOAD_OLDER_THRESHOLD_PX) loadOlderMessages();
         }}
-        className="flex-1 min-h-0 overflow-auto better-scroll px-3 py-3 md:px-8"
+        // Gutter on both edges: the scrollbar would otherwise eat the right side only and
+        // push the centred column a few px left of the centred composer below it.
+        className="flex-1 min-h-0 overflow-auto better-scroll px-3 py-3 md:px-8 [scrollbar-gutter:stable_both-edges]"
       >
         {isLoading ? (
           <div className="text-center text-subtle p-8">{t('common.loading')}</div>
         ) : timeline.length === 0 ? (
           <div className="text-center text-subtle p-8">{t('chat.emptyThread')}</div>
         ) : (
-          <div className="flex flex-col gap-3">
+          /* One centred column, at most 720px: on a wide panel the customer's bubbles
+             (left) and staff's (right) stay a reading distance apart instead of sitting
+             at the panel's far edges (Telegram Desktop's wide layout, Element's 720px). */
+          <div className="flex flex-col gap-3 w-full max-w-[720px] mx-auto">
             {isFetchingOlderMessages && (
               <div className="text-center text-xs text-subtle py-2">{t('chat.loadingOlder')}</div>
             )}
@@ -967,7 +972,7 @@ export function ChatThreadPanel({
         <button
           type="button"
           onClick={jumpToNewest}
-          className="absolute left-3 right-3 bottom-1.5 md:left-8 md:right-8 z-10 flex items-center gap-2 min-w-0 px-3 py-2 rounded-full border border-line bg-surface-elevated/95 backdrop-blur shadow-lg text-left cursor-pointer hover:bg-surface-hover transition-colors animate-pop-in"
+          className="absolute left-3 right-3 bottom-1.5 md:left-8 md:right-8 mx-auto max-w-[720px] z-10 flex items-center gap-2 min-w-0 px-3 py-2 rounded-full border border-line bg-surface-elevated/95 backdrop-blur shadow-lg text-left cursor-pointer hover:bg-surface-hover transition-colors animate-pop-in"
         >
           {/* Who it's from, capped so a long name can't crowd out the preview.
               min-w-0 + max-w (not shrink-0) so `truncate` has a bounded box. */}
@@ -985,8 +990,10 @@ export function ChatThreadPanel({
       )}
       </div>
 
-      {/* Composer pinned at panel bottom */}
-      <div className="flex-none bg-bg px-1 pb-1 md:px-3 md:pb-3">
+      {/* Composer pinned at panel bottom — centred under the message column and a
+          little wider than it (784px vs 720px), so it still reads as the base of the
+          thread rather than one more bubble. */}
+      <div className="flex-none bg-bg px-1 pb-1 md:px-3 md:pb-3 w-full max-w-[784px] mx-auto">
         {sendError && (
           <div className="alert alert-danger mb-2 animate-pop-in">
             <XCircle size={16} />

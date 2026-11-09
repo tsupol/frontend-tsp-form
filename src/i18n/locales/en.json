@@ -2946,7 +2946,8 @@
     "readReceipt": {
       "noRecord": "No record of it being opened yet",
       "openedHint": "The customer's app opened this chat — not proof they read the message"
-    }
+    },
+    "allBranches": "All branches"
   },
   "collectionMonthly": {
     "title": "Billed vs Collected",
@@ -11186,10 +11187,7 @@
     "opened": {
       "open": "Contracts opened",
       "title": "Contracts opened",
-      "empty": "No contracts opened this month yet",
-      "downOfPrice": "{{pct}}% of device price",
-      "prevMonth": "Previous month",
-      "nextMonth": "Next month"
+      "empty": "No contracts opened this month yet"
     }
   },
   "deviceLocation": {
