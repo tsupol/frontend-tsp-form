@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { authService } from '../lib/auth';
 import { apiClient, setAuthErrorHandler, setTokenRefresher, setReadOnlyViewer } from '../lib/api';
 import { queryClient } from '../lib/queryClient';
@@ -99,7 +100,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const can = useCallback((code: string) => capabilities.has(code), [capabilities]);
+  // my_capabilities is the ROLE's permissions only. A permission granted to the person
+  // (v_my_permissions, source = 'GRANT') must count too, or a granted menu stays hidden —
+  // mnt_god had CONTRACT.CHAT granted and no chat menu (BUG 2026-11-09). Same query and key
+  // as useMyPermissions, so it is one request. Not hasPermission: that hides non-read codes
+  // from a read-only viewer, who sees the chat menu today through the role.
+  const { data: myPermissions } = useQuery({
+    queryKey: ['my-permissions'],
+    queryFn: () => apiClient.get<{ permission_code: string; source: 'ROLE' | 'GRANT' }[]>('/v_my_permissions'),
+    staleTime: 5 * 60_000,
+    enabled: !!user,
+  });
+  const granted = useMemo(
+    () => new Set((myPermissions ?? []).filter(p => p.source === 'GRANT').map(p => p.permission_code)),
+    [myPermissions],
+  );
+  const can = useCallback((code: string) => capabilities.has(code) || granted.has(code), [capabilities, granted]);
   const hasHandledAuthError = useRef(false);
   const isLoginInProgress = useRef(false);
   const suppressAuthRedirect = useRef(false);
