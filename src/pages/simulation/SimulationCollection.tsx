@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from 'tsp-form';
-import { X } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { baht, bangkokYearMonth, compactBaht, monthStart, type CollectionMonth, type SimBranch } from './simulationTypes';
+import { SimWindow } from './SimWindow';
+import type { WindowStack } from './useWindowStack';
 
 // The collection window (156 §7): 3 months back, this month, 2 ahead for one branch.
 // It floats instead of being a Modal because it must stay open while another
@@ -32,7 +32,7 @@ function barPath(x: number, y: number, w: number, h: number) {
 
 const pctText = (p: number | null) => (p == null ? '—' : `${p.toFixed(1)}%`);
 
-export function SimulationCollection({ branch, generatedAt, onClose }: { branch: SimBranch; generatedAt: string; onClose: () => void }) {
+export function SimulationCollection({ branch, generatedAt, stack, onClose }: { branch: SimBranch; generatedAt: string; stack: WindowStack; onClose: () => void }) {
   const { t, i18n } = useTranslation();
   const [rows, setRows] = useState<CollectionMonth[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -70,14 +70,11 @@ export function SimulationCollection({ branch, generatedAt, onClose }: { branch:
   const hasAny = months.some(m => m.expected_total > 0);
 
   return (
-    <div className="sim__card sim__collect" role="dialog" aria-label={`${t('simulation.collection.title')} ${branch.name}`}>
-      <div className="sim__card-head">
-        <h3>
-          {t('simulation.collection.title')} · {branch.name}
-          <small>{t('simulation.collection.subtitle')}</small>
-        </h3>
-        <Button variant="ghost" size="sm" className="sim__close" startIcon={<X size={14} />} aria-label={t('common.close')} onClick={onClose} />
-      </div>
+    <SimWindow id="collect" stack={stack} onClose={onClose} className="sim__collect" role="dialog" aria-label={`${t('simulation.collection.title')} ${branch.name}`}
+      head={<h3>
+        {t('simulation.collection.title')} · {branch.name}
+        <small>{t('simulation.collection.subtitle')}</small>
+      </h3>}>
 
       {!rows && !error && <p className="sim__muted">{t('common.loading')}</p>}
       {error && <div className="alert alert-danger">{error}</div>}
@@ -167,6 +164,6 @@ export function SimulationCollection({ branch, generatedAt, onClose }: { branch:
           <p className="sim__muted">{t('simulation.collection.note')}</p>
         </>
       )}
-    </div>
+    </SimWindow>
   );
 }

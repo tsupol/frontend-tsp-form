@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Button } from 'tsp-form';
-import { TrendingUp, X } from 'lucide-react';
+import { TrendingUp } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import {
@@ -12,6 +11,8 @@ import {
 import { MonthPicker } from '../../components/MonthPicker';
 import { DownPctBadge } from '../../components/DownPctBadge';
 import { bangkokYearMonth, monthStart, type SimBranch } from './simulationTypes';
+import { SimWindow } from './SimWindow';
+import type { WindowStack } from './useWindowStack';
 
 // The opened-contracts window (156 §7b · NOTICE 2026-11-09 opened button): the same daily
 // bars and month cards as the dashboard's chart, for the picked shop, starting at the
@@ -20,7 +21,7 @@ import { bangkokYearMonth, monthStart, type SimBranch } from './simulationTypes'
 // ค่างวดทั้งหมด is left out (owner 11-09) so the cards sit in two rows. The month is the
 // app's MonthPicker (same as the dashboard), in the title row, capped at this month.
 
-export function SimulationOpened({ branch, generatedAt, onClose }: { branch: SimBranch; generatedAt: string; onClose: () => void }) {
+export function SimulationOpened({ branch, generatedAt, stack, onClose }: { branch: SimBranch; generatedAt: string; stack: WindowStack; onClose: () => void }) {
   const { t, i18n } = useTranslation();
   const { year, month } = bangkokYearMonth(generatedAt);
   const current = new Date(year, month - 1, 1);
@@ -62,13 +63,12 @@ export function SimulationOpened({ branch, generatedAt, onClose }: { branch: Sim
   const error = q.error ? translateApiError(q.error, t) : null;
 
   return (
-    <div className="sim__card sim__collect sim__opened-win" role="dialog" aria-label={`${t('simulation.opened.title')} ${branch.name}`} data-testid="sim-opened-window">
-      <div className="sim__card-head sim__opened-head">
-        <h3>{t('simulation.opened.title')} · {branch.name}</h3>
-        <div data-testid="sim-opened-month">
-          <MonthPicker value={picked} onChange={setPicked} lang={i18n.language} max={current} />
-        </div>
-        <Button variant="ghost" size="sm" className="sim__close" startIcon={<X size={14} />} aria-label={t('common.close')} onClick={onClose} />
+    <SimWindow id="opened" stack={stack} onClose={onClose} className="sim__collect sim__opened-win"
+      role="dialog" aria-label={`${t('simulation.opened.title')} ${branch.name}`} data-testid="sim-opened-window"
+      head={<h3>{t('simulation.opened.title')} · {branch.name}</h3>}>
+      {/* The month sits at the top of the body, right-aligned (owner 11-10: not in the title bar). */}
+      <div className="sim__opened-month" data-testid="sim-opened-month">
+        <MonthPicker value={picked} onChange={setPicked} lang={i18n.language} max={current} />
       </div>
 
       {error && <div className="alert alert-danger">{error}</div>}
@@ -101,6 +101,6 @@ export function SimulationOpened({ branch, generatedAt, onClose }: { branch: Sim
           )}
         </div>
       )}
-    </div>
+    </SimWindow>
   );
 }

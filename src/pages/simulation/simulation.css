@@ -116,6 +116,12 @@ button.sim__tabs-toggle:hover, .sim__company-min:hover .sim__tabs-toggle { color
 .sim__panel { position: absolute; right: 12px; top: 12px; bottom: 12px; width: 300px; display: flex; flex-direction: column; overflow: hidden; }
 .sim__panel-toggle { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; height: 30px; padding: 0 8px 0 12px; border: 0; border-bottom: 1px solid var(--color-line); background: var(--color-surface-hover); color: var(--color-subtle); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
 .sim__panel-toggle:hover { color: var(--color-fg); }
+/* The chevron that folds an open panel / legend: its own button inside the strip (the strip
+   itself only brings the part to the front), reaching the strip's right edge. */
+div.sim__panel-toggle, div.sim__legend-toggle { cursor: default; }
+div.sim__panel-toggle:hover, div.sim__legend-toggle:hover { color: var(--color-subtle); }
+.sim__fold { display: flex; align-items: center; justify-content: center; align-self: stretch; width: 32px; margin-right: -8px; padding: 0; border: 0; background: transparent; color: inherit; cursor: pointer; }
+.sim__fold:hover { color: var(--color-fg); background: var(--color-surface); }
 .sim__panel--closed { bottom: auto; width: auto; }
 .sim__panel--closed .sim__panel-toggle { border-bottom: 0; }
 .sim__panel h3 { flex: none; margin: 0; padding: 8px 12px 6px; font-size: 13px; }
@@ -133,12 +139,8 @@ button.sim__tabs-toggle:hover, .sim__company-min:hover .sim__tabs-toggle { color
 .sim__rank { grid-column: 1; grid-row: 1; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; height: 18px; min-width: 22px; margin-top: 1px; padding: 0 4px; border-radius: 6px; background: var(--color-surface-hover); color: var(--color-subtle); font-style: normal; font-size: 11px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
 .sim__rank--sold { background: var(--color-success-soft); color: var(--color-success-fg); }
 
-.sim__card-head { position: relative; padding-right: 34px; }
-.sim__card-head h3 { margin: 0 0 8px; font-size: 14px; }
-.sim__card-head h3 small { display: block; font-weight: 400; font-size: 11px; color: var(--color-subtle); }
-.sim__close { position: absolute !important; right: -4px; top: -4px; }
 
-.sim__detail { position: absolute; left: 12px; bottom: 12px; width: 300px; max-height: calc(100% - 156px); overflow: auto; padding: 12px; font-size: 13px; z-index: 2; }
+.sim__detail { --sim-win-pad: 12px; position: absolute; left: 12px; bottom: 12px; width: 300px; max-height: calc(100% - 156px); font-size: 13px; }
 .sim__detail dl { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; margin: 0 0 8px; }
 .sim__detail dt { color: var(--color-subtle); }
 .sim__detail dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
@@ -160,20 +162,30 @@ button.sim__tabs-toggle:hover, .sim__company-min:hover .sim__tabs-toggle { color
 .sim__days td:not(:first-child) { white-space: nowrap; }
 .sim__row-future td { color: var(--color-subtle); }
 
-/* The collection / opened-contracts window: always centred on the picture, like any window.
-   To keep clear of the shop card it opened from (12 + card 300 + gap 12 = 324px each side,
-   so the card's เปิดสัญญา / เก็บค่างวด stay pressable) it narrows, but not below 560px —
-   four month cards a row still fit; on a picture narrower than that it covers the card's
-   edge, centred, rather than going lopsided. */
-.sim__collect { --sim-win-w: 600px; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: clamp(min(560px, 100% - 24px), 100% - 648px, var(--sim-win-w)); max-height: calc(100% - 24px); overflow: auto; padding: 14px 16px; font-size: 13px; z-index: 3; box-shadow: 0 8px 28px rgba(20, 40, 50, .28); }
-.sim__collect h3 { font-size: 15px; }
+/* Windows (SimWindow.tsx): dragged by the title bar, the pressed one on top (z from the
+   stack, inline). Until moved, each sits where the rules below put it. The window is a
+   column — title bar fixed, body scrolls — so the bar is always there to grab. The bar is the
+   overview panel's strip (same fill, line, height), title and subtitle on one line, ellipsis
+   before anything else gives way; month picker and close sit at its right end. */
+.sim__win { display: flex; flex-direction: column; overflow: hidden; }
+.sim__win-head { flex: none; display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 4px 0 8px; border-bottom: 1px solid var(--color-line); background: var(--color-surface-hover); color: var(--color-fg); user-select: none; -webkit-user-select: none; }
+.sim__win-head h3 { flex: 1; min-width: 0; margin: 0; font-size: 12px; font-weight: 600; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sim__win-head h3 small { display: inline; margin-left: 6px; font-size: 11px; font-weight: 400; color: var(--color-subtle); }
+.sim__win-grip { flex: none; color: var(--color-subtle); display: none; }
+.sim__win-close { flex: none; }
+.sim__win-body { flex: 1; min-height: 0; overflow: auto; padding: var(--sim-win-pad, 12px); }
+@media (min-width: 1024px) {
+  .sim__win-head { cursor: grab; touch-action: none; }
+  .sim__win-grip { display: block; }
+  .sim__win--dragging, .sim__win--dragging .sim__win-head { cursor: grabbing; }
+}
+/* The collection / opened-contracts window opens centred on the picture at its full width
+   (it used to narrow to clear the shop card; now the user moves whichever is in the way). */
+.sim__collect { --sim-win-w: 600px; --sim-win-pad: 12px 16px 14px; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(var(--sim-win-w), 100% - 24px); max-height: calc(100% - 24px); font-size: 13px; box-shadow: 0 8px 28px rgba(20, 40, 50, .28); }
 /* Wider than the collection window: 4 month cards a row, so the 8 a fund sees fit in 2 (§7b). */
 .sim__opened-win { --sim-win-w: 720px; }
-/* Title and month picker on one row; the title gives way (ellipsis) before the picker. */
-.sim__opened-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-.sim__opened-head h3 { margin: 0; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sim__opened-month { display: flex; justify-content: flex-end; margin-bottom: 10px; }
 .sim__opened-chart { overflow-x: auto; } /* a narrow window scrolls the chart sideways, never squashes it */
-.sim__collect h3 small { font-size: 12px; }
 .sim__legend-row { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--color-subtle); }
 .sim__legend-row i, .sim__tip i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; }
 .sim__legend-row .sim__swatch-future { box-sizing: border-box; background: rgba(163, 169, 174, .4); border: 1px dashed #a3a9ae; }
@@ -226,8 +238,10 @@ button.sim__tabs-toggle:hover, .sim__company-min:hover .sim__tabs-toggle { color
   .sim__zoom .btn { width: 44px; height: 44px; }
   .sim__tabs-toggle { width: 44px; }
   .sim__panel-toggle, .sim__legend-toggle { height: 44px; }
+  .sim__fold { width: 44px; }
   .sim__company-min { min-height: 44px; }
-  .sim__close.btn { width: 44px; height: 44px; right: -10px; top: -10px; }
+  .sim__win-close.btn { width: 44px; height: 44px; }
+  .sim__win-head { min-height: 44px; }
   .sim__row { padding: 10px 12px; min-height: 44px; }
   .sim__company { padding: 10px 16px; }
   /* The label stays compact; only its invisible tap area is 44 px tall. */

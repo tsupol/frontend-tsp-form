@@ -1,18 +1,19 @@
 import { useTranslation } from 'react-i18next';
-import { Button } from 'tsp-form';
-import { X } from 'lucide-react';
 import { DateTime } from '../../components/DateTime';
 import { ageText, baht, type HqCreditDay, type HqPayoutDay, type HqPool, type SimBranch, type SimHq } from './simulationTypes';
+import { SimWindow } from './SimWindow';
+import type { WindowStack } from './useWindowStack';
 
 // The card a pool room opens in the company building (156 §6h): the room's numbers,
 // its day table, the shops it serves and the documents it is holding. Every figure is
 // the RPC's own (pools[] counts, never re-counted from cases/settlements).
 
-export function HqPoolCard({ hq, pool, branches, canChat, onClose }: {
+export function HqPoolCard({ hq, pool, branches, canChat, stack, onClose }: {
   hq: SimHq;
   pool: HqPool;
   branches: SimBranch[];
   canChat: boolean;
+  stack: WindowStack;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -24,11 +25,8 @@ export function HqPoolCard({ hq, pool, branches, canChat, onClose }: {
   const held = hq.settlements.filter(s => s.pool_id === pool.id && (s.status === 'CLOSE_SUBMITTED' || s.status === 'IN_PAYOUT'));
 
   return (
-    <div className="sim__card sim__detail better-scroll" data-testid="sim-hq-card">
-      <div className="sim__card-head">
-        <h3>{pool.name}<small>{t(`simulation.hq.kind_${pool.kind}`)}</small></h3>
-        <Button variant="ghost" size="sm" className="sim__close" startIcon={<X size={14} />} aria-label={t('common.close')} onClick={onClose} />
-      </div>
+    <SimWindow id="hq" stack={stack} onClose={onClose} className="sim__detail" data-testid="sim-hq-card"
+      head={<h3>{pool.name}<small>{t(`simulation.hq.kind_${pool.kind}`)}</small></h3>}>
       <dl>
         {pool.kind === 'CREDIT' && (() => {
           const d = (pool.days as HqCreditDay[]).find(x => x.day === today);
@@ -139,6 +137,6 @@ export function HqPoolCard({ hq, pool, branches, canChat, onClose }: {
 
       <h4 className="sim__sub">{t('simulation.hq.shops')}</h4>
       <div className="sim__waiter">{pool.branch_ids.map(nameOf).join(' · ') || t('simulation.hq.none')}</div>
-    </div>
+    </SimWindow>
   );
 }

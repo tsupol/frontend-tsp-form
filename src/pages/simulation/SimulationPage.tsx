@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button, DataTable, MobileHeader, PageNav, PageNavPanel, Skeleton, useSnackbarContext } from 'tsp-form';
-import { ArrowRightFromLine, Bike, CarFront, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, House, Minus, PersonStanding, Plus, X, XCircle } from 'lucide-react';
+import { ArrowRightFromLine, Bike, CarFront, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, House, Minus, PersonStanding, Plus, XCircle } from 'lucide-react';
 import { ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { DateTime } from '../../components/DateTime';
@@ -15,6 +15,8 @@ import { PILE_ICON } from './simulationIcons';
 import { SimulationCollection } from './SimulationCollection';
 import { SimulationOpened } from './SimulationOpened';
 import { HqPoolCard } from './HqPoolCard';
+import { SimWindow } from './SimWindow';
+import { stackProps, useWindowStack } from './useWindowStack';
 import { SimTile } from './SimTile';
 import { HQ_COLOR, trafficCounts } from './simulationWorld';
 import { flightSvg, type FlightKind } from './simulationFlights';
@@ -219,6 +221,8 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
   const [legendClosed, setLegendClosed] = useClosed(LEGEND_KEY, true);
   const [panelClosed, setPanelClosed] = useClosed(PANEL_KEY);
   const [tabsClosed, setTabsClosed] = useClosed(TABS_KEY);
+  // Which floating part is in front (SimWindow.tsx): the last one pressed.
+  const stack = useWindowStack();
   const scene = useRef<SceneHandle>(null);
 
   // §4.6 — permission revoked while the page is open.
@@ -380,11 +384,20 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
               <Button variant="ghost" size="sm" startIcon={<House size={14} />} aria-label={t('simulation.zoomFit')} onClick={() => scene.current?.fit()} />
             </div>
 
-            <aside className={`sim__card sim__panel${panelClosed ? ' sim__panel--closed' : ''}`}>
-              <button type="button" className="sim__panel-toggle" aria-expanded={!panelClosed} aria-label={t(panelClosed ? 'simulation.panelShow' : 'simulation.panelHide')} onClick={() => setPanelClosed(!panelClosed)}>
-                <span>{t('simulation.overview')}</span>
-                {panelClosed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-              </button>
+            <aside className={`sim__card sim__panel${panelClosed ? ' sim__panel--closed' : ''}`} {...stackProps(stack, 'panel')}>
+              {/* Open: the strip is a title bar (a press only brings the panel to the front, like
+                  a window's); only the chevron folds it. Folded: the whole strip opens it. */}
+              {panelClosed ? (
+                <button type="button" className="sim__panel-toggle" aria-expanded={false} aria-label={t('simulation.panelShow')} onClick={() => setPanelClosed(false)}>
+                  <span>{t('simulation.overview')}</span>
+                  <ChevronDown size={16} />
+                </button>
+              ) : (
+                <div className="sim__panel-toggle">
+                  <span>{t('simulation.overview')}</span>
+                  <button type="button" className="sim__fold" aria-expanded={true} aria-label={t('simulation.panelHide')} onClick={() => setPanelClosed(true)}><ChevronUp size={16} /></button>
+                </div>
+              )}
               {!panelClosed && <>
               <div className="sim__kpis">
                 <Kpi label={t('simulation.kpi.standing')} value={standing} unit={t('simulation.unit.people', { count: standing })}
@@ -482,11 +495,8 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
             </aside>
 
             {detail && (
-              <div className="sim__card sim__detail better-scroll">
-                <div className="sim__card-head">
-                  <h3>{detail.name}<small>{detail.code}{detail.day_closed ? ` · ${t('simulation.dayClosed')}` : ''}</small></h3>
-                  <Button variant="ghost" size="sm" className="sim__close" startIcon={<X size={14} />} aria-label={t('common.close')} onClick={() => pick(detail.id)} />
-                </div>
+              <SimWindow id="shop" stack={stack} onClose={() => pick(detail.id)} className="sim__detail" data-testid="sim-shop-card"
+                head={<h3>{detail.name}<small>{detail.code}{detail.day_closed ? ` · ${t('simulation.dayClosed')}` : ''}</small></h3>}>
                 {/* เปิดสัญญา for everyone, เก็บค่างวด when can_see_collection — side by side,
                     the open one filled; pressing it again closes it. */}
                 <div className="flex gap-2 mb-2">
@@ -604,27 +614,34 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
                     {(a.product || a.asset) && <small className="sim__waiter-sub">{[a.product, a.asset].filter(Boolean).join(' · ')}</small>}
                   </div>
                 ))}
-              </div>
+              </SimWindow>
             )}
 
             {hq && hqPool && (
-              <HqPoolCard hq={hq} pool={hqPool} branches={branches} canChat={canChat} onClose={() => setPickedHq(null)} />
+              <HqPoolCard hq={hq} pool={hqPool} branches={branches} canChat={canChat} stack={stack} onClose={() => setPickedHq(null)} />
             )}
 
             {collectBranch && canCollect && (
-              <SimulationCollection branch={collectBranch} generatedAt={data.generated_at} onClose={() => setWin(null)} />
+              <SimulationCollection branch={collectBranch} generatedAt={data.generated_at} stack={stack} onClose={() => setWin(null)} />
             )}
             {openedBranch && (
-              <SimulationOpened branch={openedBranch} generatedAt={data.generated_at} onClose={() => setWin(null)} />
+              <SimulationOpened branch={openedBranch} generatedAt={data.generated_at} stack={stack} onClose={() => setWin(null)} />
             )}
 
             {/* What the picture's colours and things mean, in three groups. Folds down to its bar
                 like the overview panel folds up; minimized by default, remembered per browser. */}
-            <section className={`sim__card sim__legend${legendClosed ? ' sim__legend--closed' : ''}`} data-testid="sim-legend">
-              <button type="button" className="sim__legend-toggle" aria-expanded={!legendClosed} aria-label={t(legendClosed ? 'simulation.legend.show' : 'simulation.legend.hide')} onClick={() => setLegendClosed(!legendClosed)}>
-                <span>{t('simulation.legend.title')}</span>
-                {legendClosed ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-              </button>
+            <section className={`sim__card sim__legend${legendClosed ? ' sim__legend--closed' : ''}`} data-testid="sim-legend" {...stackProps(stack, 'legend')}>
+              {legendClosed ? (
+                <button type="button" className="sim__legend-toggle" aria-expanded={false} aria-label={t('simulation.legend.show')} onClick={() => setLegendClosed(false)}>
+                  <span>{t('simulation.legend.title')}</span>
+                  <ChevronUp size={16} />
+                </button>
+              ) : (
+                <div className="sim__legend-toggle">
+                  <span>{t('simulation.legend.title')}</span>
+                  <button type="button" className="sim__fold" aria-expanded={true} aria-label={t('simulation.legend.hide')} onClick={() => setLegendClosed(true)}><ChevronDown size={16} /></button>
+                </div>
+              )}
               {!legendClosed && <div className="sim__legend-groups">
                 <div className="sim__legend-group">
                   <h4>{t('simulation.legend.groupCustomers')}</h4>
