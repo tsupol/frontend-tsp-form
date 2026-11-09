@@ -23,9 +23,10 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import { Button } from 'tsp-form';
-import { Check, Copy, Landmark } from 'lucide-react';
+import { Check, Copy, Landmark, QrCode } from 'lucide-react';
 import { apiClient } from '../lib/api';
 import { BankAccountLine } from './BankAccountLine';
+import { MediaLightbox } from './MediaLightbox';
 
 /** One account the shop is told to use, per channel. */
 interface PartnerBankAccount {
@@ -38,6 +39,11 @@ interface PartnerBankAccount {
   bank_name: string | null;
   account_no: string | null;
   account_name: string | null;
+  /** mig 1644: the account's PUBLIC payment QR, or null. Same shape as the staff views'. */
+  qr_media?: { paths: { original: string } } | null;
+  is_promptpay?: boolean;
+  /** Shown in place of the account number when there is one (like the branch dashboard). */
+  promptpay_id?: string | null;
 }
 
 /** The shop's account the FUND transfers into (device money + commission on
@@ -66,6 +72,7 @@ interface PartnerRemitAccountsProps {
 export function PartnerRemitAccounts({ only, className }: PartnerRemitAccountsProps) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState<string | null>(null);
+  const [qrKey, setQrKey] = useState<string | null>(null);
 
   const wanted = only ? [only] : SHOWN_CHANNELS;
 
@@ -133,9 +140,9 @@ export function PartnerRemitAccounts({ only, className }: PartnerRemitAccountsPr
                 // The bank name can be empty when the record keeps it as text.
                 bank_name: row.bank_name || row.bank_code,
                 account_name: row.account_name,
-                // null = a QR-only account → the line says "QR", not "—". The view
-                // has no QR picture yet, so there is nothing to open (owner 11-07 #7).
+                // A PromptPay ID stands in for the number; neither → "QR" (QR-only account).
                 account_number: row.account_no,
+                account_number_display: row.account_no ?? row.promptpay_id ?? undefined,
               }}
             />
             {/* What each account is for. The remittance one is the one people get
@@ -147,15 +154,25 @@ export function PartnerRemitAccounts({ only, className }: PartnerRemitAccountsPr
               <div className="text-xs text-subtler mt-1">{t('partnerAccounts.installmentHint')}</div>
             )}
           </div>
-          {row.account_no && (
-            <Button
-              size="sm"
-              variant="outline"
-              startIcon={copied === row.channel ? <Check size={14} className="text-success" /> : <Copy size={14} />}
-              onClick={() => copy(row.channel, row.account_no)}
-            >
-              {copied === row.channel ? t('common.copied') : t('common.copy')}
-            </Button>
+          {/* QR picture (mig 1644 · owner 11-07 #7): the shop shows it to a customer to scan. */}
+          {(row.qr_media || row.account_no) && (
+            <div className="flex flex-col items-end gap-1.5 shrink-0">
+              {row.qr_media && (
+                <Button size="sm" variant="outline" startIcon={<QrCode size={14} />} onClick={() => setQrKey(row.qr_media!.paths.original)} data-testid="partner-account-qr">
+                  {t('partnerAccounts.showQr')}
+                </Button>
+              )}
+              {row.account_no && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  startIcon={copied === row.channel ? <Check size={14} className="text-success" /> : <Copy size={14} />}
+                  onClick={() => copy(row.channel, row.account_no)}
+                >
+                  {copied === row.channel ? t('common.copied') : t('common.copy')}
+                </Button>
+              )}
+            </div>
           )}
         </div>
       ))}
@@ -206,6 +223,7 @@ export function PartnerRemitAccounts({ only, className }: PartnerRemitAccountsPr
           )}
         </div>
       )}
+      <MediaLightbox open={!!qrKey} onClose={() => setQrKey(null)} mediaKey={qrKey} alt={t('partnerAccounts.showQr')} />
     </div>
   );
 }

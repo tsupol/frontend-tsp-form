@@ -6693,7 +6693,8 @@
     "title": "Accounts for this shop",
     "installmentHint": "Tell customers to pay their instalments into this account",
     "channel_PAYOUT": "From the fund",
-    "payoutHint": "The fund transfers device money and commission into this account · set by the fund"
+    "payoutHint": "The fund transfers device money and commission into this account · set by the fund",
+    "showQr": "Show QR"
   },
   "partnerBalance": {
     "title": "Outstanding per shop",
