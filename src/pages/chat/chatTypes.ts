@@ -77,12 +77,8 @@ export interface ChatInboxRow {
    *  not fund staff, and there is no "mine" view at all. Never re-derive it. */
   is_mine?: boolean | null;
 
-  /** mig 1636: the customer's latest message is newer than the latest message a
-   *  real staff member sent (auto-replies don't count as a reply). Unlike
-   *  unread_count, a room that was read but not answered stays true. */
-  awaiting_staff_reply?: boolean;
-  /** The contract has an overdue installment. */
-  is_overdue?: boolean;
+  // awaiting_staff_reply / is_overdue (mig 1636) are still in the view but not read:
+  // the "ยังไม่ได้ตอบ" badge they drove was removed (owner 11-09) — chat_status is the signal.
 
   /** FE-only, never from the view. True for a search hit that has no chat row
    *  yet — the contract exists but nobody has ever messaged about it. Opening

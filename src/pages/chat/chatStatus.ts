@@ -77,15 +77,3 @@ export function sortChatRowsByStatusThenRecency(rows: ChatInboxRow[]): ChatInbox
     return bv - av;
   });
 }
-
-/** Rooms whose last customer message is older than this only get the "ยังไม่ได้ตอบ"
- *  badge when the contract is overdue — otherwise old "ขอบคุณค่ะ" sign-offs
- *  would badge most rooms (NOTICE 1636 §3: TPA 354 of 497 are older than 7 days). */
-export const AWAITING_FRESH_MS = 3 * 86_400_000;
-
-/** Show "ยังไม่ได้ตอบ": BE says the customer is waiting, and it is recent or overdue. */
-export function showsAwaitingReply(row: ChatInboxRow, now = Date.now()): boolean {
-  if (!row.awaiting_staff_reply) return false;
-  if (row.is_overdue) return true;
-  return !!row.last_message_at && now - new Date(row.last_message_at).getTime() <= AWAITING_FRESH_MS;
-}

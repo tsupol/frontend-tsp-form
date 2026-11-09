@@ -2,7 +2,7 @@ import type { TFunction } from 'i18next';
 import { Badge, Tooltip } from 'tsp-form';
 import { Image as ImageIcon, Pin } from 'lucide-react';
 import { formatSmart } from '../../lib/format';
-import { chatStatusBadgeColor, contractStateBadgeColor, contractStateLabel, showsAwaitingReply } from './chatStatus';
+import { chatStatusBadgeColor, contractStateBadgeColor, contractStateLabel } from './chatStatus';
 import type { ChatInboxRow } from './chatTypes';
 
 interface Props {
@@ -25,7 +25,6 @@ interface Props {
  */
 export function ChatListRow({ row, selected, onSelect, showBranch, lang, t, compact }: Props) {
   const isImage = row.last_message_type === 'IMAGE';
-  const awaiting = showsAwaitingReply(row);
 
   return (
     <button
@@ -51,18 +50,12 @@ export function ChatListRow({ row, selected, onSelect, showBranch, lang, t, comp
           )}
         </div>
       </div>
-      {/* "ยังไม่ได้ตอบ" leads the badge line: read-but-unanswered rooms
-          had no mark once the unread count cleared (owner 11-07). Not "รอตอบ" —
-          that is the WAITING_REPLY status staff set by hand. */}
-
-      {/* One flex-wrap cluster: code + all badges flow to a second line when the
+      {/* No "ยังไม่ได้ตอบ" badge here: it repeated the room's own status "รอตอบ" and
+          could contradict it (owner 11-09, NOTICE remove_chat_awaiting_reply_badge).
+          The room's status badge is the one answer to "is someone waiting".
+          One flex-wrap cluster: code + all badges flow to a second line when the
           rail is too narrow to fit them on one row, instead of overlapping. */}
       <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mt-0.5">
-        {awaiting && (
-          <Tooltip content={t('chat.awaitingReplyHint')} placement="bottom">
-            <Badge size="xs" color="danger" data-testid="chat-awaiting-reply">{t('chat.awaitingReply')}</Badge>
-          </Tooltip>
-        )}
         <div className="text-[11px] text-subtle truncate font-mono min-w-0 max-w-full">
           {row.contract_code_display}
         </div>
