@@ -11395,8 +11395,7 @@
     "testWaiting": "Sending test…",
     "bindLeft": "Valid for {{m}}:{{s}}",
     "bindHow": "Add @{{bot}} to the company's Telegram group, then type this command in the group",
-    "featuresTitle": "What it reports",
-    "featuresNeedKey": "What it reports · set the bot key first to change these",
+    "featuresTitle": "Telegram · What it reports",
     "feature": {
       "CASE_SUBMITTED": "Shop submitted a request",
       "SETTLEMENT_SUBMITTED": "Shop submitted a close-out",
@@ -11416,6 +11415,7 @@
       "window": "Give both a start and an end time, and they must differ",
       "open_after_min": "Report after must be 0–1440 minutes",
       "remind_every_min": "Remind every must be 5–720 minutes (blank = no reminder)"
-    }
+    },
+    "featuresNeedKeyHint": "Set the bot key first to change these"
   }
 }

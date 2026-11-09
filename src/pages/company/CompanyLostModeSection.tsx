@@ -1,3 +1,4 @@
+import { SettingsBox } from './SettingsBox';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -69,24 +70,27 @@ export function CompanyLostModeSection({ companyId, onDirtyChange }: {
   };
 
   return (
-    <>
-      <hr className="border-line mt-6 mb-6" />
-      <h4 className="text-sm font-semibold text-fg uppercase tracking-wider mb-1">{t('lostMode.sectionTitle')}</h4>
-      <p className="text-xs text-subtle mb-3">{t('lostMode.fundHint')}</p>
-      <div className="form-grid gap-4 max-w-xl">
+    <SettingsBox title={t('lostMode.sectionTitle')} hint={t('lostMode.fundHint')}>
+      {/* Fields and buttons span the whole box, like every other box on the tab. */}
+      <div className="form-grid gap-4">
         <LostModeFields draft={draft} phoneEmptyHint={t('lostMode.phoneEmptyCompany')} disabled={saving} />
       </div>
+      {/* Pinned to the box's foot when the box beside it (the Telegram bot) is taller. */}
+      <div className="mt-auto">
       {draft.generalError && (
         <div className="alert alert-danger mb-3"><XCircle size={16} /><div><div className="alert-description text-xs">{draft.generalError}</div></div></div>
       )}
-      <div className="flex items-center justify-end gap-2 max-w-xl">
+      {/* Preview on the left, away from the box's ยกเลิก/บันทึก pair at the right. */}
+      <div className="flex items-center gap-2">
         <LostModePreviewButton draft={draft} disabled={saving} />
+        <span className="flex-1" />
         <Button size="sm" onClick={draft.revert} disabled={saving || !draft.isDirty}>{t('common.cancel')}</Button>
         <Button size="sm" color="primary" startIcon={<Save size={14} />} onClick={handleSave} disabled={saving || !draft.isDirty}>
           {saving ? t('common.saving') : t('common.save')}
         </Button>
       </div>
+      </div>
       <LostModePreviewModal open={draft.previewOpen} onClose={draft.closePreview} content={draft.previewData} />
-    </>
+    </SettingsBox>
   );
 }

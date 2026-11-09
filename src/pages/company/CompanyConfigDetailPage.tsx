@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import type { MutableRefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -15,10 +15,11 @@ import { translateApiError } from '../../lib/apiErrors';
 import { FundRevenueShareSection } from './FundRevenueShareSection';
 import { CompanyLostModeSection } from './CompanyLostModeSection';
 import { CompanyTelegramSection } from './CompanyTelegramSection';
+import { SettingsBox } from './SettingsBox';
 
-// Two tabs, split by how a setting is saved: 'values' are typed numbers that
-// share one Save button; 'instant' are the pickers/switches that write the
-// moment they are touched.
+// Two tabs: 'values' are the typed numbers, 'instant' the documents, pickers and
+// switches. Both are boxes, and on both a box with typed fields has its own
+// Cancel/Save at its foot (saving only that box); a switch saves the moment it is touched.
 type ConfigTab = 'values' | 'instant';
 const TABS: ConfigTab[] = ['values', 'instant'];
 
@@ -38,15 +39,17 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
   const { user } = useAuth();
   const { addSnackbar } = useSnackbarContext();
 
-  const [saving, setSaving] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
+  // Which box is saving, and each box's save error, by group key.
+  const [savingGroup, setSavingGroup] = useState<string | null>(null);
+  const [groupErrors, setGroupErrors] = useState<Record<string, string>>({});
   const [formValues, setFormValues] = useState<Record<string, number | boolean>>({});
   const [activeTab, setActiveTab] = useState<ConfigTab>('values');
   // Unsaved edits in the document-info section, which owns its own Save button.
   const [docDirty, setDocDirty] = useState(false);
   const [lostModeDirty, setLostModeDirty] = useState(false);
+  const [telegramDirty, setTelegramDirty] = useState(false);
   // Changes held back while the user confirms setting app removal to 0.
-  const [confirmZero, setConfirmZero] = useState<Record<string, number | boolean> | null>(null);
+  const [confirmZero, setConfirmZero] = useState<{ group: string; changes: Record<string, number | boolean> } | null>(null);
 
   const { data: config, isLoading } = useQuery({
     queryKey: ['company-config-detail', companyId],
@@ -135,16 +138,24 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
     { key: 'reward', label: t('settings.config.groupReward') },
   ];
 
-  // Initialize form when config loads
+  // Seed the form from the server. A new company starts clean; a reload of the same
+  // company (after one box saved) refreshes only fields nobody is editing, so an
+  // unsaved edit in another box survives a neighbour's Save.
+  const seededFrom = useRef<CompanyConfig | null>(null);
   useEffect(() => {
-    if (config) {
+    if (!config) return;
+    const prevCfg = seededFrom.current;
+    const sameCompany = prevCfg?.company_id === config.company_id;
+    setFormValues(prev => {
       const vals: Record<string, number | boolean> = {};
       for (const f of fields) {
-        vals[f.key] = config[f.key] as number | boolean;
+        const untouched = !sameCompany || prev[f.key] === undefined || prev[f.key] === (prevCfg![f.key] as number | boolean);
+        vals[f.key] = untouched ? config[f.key] as number | boolean : prev[f.key];
       }
-      setFormValues(vals);
-      setErrorMessage('');
-    }
+      return vals;
+    });
+    if (!sameCompany) setGroupErrors({});
+    seededFrom.current = config;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config?.company_id, config?.updated_at]);
 
@@ -161,7 +172,11 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
     }
     return null;
   };
-  const hasRangeError = fields.some(f => rangeError(f) !== null);
+  const groupFieldsOf = (group: string) => fields.filter(f => f.group === group);
+  const groupHasRangeError = (group: string) => groupFieldsOf(group).some(f => rangeError(f) !== null);
+  const groupDirty = (group: string) =>
+    !!config && groupFieldsOf(group).some(f => formValues[f.key] !== (config[f.key] as number | boolean));
+  const setGroupError = (group: string, msg: string) => setGroupErrors(prev => ({ ...prev, [group]: msg }));
 
   const getValue = (key: string) => formValues[key];
   const setValue = (key: string, val: number | boolean) => setFormValues(prev => ({ ...prev, [key]: val }));
@@ -176,24 +191,21 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
   // them independently — the numbers tab and the document fields, which save
   // through a different button — so the guard reads either being dirty.
   useEffect(() => {
-    if (isDirtyRef) isDirtyRef.current = isDirty || docDirty || lostModeDirty;
-  }, [isDirty, docDirty, lostModeDirty, isDirtyRef]);
+    if (isDirtyRef) isDirtyRef.current = isDirty || docDirty || lostModeDirty || telegramDirty;
+  }, [isDirty, docDirty, lostModeDirty, telegramDirty, isDirtyRef]);
 
   useEffect(() => () => { if (isDirtyRef) isDirtyRef.current = false; }, [isDirtyRef]);
 
-  const handleSave = async () => {
+  // Saves one box: only its own changed fields go to fn_config_update (p_changes is a patch).
+  const handleSave = async (group: string) => {
     if (!config || !user) return;
-    setSaving(true);
-    setErrorMessage('');
+    setGroupError(group, '');
 
     // Out-of-range fields already show their message and keep Save disabled.
-    if (hasRangeError) {
-      setSaving(false);
-      return;
-    }
+    if (groupHasRangeError(group)) return;
 
     const changes: Record<string, number | boolean> = {};
-    for (const f of fields) {
+    for (const f of groupFieldsOf(group)) {
       const current = formValues[f.key];
       const original = config[f.key];
       if (current !== undefined && current !== original) {
@@ -201,26 +213,22 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
       }
     }
 
-    if (Object.keys(changes).length === 0) {
-      setSaving(false);
-      return;
-    }
+    if (Object.keys(changes).length === 0) return;
 
     // 0 lets every customer of the company delete apps (the NNF app included)
     // straight away — ask once more. No other value needs a confirm.
     if (changes.app_removal_min_paid_installments === 0) {
-      setSaving(false);
-      setConfirmZero(changes);
+      setConfirmZero({ group, changes });
       return;
     }
 
-    await submitChanges(changes);
+    await submitChanges(group, changes);
   };
 
-  const submitChanges = async (changes: Record<string, number | boolean>) => {
+  const submitChanges = async (group: string, changes: Record<string, number | boolean>) => {
     if (!config || !user) return;
-    setSaving(true);
-    setErrorMessage('');
+    setSavingGroup(group);
+    setGroupError(group, '');
     const start = Date.now();
     try {
       await apiClient.rpc('fn_config_update', {
@@ -242,23 +250,23 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
     } catch (err) {
       if (err instanceof ApiError) {
         const translated = translateApiError(err, t);
-        setErrorMessage(translated || err.message);
+        setGroupError(group, translated || err.message);
       }
     } finally {
       const elapsed = Date.now() - start;
       if (elapsed < 300) await new Promise(r => setTimeout(r, 300 - elapsed));
-      setSaving(false);
+      setSavingGroup(null);
     }
   };
 
-  const handleReset = () => {
+  const handleReset = (group: string) => {
     if (!config) return;
-    const vals: Record<string, number | boolean> = {};
-    for (const f of fields) {
-      vals[f.key] = config[f.key] as number | boolean;
-    }
-    setFormValues(vals);
-    setErrorMessage('');
+    setFormValues(prev => {
+      const vals = { ...prev };
+      for (const f of groupFieldsOf(group)) vals[f.key] = config[f.key] as number | boolean;
+      return vals;
+    });
+    setGroupError(group, '');
   };
 
   if (isLoading || !config) {
@@ -280,9 +288,6 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
         </div>
       )}
 
-      {/* Split by how a setting saves, not by topic: the numbers tab shares one
-          Save button (so it owns the footer), the switches tab writes on touch
-          (so it has no footer at all — a Save there would be a lie). */}
       <div className="flex-none border-b border-line">
         <div className="flex px-2">
           {TABS.map(tab => (
@@ -303,21 +308,24 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
       </div>
 
       <div className="flex-1 overflow-auto better-scroll px-4 py-3">
-        <div className={activeTab === 'values' ? 'max-w-5xl mx-auto' : 'max-w-2xl mx-auto'}>
+        {/* Both tabs the same width, so switching tabs never makes the page jump. */}
+        <div className="max-w-5xl mx-auto">
           {activeTab === 'values' ? (
             /* Groups sit side by side on a wide panel: each is only a handful of
                small number fields, so one column per group wasted the width. */
             /* The wrapper is the container; the grid inside it is what responds
                to the wrapper's width. An element cannot be both. */
             <div className="@container/values">
-              <div className="grid gap-x-8 gap-y-6 @xl/values:grid-cols-2 items-start">
+              {/* One box per group, as on the switches tab; boxes in a row share a height. */}
+              <div className="grid gap-4 @xl/values:grid-cols-2">
               {groups.map(group => {
-                const groupFields = fields.filter(f => f.group === group.key);
+                const groupFields = groupFieldsOf(group.key);
+                const saving = savingGroup === group.key;
+                const dirty = groupDirty(group.key);
+                const error = groupErrors[group.key];
                 return (
-                  <div key={group.key} className="@container/group min-w-0">
-                    <h4 className="text-sm font-semibold text-fg uppercase tracking-wider mb-3 pb-2 border-b border-line">
-                      {group.label}
-                    </h4>
+                  <SettingsBox key={group.key} title={group.label}>
+                  <div className="@container/group min-w-0">
                     <div className="form-grid @md/group:grid-cols-2 gap-4">
                       {groupFields.map(field => (
                         <div key={field.key} className="flex flex-col min-w-0">
@@ -351,66 +359,62 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
                       ))}
                     </div>
                   </div>
+                  {/* This box's own Save — sends only its fields. */}
+                  <div className="mt-auto">
+                  {error && (
+                    <div className="alert alert-danger mb-3">
+                      <XCircle size={16} />
+                      <div><div className="alert-description text-xs">{error}</div></div>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-end gap-2">
+                    <Button size="sm" onClick={() => handleReset(group.key)} disabled={saving || !dirty}>{t('common.cancel')}</Button>
+                    <Button size="sm" color="primary" startIcon={<Save size={14} />} onClick={() => handleSave(group.key)}
+                      disabled={saving || !dirty || groupHasRangeError(group.key)} data-testid={`config-save-${group.key}`}>
+                      {saving ? t('common.saving') : t('common.save')}
+                    </Button>
+                  </div>
+                  </div>
+                  </SettingsBox>
                 );
               })}
               </div>
             </div>
           ) : (
-            <div className="flex flex-col">
-              {/* The instant-save note sits on the sections it is true for.
-                  The document fields above have their own Save button, so a
-                  blanket "everything here saves on touch" would be a lie. */}
+            /* Two columns like the numbers tab; boxes in a row share a height. A box whose
+               content needs the width takes the whole row: the document form (2 columns of
+               fields), the Telegram work rows (3 fields a row) and the revenue-share history
+               table. Fund companies pair Lost Mode with the Telegram bot. The instant-save
+               note sits above only the boxes it is true for: those above have their own Save. */
+            <div className="@container/instant pb-6">
+            <div className="grid gap-4 @xl/instant:grid-cols-2">
               <CompanyDocumentSection companyId={config.company_id} onDirtyChange={setDocDirty} />
               {/* Fund companies only (157 §1b) — renders nothing for an operating company. */}
               <CompanyLostModeSection companyId={config.company_id} onDirtyChange={setLostModeDirty} />
               {/* Fund companies only (mig 1645) — renders nothing for an operating company. */}
-              <CompanyTelegramSection companyId={config.company_id} />
+              <CompanyTelegramSection companyId={config.company_id} onDirtyChange={setTelegramDirty} />
               {/* Fund companies only (mig 1431) — renders nothing for an operating company. */}
               <FundRevenueShareSection companyId={config.company_id} />
-              <hr className="border-line mt-6 mb-6" />
-              <p className="text-xs text-subtle mb-5">{t('settings.config.instantHint')}</p>
+              <p className="text-xs text-subtle mt-2 @xl/instant:col-span-2">{t('settings.config.instantHint')}</p>
               <ContractTemplateSection companyId={config.company_id} />
-              <hr className="border-line mt-6 mb-6" />
               <FeatureSwitchesSection
                 companyId={config.company_id}
                 codes={['SAVING', 'CREDIT', 'INSURANCE']}
                 title={t('settings.config.groupWallet')}
                 hint={t('settings.config.walletHint')}
               />
-              <hr className="border-line mt-6 mb-6" />
               <FeatureSwitchesSection
                 companyId={config.company_id}
                 codes={['REWARD']}
                 title={t('settings.config.groupReward')}
                 hint={t('settings.config.rewardHint')}
               />
-              <hr className="border-line mt-6 mb-6" />
               <ChargeOwnerSection companyId={config.company_id} />
+            </div>
             </div>
           )}
         </div>
       </div>
-
-      {/* Footer — belongs to the numbers tab only; the switches save themselves. */}
-      {activeTab === 'values' && (
-        /* On mobile the whole panel is one scroller (that is how the library
-           lays it out), so the footer would sit at the end of the content —
-           past several screens of fields. Stick it to the bottom there. */
-        <div className={`flex-none border-t border-line px-4 py-3 bg-bg ${isMobile ? 'sticky bottom-0 z-10' : ''}`}>
-          {errorMessage && (
-            <div className="alert alert-danger mb-3">
-              <XCircle size={16} />
-              <div><div className="alert-description text-xs">{errorMessage}</div></div>
-            </div>
-          )}
-          <div className="flex items-center justify-end gap-2">
-            <Button size="sm" onClick={handleReset} disabled={saving || !isDirty}>{t('common.cancel')}</Button>
-            <Button size="sm" color="primary" startIcon={<Save size={14} />} onClick={handleSave} disabled={saving || !isDirty || hasRangeError}>
-              {saving ? t('common.saving') : t('common.save')}
-            </Button>
-          </div>
-        </div>
-      )}
 
       <Modal open={!!confirmZero} onClose={() => setConfirmZero(null)} maxWidth="26rem" width="100%">
         <div className="modal-header">
@@ -425,9 +429,9 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
           <Button
             color="danger"
             onClick={() => {
-              const changes = confirmZero;
+              const pending = confirmZero;
               setConfirmZero(null);
-              if (changes) submitChanges(changes);
+              if (pending) submitChanges(pending.group, pending.changes);
             }}
           >
             {t('common.confirm')}
@@ -507,9 +511,7 @@ function ContractTemplateSection({ companyId }: { companyId: number }) {
   };
 
   return (
-    <div>
-      <h4 className="text-sm font-semibold text-fg uppercase tracking-wider mb-1">{t('settings.config.groupContractTemplate')}</h4>
-      <p className="text-xs text-subtle mb-3">{t('settings.config.contractTemplateHint')}</p>
+    <SettingsBox title={t('settings.config.groupContractTemplate')} hint={t('settings.config.contractTemplateHint')}>
       {error && (
         <div className="alert alert-danger mb-3"><XCircle size={16} /><div><div className="alert-description text-xs">{error}</div></div></div>
       )}
@@ -552,7 +554,7 @@ function ContractTemplateSection({ companyId }: { companyId: number }) {
           </Button>
         </div>
       </Modal>
-    </div>
+    </SettingsBox>
   );
 }
 
@@ -612,18 +614,21 @@ function FeatureSwitchesSection({ companyId, codes, title, hint }: {
   const byCode = (c: string) => rows.find(r => r.feature_code === c);
 
   return (
-    <div>
-      <h4 className="text-sm font-semibold text-fg uppercase tracking-wider mb-1">{title}</h4>
-      <p className="text-xs text-subtle mb-3">{hint}</p>
+    <SettingsBox title={title} hint={hint}>
       {error && (
         <div className="alert alert-danger mb-3"><XCircle size={16} /><div><div className="alert-description text-xs">{error}</div></div></div>
       )}
-      <div className="form-grid md:grid-cols-3">
+      {/* A plain grid, not form-grid: form-grid keeps 28px at its foot for field errors,
+          which switches never show — it left the box with an empty band at the bottom. */}
+      {/* Side by side only when the box itself is wide enough (it is half a row on the
+          2-column tab) — otherwise one switch a row, so no label wraps. */}
+      <div className="@container/sw">
+      <div className={`grid gap-x-8 gap-y-2 ${codes.length > 1 ? '@lg/sw:grid-cols-3' : ''}`}>
         {codes.map(code => {
           const row = byCode(code);
           const enabled = row ? row.is_enabled : true;
           return (
-            <div key={code} className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-md border border-line">
+            <div key={code} className="flex items-center justify-between gap-3 py-1">
               <span className="text-sm">{t(`settings.config.feature_${code}`)}</span>
               <Switch
                 size="sm"
@@ -635,7 +640,8 @@ function FeatureSwitchesSection({ companyId, codes, title, hint }: {
           );
         })}
       </div>
-    </div>
+      </div>
+    </SettingsBox>
   );
 }
 
@@ -732,9 +738,7 @@ function CompanyDocumentSection({ companyId, onDirtyChange }: {
     setForm(prev => ({ ...prev, [key]: val }));
 
   return (
-    <div>
-      <h4 className="text-sm font-semibold text-fg uppercase tracking-wider mb-1">{t('settings.config.groupDocumentInfo')}</h4>
-      <p className="text-xs text-subtle mb-3">{t('settings.config.documentInfoHint')}</p>
+    <SettingsBox title={t('settings.config.groupDocumentInfo')} hint={t('settings.config.documentInfoHint')} className="@xl/instant:col-span-2">
       <div className="form-grid gap-4 md:grid-cols-2 max-w-3xl">
         <div className="flex flex-col">
           <label className="form-label">{t('settings.config.docName')}</label>
@@ -790,6 +794,7 @@ function CompanyDocumentSection({ companyId, onDirtyChange }: {
           />
         </div>
       </div>
+      <div className="mt-auto">
       {error && (
         <div className="alert alert-danger mb-3"><XCircle size={16} /><div><div className="alert-description text-xs">{error}</div></div></div>
       )}
@@ -799,7 +804,8 @@ function CompanyDocumentSection({ companyId, onDirtyChange }: {
           {saving ? t('common.saving') : t('common.save')}
         </Button>
       </div>
-    </div>
+      </div>
+    </SettingsBox>
   );
 }
 
@@ -867,13 +873,11 @@ function ChargeOwnerSection({ companyId }: { companyId: number }) {
   };
 
   return (
-    <div className="pb-6">
-      <h4 className="text-sm font-semibold text-fg uppercase tracking-wider mb-1">{t('settings.config.groupOwner')}</h4>
-      <p className="text-xs text-subtle mb-3">{t('settings.config.ownerHint')}</p>
+    <SettingsBox title={t('settings.config.groupOwner')} hint={t('settings.config.ownerHint')}>
       {error && (
         <div className="alert alert-danger mb-3"><XCircle size={16} /><div><div className="alert-description text-xs">{error}</div></div></div>
       )}
-      <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-md border border-line">
+      <div className="flex items-center justify-between gap-3 py-1">
         <span className="text-sm">{t('settings.config.ownerAllHolding')}</span>
         <Switch
           size="sm"
@@ -882,7 +886,7 @@ function ChargeOwnerSection({ companyId }: { companyId: number }) {
           onChange={(e) => setOverride((e.target as HTMLInputElement).checked)}
         />
       </div>
-    </div>
+    </SettingsBox>
   );
 }
 

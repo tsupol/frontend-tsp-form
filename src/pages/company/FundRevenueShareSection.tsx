@@ -1,3 +1,4 @@
+import { SettingsBox } from './SettingsBox';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -127,12 +128,9 @@ export function FundRevenueShareSection({ companyId }: { companyId: number }) {
 
   return (
     <>
-      <hr className="border-line mt-6 mb-6" />
-      <div>
-        <h4 className="text-sm font-semibold text-fg uppercase tracking-wider mb-1">{t('settings.config.fundShareTitle')}</h4>
-        <p className="text-xs text-subtle mb-3">{t('settings.config.fundShareHint')}</p>
-
-        <div className="flex flex-wrap items-start justify-between gap-3 px-3 py-3 rounded-md border border-line">
+      {/* The whole row: the history table needs the width. */}
+      <SettingsBox title={t('settings.config.fundShareTitle')} hint={t('settings.config.fundShareHint')} className="@xl/instant:col-span-2">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex flex-col gap-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-3xl font-semibold tabular-nums leading-none">{fmtPct(row.share_pct)}</span>
@@ -172,7 +170,7 @@ export function FundRevenueShareSection({ companyId }: { companyId: number }) {
             </div>
           }
         />
-      </div>
+      </SettingsBox>
 
       <FundRevenueShareModal
         open={editOpen}
