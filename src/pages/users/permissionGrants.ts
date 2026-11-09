@@ -97,6 +97,23 @@ export function grantableBy(
   return permissions.filter(p => p.company_grantable);
 }
 
+/**
+ * Whether this viewer may grant to this particular person (mig 1305).
+ *
+ * A holding admin may grant to anyone in the holding; a company admin only to
+ * people of their own company — anyone else is refused with an out-of-scope
+ * error. Used by the users list (which rows get the action) and by the picker
+ * on the overview page (who can be picked), so both offer the same people.
+ */
+export function canGrantTo(
+  actor: { role_code?: string | null; company_id?: number | null } | null | undefined,
+  target: { company_id: number | null },
+): boolean {
+  if (HOLDING_WIDE_ROLES.includes(actor?.role_code ?? '')) return true;
+  if (actor?.role_code !== 'COMPANY_ADMIN') return false;
+  return target.company_id != null && target.company_id === actor.company_id;
+}
+
 /** Every grant for one user, newest first — active rows and revoked history. */
 export function userGrantsQuery(userId: number | null) {
   return {

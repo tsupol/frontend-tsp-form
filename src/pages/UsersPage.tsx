@@ -11,6 +11,7 @@ import { translateApiError } from '../lib/apiErrors';
 import { SearchInput } from '../components/SearchInput';
 import { useAuth } from '../contexts/AuthContext';
 import { UserPermissionGrantsModal } from './users/UserPermissionGrantsModal';
+import { canGrantTo as canGrantToShared } from './users/permissionGrants';
 import { ModalErrorBand } from '../components/ModalErrorBand';
 
 interface VUser {
@@ -1355,11 +1356,7 @@ export function UsersPage() {
    * out-of-scope error. Hiding the action for those rows keeps the refusal off
    * the screen entirely.
    */
-  const canGrantTo = (row: VUser) => {
-    if (isHoldingWide) return true;
-    if (!isCompanyAdmin) return false;
-    return row.company_id != null && row.company_id === currentUser?.company_id;
-  };
+  const canGrantTo = (row: VUser) => canGrantToShared(currentUser, row);
 
   const activeFilterCount = [filterRole, filterHolding, filterCompany, filterBranch].filter(Boolean).length + (sorting.length > 0 ? 1 : 0);
 

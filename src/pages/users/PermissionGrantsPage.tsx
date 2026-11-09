@@ -16,7 +16,8 @@ import {
   DataTable, DataTableColumnHeader, MobileHeader, Button, Badge, LabeledCheckbox,
   useSnackbarContext, type ColumnDef, type SortingState,
 } from 'tsp-form';
-import { ArrowRightFromLine, KeySquare, CheckCircle, XCircle, Undo2 } from 'lucide-react';
+import { ArrowRightFromLine, KeySquare, CheckCircle, XCircle, Undo2, Plus } from 'lucide-react';
+import { UserPermissionGrantsModal } from './UserPermissionGrantsModal';
 import { ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { DateTime } from '../../components/DateTime';
@@ -30,6 +31,7 @@ export function PermissionGrantsPage() {
   const [showRevoked, setShowRevoked] = useState(false);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pending, setPending] = useState<Set<number>>(new Set());
+  const [grantOpen, setGrantOpen] = useState(false);
 
   const { data: grants = [], isFetching } = useQuery(allGrantsQuery(!showRevoked));
 
@@ -155,15 +157,28 @@ export function PermissionGrantsPage() {
         <div className="mobile-header-title mobile-header-title-truncate">
           {t('permissionGrants.title')}
         </div>
-        <div className="mobile-header-end w-nav" />
+        <div className="mobile-header-end w-nav">
+          <button
+            className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
+            aria-label={t('permissionGrants.grantButton')}
+            onClick={() => setGrantOpen(true)}
+          >
+            <Plus size={18} />
+          </button>
+        </div>
       </MobileHeader>
 
       <div className="page-content responsive-dvh-mobile-header">
-        <div className="mb-4 flex-none max-md:hidden">
-          <h1 className="heading-2 flex items-center gap-2">
-            <KeySquare size={20} /> {t('permissionGrants.title')}
-          </h1>
-          <p className="text-sm text-subtle mt-1">{t('permissionGrants.description')}</p>
+        <div className="mb-4 flex-none max-md:hidden flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="heading-2 flex items-center gap-2">
+              <KeySquare size={20} /> {t('permissionGrants.title')}
+            </h1>
+            <p className="text-sm text-subtle mt-1">{t('permissionGrants.description')}</p>
+          </div>
+          <Button color="primary" size="sm" startIcon={<Plus size={16} />} onClick={() => setGrantOpen(true)} className="shrink-0">
+            {t('permissionGrants.grantButton')}
+          </Button>
         </div>
 
         <div className="flex-none flex items-center justify-between gap-3 mb-2 max-md:mt-3">
@@ -233,6 +248,8 @@ export function PermissionGrantsPage() {
           )}
         </div>
       </div>
+
+      <UserPermissionGrantsModal user={null} pickUser open={grantOpen} onClose={() => setGrantOpen(false)} />
     </>
   );
 }
