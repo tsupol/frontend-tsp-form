@@ -1,299 +1,390 @@
 // ============================================================================
-// Surface 4b — the permission-grants overview, one person at a time.
+// Surface 4b — the holding-wide "who has been given what" table.
 //
-// PageNav two-panel:
-//   LEFT rail: everyone who holds a per-person permission, with what they
-//     hold. Search by name / company / branch; the permission filter narrows
-//     it to the people holding one permission — "who has PAYMENT.VOID?".
-//   RIGHT detail: that person's switches (UserGrantsPanel, the same list the
-//     users page opens in a window) — flip to grant or revoke, with who gave
-//     each, when, the note, and the revoked history underneath.
+// One row per grant. The per-user window (4a, UserPermissionGrantsModal) holds
+// the switches; a person's name in any row opens it, and so does picking
+// someone from the header's Grant button. A row's own revoke button takes back
+// just that one.
 //
-// The header's Grant button picks someone who holds nothing yet and opens
-// their switches here.
+// Fits an iPad without sideways scrolling, both side menus open: fixed column
+// widths, every cell two lines (long text truncated, full text on hover, the
+// note behind an icon) so rows stay as short as the first version's. Search (person, company, branch, permission), the
+// permission filter ("who has PAYMENT.VOID?") and pages keep it usable as the
+// number of people grows.
 //
-// History of this page (2026-11-09): a flat grant table (sideways scroll on an
-// iPad) → a rail of permissions (finding a person was hard) → this. BE (Ohm)
-// liked the switches and asked to see who holds what; the filter covers that.
+// History (2026-11-09): this table → a rail of permissions → a rail of people
+// with switches → back to this table, improved. BE (Ohm) prefers the table.
+// Revoked rows stay behind a toggle: they are the audit trail, not noise.
 // ============================================================================
 
-import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  PageNav, PageNavPanel, MobileHeader, DataTable, Button, Badge, Input, Select, Modal,
+  DataTable, DataTableColumnHeader, MobileHeader, Button, Badge, Input, Select, LabeledCheckbox, Modal, Tooltip,
+  useSnackbarContext, type ColumnDef, type SortingState,
 } from 'tsp-form';
-import { ArrowRightFromLine, ArrowLeft, KeySquare, Plus, Search, Users } from 'lucide-react';
+import { ArrowRightFromLine, KeySquare, CheckCircle, XCircle, Undo2, Plus, Search, MessageSquareText } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { ApiError } from '../../lib/api';
+import { translateApiError } from '../../lib/apiErrors';
 import { fuzzyRank } from '../../lib/fuzzy';
+import { DateTime } from '../../components/DateTime';
 import { getRoleLabel } from '../../lib/roleLabel';
-import { roleBadgeColor } from '../../components/UserOptionLine';
-import { UserGrantsPanel, type GrantTargetUser } from './UserGrantsPanel';
+import { UserPermissionGrantsModal, type GrantTargetUser } from './UserPermissionGrantsModal';
 import { GrantUserPicker } from './GrantUserPicker';
 import {
-  allGrantsQuery, grantUsersQuery, canGrantTo, hasViaRole, type GrantUser,
+  allGrantsQuery, grantUsersQuery, revokePermission, canGrantTo, hasViaRole,
+  type UserPermissionGrant, type GrantUser,
 } from './permissionGrants';
 
-const BASE_PATH = '/admin/users/permission-grants';
-
-/** One rail row: a person and the permissions they hold now. */
-interface Holder {
-  user_id: number;
-  username: string;
-  role_code: string;
-  company_name: string | null;
-  branch_name: string | null;
-  codes: string[];
-}
+/** A grant row plus the branch, which the grants view doesn't carry. */
+type Row = UserPermissionGrant & { branch_name: string | null };
 
 export function PermissionGrantsPage() {
   const { t } = useTranslation();
-  const navigate = useNavigate();
-  const { userId: userIdParam } = useParams<{ userId?: string }>();
-  const selectedId = userIdParam ? Number(userIdParam) : null;
+  const queryClient = useQueryClient();
+  const { addSnackbar } = useSnackbarContext();
+  const isMobile = useMediaQuery('(max-width: 767px)');
 
-  // Active and revoked together — a few hundred rows at most. Revoked rows
-  // only matter in the person's own history, which the panel fetches itself.
-  const { data: grants = [], isFetching } = useQuery(allGrantsQuery(false));
-  // For the branch line and for people who hold nothing yet (picked to grant).
+  const [showRevoked, setShowRevoked] = useState(false);
+  const [search, setSearch] = useState('');
+  const [permFilter, setPermFilter] = useState('');
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
+  const [pending, setPending] = useState<Set<number>>(new Set());
+  const [pickOpen, setPickOpen] = useState(false);
+  const [grantsUser, setGrantsUser] = useState<GrantTargetUser | null>(null);
+
+  const { data: grants = [], isFetching } = useQuery(allGrantsQuery(!showRevoked));
+  // For the branch on each row, and for people who hold nothing yet (picked to grant).
   const { data: users = [] } = useQuery(grantUsersQuery);
   const userById = useMemo(() => new Map(users.map(u => [u.id, u])), [users]);
 
-  const holders = useMemo((): Holder[] => {
-    const byUser = new Map<number, Holder>();
-    for (const g of grants) {
-      if (!g.active) continue;
-      let h = byUser.get(g.user_id);
-      if (!h) {
-        h = {
-          user_id: g.user_id, username: g.username, role_code: g.role_code,
-          company_name: g.company_name, branch_name: userById.get(g.user_id)?.branch_name ?? null, codes: [],
-        };
-        byUser.set(g.user_id, h);
-      }
-      h.codes.push(g.permission_code);
-    }
-    const list = [...byUser.values()];
-    for (const h of list) h.codes.sort();
-    return list.sort((a, b) => a.username.localeCompare(b.username));
-  }, [grants, userById]);
+  // A person's grants sit together: by name, then permission.
+  const rows = useMemo((): Row[] => grants
+    .map(g => ({ ...g, branch_name: userById.get(g.user_id)?.branch_name ?? null }))
+    .sort((a, b) => a.username.localeCompare(b.username) || a.permission_code.localeCompare(b.permission_code)),
+  [grants, userById]);
 
-  // Permission filter: only the permissions somebody holds, with how many.
-  const [permFilter, setPermFilter] = useState('');
+  // Permission filter: only the ones somebody holds now, with how many people.
   const permOptions = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const h of holders) for (const c of h.codes) counts.set(c, (counts.get(c) ?? 0) + 1);
+    for (const g of grants) if (g.active) counts.set(g.permission_code, (counts.get(g.permission_code) ?? 0) + 1);
     return [...counts.entries()].sort(([a], [b]) => a.localeCompare(b))
       .map(([code, n]) => ({ value: code, label: `${code} (${n})` }));
-  }, [holders]);
+  }, [grants]);
 
-  const [search, setSearch] = useState('');
   const shown = useMemo(() => {
-    const filtered = permFilter ? holders.filter(h => h.codes.includes(permFilter)) : holders;
-    return fuzzyRank(filtered, search, h => `${h.username} ${h.company_name ?? ''} ${h.branch_name ?? ''}`);
-  }, [holders, permFilter, search]);
-  const [pageIndex, setPageIndex] = useState(0);
-  const [pageSize, setPageSize] = useState(25);
+    const filtered = permFilter ? rows.filter(r => r.permission_code === permFilter) : rows;
+    return fuzzyRank(filtered, search,
+      r => `${r.username} ${r.company_name ?? ''} ${r.branch_name ?? ''} ${r.permission_code}`);
+  }, [rows, permFilter, search]);
 
-  // The person on the right: from the rail, or anyone the viewer can see (a
-  // person picked to grant to, or one whose last permission was just switched
-  // off and so left the rail).
-  const selected = useMemo((): GrantTargetUser | null => {
-    if (selectedId == null) return null;
-    const h = holders.find(x => x.user_id === selectedId);
-    if (h) return { id: h.user_id, username: h.username, role_code: h.role_code, company_name: h.company_name };
-    const u = userById.get(selectedId);
-    return u ? { id: u.id, username: u.username, role_code: u.role_code, company_name: u.company_name } : null;
-  }, [selectedId, holders, userById]);
+  const openSwitches = (r: { user_id: number; username: string; role_code: string; company_name: string | null }) =>
+    setGrantsUser({ id: r.user_id, username: r.username, role_code: r.role_code, company_name: r.company_name });
 
-  const select = (id: number, goTo?: (panel: string) => void) => {
-    navigate(`${BASE_PATH}/${id}`);
-    goTo?.('detail');
+  const revoke = async (row: Row) => {
+    setPending(prev => new Set(prev).add(row.grant_id));
+    try {
+      await revokePermission(row.user_id, row.permission_code);
+      await queryClient.invalidateQueries({ queryKey: ['user-permission-grants-all'] });
+      queryClient.invalidateQueries({ queryKey: ['user-permission-grants', row.user_id] });
+      addSnackbar({
+        message: (
+          <div className="alert alert-success">
+            <CheckCircle size={16} />
+            <span>{t('permissionGrants.revokeSuccess', { permission: row.permission_code, username: row.username })}</span>
+          </div>
+        ),
+        type: 'success',
+        duration: 3000,
+      });
+    } catch (err) {
+      const msg = err instanceof ApiError ? (translateApiError(err, t) || err.message) : t('common.error');
+      addSnackbar({
+        message: (
+          <div className="alert alert-danger">
+            <XCircle size={16} />
+            <span>{msg}</span>
+          </div>
+        ),
+        type: 'error',
+        duration: 5000,
+      });
+    } finally {
+      setPending(prev => { const n = new Set(prev); n.delete(row.grant_id); return n; });
+    }
   };
 
-  // Opened on a person further down (a link, a reload): bring the row into
-  // view. `nearest` leaves a row that is already visible where it is.
-  const hasRows = shown.length > 0;
-  useEffect(() => {
-    if (selectedId == null || !hasRows) return;
-    document.querySelector('.panel-datatable [data-state="selected"]')?.scrollIntoView({ block: 'nearest' });
-  }, [selectedId, hasRows]);
+  const filtersActive = !!search || !!permFilter;
+  const noResults = (
+    <div className="p-8 text-center text-subtle">
+      {filtersActive ? t('permissionGrants.noMatch') : t('permissionGrants.noPeople')}
+    </div>
+  );
 
-  const [pickOpen, setPickOpen] = useState(false);
+  // ── cell pieces, shared by the table and the phone cards ──
+
+  const personName = (r: Row) => (
+    <button
+      type="button"
+      onClick={() => openSwitches(r)}
+      title={t('permissionGrants.openSwitches')}
+      className="text-sm font-medium text-primary-fg hover:underline bg-transparent border-none p-0 cursor-pointer text-left break-all"
+    >
+      {r.username}
+    </button>
+  );
+
+  const personWhere = (r: Row) =>
+    [getRoleLabel(t, r.role_code), r.company_name, r.branch_name].filter(Boolean).join(' · ');
+
+  const grantedLine = (r: Row) => (
+    <>
+      {t('permissionGrants.grantedBy')} {r.granted_by_username ?? '—'} · <DateTime value={r.granted_at} showTime={false} />
+    </>
+  );
+
+  const revokedLine = (r: Row) => (
+    <>
+      {t('permissionGrants.revokedBy')} {r.revoked_by_username ?? '—'}
+      {r.revoked_at && <> · <DateTime value={r.revoked_at} showTime={false} /></>}
+    </>
+  );
+
+  // Why it was given; for a revoked row, why it was taken back — rows revoked
+  // before mig 1650 kept that in `note`.
+  const reason = (r: Row) => (r.active ? r.note : (r.revoke_note ?? r.note));
+
+  const actionCell = (r: Row) => r.active ? (
+    <Button
+      variant="outline"
+      size="sm"
+      startIcon={<Undo2 size={14} />}
+      disabled={pending.has(r.grant_id)}
+      onClick={() => revoke(r)}
+    >
+      {t('permissionGrants.revoke')}
+    </Button>
+  ) : (
+    <Badge size="sm" color="default">{t('permissionGrants.revoked')}</Badge>
+  );
+
+  // Two lines a row, like the first version of this table: the long DB
+  // description and the note stay one line / behind an icon, so a screen
+  // still shows a dozen grants.
+  const columns: ColumnDef<Row>[] = [
+    {
+      accessorKey: 'username',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('permissionGrants.user')} />,
+      cell: ({ row }) => (
+        <div className="min-w-0 flex flex-col items-start">
+          <div className="max-w-full truncate">{personName(row.original)}</div>
+          <div className="text-xs text-subtle truncate max-w-full" title={personWhere(row.original)}>{personWhere(row.original)}</div>
+        </div>
+      ),
+      className: 'w-[28%]',
+    },
+    {
+      accessorKey: 'permission_code',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('permissionGrants.permission')} />,
+      cell: ({ row }) => {
+        const r = row.original;
+        const why = reason(r);
+        return (
+          <div className={`min-w-0 ${r.active ? '' : 'opacity-70'}`}>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span
+                className={`text-sm font-mono truncate ${r.permission_code === permFilter ? 'text-info-fg font-semibold' : ''}`}
+                title={r.permission_code}
+              >
+                {r.permission_code}
+              </span>
+              {why && (
+                <Tooltip content={`${t('permissionGrants.note')}: ${why}`}>
+                  <MessageSquareText size={14} className="shrink-0 text-subtle" aria-label={t('permissionGrants.note')} />
+                </Tooltip>
+              )}
+            </div>
+            {/* Thai description written by the DB — shown verbatim, one line; full text on hover. */}
+            <div className="text-xs text-subtle truncate" title={r.description}>{r.description}</div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: 'granted_by_username',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('permissionGrants.grantedBy')} />,
+      cell: ({ row }) => {
+        const r = row.original;
+        // A revoked row shows who took it back instead — that's the newer fact.
+        const who = r.active ? r.granted_by_username : r.revoked_by_username;
+        const when = r.active ? r.granted_at : r.revoked_at;
+        return (
+          <div className="min-w-0 text-xs text-subtle">
+            <div className="truncate" title={who ?? undefined}>
+              {!r.active && `${t('permissionGrants.revokedBy')} `}{who ?? '—'}
+            </div>
+            <div><DateTime value={when} showTime={false} /></div>
+          </div>
+        );
+      },
+      // Dropped when the table itself is narrow (an iPad with both side menus
+      // open) so the permission code isn't cut; the person's window still shows it.
+      className: 'w-36 @max-[44rem]:hidden',
+    },
+    {
+      id: 'actions',
+      header: () => null,
+      cell: ({ row }) => <div className="flex justify-end">{actionCell(row.original)}</div>,
+      enableSorting: false,
+      className: 'w-28',
+    },
+  ];
+
+  const pagination = {
+    enablePagination: true,
+    pageIndex,
+    pageSize,
+    pageSizeOptions: [25, 50, 100],
+    onPageChange: ({ pageIndex: pi, pageSize: ps }: { pageIndex: number; pageSize: number }) => {
+      setPageIndex(pi); setPageSize(ps);
+    },
+  };
 
   return (
-    <PageNav panels={['list', 'detail']} defaultPanel={selectedId ? 'detail' : undefined} className="h-dvh overflow-hidden">
-      {({ isMobile, isRoot, goTo, goBack }) => (
-        <>
-          {isMobile && (
-            <MobileHeader className="mobile-header-bordered">
-              <div className="mobile-header-start">
-                {isRoot ? (
-                  <button
-                    className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
-                    aria-label="Open menu"
-                    onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}
-                  >
-                    <ArrowRightFromLine size={18} />
-                  </button>
-                ) : (
-                  <button
-                    className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
-                    aria-label={t('common.back')}
-                    onClick={goBack}
-                  >
-                    <ArrowLeft size={20} />
-                  </button>
-                )}
-              </div>
-              <div className="mobile-header-title mobile-header-title-truncate">
-                {isRoot ? t('permissionGrants.title') : (selected?.username ?? t('permissionGrants.title'))}
-              </div>
-              <div className="mobile-header-end w-nav">
-                {isRoot && (
-                  <button
-                    className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
-                    aria-label={t('permissionGrants.grantButton')}
-                    onClick={() => setPickOpen(true)}
-                  >
-                    <Plus size={18} />
-                  </button>
-                )}
-              </div>
-            </MobileHeader>
-          )}
+    <>
+      <MobileHeader className="mobile-header-bordered md:hidden">
+        <div className="mobile-header-start">
+          <button
+            className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
+            aria-label="Open menu"
+            onClick={() => window.dispatchEvent(new CustomEvent('sidemenu:open'))}
+          >
+            <ArrowRightFromLine size={18} />
+          </button>
+        </div>
+        <div className="mobile-header-title mobile-header-title-truncate">{t('permissionGrants.title')}</div>
+        <div className="mobile-header-end w-nav">
+          <button
+            className="flex items-center justify-center w-nav h-nav cursor-pointer bg-transparent border-none text-current"
+            aria-label={t('permissionGrants.grantButton')}
+            onClick={() => setPickOpen(true)}
+          >
+            <Plus size={18} />
+          </button>
+        </div>
+      </MobileHeader>
 
-          {!isMobile && (
-            <div key="header" className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
-              <h1 className="heading-2 shrink-0 flex items-center gap-2">
-                <KeySquare size={20} /> {t('permissionGrants.title')}
-              </h1>
-              <span className="text-xs text-subtle min-w-0 truncate">{t('permissionGrants.description')}</span>
-              <Button color="primary" size="sm" startIcon={<Plus size={14} />} onClick={() => setPickOpen(true)} className="ml-auto shrink-0">
-                {t('permissionGrants.grantButton')}
-              </Button>
-            </div>
-          )}
-
-          <div key="panels" className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
-            {/* Left — people */}
-            <PageNavPanel id="list" className={isMobile ? '' : 'w-5/12 xl:w-4/12 border-r border-line flex flex-col'}>
-              <div className="flex-none p-2 border-b border-line flex flex-col gap-2">
-                <Input
-                  value={search}
-                  onChange={(e) => { setSearch(e.target.value); setPageIndex(0); }}
-                  placeholder={t('permissionGrants.searchPerson')}
-                  size="sm"
-                  startIcon={<Search size={16} />}
-                  className="w-full"
-                />
-                <Select
-                  options={permOptions}
-                  value={permFilter || null}
-                  onChange={(v) => { setPermFilter((v as string) ?? ''); setPageIndex(0); }}
-                  placeholder={t('permissionGrants.allPermissions')}
-                  size="sm"
-                  showChevron
-                  clearable
-                  searchable
-                />
-              </div>
-              <DataTable<Holder>
-                data={shown}
-                getRowProps={(row) => ({
-                  'data-state': row.original.user_id === selectedId ? 'selected' : undefined,
-                })}
-                enableKeyboardNav={!isMobile}
-                onRowActivate={(row) => select(row.original.user_id)}
-                renderRow={(row) => {
-                  const h = row.original;
-                  const where = [h.company_name, h.branch_name].filter(Boolean).join(' · ');
-                  return (
-                    <button
-                      key={h.user_id}
-                      type="button"
-                      className="w-full text-left px-4 py-2.5 flex flex-col gap-0.5 transition-colors cursor-pointer"
-                      onClick={() => select(h.user_id, isMobile ? goTo : undefined)}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-sm font-medium truncate">{h.username}</span>
-                        <Badge size="xs" color={roleBadgeColor(h.role_code)} className="shrink-0">
-                          {getRoleLabel(t, h.role_code)}
-                        </Badge>
-                        <span className="ml-auto shrink-0 text-xs text-subtle tabular-nums">
-                          {t('permissionGrants.permissionCount', { n: h.codes.length })}
-                        </span>
-                      </div>
-                      {where && <div className="text-xs text-subtle truncate">{where}</div>}
-                      <div className="text-xs font-mono text-subtle truncate">
-                        {/* The filtered one first, so the cut-off end of the
-                            line never hides the reason this row is here. */}
-                        {(permFilter && h.codes.includes(permFilter)
-                          ? [permFilter, ...h.codes.filter(c => c !== permFilter)]
-                          : h.codes
-                        ).map((c, i) => (
-                          <span key={c} className={c === permFilter ? 'text-info-fg font-semibold' : undefined}>
-                            {i > 0 && ' · '}{c}
-                          </span>
-                        ))}
-                      </div>
-                    </button>
-                  );
-                }}
-                enablePagination
-                pageIndex={pageIndex}
-                pageSize={pageSize}
-                pageSizeOptions={[25, 50]}
-                rowCount={shown.length}
-                onPageChange={({ pageIndex: pi, pageSize: ps }) => { setPageIndex(pi); setPageSize(ps); }}
-                className={`flex-1 min-h-0 panel-datatable ${isFetching ? 'opacity-60' : ''} transition-opacity`}
-                noResults={<div className="p-8 text-center text-subtler">{t('permissionGrants.noPeople')}</div>}
-              />
-            </PageNavPanel>
-
-            {/* Right — that person's switches */}
-            <PageNavPanel id="detail" className={isMobile ? '' : 'flex-1 min-w-0 flex flex-col'}>
-              {selected ? (
-                <div className="flex flex-col h-full min-h-0">
-                  <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2 min-w-0">
-                    <span className="font-semibold truncate">{selected.username}</span>
-                    <Badge size="xs" color={roleBadgeColor(selected.role_code)} className="shrink-0">
-                      {getRoleLabel(t, selected.role_code)}
-                    </Badge>
-                    {selected.company_name && (
-                      <span className="text-xs text-subtle truncate">{selected.company_name}</span>
-                    )}
-                  </div>
-                  <div className="flex-1 overflow-auto better-scroll px-4 py-3">
-                    <UserGrantsPanel user={selected} highlightCode={permFilter || null} />
-                  </div>
-                </div>
-              ) : (
-                <div className="flex-1 h-full flex flex-col items-center justify-center text-subtler p-8 gap-2">
-                  <Users size={32} />
-                  <div>{t('permissionGrants.selectPersonToView')}</div>
-                </div>
-              )}
-            </PageNavPanel>
+      <div className="page-content responsive-dvh-mobile-header">
+        <div className="mb-4 flex-none max-md:hidden flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="heading-2 flex items-center gap-2">
+              <KeySquare size={20} /> {t('permissionGrants.title')}
+            </h1>
+            <p className="text-sm text-subtle mt-1">{t('permissionGrants.description')}</p>
           </div>
+          <Button color="primary" size="sm" startIcon={<Plus size={16} />} onClick={() => setPickOpen(true)} className="shrink-0">
+            {t('permissionGrants.grantButton')}
+          </Button>
+        </div>
 
-          <PickPersonModal
-            open={pickOpen}
-            users={users}
-            onClose={() => setPickOpen(false)}
-            onPick={(u) => { setPickOpen(false); select(u.id, isMobile ? goTo : undefined); }}
+        <div className="flex-none flex flex-wrap md:flex-nowrap items-center gap-2 mb-2 max-md:mt-3">
+          {/* One row from iPad up: the two boxes share what the checkbox leaves. */}
+          <div className="w-full md:w-auto md:flex-1 md:max-w-72 min-w-0">
+            <Input
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPageIndex(0); }}
+              placeholder={t('permissionGrants.searchGrants')}
+              size="sm"
+              startIcon={<Search size={16} />}
+              className="w-full"
+            />
+          </div>
+          <div className="w-full md:w-auto md:flex-1 md:max-w-72 min-w-0">
+            <Select
+              options={permOptions}
+              value={permFilter || null}
+              onChange={(v) => { setPermFilter((v as string) ?? ''); setPageIndex(0); }}
+              placeholder={t('permissionGrants.allPermissions')}
+              size="sm"
+              showChevron
+              clearable
+              searchable
+            />
+          </div>
+          <LabeledCheckbox
+            label={t('permissionGrants.showRevoked')}
+            checked={showRevoked}
+            onChange={(e) => { setShowRevoked(e.target.checked); setPageIndex(0); }}
+            className="md:ml-auto shrink-0 whitespace-nowrap"
           />
-        </>
-      )}
-    </PageNav>
+        </div>
+
+        {isMobile ? (
+          // Phone: one card per grant — the columns don't fit.
+          <DataTable<Row>
+            data={shown}
+            renderRow={(row) => {
+              const r = row.original;
+              return (
+                <div key={r.grant_id} className="px-1 py-3 flex flex-col gap-0.5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex flex-col items-start">
+                      {personName(r)}
+                      <div className="text-xs text-subtle">{personWhere(r)}</div>
+                    </div>
+                    <div className="shrink-0">{actionCell(r)}</div>
+                  </div>
+                  <div className={`text-sm font-mono break-all mt-1 ${r.permission_code === permFilter ? 'text-info-fg font-semibold' : ''}`}>
+                    {r.permission_code}
+                  </div>
+                  <div className="text-xs text-subtle">{r.description}</div>
+                  {reason(r) && <div className="text-xs text-subtle">{t('permissionGrants.note')}: {reason(r)}</div>}
+                  <div className="text-xs text-subtle">{r.active ? grantedLine(r) : revokedLine(r)}</div>
+                </div>
+              );
+            }}
+            {...pagination}
+            className={`flex-1 min-h-0 ${isFetching ? 'opacity-60' : ''} transition-opacity`}
+            noResults={noResults}
+          />
+        ) : (
+          <DataTable<Row>
+            outlined
+            data={shown}
+            columns={columns}
+            sorting={sorting}
+            onSortingChange={setSorting}
+            tableClassName="table-fixed"
+            {...pagination}
+            className={`@container flex-1 min-h-0 ${isFetching ? 'opacity-60' : ''} transition-opacity`}
+            noResults={noResults}
+          />
+        )}
+      </div>
+
+      <PickPersonModal
+        open={pickOpen}
+        users={users}
+        onClose={() => setPickOpen(false)}
+        onPick={(u) => {
+          setPickOpen(false);
+          openSwitches({ user_id: u.id, username: u.username, role_code: u.role_code, company_name: u.company_name });
+        }}
+      />
+      <UserPermissionGrantsModal user={grantsUser} open={!!grantsUser} onClose={() => setGrantsUser(null)} />
+    </>
   );
 }
 
 /* ── Pick someone to grant to ─────────────────────────────────────────────── */
 
-// Only chooses whom to show on the right — the switches there do the granting,
-// so this window writes nothing and needs no success step.
+// Only chooses whose switches to open — the switches do the granting, so this
+// window writes nothing and needs no success step.
 function PickPersonModal({ open, users, onClose, onPick }: {
   open: boolean;
   users: GrantUser[];

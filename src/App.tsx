@@ -423,7 +423,7 @@ function App() {
         }
       />
       <Route
-        path="/admin/users/permission-grants/:userId?"
+        path="/admin/users/permission-grants"
         element={
           <ProtectedRoute>
             <AdminLayout>

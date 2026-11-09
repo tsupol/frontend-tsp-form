@@ -7561,7 +7561,7 @@
   "permissionGrants": {
     "title": "Permission grants",
     "navTitle": "Permission grants",
-    "description": "Permissions given to one person on top of their role. Pick a person to switch them on or off, or filter by a permission to see who has it.",
+    "description": "Permissions given to one person on top of their role. Click a name to switch that person's permissions on or off, or filter by a permission to see who has it.",
     "manageFor": "Permission grants",
     "revoked": "Revoked",
     "grantedBy": "Granted by",
@@ -7585,12 +7585,13 @@
     "noCompanyGroup": "Holding level (no company)",
     "holdingOnlyBadge": "Holding grants only",
     "revokedBy": "Revoked by",
-    "searchPerson": "Search name, company or branch",
     "allPermissions": "All permissions",
-    "permissionCount": "{{n}} permissions",
     "noPeople": "Nobody here has a per-person permission",
-    "selectPersonToView": "Pick a person to see and switch their permissions",
-    "pickPersonHint": "Their permissions open on the right — switch on the ones to give."
+    "pickPersonHint": "Their permissions open as a list of switches — switch on the ones to give.",
+    "searchGrants": "Search name, company, branch or permission",
+    "showRevoked": "Show revoked",
+    "noMatch": "Nothing matches the search",
+    "openSwitches": "Switch this person's permissions"
   },
   "po": {
     "contractable": "Contractable",
