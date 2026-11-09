@@ -53,9 +53,17 @@ export interface UserPermissionGrant {
   granted_by: number | null;
   granted_by_username: string | null;
   granted_at: string;
+  /** Why it was given. Rows revoked before mig 1650 may hold the revoke reason
+   *  here instead — the revoke used to write over it. */
   note: string | null;
   revoked_at: string | null;
   revoked_by: number | null;
+  /** mig 1650 — visible to anyone who can see the row. */
+  revoked_by_username: string | null;
+  /** mig 1650 — why it was taken back, kept apart from `note`. */
+  revoke_note: string | null;
+  /** mig 1650 — the recipient's company; null for a holding-level person. */
+  company_name: string | null;
   active: boolean;
 }
 
@@ -113,6 +121,28 @@ export function canGrantTo(
   if (actor?.role_code !== 'COMPANY_ADMIN') return false;
   return target.company_id != null && target.company_id === actor.company_id;
 }
+
+/** A person as the grant screens need them: to pick, to group, to name. */
+export interface GrantUser {
+  id: number;
+  username: string;
+  role_code: string;
+  company_id: number | null;
+  company_name: string | null;
+  branch_name: string | null;
+  is_active: boolean;
+}
+
+/**
+ * Everyone this viewer can see, for the grant pickers (they offer the active
+ * ones). Loaded once and searched on screen: a few hundred rows.
+ */
+export const grantUsersQuery = {
+  queryKey: ['grant-users'],
+  queryFn: () => apiClient.get<GrantUser[]>(
+    '/v_users?select=id,username,role_code,company_id,company_name,branch_name,is_active&order=username',
+  ),
+};
 
 /** Every grant for one user, newest first — active rows and revoked history. */
 export function userGrantsQuery(userId: number | null) {
