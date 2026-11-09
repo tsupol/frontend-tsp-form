@@ -11367,7 +11367,8 @@
       "CASE_SUBMITTED": "ร้านยื่นขออนุมัติ",
       "SETTLEMENT_SUBMITTED": "ร้านยื่นปิดงาน รอตรวจ",
       "CHAT_WAITING": "ลูกค้าทักแชท รอตอบ",
-      "SLIP_PENDING": "สลิปรอตรวจค้างนาน"
+      "SLIP_PENDING": "สลิปรอตรวจค้างนาน",
+      "PAYOUT_SUMMARY": "โอนให้ร้านแล้ว — ส่งสรุปของวัน"
     },
     "customized": "ปรับแล้ว",
     "window": "ช่วงเวลา",

@@ -11401,7 +11401,8 @@
       "CASE_SUBMITTED": "Shop submitted a request",
       "SETTLEMENT_SUBMITTED": "Shop submitted a close-out",
       "CHAT_WAITING": "Customer chat waiting",
-      "SLIP_PENDING": "Slip waiting too long"
+      "SLIP_PENDING": "Slip waiting too long",
+      "PAYOUT_SUMMARY": "Paid to shops — daily summary"
     },
     "customized": "Changed",
     "window": "Hours",

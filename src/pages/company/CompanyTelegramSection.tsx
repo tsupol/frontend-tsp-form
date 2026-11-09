@@ -39,6 +39,9 @@ interface TgChannel {
 }
 
 interface TgFeature {
+  /** mig 1647: WORK = a kind of pending work (all fields) · SUMMARY = a daily summary
+   *  (on/off + hours only; the bot ignores report-after and reminders). */
+  kind?: 'WORK' | 'SUMMARY';
   feature_code: string;
   sort_order: number;
   enabled: boolean;
@@ -216,7 +219,10 @@ export function CompanyTelegramSection({ companyId, onDirtyChange }: {
   // go one after another; the first refusal stops the run and its message shows.
   const saveFeatures = async () => {
     for (const f of dirtyRows) {
-      const res = await call('features', 'fn_tg_feature_set', { p_feature_code: f.feature_code, ...toValues(drafts[f.feature_code]) }, 0);
+      const v = toValues(drafts[f.feature_code]);
+      // A summary row sends no report-after / reminder (1647: 0 and null).
+      const body = f.kind === 'SUMMARY' ? { ...v, p_open_after_min: 0, p_remind_every_min: null } : v;
+      const res = await call('features', 'fn_tg_feature_set', { p_feature_code: f.feature_code, ...body }, 0);
       if (!res) return;
     }
   };
@@ -373,6 +379,7 @@ function FeatureRow({ f, draft, editable, busy, onChange }: {
             </div>
             {!draft.start && !draft.end && <span className="text-[11px] text-subtler mt-0.5">{t('telegram.allDay')}</span>}
           </div>
+          {f.kind !== 'SUMMARY' && (<>
           <div className="flex flex-col">
             <span className="text-xs text-subtle">{t('telegram.openAfter')}</span>
             <MaskedInput size="sm" className="w-full" mask="number" decimalScale={0} value={draft.after} disabled={off} onChange={(raw) => onChange({ after: raw })} />
@@ -382,6 +389,7 @@ function FeatureRow({ f, draft, editable, busy, onChange }: {
             <MaskedInput size="sm" className="w-full" mask="number" decimalScale={0} value={draft.remind} placeholder={t('telegram.noRemind')} disabled={off} onChange={(raw) => onChange({ remind: raw })} />
             <span className="text-[11px] text-subtler mt-0.5">{t('telegram.maxReminders', { n: f.max_reminders })}</span>
           </div>
+          </>)}
         </div>
       </div>
     </div>
