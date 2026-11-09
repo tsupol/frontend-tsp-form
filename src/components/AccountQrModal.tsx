@@ -1,14 +1,17 @@
 // A bank account's payment QR, for a customer to scan at the counter. Laid out like the
 // app's other QR windows (sign / view QR): a title, whose account it is, the QR on a
 // white card at a size a phone camera reads from a screen, and one line saying what it
-// is for. Not a full-screen image viewer — a giant QR is harder to scan, not easier.
+// is for. Tapping the image opens the zoomable viewer: shops upload a whole bank poster
+// (header, logo, text) where the QR itself is a small part, so at 224px it can be too
+// small to scan — the viewer lets the counter zoom in on the code (owner 11-10).
 // The data must outlive `open`: the caller clears its selection on close, so the last
 // account is held while the window animates out.
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal } from 'tsp-form';
 import { BankAccountLine } from './BankAccountLine';
+import { MediaLightbox } from './MediaLightbox';
 import { publicMediaUrl } from '../lib/mediaPath';
 import type { BankAccountLike } from '../lib/bankAccount';
 
@@ -27,6 +30,7 @@ export function AccountQrModal({ qr: qrProp, onClose }: { qr: AccountQr | null; 
   const last = useRef(qrProp);
   if (qrProp) last.current = qrProp;
   const qr = qrProp ?? last.current;
+  const [zoom, setZoom] = useState(false);
 
   return (
     <Modal open={!!qrProp} onClose={onClose} maxWidth="26rem" width="100%">
@@ -41,10 +45,11 @@ export function AccountQrModal({ qr: qrProp, onClose }: { qr: AccountQr | null; 
               <BankAccountLine account={qr.account} showWhere={false} />
             </div>
             {/* White card even in dark mode: a QR needs a light quiet zone to scan. */}
-            <div className="rounded-lg border border-line bg-white p-3">
+            <button type="button" className="rounded-lg border border-line bg-white p-3 cursor-zoom-in" onClick={() => setZoom(true)} aria-label={t('common.zoomImage')} data-testid="account-qr-zoom">
               <img src={publicMediaUrl(qr.qrKey)} alt={qr.title} width={224} height={224} className="block w-56 h-56 object-contain" />
-            </div>
+            </button>
             {qr.hint && <p className="text-sm text-subtle text-center">{qr.hint}</p>}
+            <MediaLightbox open={zoom} onClose={() => setZoom(false)} mediaKey={qr.qrKey} alt={qr.title} />
           </div>
         )}
       </div>

@@ -3143,6 +3143,7 @@
     "deal": "Actual"
   },
   "common": {
+    "zoomImage": "Enlarge image",
     "actions": "Actions",
     "active": "Active",
     "add": "Add",
