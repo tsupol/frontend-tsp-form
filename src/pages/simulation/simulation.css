@@ -18,7 +18,7 @@
 .sim__chip--on { padding: 2px 9px; font-size: 12px; line-height: 16px; z-index: 1; box-shadow: 0 1px 4px rgba(20, 40, 50, .24); }
 .sim__pile-icon { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border: 1.5px solid; border-radius: 50%; background: #fff; }
 
-.sim__tag { position: absolute; transform: translate(-50%, -50%) scale(var(--sim-tag-scale, 1)); display: flex; flex-direction: column; gap: 1px; padding: 2px 8px; border: 0; border-radius: 8px; background: var(--color-surface-elevated); color: var(--color-fg); font: inherit; font-size: 12px; white-space: nowrap; box-shadow: 0 1px 4px rgba(20, 40, 50, .24); cursor: pointer; }
+.sim__tag { position: absolute; transform: translate(-50%, -50%) scale(var(--sim-tag-scale, 1)); display: flex; flex-direction: column; gap: 1px; padding: 2px 8px; border: 1px solid var(--color-line); border-radius: 8px; background: var(--color-surface); color: var(--color-fg); font: inherit; font-size: 12px; white-space: nowrap; box-shadow: 0 1px 4px rgba(20, 40, 50, .24); cursor: pointer; }
 .sim__tag--on { outline: 2px solid var(--color-primary); }
 /* Anchored by its left edge (off a wall), not its centre. */
 .sim__tag--side { transform: translate(0, -50%) scale(var(--sim-tag-scale, 1)); transform-origin: left center; }
@@ -60,7 +60,12 @@
 .sim__people--on { color: #23874a; font-weight: 700; }
 [data-theme="dark"] .sim__people--on { color: #6fdc95; }
 
-.sim__card { background: var(--color-surface-elevated); color: var(--color-fg); border-radius: 14px; box-shadow: 0 2px 8px rgba(20, 40, 50, .14); }
+/* Every floating panel is the app's panel: tsp-form's modal / popover / .card look —
+   --color-surface, a 1px --color-line border, 8px corners. (--color-surface-elevated is the
+   theme's button / badge / hover fill, not a panel; it made these lighter than every other
+   window and, with no border, let one panel run into the one under it.) The shadow stays:
+   these sit over the 3D picture, as a popover sits over the page. */
+.sim__card { background: var(--color-surface); color: var(--color-fg); border: 1px solid var(--color-line); border-radius: 8px; box-shadow: 0 2px 8px rgba(20, 40, 50, .14); }
 .sim__stack { position: relative; flex: none; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 0; pointer-events: none; }
 .sim__stack > * > *, .sim__band { pointer-events: auto; }
 .sim__top { display: flex; gap: 10px; justify-content: space-between; align-items: stretch; }
@@ -106,7 +111,7 @@ button.sim__tabs-toggle:hover, .sim__company-min:hover .sim__tabs-toggle { color
 .sim__loading { position: absolute; inset: 12px; display: flex; flex-direction: column; gap: 12px; }
 .sim__empty { position: absolute; left: 50%; top: 40%; transform: translateX(-50%); padding: 12px 20px; font-size: 14px; }
 
-.sim__zoom { position: absolute; left: 12px; top: 12px; display: flex; flex-direction: column; gap: 2px; padding: 4px; background: var(--color-surface-elevated); border-radius: 10px; box-shadow: 0 2px 8px rgba(20, 40, 50, .14); }
+.sim__zoom { position: absolute; left: 12px; top: 12px; display: flex; flex-direction: column; gap: 2px; padding: 4px; background: var(--color-surface); border: 1px solid var(--color-line); border-radius: 8px; box-shadow: 0 2px 8px rgba(20, 40, 50, .14); }
 
 .sim__panel { position: absolute; right: 12px; top: 12px; bottom: 12px; width: 300px; display: flex; flex-direction: column; overflow: hidden; }
 .sim__panel-toggle { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; height: 30px; padding: 0 8px 0 12px; border: 0; border-bottom: 1px solid var(--color-line); background: var(--color-surface-hover); color: var(--color-subtle); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
@@ -155,10 +160,18 @@ button.sim__tabs-toggle:hover, .sim__company-min:hover .sim__tabs-toggle { color
 .sim__days td:not(:first-child) { white-space: nowrap; }
 .sim__row-future td { color: var(--color-subtle); }
 
-.sim__collect { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 600px; max-width: calc(100% - 24px); max-height: calc(100% - 24px); overflow: auto; padding: 14px 16px; font-size: 13px; z-index: 3; box-shadow: 0 8px 28px rgba(20, 40, 50, .28); }
+/* The collection / opened-contracts window: always centred on the picture, like any window.
+   To keep clear of the shop card it opened from (12 + card 300 + gap 12 = 324px each side,
+   so the card's เปิดสัญญา / เก็บค่างวด stay pressable) it narrows, but not below 560px —
+   four month cards a row still fit; on a picture narrower than that it covers the card's
+   edge, centred, rather than going lopsided. */
+.sim__collect { --sim-win-w: 600px; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: clamp(min(560px, 100% - 24px), 100% - 648px, var(--sim-win-w)); max-height: calc(100% - 24px); overflow: auto; padding: 14px 16px; font-size: 13px; z-index: 3; box-shadow: 0 8px 28px rgba(20, 40, 50, .28); }
 .sim__collect h3 { font-size: 15px; }
 /* Wider than the collection window: 4 month cards a row, so the 8 a fund sees fit in 2 (§7b). */
-.sim__opened-win { width: 720px; }
+.sim__opened-win { --sim-win-w: 720px; }
+/* Title and month picker on one row; the title gives way (ellipsis) before the picker. */
+.sim__opened-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.sim__opened-head h3 { margin: 0; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sim__opened-chart { overflow-x: auto; } /* a narrow window scrolls the chart sideways, never squashes it */
 .sim__collect h3 small { font-size: 12px; }
 .sim__legend-row { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--color-subtle); }

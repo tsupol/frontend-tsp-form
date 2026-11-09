@@ -159,7 +159,12 @@ export const OPENED_METRICS: OpenedMetricDef[] = [
   { key: 'margin',      label: 'contractsOpened.sumMargin',      kind: 'pct',   hint: 'contractsOpened.marginHint' },
 ];
 
-export interface OpenedMetricCell { key: string; label: string; value: string; hint?: string; dot?: string }
+export interface OpenedMetricCell {
+  key: string; label: string; value: string; hint?: string; dot?: string;
+  /** Drawn beside the figure, e.g. the down payment's % of the device price — a figure
+   *  of its own, so never the faint hint line under it. */
+  badge?: React.ReactNode;
+}
 
 type TFn = (key: string, opts?: Record<string, unknown>) => string;
 
@@ -481,7 +486,14 @@ export function OpenedMetricStrip({ cells, framed, size = 'lg' }: {
       {cells.map(c => (
         <div key={c.key} className={`min-w-0 border-r border-b border-line -mr-px -mb-px max-sm:px-2 max-sm:py-1.5 ${size === 'lg' ? 'px-4 py-2.5' : 'px-3 py-2'}`}>
           <div className="text-xs text-subtle truncate max-sm:whitespace-normal max-sm:leading-tight">{c.label}</div>
-          <div className={`${size === 'lg' ? 'text-lg' : 'text-base'} max-sm:text-sm font-semibold tabular-nums truncate`}>{c.value}</div>
+          {c.badge ? (
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className={`${size === 'lg' ? 'text-lg' : 'text-base'} max-sm:text-sm font-semibold tabular-nums truncate`}>{c.value}</span>
+              {c.badge}
+            </div>
+          ) : (
+            <div className={`${size === 'lg' ? 'text-lg' : 'text-base'} max-sm:text-sm font-semibold tabular-nums truncate`}>{c.value}</div>
+          )}
           {c.hint && <div className="text-[10px] leading-tight text-subtler max-sm:hidden">{c.hint}</div>}
         </div>
       ))}

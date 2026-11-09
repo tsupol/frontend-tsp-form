@@ -490,12 +490,12 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
                 {/* เปิดสัญญา for everyone, เก็บค่างวด when can_see_collection — side by side,
                     the open one filled; pressing it again closes it. */}
                 <div className="flex gap-2 mb-2">
-                  <Button variant={win?.kind === 'opened' ? 'primary' : 'outline'} size="sm" className="flex-1" data-testid="sim-open-opened"
+                  <Button color={win?.kind === 'opened' ? 'primary' : undefined} variant={win?.kind === 'opened' ? undefined : 'outline'} size="sm" className="flex-1" data-testid="sim-open-opened"
                     onClick={() => setWin(w => (w?.kind === 'opened' ? null : { kind: 'opened', id: detail.id }))}>
                     {t('simulation.opened.open')}
                   </Button>
                   {canCollect && (
-                    <Button variant={win?.kind === 'collect' ? 'primary' : 'outline'} size="sm" className="flex-1"
+                    <Button color={win?.kind === 'collect' ? 'primary' : undefined} variant={win?.kind === 'collect' ? undefined : 'outline'} size="sm" className="flex-1"
                       onClick={() => setWin(w => (w?.kind === 'collect' ? null : { kind: 'collect', id: detail.id }))}>
                       {t('simulation.collection.openShort')}
                     </Button>

@@ -2,26 +2,30 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Button } from 'tsp-form';
-import { ChevronLeft, ChevronRight, TrendingUp, X } from 'lucide-react';
+import { TrendingUp, X } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import {
   ChartLegend, ContractsOpenedChart, OpenedMetricStrip, openedMetricCells, useDayPoints, useMonthTotals,
   type MonthlyRow,
 } from '../../components/ContractsOpenedChart';
+import { MonthPicker } from '../../components/MonthPicker';
+import { DownPctBadge } from '../../components/DownPctBadge';
 import { bangkokYearMonth, monthStart, type SimBranch } from './simulationTypes';
 
 // The opened-contracts window (156 §7b · NOTICE 2026-11-09 opened button): the same daily
 // bars and month cards as the dashboard's chart, for the picked shop, starting at the
 // current month and stepping back with ‹ ›. Floats like the collection window and follows
 // the selection. Which figures appear is the RPC's call (null for this viewer → no card);
-// ค่างวดทั้งหมด is left out (owner 11-09) so the cards sit in two rows.
+// ค่างวดทั้งหมด is left out (owner 11-09) so the cards sit in two rows. The month is the
+// app's MonthPicker (same as the dashboard), in the title row, capped at this month.
 
 export function SimulationOpened({ branch, generatedAt, onClose }: { branch: SimBranch; generatedAt: string; onClose: () => void }) {
   const { t, i18n } = useTranslation();
   const { year, month } = bangkokYearMonth(generatedAt);
-  const [back, setBack] = useState(0); // months before the current one
-  const pMonth = monthStart(year, month, -back);
+  const current = new Date(year, month - 1, 1);
+  const [picked, setPicked] = useState(current);
+  const pMonth = monthStart(picked.getFullYear(), picked.getMonth() + 1, 0);
 
   const q = useQuery({
     queryKey: ['simulation', 'opened-monthly', branch.id, pMonth],
@@ -37,10 +41,12 @@ export function SimulationOpened({ branch, generatedAt, onClose }: { branch: Sim
     // An internal branch always gets commission 0 from the RPC (not null) — no card for it.
     const list = openedMetricCells({ ...totals, installment: null }, t, { commission: branch.type !== 'INTERNAL' });
     // ดาวน์: the % of the device price over the month — Σdown × 100 ÷ (Σfinanced + Σdown), the
-    // notice's formula (never an average of the daily down_pct).
+    // notice's formula (never an average of the daily down_pct) — drawn as the same badge the
+    // down % has everywhere else (#12), beside the baht.
     const down = list.find(c => c.key === 'down');
     if (down && totals.down != null && totals.financed != null && totals.financed + totals.down > 0) {
-      down.hint = t('simulation.opened.downOfPrice', { pct: ((totals.down * 100) / (totals.financed + totals.down)).toFixed(1) });
+      const pct = Math.round((totals.down * 1000) / (totals.financed + totals.down)) / 10;
+      down.badge = <DownPctBadge value={pct} size="lg" />;
     }
     // The notice's order: … ยอดจ่าย · ค่าคอม · เงินลงทุน …
     const ci = list.findIndex(c => c.key === 'commission');
@@ -53,21 +59,16 @@ export function SimulationOpened({ branch, generatedAt, onClose }: { branch: Sim
     return list;
   }, [totals, t, branch.type]);
 
-  const locale = i18n.language === 'th' ? 'th-TH' : 'en-GB';
-  const monthLabel = new Date(`${pMonth}T00:00:00`).toLocaleDateString(locale, { month: 'long', year: 'numeric' });
   const error = q.error ? translateApiError(q.error, t) : null;
 
   return (
     <div className="sim__card sim__collect sim__opened-win" role="dialog" aria-label={`${t('simulation.opened.title')} ${branch.name}`} data-testid="sim-opened-window">
-      <div className="sim__card-head">
+      <div className="sim__card-head sim__opened-head">
         <h3>{t('simulation.opened.title')} · {branch.name}</h3>
+        <div data-testid="sim-opened-month">
+          <MonthPicker value={picked} onChange={setPicked} lang={i18n.language} max={current} />
+        </div>
         <Button variant="ghost" size="sm" className="sim__close" startIcon={<X size={14} />} aria-label={t('common.close')} onClick={onClose} />
-      </div>
-
-      <div className="flex items-center gap-1 mb-2">
-        <Button variant="ghost" size="sm" startIcon={<ChevronLeft size={14} />} aria-label={t('simulation.opened.prevMonth')} onClick={() => setBack(b => b + 1)} />
-        <span className="min-w-36 text-center font-medium tabular-nums" data-testid="sim-opened-month">{monthLabel}</span>
-        <Button variant="ghost" size="sm" startIcon={<ChevronRight size={14} />} aria-label={t('simulation.opened.nextMonth')} disabled={back === 0} onClick={() => setBack(b => Math.max(0, b - 1))} />
       </div>
 
       {error && <div className="alert alert-danger">{error}</div>}
