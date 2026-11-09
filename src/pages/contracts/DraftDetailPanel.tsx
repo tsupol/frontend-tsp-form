@@ -1,4 +1,5 @@
 import { OverflowTabs } from '../../components/OverflowTabs';
+import { DownPctBadge } from '../../components/DownPctBadge';
 import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
@@ -205,7 +206,7 @@ function DraftOverviewTab({ contract, t }: { contract: ContractDetail; t: Return
               )}
             </div>
             <InfoCell label={t('contract.agreedPrice')} value={fmtCurrency(contract.agreed_price)} />
-            <InfoCell label={t('contract.downPayment')} value={fmtCurrency(contract.down_payment)} />
+            <InfoCell label={t('contract.downPayment')} value={<span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">{fmtCurrency(contract.down_payment)}<DownPctBadge value={contract.down_pct} size="lg" /></span>} />
             <InfoCell label={t('contract.installmentAmount')} value={formatInstallment(contract, t, fmtCurrency)} />
             <InfoCell
               label={t('contract.termMonths')}

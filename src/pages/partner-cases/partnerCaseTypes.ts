@@ -56,6 +56,10 @@ export interface PartnerCase {
   /** The same two with the uplift taken off the down. Null = no uplift, no second row. */
   d_score_ex_uplift?: number | null;
   deal_d_score_ex_uplift?: number | null;
+  /** mig 1646, fund side: down as % of (device price + uplift), 1 decimal, the DB's figure.
+   *  down_pct = as submitted · deal_down_pct = in force. null → no badge. */
+  down_pct?: number | null;
+  deal_down_pct?: number | null;
 
   customer_id: number;
   customer_name: string | null;
@@ -232,6 +236,8 @@ export interface PartnerCaseDetail extends PartnerCase {
   /** D-score of the approved figures. Null = no approved figures on this case. */
   approved_d_score?: number | null;
   approved_d_score_ex_uplift?: number | null;
+  /** mig 1646: down % of the approved figures. null = the case was not adjusted. */
+  approved_down_pct?: number | null;
   /** What the shop asked to collect at signing (down + doc fee). */
   requested_due_at_signing: number | null;
   // The approved plan, frozen at approval. All null on a case without adjustments.
@@ -280,6 +286,8 @@ export interface PartnerCaseQueueRow {
   in_my_pool: boolean;
   d_score?: number | null;
   d_score_ex_uplift?: number | null;
+  /** mig 1646: down % of what the shop submitted. */
+  down_pct?: number | null;
 }
 
 /** Row of `v_ref_partner_case_statuses` / `v_partner_ref_partner_case_statuses`. */

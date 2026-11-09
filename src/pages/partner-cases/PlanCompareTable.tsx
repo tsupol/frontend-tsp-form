@@ -10,6 +10,7 @@
 import { useTranslation } from 'react-i18next';
 import { fmtCurrency } from '../../lib/format';
 import { DScoreStars } from '../../components/DScore';
+import { DownPctBadge, formatDownPct } from '../../components/DownPctBadge';
 import { adjustLabel, adjustValue } from './adjustFormat';
 import type { PartnerCaseAdjustKey } from './partnerCaseTypes';
 
@@ -22,6 +23,9 @@ export interface PlanSide {
   dScore?: number | null;
   /** The approve window's preview has no such figure, so that window has no second row. */
   dScoreExUplift?: number | null;
+  /** mig 1646: down % (submitted · approved). Null on both sides = no row. The approve
+   *  window's dry run has no such figure, so it passes none and gets no row. */
+  downPct?: number | null;
 }
 
 interface Props {
@@ -69,6 +73,13 @@ export function PlanCompareTable({ requested, approved, changes, pending }: Prop
         <span className="text-right tabular-nums text-subtle">{fmtCurrency(requested.dueAtSigning)}</span>
         <span className={`text-right text-lg font-semibold leading-tight ${newCls}`}>{fmtCurrency(approved.dueAtSigning)}</span>
       </div>
+      {(requested.downPct != null || approved.downPct != null) && (
+        <div className="grid grid-cols-subgrid col-span-3 gap-x-4 px-3 py-2 border-t border-line items-center" data-testid="compare-down-pct">
+          <span className="font-medium">{t('downPct.label')}</span>
+          <span className="text-right tabular-nums text-subtle">{formatDownPct(requested.downPct) ?? '—'}</span>
+          <span className={`text-right ${newCls}`}>{approved.downPct != null ? <DownPctBadge value={approved.downPct} size="lg" /> : '—'}</span>
+        </div>
+      )}
       {(requested.dScore != null || approved.dScore != null) && (
         <div className="grid grid-cols-subgrid col-span-3 gap-x-4 px-3 py-2 border-t border-line items-center">
           <span className="font-medium">{t('dScore.label')}</span>

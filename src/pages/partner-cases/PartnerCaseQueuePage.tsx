@@ -69,6 +69,9 @@ interface RailRow {
   /** The same two with the uplift taken off the down. Null = no second row. */
   d_score_ex_uplift?: number | null;
   deal_d_score_ex_uplift?: number | null;
+  /** mig 1646: down % — queue: as submitted · history: in force, plus the submitted one. */
+  down_pct?: number | null;
+  deal_down_pct?: number | null;
   /** Queue only. */
   age_hours?: number;
   in_my_pool?: boolean;
@@ -87,6 +90,7 @@ const fromQueue = (r: PartnerCaseQueueRow): RailRow => ({
   financed_amount: r.financed_amount,
   d_score: r.d_score,
   d_score_ex_uplift: r.d_score_ex_uplift,
+  down_pct: r.down_pct,
   is_used_asset: r.is_used_asset,
   submitted_by_name: r.submitted_by_name,
   timestamp: r.submitted_at,
@@ -107,6 +111,8 @@ const fromHistory = (r: PartnerCase): RailRow => ({
   deal_d_score: r.deal_d_score,
   d_score_ex_uplift: r.d_score_ex_uplift,
   deal_d_score_ex_uplift: r.deal_d_score_ex_uplift,
+  down_pct: r.down_pct,
+  deal_down_pct: r.deal_down_pct,
   is_used_asset: r.is_used_asset,
   submitted_by_name: r.submitted_by_name,
   timestamp: r.updated_at,
@@ -369,6 +375,8 @@ export function PartnerCaseQueuePage() {
                           dealDScore={r.deal_d_score}
                           exUplift={r.d_score_ex_uplift}
                           dealExUplift={r.deal_d_score_ex_uplift}
+                          downPct={isQueue ? r.down_pct : r.deal_down_pct}
+                          requestedDownPct={isQueue ? null : r.down_pct}
                         />
                       </button>
                     );

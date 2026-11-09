@@ -11345,5 +11345,10 @@
       "stale": "Fix older than {{days}} days"
     },
     "pickHint": "Pick a contract in the list or a pin on the map to open it in Google Maps"
+  },
+  "downPct": {
+    "label": "Down %",
+    "chip": "Down {{pct}}",
+    "requestedHint": "Submitted {{pct}}"
   }
 }

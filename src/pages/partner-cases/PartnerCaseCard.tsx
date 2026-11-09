@@ -275,6 +275,7 @@ export function PartnerCaseCard({
                       dueAtSigning: adjusted.requested_due_at_signing,
                       dScore: adjusted.d_score,
                       dScoreExUplift: adjusted.d_score_ex_uplift,
+                      downPct: adjusted.down_pct,
                     }}
                     approved={{
                       installment: adjusted.approved_installment_amount,
@@ -282,6 +283,7 @@ export function PartnerCaseCard({
                       dueAtSigning: adjusted.approved_due_at_signing,
                       dScore: adjusted.approved_d_score,
                       dScoreExUplift: adjusted.approved_d_score_ex_uplift,
+                      downPct: adjusted.approved_down_pct,
                     }}
                     changes={adjustmentRows(adjusted.adjustments)}
                   />

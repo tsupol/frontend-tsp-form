@@ -48,6 +48,7 @@ import { PartnerCaseApproveModal } from './PartnerCaseApproveModal';
 import { adjustLabel, adjustValue, adjustmentRows } from './adjustFormat';
 import { PartnerCaseReturnModal } from './PartnerCaseReturnModal';
 import { PartnerCaseCommissionSection } from './PartnerCaseCommissionSection';
+import { DownPctBadge, formatDownPct } from '../../components/DownPctBadge';
 import { DScoreStars } from '../../components/DScore';
 
 interface PartnerCaseDetailPanelProps {
@@ -525,6 +526,15 @@ export function PartnerCaseDetailPanel({
                 )}
               </div>
               <div className="flex flex-col gap-1 text-sm">
+                {/* Down % first (mig 1646): submitted, faint → approved, the badge. */}
+                {detail.approved_down_pct != null && (
+                  <div className="flex items-center gap-2" data-testid="adjusted-down-pct">
+                    <span className="text-subtle flex-1 min-w-0">{t('downPct.label')}</span>
+                    <span className="text-subtle tabular-nums">{formatDownPct(detail.down_pct) ?? '—'}</span>
+                    <span className="text-subtler">→</span>
+                    <DownPctBadge value={detail.approved_down_pct} size="lg" />
+                  </div>
+                )}
                 {detail.approved_d_score != null && (
                   <div className="flex items-center gap-2">
                     <span className="text-subtle flex-1 min-w-0">{t('dScore.label')}</span>
@@ -791,7 +801,11 @@ export function PartnerCaseDetailPanel({
             {detail.guarantee_days != null && (
               <Field label={t('partnerCase.guarantee')} value={t('partnerCase.guaranteeDays', { n: detail.guarantee_days })} />
             )}
-            <Field label={t('partnerCase.downPayment')} value={fmtCurrency(detail.deal_down_payment)} />
+            {/* The % in force beside the baht in force (deal_*), against the net price above. */}
+            <Field
+              label={t('partnerCase.downPayment')}
+              value={<span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">{fmtCurrency(detail.deal_down_payment)}<DownPctBadge value={detail.deal_down_pct} size="lg" /></span>}
+            />
             <Field
               label={t('partnerCase.financedAmount')}
               value={fmtCurrency(detail.deal_financed_amount)}

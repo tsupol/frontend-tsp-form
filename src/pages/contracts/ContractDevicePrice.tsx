@@ -17,6 +17,9 @@ export interface ContractDevicePriceFields {
   device_price_base?: number | null;
   device_uplift?: number | null;
   device_price_total?: number | null;
+  /** mig 1646, fund contracts: down ÷ device_price_total × 100, 1 decimal (the DB's figure).
+   *  null for OPERATING and drafts not priced yet → no badge. */
+  down_pct?: number | null;
 }
 
 function Cell({ label, children }: { label: string; children: ReactNode }) {

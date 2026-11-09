@@ -1,4 +1,5 @@
 import { OverflowTabs } from '../../components/OverflowTabs';
+import { DownPctBadge } from '../../components/DownPctBadge';
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
@@ -1244,7 +1245,7 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
               drift (e.g. snapshot_down_amount=0, snapshot_installment≠agreed) and
               show wrong numbers. Per BE (Ohm, 2026-07-06): installment_amount /
               value_month / down_payment are the source of truth here. */}
-          <InfoCell label={t('contract.downPayment')} value={fmtCurrency(contract.down_payment)} />
+          <InfoCell label={t('contract.downPayment')} value={<span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">{fmtCurrency(contract.down_payment)}<DownPctBadge value={contract.down_pct} size="lg" /></span>} />
           {/* A non-uniform plan (FIN1, flat interest) must never be shown as
               "X × n" — the final installment is lighter and the customer will
               be told the wrong number. mig 1179 exposes the split. */}

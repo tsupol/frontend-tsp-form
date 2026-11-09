@@ -220,6 +220,8 @@ export function PendingApprovalPage({ view }: { view: PendingApprovalView }) {
                           dealDScore={r.deal_d_score}
                           exUplift={r.d_score_ex_uplift}
                           dealExUplift={r.deal_d_score_ex_uplift}
+                          downPct={isWaiting ? r.down_pct : r.deal_down_pct}
+                          requestedDownPct={isWaiting ? null : r.down_pct}
                         />
                       </button>
                     );
