@@ -1470,5 +1470,13 @@
   "blockingReason.void_related_bills_first": "Cancel bill {{related_bills_label}} first",
   "blockingReason.void_related_bills_first_basic": "Cancel the contract's other bills first",
   "sale.state.has_open_bills": "{{open_bill_count}} open bill(s) on {{open_bill_dates_label}} — clear that day's bills first",
-  "blockingReason.open_bills_pending_basic": "The contract has open / partly paid bills — settle or waive them first"
+  "blockingReason.open_bills_pending_basic": "The contract has open / partly paid bills — settle or waive them first",
+  "notif.auth.permission_denied": "You can't set up Telegram for this company",
+  "notif.not_found.company": "Company not found",
+  "notif.not_found.tg_channel": "No bot key set yet",
+  "notif.not_found.tg_feature": "Unknown kind of work",
+  "notif.validation.tg_token_invalid": "That is not a bot key (digits:letters)",
+  "notif.validation.tg_setting_invalid": "Invalid setting ({{field}})",
+  "notif.state.tg_bot_not_verified": "Wait for the key check to pass before binding a group",
+  "notif.state.tg_not_active": "Cannot send yet — bind a group first"
 }

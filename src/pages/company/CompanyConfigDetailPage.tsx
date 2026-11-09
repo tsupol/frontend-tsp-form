@@ -14,6 +14,7 @@ import type { CompanyFeatureCode } from '../../hooks/useCompanyFeatures';
 import { translateApiError } from '../../lib/apiErrors';
 import { FundRevenueShareSection } from './FundRevenueShareSection';
 import { CompanyLostModeSection } from './CompanyLostModeSection';
+import { CompanyTelegramSection } from './CompanyTelegramSection';
 
 // Two tabs, split by how a setting is saved: 'values' are typed numbers that
 // share one Save button; 'instant' are the pickers/switches that write the
@@ -362,6 +363,8 @@ export function CompanyConfigDetail({ companyId, isMobile, isDirtyRef }: {
               <CompanyDocumentSection companyId={config.company_id} onDirtyChange={setDocDirty} />
               {/* Fund companies only (157 §1b) — renders nothing for an operating company. */}
               <CompanyLostModeSection companyId={config.company_id} onDirtyChange={setLostModeDirty} />
+              {/* Fund companies only (mig 1645) — renders nothing for an operating company. */}
+              <CompanyTelegramSection companyId={config.company_id} />
               {/* Fund companies only (mig 1431) — renders nothing for an operating company. */}
               <FundRevenueShareSection companyId={config.company_id} />
               <hr className="border-line mt-6 mb-6" />

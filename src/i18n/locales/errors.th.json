@@ -1471,5 +1471,13 @@
   "blockingReason.void_related_bills_first": "ยกเลิกบิล {{related_bills_label}} ก่อน",
   "blockingReason.void_related_bills_first_basic": "ต้องยกเลิกบิลอื่นของสัญญานี้ก่อน",
   "sale.state.has_open_bills": "มีบิลค้างชำระ {{open_bill_count}} ใบ ค้างอยู่วันที่ {{open_bill_dates_label}} — เคลียร์บิลของวันนั้นก่อน",
-  "blockingReason.open_bills_pending_basic": "สัญญามีบิลค้างชำระ/ชำระบางส่วน — รับชำระหรือยกเว้นให้เรียบร้อยก่อน"
+  "blockingReason.open_bills_pending_basic": "สัญญามีบิลค้างชำระ/ชำระบางส่วน — รับชำระหรือยกเว้นให้เรียบร้อยก่อน",
+  "notif.auth.permission_denied": "ไม่มีสิทธิ์ตั้งค่า Telegram ของบริษัทนี้",
+  "notif.not_found.company": "ไม่พบบริษัทนี้",
+  "notif.not_found.tg_channel": "ยังไม่ได้วางกุญแจ bot",
+  "notif.not_found.tg_feature": "ไม่รู้จักงานแบบนี้",
+  "notif.validation.tg_token_invalid": "ข้อความที่วางไม่ใช่กุญแจ bot (รูปแบบ ตัวเลข:ตัวอักษร)",
+  "notif.validation.tg_setting_invalid": "ค่าที่ตั้งไม่ถูกต้อง ({{field}})",
+  "notif.state.tg_bot_not_verified": "ต้องรอตรวจกุญแจผ่านก่อนจึงผูกกลุ่มได้",
+  "notif.state.tg_not_active": "ยังส่งไม่ได้ ต้องผูกกลุ่มก่อน"
 }
