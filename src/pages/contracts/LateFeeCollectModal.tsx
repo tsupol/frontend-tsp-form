@@ -1,8 +1,8 @@
 import { useState, useEffect, useLayoutEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
-import { Modal, Button, FormErrorMessage, MaskedInput, TextArea, Tooltip } from 'tsp-form';
-import { AlertCircle, ArrowRight, ExternalLink, Loader2, ReceiptText, ChevronsRight, Split, X } from 'lucide-react';
+import { Modal, Button, FormErrorMessage, MaskedInput, TextArea } from 'tsp-form';
+import { AlertCircle, ArrowRight, ExternalLink, Loader2, ReceiptText, Split, X } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { fmtCurrency } from '../../lib/format';
 import { useAuth } from '../../contexts/AuthContext';
@@ -267,8 +267,19 @@ export function LateFeeCollectModal({ open, contract, onClose, onSuccess }: {
 
                   {balance > 0 && (
                     <>
+                      {/* "ยกเว้นทั้งหมด" is a button you can see, not only the » in the
+                          field — the common case when a contract ends with a fee
+                          owed (REQUEST 2026-11-09). It sends p_amount = p_waive = balance;
+                          the reason is still required below. */}
                       <div className={FEE_ROW}>
-                        <label className="text-sm text-success-fg">{t('lateFee.waiveAmount')}</label>
+                        <span className="inline-flex items-center gap-2 min-w-0 flex-wrap">
+                          <label className="text-sm text-success-fg">{t('lateFee.waiveAmount')}</label>
+                          <Button type="button" size="xs" variant="outline" data-action="LATE_FEE_WAIVE_ALL"
+                            disabled={waive >= balance && !partialOn}
+                            onClick={() => { setWaiveAmount(String(balance)); setPartialOn(false); setPartialTouched(false); setAmount(''); }}>
+                            {t('lateFee.waiveAll')}
+                          </Button>
+                        </span>
                         <div className={FEE_INPUT}>
                           <MaskedInput
                             mask="number"
@@ -278,8 +289,6 @@ export function LateFeeCollectModal({ open, contract, onClose, onSuccess }: {
                             className="w-full"
                             placeholder="0"
                             reserveIconSlots
-                            endIcon={<Tooltip content={t('lateFee.waiveAll')}><ChevronsRight size={14} /></Tooltip>}
-                            onEndIconClick={() => setWaiveAmount(String(balance))}
                           />
                         </div>
                       </div>

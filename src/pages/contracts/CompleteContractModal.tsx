@@ -17,6 +17,7 @@ import { BillDayBlockedNotice } from '../../components/BillDayPreview';
 import { useBillDatePreview, useBillDayConfirm } from '../../hooks/useBillDay';
 import { billDayDoneRow, type BillDay } from '../../lib/billDay';
 import { ContractFeeModal } from './ContractFeeModal';
+import { LateFeeCollectModal } from './LateFeeCollectModal';
 import { useContractInvalidate } from './useContractInvalidate';
 import { blockingReasonText, translateApiError } from '../../lib/apiErrors';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
@@ -36,6 +37,9 @@ interface ContractForClosure {
   credit_balance: number | null;
   credit_balance_company: number | null;
   insurance_balance: number | null;
+  /** Late fee accrued and not billed yet — the shortcut button's figure when the
+   *  blocker itself does not carry one. */
+  late_fee_balance?: number | null;
 }
 
 export type ClosureAction =
@@ -250,6 +254,10 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
   // Stacked fee/service-bill modal opened from the wallet gate — settle an
   // outstanding late fee / service charge without leaving the close flow.
   const [feeModalOpen, setFeeModalOpen] = useState(false);
+  // The late-fee window, opened from the "ค่าปรับ (n)" shortcut when the close is
+  // blocked by an unbilled late fee (REQUEST 2026-11-09 late_fee_button_from_terminate_block).
+  const [lateFeeOpen, setLateFeeOpen] = useState(false);
+  const [lateFeeBalance, setLateFeeBalance] = useState(0);
   const [note, setNote] = useState('');
   const [pin, setPin] = useState('');
   const [terminateReason, setTerminateReason] = useState<TerminateReason>('CUSTOMER_REQUEST');
@@ -257,6 +265,7 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
   /** BE error code + params — drive the "go fix it" hint links under the alert
    *  (mig 1158 ships params.hint_code on the close blockers). */
   const [errorCode, setErrorCode] = useState<string | null>(null);
+  const [errorParams, setErrorParams] = useState<Record<string, unknown> | null>(null);
   const [errorKey, setErrorKey] = useState(0);
 
   // Early-payoff state — only meaningful when isEarlyPayoff
@@ -311,6 +320,7 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
         translateApiError(err, t);
       setError(translated || err.message);
       setErrorCode(err.code ?? null);
+      setErrorParams(err.messageParams ?? null);
     } else {
       setError(err instanceof Error ? err.message : String(err));
       setErrorCode(null);
@@ -565,25 +575,28 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
   });
 
   // The way out of a close blocker, shared by the refusal band and the notice
-  // shown before the PIN. Late fee not billed yet (hint_code USE_LATE_FEE_COLLECT,
-  // mig 1158): the fee modal is part of this flow, so it opens in place. Open
-  // bills: the contract's bill list, to settle or waive them.
-  const wayOut = (code: string | undefined): React.ReactNode => {
-    const linkClass = 'text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer self-start';
+  // shown before the PIN — a button that goes to the step, never a sentence alone
+  // (REQUEST 2026-11-09 late_fee_button_from_terminate_block).
+  // Late fee not billed yet (hint_code USE_LATE_FEE_COLLECT): "ค่าปรับ (1,250)" opens
+  // the late-fee window on top of this one; once it is billed or waived, the
+  // contract's actions refetch and the blocker goes. Open bills: the bill list.
+  const wayOut = (code: string | undefined, params?: Record<string, unknown> | null): React.ReactNode => {
     if (code === 'SALE.STATE.LATE_FEE_NOT_CLEARED') {
+      const balance = Number(params?.balance ?? contract.late_fee_balance ?? 0) || 0;
       return (
-        <button type="button" onClick={() => setFeeModalOpen(true)} className={linkClass}>
-          {t('contract.goIssueLateFeeBill', { defaultValue: 'Issue the late-fee bill (collect / waive)' })}
-          <ExternalLink size={12} />
-        </button>
+        <Button size="sm" variant="outline" className="self-start" startIcon={<Receipt size={14} />}
+          data-action="LATE_FEE_COLLECT"
+          onClick={() => { setLateFeeBalance(balance); setLateFeeOpen(true); }}>
+          {balance > 0 ? t('contract.lateFeeShortcut', { amount: fmtCurrency(balance) }) : t('contract.lateFeeShortcutNoAmount')}
+        </Button>
       );
     }
     if (code === 'SALE.STATE.BILLS_PENDING_RESOLVE_FIRST' && onNavigateTab) {
       return (
-        <button type="button" onClick={() => { onClose(); onNavigateTab('money', 'bills'); }} className={linkClass}>
+        <Button size="sm" variant="outline" className="self-start" endIcon={<ExternalLink size={12} />}
+          onClick={() => { onClose(); onNavigateTab('money', 'bills'); }}>
           {t('contract.goToOpenBills', { defaultValue: 'Go to the open bills' })}
-          <ExternalLink size={12} />
-        </button>
+        </Button>
       );
     }
     return null;
@@ -640,7 +653,7 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
               <AlertTriangle size={16} />
               <div className="flex flex-col gap-1">
                 <span>{blockingReasonText({ blocking_reason: blocker.reason, blocking_params: blocker.params }, t)}</span>
-                {wayOut(BLOCKER_TO_CODE[blocker.reason])}
+                {wayOut(BLOCKER_TO_CODE[blocker.reason], blocker.params)}
               </div>
             </div>
           )}
@@ -808,16 +821,35 @@ export function CompleteContractModal({ open, contract, action, onClose, onSucce
         <ModalErrorBand
           key={errorKey}
           message={view !== 'clear-wallet' ? error : null}
-          onDismiss={() => { setError(''); setErrorCode(null); }}
-          action={errorCode ? wayOut(errorCode) : undefined}
+          onDismiss={() => { setError(''); setErrorCode(null); setErrorParams(null); }}
+          action={errorCode ? wayOut(errorCode, errorParams) : undefined}
         />
       </div>
     </Modal>
 
     {billDayConfirm.dialog}
 
-    {/* Stacked on top of the close flow — settle a late fee / service charge,
-        then the wallet gate refetches balances on close. */}
+    {/* The late fee that blocks the close, billed or waived on top of this window. */}
+    <LateFeeCollectModal
+      open={lateFeeOpen}
+      contract={lateFeeOpen ? {
+        id: contract.id,
+        code: contract.code,
+        code_display: contract.code_display,
+        late_fee_balance: lateFeeBalance,
+        branch_id: contract.branch_id,
+      } : null}
+      onClose={() => setLateFeeOpen(false)}
+      onSuccess={() => {
+        invalidate();
+        // The refusal named a fee that is now billed — clear it so the next press
+        // asks the server again instead of showing the old message.
+        if (errorCode === 'SALE.STATE.LATE_FEE_NOT_CLEARED') { setError(''); setErrorCode(null); setErrorParams(null); }
+      }}
+    />
+
+    {/* Stacked on top of the close flow — a service charge, then the wallet gate
+        refetches balances on close. */}
     <ContractFeeModal
       open={feeModalOpen}
       contract={feeModalOpen ? {

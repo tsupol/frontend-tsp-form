@@ -2946,9 +2946,7 @@
     "readReceipt": {
       "noRecord": "No record of it being opened yet",
       "openedHint": "The customer's app opened this chat — not proof they read the message"
-    },
-    "awaitingReply": "Not replied",
-    "awaitingReplyHint": "The customer wrote last and no staff member has replied"
+    }
   },
   "collectionMonthly": {
     "title": "Billed vs Collected",
@@ -3508,7 +3506,6 @@
     "financials": "Financial Summary",
     "gate_no_cashable": "No cashable balance",
     "gate_no_clear_path": "This balance cannot be cleared here — resolve it from the Wallets tab.",
-    "goIssueLateFeeBill": "Issue the late-fee bill (collect / waive)",
     "goToDeviceTabToUnbind": "Unbind the device first",
     "goToOpenBills": "Go to the open bills",
     "goToRepairTicket": "Open repair ticket {{code}}",
@@ -3842,7 +3839,9 @@
       "TARGET_DEVICE": "Reserved device",
       "CUSTOMER": "Customer",
       "CO_LESSEE": "Co-lessee"
-    }
+    },
+    "lateFeeShortcut": "Late fee ({{amount}})",
+    "lateFeeShortcutNoAmount": "Late fee"
   },
   "contractAddon": {
     "title": "Add add-on",

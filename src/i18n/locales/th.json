@@ -2943,9 +2943,7 @@
     "readReceipt": {
       "noRecord": "ยังไม่มีบันทึกว่าเปิดอ่าน",
       "openedHint": "แอปลูกค้าเปิดห้องแชทนี้แล้ว — ไม่ได้แปลว่าลูกค้ารับรู้เนื้อหาแล้ว"
-    },
-    "awaitingReply": "ยังไม่ได้ตอบ",
-    "awaitingReplyHint": "ลูกค้าส่งข้อความล่าสุด ยังไม่มีพนักงานตอบ"
+    }
   },
   "collectionMonthly": {
     "title": "รายงานเรียกเก็บ vs เก็บได้จริง",
@@ -3505,7 +3503,6 @@
     "financials": "สรุปการเงิน",
     "gate_no_cashable": "ไม่มียอดที่ถอนได้",
     "gate_no_clear_path": "ยอดนี้เคลียร์จากตรงนี้ไม่ได้ — จัดการที่แท็บกระเป๋าเงิน",
-    "goIssueLateFeeBill": "ออกบิลค่าปรับ (เก็บ / ยกเว้น)",
     "goToDeviceTabToUnbind": "ถอดเครื่องออกจากสัญญาก่อน",
     "goToOpenBills": "ไปที่บิลค้างชำระ",
     "goToRepairTicket": "เปิดใบซ่อม {{code}}",
@@ -3838,7 +3835,9 @@
       "TARGET_DEVICE": "เครื่องที่จองไว้",
       "CUSTOMER": "ลูกค้า",
       "CO_LESSEE": "ผู้เช่าร่วม"
-    }
+    },
+    "lateFeeShortcut": "ค่าปรับ ({{amount}})",
+    "lateFeeShortcutNoAmount": "ค่าปรับ"
   },
   "contractAddon": {
     "title": "เพิ่ม Add-on",

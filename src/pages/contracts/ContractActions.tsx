@@ -792,6 +792,11 @@ function getPrimaryActionCodes(contract: ContractForActions): string[] {
   // Always offer PAY_INSTALLMENT — customer can pay any time, even before due date
   codes.push('PAY_INSTALLMENT');
 
+  // A late fee still to bill: next to paying, not two clicks deep in "เพิ่มเติม" →
+  // ค่าธรรมเนียม, where staff ending a contract could not find it (REQUEST 2026-11-09
+  // late_fee_button_from_terminate_block). Hidden until the backend offers it.
+  codes.push('LATE_FEE_COLLECT');
+
   codes.push('EARLY_PAYOFF');
 
   // Complete surfaces as a primary only when the backend says it's completable
@@ -799,13 +804,15 @@ function getPrimaryActionCodes(contract: ContractForActions): string[] {
   // shows as a perpetually-disabled button on every ACTIVE contract.
   codes.push('COMPLETE_CONTRACT');
 
-  return codes.slice(0, 5);
+  // The cap of 5 is applied after the hidden-until-available ones drop out, so a
+  // hidden code never takes a visible one's place.
+  return codes;
 }
 
 // Primaries normally show even when unavailable (disabled + tooltip). These ones
 // hide entirely until available, so they don't clutter the footer with a
 // disabled button that only makes sense in a specific end-state.
-const HIDE_UNTIL_AVAILABLE_PRIMARY: ReadonlySet<string> = new Set(['COMPLETE_CONTRACT', 'RESCHEDULE_DUE_DAY']);
+const HIDE_UNTIL_AVAILABLE_PRIMARY: ReadonlySet<string> = new Set(['COMPLETE_CONTRACT', 'RESCHEDULE_DUE_DAY', 'LATE_FEE_COLLECT']);
 
 const CATEGORY_LABEL_KEY: Record<string, string> = {
   LIFECYCLE: 'contract.actionCategory.lifecycle',
@@ -1036,7 +1043,8 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   const primaryActions = primaryCodes
     .map(c => allowedActions.find(a => a.action_code === c))
     .filter((a): a is BackendContractAction => !!a)
-    .filter(a => a.is_available || !HIDE_UNTIL_AVAILABLE_PRIMARY.has(a.action_code));
+    .filter(a => a.is_available || !HIDE_UNTIL_AVAILABLE_PRIMARY.has(a.action_code))
+    .slice(0, 5);
   // More menu shows every action — primaries are also listed here so staff have one consistent place to find any action
   const secondaryActions = allowedActions;
 
@@ -1067,7 +1075,11 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   const renderActionButton = (a: BackendContractAction, primary = false) => {
     const feAction = BACKEND_TO_FE_ACTION[a.action_code];
     const config = feAction ? ACTION_CONFIGS[feAction] : null;
-    const label = t(a.action_code, { ns: 'contractActions', defaultValue: a.action_code });
+    const baseLabel = t(a.action_code, { ns: 'contractActions', defaultValue: a.action_code });
+    // The late-fee button says how much is waiting to be billed (the contract's own figure).
+    const label = a.action_code === 'LATE_FEE_COLLECT' && (contract.late_fee_balance ?? 0) > 0
+      ? `${baseLabel} (${fmtCurrency(contract.late_fee_balance ?? 0)})`
+      : baseLabel;
     const placement = ACTION_PLACEMENT[a.action_code];
     // An action is "wired" if it has a FE handler OR is routed elsewhere (e.g. UPDATE_DELIVERY → DeliveryModal)
     const isWired = !!feAction || placement?.kind === 'elsewhere';
