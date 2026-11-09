@@ -26,7 +26,7 @@ import { Button } from 'tsp-form';
 import { Check, Copy, Landmark, QrCode } from 'lucide-react';
 import { apiClient } from '../lib/api';
 import { BankAccountLine } from './BankAccountLine';
-import { MediaLightbox } from './MediaLightbox';
+import { AccountQrModal, type AccountQr } from './AccountQrModal';
 
 /** One account the shop is told to use, per channel. */
 interface PartnerBankAccount {
@@ -72,7 +72,7 @@ interface PartnerRemitAccountsProps {
 export function PartnerRemitAccounts({ only, className }: PartnerRemitAccountsProps) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState<string | null>(null);
-  const [qrKey, setQrKey] = useState<string | null>(null);
+  const [qr, setQr] = useState<AccountQr | null>(null);
 
   const wanted = only ? [only] : SHOWN_CHANNELS;
 
@@ -158,7 +158,12 @@ export function PartnerRemitAccounts({ only, className }: PartnerRemitAccountsPr
           {(row.qr_media || row.account_no) && (
             <div className="flex flex-col items-end gap-1.5 shrink-0">
               {row.qr_media && (
-                <Button size="sm" variant="outline" startIcon={<QrCode size={14} />} onClick={() => setQrKey(row.qr_media!.paths.original)} data-testid="partner-account-qr">
+                <Button size="sm" variant="outline" startIcon={<QrCode size={14} />} onClick={() => setQr({
+                    title: t('partnerAccounts.qrTitle', { channel: row.channel_name ?? t(`partnerAccounts.channel_${row.channel}`, { defaultValue: row.channel }) }),
+                    hint: t(`partnerAccounts.qrHint_${row.channel}`, { defaultValue: '' }) || undefined,
+                    account: { bank_code: row.bank_code, bank_name: row.bank_name || row.bank_code, account_name: row.account_name, account_number: row.account_no, account_number_display: row.account_no ?? row.promptpay_id ?? undefined },
+                    qrKey: row.qr_media!.paths.original,
+                  })} data-testid="partner-account-qr">
                   {t('partnerAccounts.showQr')}
                 </Button>
               )}
@@ -223,7 +228,7 @@ export function PartnerRemitAccounts({ only, className }: PartnerRemitAccountsPr
           )}
         </div>
       )}
-      <MediaLightbox open={!!qrKey} onClose={() => setQrKey(null)} mediaKey={qrKey} alt={t('partnerAccounts.showQr')} />
+      <AccountQrModal qr={qr} onClose={() => setQr(null)} />
     </div>
   );
 }

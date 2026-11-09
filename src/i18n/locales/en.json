@@ -6694,7 +6694,10 @@
     "installmentHint": "Tell customers to pay their instalments into this account",
     "channel_PAYOUT": "From the fund",
     "payoutHint": "The fund transfers device money and commission into this account · set by the fund",
-    "showQr": "Show QR"
+    "showQr": "Show QR",
+    "qrTitle": "{{channel}} QR",
+    "qrHint_INSTALLMENT": "Have the customer scan this QR to pay the installment",
+    "qrHint_PARTNER_REMIT": "Scan this QR to pay the fund back"
   },
   "partnerBalance": {
     "title": "Outstanding per shop",

@@ -6685,7 +6685,10 @@
     "installmentHint": "บอกลูกค้าให้โอนค่างวดเข้าบัญชีนี้",
     "channel_PAYOUT": "บัญชีรับเงินจากกองทุน",
     "payoutHint": "กองทุนโอนค่าเครื่องและค่าคอมเข้าบัญชีนี้ · กองทุนเป็นผู้ตั้ง",
-    "showQr": "แสดง QR"
+    "showQr": "แสดง QR",
+    "qrTitle": "QR {{channel}}",
+    "qrHint_INSTALLMENT": "ให้ลูกค้าสแกน QR นี้เพื่อโอนค่างวด",
+    "qrHint_PARTNER_REMIT": "สแกน QR นี้เพื่อโอนคืนกองทุน"
   },
   "partnerBalance": {
     "title": "ยอดค้างต่อร้าน",

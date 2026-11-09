@@ -42,7 +42,7 @@ import {
 } from '../components/ContractsOpenedChart';
 import { PushSubscribeBanner } from '../components/PushSubscribeBanner';
 import { SimulationLink } from './simulation/SimulationLink';
-import { MediaLightbox } from '../components/MediaLightbox';
+import { AccountQrModal, type AccountQr } from '../components/AccountQrModal';
 import { useBranchPaymentAccounts, type BranchPaymentAccount } from '../components/BranchPaymentAccountField';
 import { BankAccountLine } from '../components/BankAccountLine';
 import {
@@ -866,7 +866,7 @@ function ReceivingAccount({
   noAccount: boolean;
   t: (k: string, opts?: Record<string, unknown>) => string;
 }) {
-  const [qrKey, setQrKey] = useState<string | null>(null);
+  const [qr, setQr] = useState<AccountQr | null>(null);
 
   if (!show) return null;
 
@@ -901,26 +901,27 @@ function ReceivingAccount({
                   />
                   {/* line 5 — show QR button (only when a QR image exists) */}
                   {account.qr_media && (
-                    <button
-                      type="button"
-                      onClick={() => setQrKey(account.qr_media!.paths.original)}
-                      className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-line bg-transparent px-2 py-1 text-xs text-fg cursor-pointer hover:bg-surface-hover transition-colors"
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="mt-2"
+                      startIcon={<QrCode size={14} />}
+                      onClick={() => setQr({
+                        title: t('partnerAccounts.qrTitle', { channel: t(`bankChannel.channel_${account.channel}`, { defaultValue: account.channel }) }),
+                        hint: t(`partnerAccounts.qrHint_${account.channel}`, { defaultValue: '' }) || undefined,
+                        account: { ...account, account_number_display: account.account_number_display ?? account.account_number ?? account.promptpay_id },
+                        qrKey: account.qr_media!.paths.original,
+                      })}
                     >
-                      <QrCode size={14} />
-                      <span>{t('dashboard.showQr')}</span>
-                    </button>
+                      {t('dashboard.showQr')}
+                    </Button>
                   )}
                 </div>
               );
             })}
           </div>
         </div>
-        <MediaLightbox
-          open={!!qrKey}
-          onClose={() => setQrKey(null)}
-          mediaKey={qrKey}
-          alt={t('dashboard.receivingAccount')}
-        />
+        <AccountQrModal qr={qr} onClose={() => setQr(null)} />
       </>
     );
   }
