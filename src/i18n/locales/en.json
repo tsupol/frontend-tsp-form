@@ -7558,7 +7558,7 @@
   "permissionGrants": {
     "title": "Permission grants",
     "navTitle": "Permission grants",
-    "description": "A holding admin hands the pricing work behind the FIN1/FIN2 calculations on holding's own items to individual people. An edit takes effect across the whole holding, not just the recipient's company — grant it to company-level users (company admin / company inventory).",
+    "description": "A holding admin gives individual people permissions on top of their role. This page shows who has what and lets you take one back; to give one, go to Users → ⋯ on that person's row → Permission grants.",
     "manageFor": "Permission grants",
     "granted": "Granted",
     "revoked": "Revoked",
@@ -7581,7 +7581,7 @@
     "reloginHint": "The user sees the change after their next page load or login.",
     "onlyHoldingAdmin": "Only a holding admin can grant permissions.",
     "companyScope": "{{company}}",
-    "holdingWideHint": "Granted pricing work covers holding's own items, and an edit takes effect across the whole holding."
+    "holdingWideHint": "Turning a switch on gives this person that permission right away, on top of their role. Some, like FIN1/FIN2 pricing work, apply across the whole holding, not just their company."
   },
   "po": {
     "contractable": "Contractable",
