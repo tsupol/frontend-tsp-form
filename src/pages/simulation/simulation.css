@@ -157,6 +157,9 @@ button.sim__tabs-toggle:hover, .sim__company-min:hover .sim__tabs-toggle { color
 
 .sim__collect { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 600px; max-width: calc(100% - 24px); max-height: calc(100% - 24px); overflow: auto; padding: 14px 16px; font-size: 13px; z-index: 3; box-shadow: 0 8px 28px rgba(20, 40, 50, .28); }
 .sim__collect h3 { font-size: 15px; }
+/* Wider than the collection window: 4 month cards a row, so the 8 a fund sees fit in 2 (§7b). */
+.sim__opened-win { width: 720px; }
+.sim__opened-chart { overflow-x: auto; } /* a narrow window scrolls the chart sideways, never squashes it */
 .sim__collect h3 small { font-size: 12px; }
 .sim__legend-row { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--color-subtle); }
 .sim__legend-row i, .sim__tip i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; }

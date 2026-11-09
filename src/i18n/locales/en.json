@@ -11173,9 +11173,18 @@
       "month": "Month",
       "futureCount": "{{due}} installments · {{paid}} paid",
       "paidCount": "Fully paid {{paid}}/{{due}} installments",
-      "note": "* This month isn't over, so Billed includes installments not yet due · ↗ A month ahead = installments of running contracts that will fall due; Collected there means paid in advance · On time = paid by the due date plus the company's grace days"
+      "note": "* This month isn't over, so Billed includes installments not yet due · ↗ A month ahead = installments of running contracts that will fall due; Collected there means paid in advance · On time = paid by the due date plus the company's grace days",
+      "openShort": "Collection"
     },
-    "waitedFor": "waiting {{age}}"
+    "waitedFor": "waiting {{age}}",
+    "opened": {
+      "open": "Contracts opened",
+      "title": "Contracts opened",
+      "empty": "No contracts opened this month yet",
+      "downOfPrice": "{{pct}}% of device price",
+      "prevMonth": "Previous month",
+      "nextMonth": "Next month"
+    }
   },
   "deviceLocation": {
     "button": "View location",

@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+  Bar, BarChart, CartesianGrid, Cell, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import { TrendingUp } from 'lucide-react';
 import { fmtCurrency } from '../lib/format';
@@ -241,10 +241,20 @@ export function useMonthTotals(points: DayPoint[]): OpenedMoney {
  *  per-branch table; without it the hover keeps the single-day summary.
  *  `showCommission` adds the day's commission to that summary (a shop's own
  *  dashboard — never on an internal branch, where it is always 0). */
-export function ContractsOpenedChart({ points, branchRowsByDay, showCommission }: {
+/** Contract count over a bar; '' on a day with none. Module-level so the label props
+ *  never change between renders. */
+const countLabel = (v: unknown) => (Number(v) > 0 ? String(v) : '');
+const COUNT_LABEL_STYLE = { fontSize: 11, fontWeight: 600, fill: 'var(--color-fg)' };
+
+/** Memoised: a parent that re-renders every second (the simulation's clock) must not
+ *  redraw the bars — recharts replays the bar animation and hides the count labels
+ *  until it ends, so they blinked once a second. */
+export const ContractsOpenedChart = memo(function ContractsOpenedChart({ points, branchRowsByDay, showCommission, countLabels }: {
   points: DayPoint[];
   branchRowsByDay?: Map<string, MonthlyRow[]>;
   showCommission?: boolean;
+  /** The day's contract count over each bar (the simulation's window, 156 §7b). Off on the dashboards. */
+  countLabels?: boolean;
 }) {
   // Touch screens: the card opens on a tap (click trigger) instead of hover —
   // the browser's made-up mouse events after a tap are not reliable — and a
@@ -264,7 +274,7 @@ export function ContractsOpenedChart({ points, branchRowsByDay, showCommission }
   return (
     <div ref={wrapRef} className="w-full h-full">
     <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={points} margin={{ top: 8, right: 8, bottom: 4, left: 8 }} barCategoryGap="12%">
+      <BarChart data={points} margin={{ top: countLabels ? 18 : 8, right: 8, bottom: 4, left: 8 }} barCategoryGap="12%">
         <CartesianGrid vertical={false} stroke="var(--color-line)" strokeDasharray="3 3" />
         <XAxis
           dataKey="dayNum"
@@ -303,12 +313,21 @@ export function ContractsOpenedChart({ points, branchRowsByDay, showCommission }
             // Flat top when a bar is down-only, so single-segment bars still round nicely.
             <Cell key={i} fill={(p.financed ?? 0) > 0 ? COLOR_FINANCED : COLOR_DOWN} />
           ))}
+          {countLabels && (
+            <LabelList
+              dataKey="contracts"
+              position="top"
+              // In style, not the fill attribute: an SVG attribute doesn't resolve var(--…).
+              style={COUNT_LABEL_STYLE}
+              formatter={countLabel}
+            />
+          )}
         </Bar>
       </BarChart>
     </ResponsiveContainer>
     </div>
   );
-}
+});
 
 /** Legend for the two bar segments. `hideDown` when the down figure is
  *  `null` for this caller — the bars are then one colour. */
