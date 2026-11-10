@@ -43,6 +43,7 @@ import { BankAccountLine } from '../../components/BankAccountLine';
 import { accountNumberText } from '../../lib/bankAccount';
 import { useRefBanks } from '../../components/DealPartnerPayoutAccountField';
 import { PartnerPayoutAccountsTab } from './PartnerPayoutAccountsTab';
+import { QrCropModal } from '../../components/QrCropModal';
 
 type AccountLevel = 'branch' | 'company';
 
@@ -289,6 +290,7 @@ function AccountModal({ open, onClose, account, level, branches, companies, canM
     }
     setErrorMessage('');
     setQrBusy(false);
+    setQrSaved(null);
     setConfirmRemoveQr(false);
     setView('form');
     setSaved(null);
@@ -336,6 +338,11 @@ function AccountModal({ open, onClose, account, level, branches, companies, canM
   const [qrBusy, setQrBusy] = useState(false);
   const [confirmRemoveQr, setConfirmRemoveQr] = useState(false);
   const [qrLightbox, setQrLightbox] = useState(false);
+  // The picked file waits here while the shop frames the code (QrCropModal); only the square uploads.
+  const [qrCropSource, setQrCropSource] = useState<File | null>(null);
+  // The QR saves on its own (upload / remove act at once), apart from the form's Save — which
+  // stays disabled when nothing else changed. This line says so under the QR (owner 11-10).
+  const [qrSaved, setQrSaved] = useState<'saved' | 'removed' | null>(null);
   const qrKey = account?.qr_media?.paths.original ?? null;
   const qrUrl = qrKey ? publicMediaUrl(qrKey) : null;
 
@@ -351,14 +358,21 @@ function AccountModal({ open, onClose, account, level, branches, companies, canM
     return t('common.error');
   };
 
-  const handleQrPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleQrPick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = ''; // allow re-picking the same file
     if (!file || !account) return;
+    setQrCropSource(file);
+  };
+
+  const handleQrCropped = async (file: File) => {
+    setQrCropSource(null);
+    if (!account) return;
     setQrBusy(true);
+    setQrSaved(null);
     setErrorMessage('');
     try {
-      // Step 1 — upload the original bytes to be-media (no resize; PNG allowed).
+      // Step 1 — upload the cropped square (PNG) to be-media, no further resize.
       const uploaded = await uploadBankAccountQr(account.id, file);
       // Step 2 — bind the key to the account. Skipping this orphans the file.
       const res = await apiClient.rpc<{ media_id: number; replaced_media_id: number | null }>(
@@ -384,6 +398,7 @@ function AccountModal({ open, onClose, account, level, branches, companies, canM
         ),
         type: 'success',
       });
+      setQrSaved('saved');
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
     } catch (err) {
       setErrorMessage(translateErr(err));
@@ -398,7 +413,9 @@ function AccountModal({ open, onClose, account, level, branches, companies, canM
     setQrBusy(true);
     setErrorMessage('');
     try {
+      setQrSaved(null);
       await apiClient.rpc('fn_bank_account_qr_remove', { p_account_id: account.id });
+      setQrSaved('removed');
       addSnackbar({
         message: <div className="alert alert-success"><CheckCircle size={16} /><span className="alert-description">{t('settings.bankAccounts.qr.removed')}</span></div>,
         type: 'success',
@@ -739,6 +756,12 @@ function AccountModal({ open, onClose, account, level, branches, companies, canM
                             </Button>
                           )}
                         </div>
+                        {qrSaved && (
+                          <p className="text-xs mt-1.5 text-success-fg flex items-start gap-1" data-testid="qr-saved-note">
+                            <CheckCircle size={12} className="shrink-0 mt-0.5" />
+                            <span>{t(qrSaved === 'saved' ? 'settings.bankAccounts.qr.savedNote' : 'settings.bankAccounts.qr.removedNote')}</span>
+                          </p>
+                        )}
                         <p className={`text-xs mt-1.5 ${account?.requires_qr_image && !qrUrl ? 'text-warning-fg' : 'text-subtle'}`}>
                           {account?.requires_qr_image && !qrUrl ? t('bankAccountForm.qrMissingHint') : t('settings.bankAccounts.qr.hint')}
                         </p>
@@ -804,6 +827,8 @@ function AccountModal({ open, onClose, account, level, branches, companies, canM
         mediaKey={qrKey}
         alt={t('settings.bankAccounts.qr.label')}
       />
+
+      <QrCropModal source={qrCropSource} onConfirm={handleQrCropped} onCancel={() => setQrCropSource(null)} />
     </Modal>
 
     <Modal open={confirmClose} onClose={() => setConfirmClose(false)} maxWidth="24rem" width="100%" ariaLabel={t('common.unsavedChanges')}>
