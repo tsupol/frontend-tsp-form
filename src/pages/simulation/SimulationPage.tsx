@@ -237,17 +237,44 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
   const customers = useCustomers(data);
   const chatters = useChatters(data);
 
+  // Pointing at something shows a tooltip that fades after 4 s. Tapping a person pins it as a
+  // popover with a way out (open the chat / the contract) that stays until a tap elsewhere or
+  // Esc — a hover-only popover vanishes on the way to its button, and an iPad has no hover.
   const [focusKey, setFocusKey] = useState<string | null>(null);
+  const [focusPinned, setFocusPinned] = useState(false);
   const focusTimer = useRef(0);
   useEffect(() => () => window.clearTimeout(focusTimer.current), []);
   const focus: Focus = {
     key: focusKey,
+    pinned: focusPinned,
     set: key => {
+      if (focusPinned) return;
       window.clearTimeout(focusTimer.current);
       setFocusKey(key);
       focusTimer.current = window.setTimeout(() => setFocusKey(null), 4000);
     },
+    pin: key => {
+      window.clearTimeout(focusTimer.current);
+      setFocusKey(key);
+      setFocusPinned(true);
+    },
+    clear: () => {
+      window.clearTimeout(focusTimer.current);
+      setFocusKey(null);
+      setFocusPinned(false);
+    },
   };
+  useEffect(() => {
+    if (!focusPinned) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      window.clearTimeout(focusTimer.current);
+      setFocusKey(null);
+      setFocusPinned(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [focusPinned]);
 
   const branches = useMemo(() => data?.branches ?? [], [data]);
   const companies = data?.companies ?? [];

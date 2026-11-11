@@ -11229,7 +11229,9 @@
     "noteHeld": "with {{name}}",
     "noteUnread_one": "{{n}} message awaiting reply",
     "noteUnread_other": "{{n}} messages awaiting reply",
-    "noteWait": "waiting {{age}}"
+    "noteWait": "waiting {{age}}",
+    "openChat": "Open chat",
+    "openContract": "View contract"
   },
   "deviceLocation": {
     "button": "View location",

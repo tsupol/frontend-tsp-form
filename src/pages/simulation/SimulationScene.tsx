@@ -1,5 +1,9 @@
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, type CSSProperties, type MouseEvent as RMouseEvent, type PointerEvent as RPointerEvent } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as RMouseEvent, type PointerEvent as RPointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
+import { Button } from 'tsp-form';
+import { FileText, MessageCircle } from 'lucide-react';
+import { useChatDock } from '../../contexts/ChatDockContext';
 import { PILE_ICON } from './simulationIcons';
 import { CHAT_COLOR, CHAT_LABEL, HQ_BACK_H, HQ_COLOR, HQ_RW, RW, ShopWorld, planOf, project, zoneLabels, type Hit, type HqMark, type MoreMark, type PilePlace, type ShopRef, type StalePile } from './simulationWorld';
 import type { Chatter, Customer } from './useCustomers';
@@ -17,10 +21,16 @@ const clampK = (k: number) => Math.max(0.25, Math.min(3.2, k));
 const ICON_K = 1.5;
 const DETAIL_K = 2;
 
-// Tap or point at a customer or pile = a short-lived label, because an iPad has no hover.
+// Point at a customer or pile = a short-lived tooltip. Tap a person = a pinned popover with a
+// button (open the chat / the contract), kept until a tap elsewhere or Esc.
 export interface Focus {
   key: string | null;
+  /** The note is a popover the user opened by tapping — it stays and takes clicks. */
+  pinned: boolean;
+  /** Tooltip (fades); ignored while a popover is pinned. */
   set: (key: string) => void;
+  pin: (key: string) => void;
+  clear: () => void;
 }
 
 export interface SceneHandle {
@@ -53,6 +63,7 @@ const hitKey = (h: Hit) => (h?.kind === 'customer' ? `a${h.id}` : h?.kind === 'p
 
 export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function SimulationScene({ branches, customers: all, chatters, showChat, showProfit, picked, focus, onPick, hq, companyName, pickedHq, onPickHq }, ref) {
   const { t } = useTranslation();
+  const { openChat } = useChatDock();
   // People are today's contracts; earlier days' are folders at their step (see world).
   const customers = useMemo(() => all.filter(c => !c.stale), [all]);
   const stale = useMemo(() => all.filter(c => c.stale).map(c => ({ branchId: c.branchId, station: c.station, age: c.age })), [all]);
@@ -86,6 +97,14 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
   const gesture = useRef<{ pinch: boolean; x: number; y: number; d: number; vx: number; vy: number; k: number } | null>(null);
   const moved = useRef(false);
   const hovered = useRef<string | null>(null);
+  // The note's own height, so a note over someone near the top edge is pushed down into view
+  // instead of opening above the screen (a popover's button must always be reachable).
+  const noteEl = useRef<HTMLSpanElement>(null);
+  const [noteH, setNoteH] = useState(0);
+  useLayoutEffect(() => {
+    const h = noteEl.current?.offsetHeight ?? 0;
+    if (h !== noteH) setNoteH(h);
+  });
   // Envelopes / bank notes (§3). The page keys this scene by company, so a company switch —
   // and coming back from another company — starts with no previous answer: nothing flies.
   const flightHost = useRef<HTMLDivElement>(null);
@@ -307,6 +326,9 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
     const p = local(e);
     const h = world.current.hit(p.x, p.y);
     const key = hitKey(h);
+    // A person (waiting in a shop, or for a chat reply) pins a popover with a way to act.
+    if (key?.startsWith('a')) { focus.pin(key); return; }
+    if (focus.pinned) focus.clear();
     if (key) focus.set(key);
     else if (h?.kind === 'room') onPick(h.id);
     else if (h?.kind === 'hq') onPickHq(h.index);
@@ -323,7 +345,7 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
   // What the tapped or pointed-at thing says, placed just above it. A person's note has two
   // lines (owner 11-11): a header in their colour — status, then the contract code — and the
   // details below in the normal text colour; colouring the whole note made it hard to read.
-  let note: { head?: string; code?: string; text: string; color: string; at: { left: number; top: number } } | null = null;
+  let note: { head?: string; code?: string; text: string; color: string; at: { left: number; top: number }; open?: { kind: 'chat' | 'contract'; id: number } } | null = null;
   if (focus.key?.startsWith('a-')) {
     // Someone in the chat corner (hits carry the contract id negated).
     const c = chatters.find(x => `a-${x.id}` === focus.key);
@@ -332,6 +354,7 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
       head: situationText(t, c.situation || null, c.overdueDays), code: c.code,
       text: [c.collector ? t('simulation.noteHeld', { name: c.collector }) : '', t('simulation.noteUnread', { n: c.unread, count: c.unread }), t('simulation.noteWait', { age: ageText(t, c.age) })].filter(Boolean).join(' · '),
       color: situationColor(c.situation), at: place(at[0], at[1] + 0.35, at[2]),
+      open: { kind: 'chat', id: c.id },
     };
   } else if (focus.key?.startsWith('a')) {
     const c = customers.find(x => `a${x.id}` === focus.key);
@@ -341,6 +364,7 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
       head: stateLabel(t, c.state), code: codeOf(c.code, c.months),
       text: [ageText(t, c.age), c.product, c.asset].filter(Boolean).join(' · '),
       color: stateColor(c.state), at: place(at[0], at[1] + 0.12, at[2]),
+      open: { kind: 'contract', id: c.id },
     };
   } else if (focus.key?.startsWith('s')) {
     // An empty chair: which zone it is, and how many wait in that zone now.
@@ -502,9 +526,12 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
         const half = Math.min(160, size.w * 0.43);
         const left = Math.min(Math.max(note.at.left, half + 4), size.w - half - 4);
         // --note feeds the border, the dot and the header colour (adjusted per theme in CSS).
-        const style = { ...note.at, left, borderColor: note.color, '--note': note.color } as CSSProperties;
+        const top = Math.max(note.at.top, noteH + 4);
+        const style = { ...note.at, left, top, borderColor: note.color, '--note': note.color } as CSSProperties;
+        const pinned = focus.pinned && !!note.open;
         return (
-          <span className="sim__chip sim__chip--on" style={style} data-testid="sim-note">
+          <span className={`sim__chip sim__chip--on${pinned ? ' sim__chip--pinned' : ''}`} ref={noteEl} style={style} data-testid="sim-note"
+            data-pinned={pinned || undefined} onPointerDown={pinned ? e => e.stopPropagation() : undefined}>
             {note.head ? (
               <>
                 <span className="sim__note-head"><i className="sim__note-dot" /><b>{note.head}</b>{note.code && <span className="sim__note-code"> · {note.code}</span>}</span>
@@ -512,6 +539,24 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
               </>
             ) : (
               <><i className="sim__note-dot" />{note.text}</>
+            )}
+            {/* Popover only (tapped): the way to act on this person. The chat opens in the floating
+                chat window so the picture stays where it was; the contract is a real link, so
+                ctrl/middle-click opens it in a new tab. */}
+            {pinned && note.open && (
+              <span className="sim__note-actions">
+                {note.open.kind === 'chat' ? (
+                  <Button size="xs" variant="outline" startIcon={<MessageCircle />} onClick={() => { openChat(note.open!.id); focus.clear(); }}
+                    data-testid="sim-note-open-chat">
+                    {t('simulation.openChat')}
+                  </Button>
+                ) : (
+                  <Link to={`/admin/contracts/search/${note.open.id}`} className="btn btn-outline-default btn-xs inline-flex items-center gap-1 no-underline"
+                    data-testid="sim-note-open-contract">
+                    <FileText size={12} />{t('simulation.openContract')}
+                  </Link>
+                )}
+              </span>
             )}
           </span>
         );

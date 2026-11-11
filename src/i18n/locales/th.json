@@ -11193,7 +11193,9 @@
     "chatHeld": " · อยู่กับ {{name}}",
     "noteHeld": "อยู่กับ {{name}}",
     "noteUnread": "ข้อความรอตอบ {{n}}",
-    "noteWait": "รอ {{age}}"
+    "noteWait": "รอ {{age}}",
+    "openChat": "เปิดแชท",
+    "openContract": "ดูสัญญา"
   },
   "deviceLocation": {
     "button": "ดูตำแหน่ง",

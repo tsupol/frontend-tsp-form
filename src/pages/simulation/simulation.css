@@ -264,6 +264,9 @@ div.sim__panel-toggle:hover, div.sim__legend-toggle:hover { color: var(--color-s
 [data-theme="light"] .sim__note-head b { color: color-mix(in srgb, var(--note) 82%, #000); }
 .sim__note-code { font-weight: 500; color: var(--color-subtle); }
 .sim__note-body { display: block; font-weight: 500; }
+/* Tapped = popover: takes clicks (tooltips don't) and ends with its button. */
+.sim__chip--pinned { pointer-events: auto; z-index: 3; }
+.sim__note-actions { display: flex; justify-content: flex-end; margin: 6px 0 3px; }
 /* Chat waiting (§6g): the seated customers' teal, a chip after the people count. */
 .sim__chat-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; background: #1fa3ad; }
 /* Chat corner: its floor sign, the unread bubble on each head, the chip on the shop tag. */
