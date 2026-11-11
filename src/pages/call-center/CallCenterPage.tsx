@@ -20,8 +20,9 @@ import { RowTransferModal } from './DunningActions';
 import { ContractDunningDetail } from './ContractDunningDetail';
 import { TransferView, TransferOfferDetail } from './TransferView';
 import { SearchInput } from '../../components/SearchInput';
+import { DunningQueueView } from './queue/DunningQueueView';
 
-type View = 'focus' | 'book' | 'transfer';
+type View = 'focus' | 'book' | 'transfer' | 'queue';
 type SortKey =
   | 'work_priority.desc'
   | 'overdue_days.desc'
@@ -34,7 +35,16 @@ export function CallCenterPage() {
   const { addSnackbar } = useSnackbarContext();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [view, setView] = useState<View>('focus');
+  // ?view=queue opens the queue view (แถวทวง) directly; other views stay in state.
+  const [view, setViewState] = useState<View>(() => (searchParams.get('view') === 'queue' ? 'queue' : 'focus'));
+  const setView = (v: View) => {
+    setViewState(v);
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      if (v === 'queue') next.set('view', 'queue'); else next.delete('view');
+      return next;
+    }, { replace: true });
+  };
   // Transfer sub-state lifted here so its box-tab strip can render in the
   // full-width toolbar (spanning both list + detail panels), like the view tabs.
   const [transferBox, setTransferBox] = useState<'inbox' | 'outbox'>('inbox');
@@ -220,7 +230,7 @@ export function CallCenterPage() {
   const selectedRow = selectedId ? rows.find(r => r.contract_id === selectedId) : null;
 
   return (
-    <PageNav panels={['list', 'detail']} defaultPanel={(selectedId || selectedOffer) ? 'detail' : undefined} className="h-dvh">
+    <PageNav panels={['list', 'detail']} defaultPanel={(selectedId || selectedOffer) ? 'detail' : undefined} className="h-dvh overflow-hidden">
       {({ isMobile, isRoot, goTo, goBack }) => (
         <>
           {isMobile ? (
@@ -247,7 +257,7 @@ export function CallCenterPage() {
                 </div>
               )}
             </MobileHeader>
-          ) : (
+          ) : view === 'queue' ? null /* the queue needs the height; the tab row says where we are */ : (
             <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-4">
               <h1 className="heading-2 shrink-0">{t('callCenter.title')}</h1>
             </div>
@@ -289,6 +299,17 @@ export function CallCenterPage() {
                     {tradeInboxCount > 0 && <Badge size="xs" color="warning">{tradeInboxCount}</Badge>}
                   </span>
                 </button>
+                {/* แถวทวง — computer + iPad only (owner 11-11: no phone layout). */}
+                {!isMobile && (
+                  <button
+                    className={`py-2 px-3 text-sm font-medium transition-colors cursor-pointer border-b-2 whitespace-nowrap bg-transparent ${
+                      view === 'queue' ? 'border-primary-fg text-primary-fg' : 'border-transparent text-fg'
+                    }`}
+                    onClick={() => { setView('queue'); setPageIndex(0); }}
+                  >
+                    {t('dunningQueue.tab')}
+                  </button>
+                )}
               </div>
               {/* Transfer box sub-tabs (กล่องเข้า/ที่ส่งไป) + offer button —
                   full width so it spans both the list and detail panels. */}
@@ -327,7 +348,7 @@ export function CallCenterPage() {
               )}
               {/* Search + sort + red filter — book/focus only; Transfer has its
                   own sub-tab strip and no sort. */}
-              {view !== 'transfer' && (
+              {view !== 'transfer' && view !== 'queue' && (
               <div className="px-4 py-2 flex flex-col gap-2 border-b border-line">
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="flex-[2] min-w-0 basis-40">
@@ -405,6 +426,9 @@ export function CallCenterPage() {
             </div>
           )}
 
+          {view === 'queue' ? (
+            <DunningQueueView isMobile={isMobile} />
+          ) : (
           <div className={isMobile ? 'pagenav-panels' : 'flex flex-1 min-h-0'}>
             <PageNavPanel id="list" className={isMobile ? 'flex flex-col overflow-hidden' : 'w-1/2 xl:w-5/12 border-r border-line flex flex-col'}>
               {view === 'transfer' ? (
@@ -589,6 +613,7 @@ export function CallCenterPage() {
               )}
             </PageNavPanel>
           </div>
+          )}
 
           <RowTransferModal
             open={!!transferRow}

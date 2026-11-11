@@ -224,7 +224,7 @@ function LogActivity({ row }: { row: BookRow }) {
   );
 }
 
-function OverviewTab({ row }: { row: BookRow }) {
+function OverviewTab({ row, hideLog }: { row: BookRow; hideLog?: boolean }) {
   const { t } = useTranslation();
   const { data: flagLevels } = useFlagLevels();
   const queryClient = useQueryClient();
@@ -411,7 +411,7 @@ function OverviewTab({ row }: { row: BookRow }) {
         </div>
       )}
 
-      <LogActivity row={row} />
+      {!hideLog && <LogActivity row={row} />}
 
       <FlagChangeModal
         open={flagOpen}
@@ -620,12 +620,16 @@ function HistoryTab({ contractId }: { contractId: number }) {
 // ── Container ────────────────────────────────────────────────────────────────
 
 export function ContractDunningDetail({
-  contractId, isMobile, initialTab, onTabChange,
+  contractId, isMobile, initialTab, onTabChange, embedded,
 }: {
   contractId: number;
   isMobile: boolean;
   initialTab?: DetailTab;
   onTabChange?: (t: DetailTab) => void;
+  /** Inside the dunning queue's work panel: that panel already has the header
+   *  (chat, focus) and the result form, so they are left out here and the body
+   *  grows with its content instead of scrolling on its own. */
+  embedded?: boolean;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -672,6 +676,12 @@ export function ContractDunningDetail({
   const switchTab = (tab: DetailTab) => { setActiveTab(tab); onTabChange?.(tab); };
 
   if (isLoading) return <div className="p-4 text-subtle">{t('common.loading')}</div>;
+  // v_my_book holds only the viewer's own book, so a supervisor opening another
+  // collector's customer from the queue gets no row: the queue panel above still
+  // works for them (its RPCs check permission themselves).
+  if (embedded && !isError && !row) {
+    return <div className="px-4 py-3 text-xs text-subtler">{t('dunningQueue.detailOwnerOnly')}</div>;
+  }
   if (isError || !row) {
     return (
       <div className="p-4">
@@ -681,8 +691,8 @@ export function ContractDunningDetail({
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {!isMobile && (
+    <div className={embedded ? 'flex flex-col' : 'flex flex-col h-full'}>
+      {!isMobile && !embedded && (
         <div className="flex-none flex items-center gap-2 h-panel-header-h px-4 border-b border-line">
           <span className="font-semibold truncate">{row.contract_code_display}</span>
           <span className="text-sm text-subtle truncate">{row.customer_name}</span>
@@ -720,8 +730,8 @@ export function ContractDunningDetail({
         }}
       />
 
-      <div className="flex-1 min-h-0 overflow-y-auto better-scroll">
-        {isMobile && (
+      <div className={embedded ? '' : 'flex-1 min-h-0 overflow-y-auto better-scroll'}>
+        {isMobile && !embedded && (
           <div className="px-4 pt-3 flex items-center gap-2">
             <Button
               variant="outline"
@@ -742,7 +752,7 @@ export function ContractDunningDetail({
             </Button>
           </div>
         )}
-        {activeTab === 'overview' && <OverviewTab row={row} />}
+        {activeTab === 'overview' && <OverviewTab row={row} hideLog={embedded} />}
         {activeTab === 'installments' && <InstallmentsTab contractId={contractId} />}
         {activeTab === 'contacts' && <ContactsTab contractId={contractId} />}
         {activeTab === 'history' && <HistoryTab contractId={contractId} />}
