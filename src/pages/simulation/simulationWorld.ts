@@ -43,7 +43,6 @@ const STAND_H = 0.85;
 const DOOR: [number, number] = [6.6, 9.4];
 const CAR_LEN = 2.9;
 const CAR_CAPACITY = 64; // instances made up front; grows when a busy day needs more
-const CAR_RUNOFF = 6; // road beyond the frontage the cars still use, each end
 const CAR_FADE = 3; // a car grows in / shrinks away over this much road at each end
 const MOTO_LEN = 1.7;
 const MOTO_IN = 0.4; // a motorcycle lane's centre, in from each kerb — clear of the car lanes (bodies start 0.71 in)
@@ -318,15 +317,24 @@ function motoParts() {
   return { paint, fixed };
 }
 
-// Someone walking, facing +x, feet on y = 0. Paint (per instance) = the shirt.
+// Someone walking, facing +x, feet on y = 0. Paint (per instance) = the shirt. The legs are
+// their own piece (one leg, drawn twice per walker) hinged at the hip, so they can swing.
+const WALK_HIP = 0.36;
+const WALK_LEG_Z = 0.065; // each leg's offset from the middle, across the walking direction
+const WALK_STRIDE = 0.8; // m travelled per full step cycle (left + right), so feet don't slide
+const WALK_SWING = 0.42; // rad, each leg forward/back at the far end of a step
 function walkerParts() {
   const paint = new CylinderGeometry(0.15, 0.19, 0.6, 12).translate(0, 0.66, 0);
   const fixed = mergeGeometries([
-    coloured(new BoxGeometry(0.16, 0.36, 0.26).translate(0, 0.18, 0), C.trousers),
     coloured(new SphereGeometry(0.16, 12, 10).translate(0, 1.13, 0), C.skin[1]),
     coloured(new SphereGeometry(0.17, 12, 10).scale(1, 0.75, 1).translate(-0.02, 1.2, 0), C.hair[0]),
   ]);
-  return { paint, fixed };
+  // Top at the hinge (y = 0), hanging down to the foot; a darker toe so the swing reads.
+  const leg = mergeGeometries([
+    coloured(new BoxGeometry(0.1, WALK_HIP - 0.04, 0.11).translate(0, -(WALK_HIP - 0.04) / 2, 0), C.trousers),
+    coloured(new BoxGeometry(0.15, 0.05, 0.11).translate(0.025, -WALK_HIP + 0.025, 0), '#2a2f35'),
+  ]);
+  return { paint, fixed, leg };
 }
 
 // A car along +x, wheels on y = 0. Paint is per car; glass, tyres and hubs keep their own colour.
@@ -597,9 +605,9 @@ export class ShopWorld {
     slab(spanStart, roadZ + ROAD_D, span, FOOT, FOOT_Y, C.footLine, C.foot, C.kerb);
     box(boxes, spanStart, 0, roadZ, span, 0.04, ROAD_D, C.road);
     for (let x = spanStart; x < spanStart + span; x += 5) box(boxes, x, 0.04, roadZ + ROAD_D / 2 - 0.07, 2.6, 0.012, 0.14, C.dash);
-    // Cars run only along the shops' frontage (plus a little either side), so every
-    // one of them is on screen at once and the count can be read.
-    this.buildTraffic(root, -CAR_RUNOFF, fw + CAR_RUNOFF * 2, roadZ, fd);
+    // Traffic starts and ends at the two ends of the drawn road, the edges of the map: ending
+    // just past the frontage made cars grow in and shrink away in plain view (owner 11-11).
+    this.buildTraffic(root, spanStart, span, roadZ, fd);
 
     const tree = (x: number, z: number, s: number, n: number) => {
       posts.add(x, 0.4 * s, z, 0.1 * s, 0.8 * s, 0.1 * s, C.trunk);
@@ -741,7 +749,7 @@ export class ShopWorld {
     f.meshes.forEach(m => {
       m.frustumCulled = false;
       m.castShadow = false;
-      m.count = f.items.length;
+      m.count = f.items.length * (kind === 'walker' && m === f.meshes[3] ? 2 : 1);
       root.add(m);
     });
     f.capacity = capacity;
@@ -769,9 +777,13 @@ export class ShopWorld {
     return this.moverMeshes(capacity, paint, fixed, new PlaneGeometry(MOTO_LEN, 0.55).rotateX(-Math.PI / 2), C.motos, 1);
   }
 
+  /** [shirt, head + hair, shadow patch, legs] — the legs mesh holds two instances per walker. */
   private walkerMeshes(capacity: number) {
-    const { paint, fixed } = walkerParts();
-    return this.moverMeshes(capacity, paint, fixed, new CircleGeometry(0.28, 16).rotateX(-Math.PI / 2), C.shirts, 3);
+    const { paint, fixed, leg } = walkerParts();
+    const meshes = this.moverMeshes(capacity, paint, fixed, new CircleGeometry(0.28, 16).rotateX(-Math.PI / 2), C.shirts, 3);
+    const legMat = new MeshLambertMaterial({ color: '#ffffff', vertexColors: true });
+    this.owned.push(leg, legMat);
+    return [...meshes, new InstancedMesh(leg, legMat, capacity * 2)];
   }
 
   /** n of a fleet, split over its two lanes with even gaps. */
@@ -789,10 +801,12 @@ export class ShopWorld {
       }
     });
     if (n > f.capacity) this.allocate(kind, Math.max(n, f.capacity * 2));
-    f.meshes.forEach(m => { m.count = f.items.length; });
+    f.meshes.forEach(m => { m.count = f.items.length * (m === this.walkerLegs() ? 2 : 1); });
     this.trafficWasVisible = true;
     this.placeTraffic(this.motion ? performance.now() / 1000 : 0);
   }
+
+  private walkerLegs() { return this.fleets.walker?.meshes[3]; }
 
   private placeTraffic(seconds: number) {
     const mat = new Matrix4();
@@ -800,18 +814,59 @@ export class ShopWorld {
     const scale = new Vector3(1, 1, 1);
     const flip = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), Math.PI);
     const none = new Quaternion();
-    Object.values(this.fleets).forEach(f => {
+    // Walking (owner 11-11): legs swing, the body rises a little on each step and rocks from
+    // side to side. All of it is a function of distance walked, so steps match the speed.
+    const base = new Matrix4();
+    const local = new Matrix4();
+    const turn = new Quaternion();
+    const lean = new Quaternion();
+    const upper = new Quaternion();
+    const axisX = new Vector3(1, 0, 0);
+    const axisY = new Vector3(0, 1, 0);
+    const axisZ = new Vector3(0, 0, 1);
+    Object.entries(this.fleets).forEach(([kind, f]) => {
+      const walking = kind === 'walker';
       f.items.forEach((c, i) => {
-        const run = (c.offset + c.speed * seconds) % this.span;
+        const travelled = c.offset + c.speed * seconds;
+        const run = travelled % this.span;
         const x = this.spanStart + (c.dir > 0 ? run : this.span - run);
         // Arriving at one end and leaving at the other, rather than popping in and out.
         const s = Math.min(1, Math.max(0.001, Math.min(run, this.span - run) / CAR_FADE));
         scale.set(s, s, s);
+        const heading = c.dir > 0 ? none : flip;
+        if (!walking) {
+          f.meshes.forEach((m, k) => {
+            pos.set(x, f.ys[k], c.lane);
+            m.setMatrixAt(i, mat.compose(pos, heading, scale));
+            m.instanceMatrix.needsUpdate = true;
+          });
+          return;
+        }
+        // Phase from distance, offset per walker so they don't step in unison.
+        const phase = (travelled / WALK_STRIDE) * Math.PI * 2 + i * 1.7;
+        const step = Math.sin(phase);
+        const bob = 0.035 * Math.abs(Math.cos(phase)); // highest as the legs pass each other
+        // Upper body: a small roll toward the standing leg, a slight twist, and leaning in.
+        turn.setFromAxisAngle(axisX, 0.07 * step)
+          .multiply(lean.setFromAxisAngle(axisY, 0.09 * step))
+          .multiply(lean.setFromAxisAngle(axisZ, -0.05));
+        upper.copy(heading).multiply(turn);
         f.meshes.forEach((m, k) => {
-          pos.set(x, f.ys[k], c.lane);
-          m.setMatrixAt(i, mat.compose(pos, c.dir > 0 ? none : flip, scale));
+          if (k === 3) return; // legs below
+          const lift = k === 2 ? 0 : bob * s; // the shadow patch stays on the ground
+          pos.set(x, f.ys[k] + lift, c.lane);
+          m.setMatrixAt(i, mat.compose(pos, k === 2 ? heading : upper, scale));
           m.instanceMatrix.needsUpdate = true;
         });
+        const legs = f.meshes[3];
+        base.compose(pos.set(x, f.ys[0] + bob * s, c.lane), heading, scale);
+        for (let j = 0; j < 2; j++) {
+          const swing = WALK_SWING * (j === 0 ? step : -step);
+          local.compose(pos.set(0, WALK_HIP, j === 0 ? WALK_LEG_Z : -WALK_LEG_Z), lean.setFromAxisAngle(axisZ, swing), scale.set(1, 1, 1));
+          legs.setMatrixAt(i * 2 + j, mat.multiplyMatrices(base, local));
+        }
+        scale.set(s, s, s);
+        legs.instanceMatrix.needsUpdate = true;
       });
     });
   }

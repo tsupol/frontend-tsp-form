@@ -33,8 +33,11 @@
    B · score column: today's contract count, a fixed 42px column on the shop tag's left edge —
    the loudest thing on the tag, same place on every tag. Green above 0, slate at 0 (solid, so 0
    is as easy to spot as a sale). */
-.sim__tag--shop { flex-direction: row; align-items: stretch; gap: 0; padding: 0; overflow: hidden; }
+/* The tag's edge line runs round the text part only: drawn round the whole tag it framed the
+   coloured count block in a dark line (owner 11-11). The block itself reaches the tag's edge. */
+.sim__tag--shop { flex-direction: row; align-items: stretch; gap: 0; padding: 0; overflow: hidden; border: 0; }
 .sim__tag-body { display: flex; flex-direction: column; justify-content: center; gap: 1px; padding: 3px 9px; }
+.sim__tag--shop .sim__tag-body { border: 1px solid var(--color-line); border-left: 0; border-radius: 0 8px 8px 0; }
 .sim__tag--shop .sim__tag-row { gap: 6px; }
 .sim__score { flex: none; width: 42px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #25814a; color: #fff; }
 .sim__score b { font-size: 19px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
@@ -148,6 +151,16 @@ div.sim__panel-toggle:hover, div.sim__legend-toggle:hover { color: var(--color-s
 .sim__detail dl { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; margin: 0 0 8px; }
 .sim__detail dt { color: var(--color-subtle); }
 .sim__detail dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+/* A tapped person's window (SimPersonWindow): top centre until moved, clear of the shop card
+   (bottom-left) and the overview panel (right). */
+.sim__person { --sim-win-pad: 12px; position: absolute; left: 50%; top: 12px; transform: translateX(-50%); width: 300px; max-height: calc(100% - 24px); font-size: 13px; }
+.sim__person dl { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; margin: 0 0 4px; }
+.sim__person dt { color: var(--color-subtle); }
+.sim__person dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.sim__person .sim__opened { border-top: 0; padding-top: 0; }
+.sim__person-sit { margin: 0 0 8px; }
+.sim__person-gone { margin: 0 0 8px; font-size: 12px; color: var(--color-subtle); }
+.sim__person-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .sim__opened { display: grid; grid-template-columns: 1fr auto; gap: 0 8px; padding: 5px 0; border-top: 1px solid var(--color-line); font-size: 12px; }
 .sim__opened small { grid-column: 1 / -1; color: var(--color-subtle); font-size: 11px; }
 /* A contract not signed yet: the flag is its status in the person's colour (§6e). */
@@ -226,6 +239,7 @@ div.sim__panel-toggle:hover, div.sim__legend-toggle:hover { color: var(--color-s
   .sim__panel { top: auto; left: 12px; right: 12px; bottom: 12px; width: auto; height: 42%; }
   .sim__kpis { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
   .sim__detail { left: 12px; right: 12px; width: auto; max-height: 55%; }
+  .sim__person { left: 12px; right: 12px; width: auto; transform: none; max-height: 55%; }
   .sim__zoom { top: auto; bottom: calc(42% + 24px); }
   .sim__legend { left: 72px; right: 12px; bottom: calc(42% + 24px); margin-inline: auto 0; max-width: calc(100% - 84px); }
   .sim__legend-groups { max-height: 30vh; }
@@ -264,9 +278,6 @@ div.sim__panel-toggle:hover, div.sim__legend-toggle:hover { color: var(--color-s
 [data-theme="light"] .sim__note-head b { color: color-mix(in srgb, var(--note) 82%, #000); }
 .sim__note-code { font-weight: 500; color: var(--color-subtle); }
 .sim__note-body { display: block; font-weight: 500; }
-/* Tapped = popover: takes clicks (tooltips don't) and ends with its button. */
-.sim__chip--pinned { pointer-events: auto; z-index: 3; }
-.sim__note-actions { display: flex; justify-content: flex-end; margin: 6px 0 3px; }
 /* Chat waiting (§6g): the seated customers' teal, a chip after the people count. */
 .sim__chat-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; background: #1fa3ad; }
 /* Chat corner: its floor sign, the unread bubble on each head, the chip on the shop tag. */
@@ -304,3 +315,9 @@ div.sim__panel-toggle:hover, div.sim__legend-toggle:hover { color: var(--color-s
 .sim__flight-label { margin-bottom: 1px; padding: 0 6px; border: 1.5px solid #3f9153; border-radius: 8px; background: #fff; color: #2e7d40; font-size: 12px; font-weight: 700; line-height: 16px; white-space: nowrap; }
 .sim__legend-flight { display: inline-flex; flex: none; }
 .sim__legend-flight svg { width: 20px; height: auto; }
+
+/* Tap feedback on touch screens: a ring where the finger landed, gone in under half a second. */
+.sim__tap { position: absolute; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; pointer-events: none; z-index: 2;
+  border: 2px solid rgba(255, 255, 255, .95); box-shadow: 0 0 0 1px rgba(20, 40, 50, .3); animation: sim-tap .42s ease-out forwards; }
+@keyframes sim-tap { from { transform: scale(.35); opacity: .9; } to { transform: scale(1); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .sim__tap { animation: none; opacity: .6; } }

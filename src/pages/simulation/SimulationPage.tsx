@@ -9,7 +9,8 @@ import { translateApiError } from '../../lib/apiErrors';
 import { DateTime } from '../../components/DateTime';
 import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { useSimulationLive } from './useSimulationLive';
-import type { Focus, SceneHandle } from './SimulationScene';
+import type { Focus, PersonPick, SceneHandle } from './SimulationScene';
+import { SimPersonWindow, SimWaitingLines } from './SimPersonWindow';
 import { useChatters, useCustomers } from './useCustomers';
 import { PILE_ICON } from './simulationIcons';
 import { SimulationCollection } from './SimulationCollection';
@@ -22,7 +23,7 @@ import { HQ_COLOR, trafficCounts } from './simulationWorld';
 import { flightSvg, type FlightKind } from './simulationFlights';
 import {
   AMBER, BLUE, FLOOR, GREEN, PILES, PURPLE, SIMULATION_PERMISSION, SOLD_EDGE,
-  ageText, annualAtRate, chatterText, annualPct, assetOf, baht, bangkokClock, codeOf, companyEdge, downPct, downPctOf, flagColor, gradeLabel, plainNum, stateColor, stateLabel, termsOf,
+  ageText, annualAtRate, chatterText, annualPct, assetOf, baht, bangkokClock, codeOf, companyEdge, downPct, downPctOf, gradeLabel, plainNum, stateColor, stateLabel, termsOf,
   type PileKey, type SimBranch,
 } from './simulationTypes';
 import { SITUATION_ORDER, situationColor, situationText } from '../../lib/situation';
@@ -218,6 +219,9 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
   const [picked, setPicked] = useState<number | null>(null);
   // One window at a time beside the shop card: opened contracts, or collection (§7 · §7b).
   const [win, setWin] = useState<{ kind: 'opened' | 'collect'; id: number } | null>(null);
+  // A tapped person's window (SimPersonWindow): tapping the same person again closes it.
+  const [person, setPerson] = useState<PersonPick | null>(null);
+  const pickPerson = (p: PersonPick) => setPerson(cur => (cur && cur.kind === p.kind && cur.id === p.id ? null : p));
   // The company building's room whose card is open (§6h); a shop and a pool card never both.
   const [pickedHq, setPickedHq] = useState<number | null>(null);
   const [legendClosed, setLegendClosed] = useClosed(LEGEND_KEY, true);
@@ -237,44 +241,21 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
   const customers = useCustomers(data);
   const chatters = useChatters(data);
 
-  // Pointing at something shows a tooltip that fades after 4 s. Tapping a person pins it as a
-  // popover with a way out (open the chat / the contract) that stays until a tap elsewhere or
-  // Esc — a hover-only popover vanishes on the way to its button, and an iPad has no hover.
   const [focusKey, setFocusKey] = useState<string | null>(null);
-  const [focusPinned, setFocusPinned] = useState(false);
   const focusTimer = useRef(0);
   useEffect(() => () => window.clearTimeout(focusTimer.current), []);
   const focus: Focus = {
     key: focusKey,
-    pinned: focusPinned,
     set: key => {
-      if (focusPinned) return;
       window.clearTimeout(focusTimer.current);
       setFocusKey(key);
       focusTimer.current = window.setTimeout(() => setFocusKey(null), 4000);
     },
-    pin: key => {
+    hover: key => {
       window.clearTimeout(focusTimer.current);
       setFocusKey(key);
-      setFocusPinned(true);
-    },
-    clear: () => {
-      window.clearTimeout(focusTimer.current);
-      setFocusKey(null);
-      setFocusPinned(false);
     },
   };
-  useEffect(() => {
-    if (!focusPinned) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      window.clearTimeout(focusTimer.current);
-      setFocusKey(null);
-      setFocusPinned(false);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [focusPinned]);
 
   const branches = useMemo(() => data?.branches ?? [], [data]);
   const companies = data?.companies ?? [];
@@ -319,6 +300,7 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
     setCompany(id);
     saveCompany(id);
     setPicked(null);
+    setPerson(null);
     setWin(null);
     setPickedHq(null);
   };
@@ -359,7 +341,7 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
       {data && !empty && (
         <Suspense fallback={null}>
           <SimulationScene key={data.company_id} ref={scene} branches={branches} customers={customers} chatters={chatters} showChat={!!data.can_see_chat} showProfit={canProfit} picked={picked} focus={focus} onPick={pick}
-            hq={hq} companyName={current?.name ?? ''} pickedHq={pickedHq} onPickHq={pickHq} />
+            hq={hq} companyName={current?.name ?? ''} pickedHq={pickedHq} onPickHq={pickHq} onPickPerson={pickPerson} />
         </Suspense>
       )}
 
@@ -634,21 +616,7 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
                     waited. A part whose field is 0 / "" (not priced yet) is left out. */}
                 {inRoom(detail.id).map(a => {
                   const w = waitingById.get(a.id);
-                  const asset = assetOf(a.asset, w?.serial ?? '');
-                  const grade = w?.grade ? gradeLabel(t, w.grade) : '';
-                  const financed = isFund && w?.financed ? `${t('simulation.financedShort')} ${baht(w.financed)}` : '';
-                  const terms = termsOf({ code: a.code, months: a.months, down: w?.down ?? 0, installment: w?.installment ?? 0 });
-                  return (
-                    <div key={a.id} className="sim__opened sim__opened--wait" data-testid="sim-waiting-row">
-                      <b><span className="sim__flag" style={{ background: flagColor(stateColor(a.state)) }}>{stateLabel(t, a.state)}</span>{a.product || '—'}</b>
-                      <span>{[grade, financed].filter(Boolean).join(' · ')}</span>
-                      {isFund && !!w?.sale_price && (
-                        <small>{t('simulation.saleUplift', { sale: plainNum(w.sale_price), uplift: plainNum(w.uplift ?? 0) })}</small>
-                      )}
-                      <small>{isFund && w?.down_pct != null ? `${terms} · ${t('simulation.downShort')} ${downPct(w.down_pct)}` : terms}</small>
-                      <small>{[asset, t('simulation.waitedFor', { age: ageText(t, a.age) })].filter(Boolean).join(' · ')}</small>
-                    </div>
-                  );
+                  return w ? <SimWaitingLines key={a.id} w={w} isFund={isFund} /> : null;
                 })}
                 {staleIn(detail.id).length > 0 && <h4 className="sim__sub">{t('simulation.staleHeading', { n: staleIn(detail.id).length })}</h4>}
                 {staleIn(detail.id).map(a => (
@@ -658,6 +626,12 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
                   </div>
                 ))}
               </SimWindow>
+            )}
+
+            {person && (
+              <SimPersonWindow person={person} branches={branches} isFund={isFund} stack={stack} onClose={() => setPerson(null)}
+                waiting={person.kind === 'wait' ? waitingById.get(person.id) : undefined}
+                chat={person.kind === 'chat' ? chat.find(c => c.id === person.id) : undefined} />
             )}
 
             {hq && hqPool && (

@@ -11231,7 +11231,14 @@
     "noteUnread_other": "{{n}} messages awaiting reply",
     "noteWait": "waiting {{age}}",
     "openChat": "Open chat",
-    "openContract": "View contract"
+    "openContract": "Open contract",
+    "person": {
+      "unread": "Awaiting reply",
+      "waited": "Waiting",
+      "collector": "With collector",
+      "goneWait": "No longer waiting in the shop — last figures shown.",
+      "goneChat": "No longer waiting for a reply — last figures shown."
+    }
   },
   "deviceLocation": {
     "button": "View location",

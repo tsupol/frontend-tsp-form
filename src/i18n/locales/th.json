@@ -11195,7 +11195,14 @@
     "noteUnread": "ข้อความรอตอบ {{n}}",
     "noteWait": "รอ {{age}}",
     "openChat": "เปิดแชท",
-    "openContract": "ดูสัญญา"
+    "openContract": "เปิดหน้าสัญญา",
+    "person": {
+      "unread": "ข้อความรอตอบ",
+      "waited": "รอมา",
+      "collector": "อยู่กับ",
+      "goneWait": "ไม่ได้รออยู่ในร้านแล้ว — แสดงข้อมูลล่าสุด",
+      "goneChat": "ไม่มีข้อความรอตอบแล้ว — แสดงข้อมูลล่าสุด"
+    }
   },
   "deviceLocation": {
     "button": "ดูตำแหน่ง",
