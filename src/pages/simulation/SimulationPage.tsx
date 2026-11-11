@@ -341,7 +341,7 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
       {data && !empty && (
         <Suspense fallback={null}>
           <SimulationScene key={data.company_id} ref={scene} branches={branches} customers={customers} chatters={chatters} showChat={!!data.can_see_chat} showProfit={canProfit} picked={picked} focus={focus} onPick={pick}
-            hq={hq} companyName={current?.name ?? ''} pickedHq={pickedHq} onPickHq={pickHq} onPickPerson={pickPerson} />
+            hq={hq} companyName={current?.name ?? ''} pickedHq={pickedHq} onPickHq={pickHq} onPickPerson={pickPerson} selected={person} />
         </Suspense>
       )}
 

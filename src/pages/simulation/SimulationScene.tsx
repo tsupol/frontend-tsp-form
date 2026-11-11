@@ -55,6 +55,8 @@ interface SceneProps {
   onPickHq: (index: number) => void;
   /** Tap on a person: open their window. */
   onPickPerson: (p: PersonPick) => void;
+  /** The person whose window is open: a ring on the floor under them. */
+  selected: PersonPick | null;
 }
 
 // A fingertip is ~40 px and a person at the default zoom ~10 px, so an exact hit test misses
@@ -80,7 +82,7 @@ const hitKey = (h: Hit) => (h?.kind === 'customer' ? `a${h.id}` : h?.kind === 'p
   : h?.kind === 'seat' ? `s${h.branchId}:${h.zone}:${h.x.toFixed(2)}:${h.z.toFixed(2)}`
   : h?.kind === 'stale' ? `t${h.branchId}:${h.station}` : null);
 
-export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function SimulationScene({ branches, customers: all, chatters, showChat, showProfit, picked, focus, onPick, hq, companyName, pickedHq, onPickHq, onPickPerson }, ref) {
+export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function SimulationScene({ branches, customers: all, chatters, showChat, showProfit, picked, focus, onPick, hq, companyName, pickedHq, onPickHq, onPickPerson, selected }, ref) {
   const { t } = useTranslation();
   // People are today's contracts; earlier days' are folders at their step (see world).
   const customers = useMemo(() => all.filter(c => !c.stale), [all]);
@@ -115,14 +117,8 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
   const gesture = useRef<{ pinch: boolean; x: number; y: number; d: number; vx: number; vy: number; k: number } | null>(null);
   const moved = useRef(false);
   const hovered = useRef<string | null>(null);
-  // Touch vs mouse, from the last press: a finger gets a bigger target and a ring where it tapped.
+  // Touch vs mouse, from the last press: a finger gets a bigger target (touchHit).
   const lastPointer = useRef('mouse');
-  const [tapAt, setTapAt] = useState<{ x: number; y: number; n: number } | null>(null);
-  useEffect(() => {
-    if (!tapAt) return;
-    const id = window.setTimeout(() => setTapAt(null), 450);
-    return () => window.clearTimeout(id);
-  }, [tapAt]);
   // The note's own height, so a note over someone near the top edge is pushed down into view
   // instead of opening above the screen (a popover's button must always be reachable).
   const noteEl = useRef<HTMLSpanElement>(null);
@@ -175,6 +171,13 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
     setStalePiles([...world.current.stalePiles()]);
     world.current.render();
   }, [ready, branches, customers, picked, showChat, chatters, hq, stale]);
+
+  // The ring under the selected person: after setLive above (it rebuilds the people), and when
+  // the selection changes. Someone who left the picture loses the ring; their window stays.
+  const selectedId = selected ? (selected.kind === 'chat' ? -selected.id : selected.id) : null;
+  useEffect(() => {
+    if (ready) world.current?.setSelected(selectedId);
+  }, [ready, selectedId, branches, customers, picked, showChat, chatters, hq, stale]);
 
   // After setLive above, so the shop piles the bank notes land on are this answer's.
   useEffect(() => {
@@ -357,12 +360,12 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
     const p = local(e);
     const touch = lastPointer.current !== 'mouse';
     const h = touch ? touchHit(world.current, p.x, p.y) : world.current.hit(p.x, p.y);
-    // Tap feedback: a fingertip covers the target, so show where the tap landed.
-    if (touch) setTapAt({ x: p.x, y: p.y, n: Date.now() });
     const key = hitKey(h);
     // A person (waiting in a shop, or for a chat reply — hits carry that contract id negated)
     // opens their window, like a shop opens its card.
     if (key?.startsWith('a')) {
+      // The person answers the tap: a small hop (the finger covers them), then their window.
+      world.current.hop(Number(key.slice(1)));
       onPickPerson({ kind: key[1] === '-' ? 'chat' : 'wait', id: Math.abs(Number(key.slice(1))) });
       return;
     }
@@ -555,7 +558,6 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
       })}
 
       <div ref={flightHost} className="sim__flights" />
-      {tapAt && <span key={tapAt.n} className="sim__tap" style={{ left: tapAt.x, top: tapAt.y }} aria-hidden="true" />}
 
       {/* Kept inside the scene: the label is up to 320 px wide (86 vw on a narrow
           screen, see .sim__chip--on) and centred on its customer, who may stand by an edge. */}

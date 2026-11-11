@@ -1,6 +1,6 @@
 import {
   BoxGeometry, CanvasTexture, CircleGeometry, Color, CylinderGeometry, DirectionalLight, Float32BufferAttribute, Group, HemisphereLight, IcosahedronGeometry, InstancedMesh,
-  Matrix4, Mesh, MeshBasicMaterial, MeshLambertMaterial, OrthographicCamera, PCFShadowMap, Plane, PlaneGeometry, Quaternion, Raycaster, RepeatWrapping,
+  Matrix4, Mesh, MeshBasicMaterial, MeshLambertMaterial, OrthographicCamera, PCFShadowMap, Plane, PlaneGeometry, Quaternion, Raycaster, RepeatWrapping, RingGeometry,
   SRGBColorSpace, Scene, ShadowMaterial, SphereGeometry, Vector2, Vector3, WebGLRenderer, type BufferGeometry, type Material,
 } from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -43,6 +43,10 @@ const STAND_H = 0.85;
 const DOOR: [number, number] = [6.6, 9.4];
 const CAR_LEN = 2.9;
 const CAR_CAPACITY = 64; // instances made up front; grows when a busy day needs more
+// The selected person's floor ring: the app's primary blue, apart from every status colour.
+const SELECT_COLOR = '#2563eb';
+const HOP_MS = 320;
+const HOP_UP = 0.22; // m at the top of the hop
 const CAR_FADE = 3; // a car grows in / shrinks away over this much road at each end
 const MOTO_LEN = 1.7;
 const MOTO_IN = 0.4; // a motorcycle lane's centre, in from each kerb — clear of the car lanes (bodies start 0.71 in)
@@ -493,6 +497,13 @@ export class ShopWorld {
   private hqMarkList: HqMark[] = [];
   private emptySeats: EmptySeat[] = [];
   private posById = new Map<number, [number, number, number]>();
+  // Tapped-person feedback (owner 11-11): floor point of every drawn person (chatters by
+  // their negated contract id, as in customerIds), the hair mesh so a hop moves the whole
+  // figure, the ring under the person whose window is open, and the hop's own frame loop.
+  private floorById = new Map<number, [number, number, number]>();
+  private hairMesh: InstancedMesh | null = null;
+  private selRing: Mesh | null = null;
+  private hopRaf = 0;
   private moreList: MoreMark[] = [];
   private staleList: StalePile[] = [];
   private staleMesh: InstancedMesh | null = null;
@@ -1032,6 +1043,7 @@ export class ShopWorld {
     const hair = new Batch(UNIT_BALL, this.lambert);
     this.customerIds = [];
     this.posById = new Map();
+    this.floorById = new Map();
     this.moreList = [];
     const chairs = new Batch(UNIT_BOX, this.lambert);
     // Station by station, so the outside line fills in the order a contract moves.
@@ -1066,6 +1078,7 @@ export class ShopWorld {
       hair.add(x, headY + HEAD_R * 0.3, z - 0.015, HEAD_R * 1.05, HEAD_R * 0.85, HEAD_R * 1.05, pick(C.hair, c.id * 3 + 1));
       this.customerIds.push(c.id);
       this.posById.set(c.id, [x, headY + HEAD_R * 1.1, r.oz + s.z]);
+      this.floorById.set(c.id, [x, y, r.oz + s.z]);
     });
     outsideMore.forEach((n, id) => {
       const r = byId.get(id);
@@ -1101,6 +1114,7 @@ export class ShopWorld {
           hair.add(x, headY + HEAD_R * 0.3, z - 0.015, HEAD_R * 1.05, HEAD_R * 0.85, HEAD_R * 1.05, pick(C.hair, c.id * 3 + 2));
           box(corner, x + BODY_R - 0.02, base + SIT_H * 0.62, z - 0.07, 0.04, 0.22, 0.14, C.phone);
           this.customerIds.push(-c.id);
+          this.floorById.set(-c.id, [x, y, room.oz + s.z]);
           return;
         }
         if (c.room != null) return; // a room that isn't drawn: nowhere to sit, never back in the shop
@@ -1123,6 +1137,7 @@ export class ShopWorld {
         // The phone in their hand, held at the side the viewer sees.
         box(corner, x + BODY_R - 0.02, base + h * 0.62, z - 0.07, 0.04, 0.22, 0.14, C.phone);
         this.customerIds.push(-c.id);
+        this.floorById.set(-c.id, [x, y, r.oz + s.z]);
       });
       if (corner.size) corner.build(this.live);
       chatMore.forEach((n, id) => {
@@ -1160,7 +1175,8 @@ export class ShopWorld {
     if (chairs.size) chairs.build(this.live);
     this.bodies = bodies.size ? bodies.build(this.live) : null;
     this.heads = heads.size ? heads.build(this.live) : null;
-    if (hair.size) hair.build(this.live);
+    cancelAnimationFrame(this.hopRaf); // a hop's saved matrices belong to the meshes being replaced
+    this.hairMesh = hair.size ? hair.build(this.live) : null;
 
     const maxPile = Math.max(1, ...branches.flatMap(b => PILES[b.company_type].map(p => b[p.key])));
     const piles = new Batch(UNIT_BOX, this.lambert);
@@ -1327,6 +1343,81 @@ export class ShopWorld {
     return at === 'money' ? [cx, y + 0.8, r.oz + 4.65] : [cx, y + 0.5, r.oz + 3.9];
   }
 
+  /** The ring on the floor under the person whose window is open; null hides it. `id` is the
+   *  contract id, negated for someone waiting for a chat reply (as in customerIds). Call again
+   *  after setLive: the person may have moved, or left the picture (the ring goes). */
+  setSelected(id: number | null) {
+    const at = id == null ? undefined : this.floorById.get(id);
+    if (!at) {
+      if (this.selRing?.visible) { this.selRing.visible = false; this.render(); }
+      return;
+    }
+    if (!this.selRing) {
+      // A flat overlay: lifted off the floor, depth offset, no depth write (threejs-guide).
+      const geo = new RingGeometry(0.34, 0.5, 40).rotateX(-Math.PI / 2);
+      const mat = new MeshBasicMaterial({ color: SELECT_COLOR, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+      this.selRing = new Mesh(geo, mat);
+      this.selRing.renderOrder = 2;
+      // In a crowd the people in front hide most of the ring: a faint copy drawn through them
+      // keeps the whole ring readable, the solid one still sits under the feet.
+      const ghostMat = new MeshBasicMaterial({ color: SELECT_COLOR, transparent: true, opacity: 0.4, depthTest: false, depthWrite: false });
+      const ghost = new Mesh(geo, ghostMat);
+      ghost.renderOrder = 3;
+      this.selRing.add(ghost);
+      this.owned.push(geo, mat, ghostMat);
+      this.live.parent?.add(this.selRing);
+    }
+    this.selRing.position.set(at[0], at[1] + 0.025, at[2]);
+    this.selRing.visible = true;
+    this.render();
+  }
+
+  /** A tapped person squashes and hops once (~0.3 s), so the finger sees who it hit. Only that
+   *  person's three instances move; their own frame loop, so it runs with the traffic idle. */
+  hop(id: number) {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const i = this.customerIds.indexOf(id);
+    const body = this.bodies;
+    const head = this.heads;
+    const hair = this.hairMesh;
+    if (i < 0 || !body || !head || !hair) return;
+    cancelAnimationFrame(this.hopRaf);
+    const orig = [body, head, hair].map(m => { const mt = new Matrix4(); m.getMatrixAt(i, mt); return mt; });
+    const p = new Vector3();
+    const q = new Quaternion();
+    const sc = new Vector3();
+    const m4 = new Matrix4();
+    orig[0].decompose(p, q, sc);
+    const bodyH = sc.y;
+    const bottom = p.y - bodyH / 2; // the unit body is centred on its origin
+    const t0 = performance.now();
+    const step = (now: number) => {
+      if (this.bodies !== body) return; // rebuilt by setLive meanwhile
+      const t = Math.min(1, (now - t0) / HOP_MS);
+      let f = 1; // body height factor: squash, stretch, settle
+      let jump = 0;
+      if (t < 0.25) f = 1 - 0.12 * (t / 0.25);
+      else if (t < 0.6) { const u = (t - 0.25) / 0.35; f = 0.88 + 0.18 * u; jump = HOP_UP * Math.sin((u * Math.PI) / 2); }
+      else { const u = (t - 0.6) / 0.4; f = 1.06 - 0.06 * u; jump = HOP_UP * Math.cos((u * Math.PI) / 2); }
+      if (t >= 1) { f = 1; jump = 0; }
+      orig[0].decompose(p, q, sc);
+      sc.y = bodyH * f;
+      p.y = bottom + sc.y / 2 + jump;
+      body.setMatrixAt(i, m4.compose(p, q, sc));
+      const lift = bodyH * (f - 1) + jump;
+      [head, hair].forEach((m, k) => {
+        orig[k + 1].decompose(p, q, sc);
+        p.y += lift;
+        m.setMatrixAt(i, m4.compose(p, q, sc));
+        m.instanceMatrix.needsUpdate = true;
+      });
+      body.instanceMatrix.needsUpdate = true;
+      this.render();
+      if (t < 1) this.hopRaf = requestAnimationFrame(step);
+    };
+    this.hopRaf = requestAnimationFrame(step);
+  }
+
   /** Head-top position of a customer, for a label. */
   customerAt(c: SeatedCustomer): [number, number, number] | null {
     // Where setLive actually put them — inside, in the queue, or out of the door; null = in a "+n".
@@ -1407,6 +1498,7 @@ export class ShopWorld {
   }
 
   dispose() {
+    cancelAnimationFrame(this.hopRaf);
     cancelAnimationFrame(this.raf);
     this.raf = 0;
     this.flights = null;

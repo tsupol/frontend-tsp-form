@@ -316,8 +316,3 @@ div.sim__panel-toggle:hover, div.sim__legend-toggle:hover { color: var(--color-s
 .sim__legend-flight { display: inline-flex; flex: none; }
 .sim__legend-flight svg { width: 20px; height: auto; }
 
-/* Tap feedback on touch screens: a ring where the finger landed, gone in under half a second. */
-.sim__tap { position: absolute; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; pointer-events: none; z-index: 2;
-  border: 2px solid rgba(255, 255, 255, .95); box-shadow: 0 0 0 1px rgba(20, 40, 50, .3); animation: sim-tap .42s ease-out forwards; }
-@keyframes sim-tap { from { transform: scale(.35); opacity: .9; } to { transform: scale(1); opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .sim__tap { animation: none; opacity: .6; } }
