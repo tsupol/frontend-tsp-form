@@ -619,9 +619,9 @@ function ChatBubble({ c, at }: { c: Chatter; at: { left: number; top: number } }
     <svg className="sim__bubble" style={at} width={w} height={h + tail + 1} viewBox={`0 0 ${w} ${h + tail + 1}`}
       data-chat={c.code} data-situation={c.situation || 'NONE'} data-held={c.collector ? 'true' : undefined} aria-hidden="true">
       <path d={d} fill={situationColor(c.situation)} stroke="#fff" strokeWidth={1.5} strokeLinejoin="round" />
-      {/* Baseline puts the digit's ink (8px tall at 11px) on the body's middle, y = (1 + h) / 2.
-          The old h / 2 + 4 sat the digit 1px high — it read as crowding the top edge. */}
-      <text x={w / 2} y={(1 + h) / 2 + 4} textAnchor="middle" fontSize={11} fontWeight={700} fill="#fff">{text}</text>
+      {/* h / 2 + 4: the digit's ink sits on the body's middle by arithmetic at (1 + h) / 2 + 4, but
+          the tail under the body makes that read low (owner 11-11); half a pixel up reads centred. */}
+      <text x={w / 2} y={h / 2 + 4} textAnchor="middle" fontSize={11} fontWeight={700} fill="#fff">{text}</text>
       {c.collector && (
         <g transform="translate(1.5 1.5) scale(0.75)">
           <circle r={6.5} fill="#fff" stroke={held} strokeWidth={1.4} />

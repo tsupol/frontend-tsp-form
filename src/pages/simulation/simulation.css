@@ -13,8 +13,8 @@
 .sim__no-gl { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); max-width: 420px; }
 /* Labels over the picture: tapping and dragging pass through to it. */
 .sim__spot, .sim__chip, .sim__pile-icon { position: absolute; transform: translate(-50%, -100%); pointer-events: none; white-space: nowrap; }
-.sim__spot { transform: translate(-50%, -50%); padding: 0 6px; border-radius: 6px; background: rgba(255, 255, 255, .82); font-size: 11px; font-weight: 600; color: #5f6d77; }
-.sim__chip { padding: 0 6px; border: 1.5px solid; border-radius: 999px; background: #fff; font-size: 10.5px; font-weight: 600; line-height: 15px; }
+.sim__spot { transform: translate(-50%, -50%); padding: 1.6px 6px 0; line-height: 14.9px; border-radius: 6px; background: rgba(255, 255, 255, .82); font-size: 11px; font-weight: 600; color: #5f6d77; }
+.sim__chip { padding: 3px 6px 0; border: 1.5px solid; border-radius: 999px; background: #fff; font-size: 10.5px; font-weight: 600; line-height: 12px; }
 /* Top padding > bottom: the Thai font keeps room under each line for lower vowels (ุ ู), so
    equal padding left the text visibly closer to the top edge (measured 4px above vs 9px below). */
 /* Rounded corners, not the one-line pill's round ends: on a two-line note those ends curve
@@ -144,7 +144,7 @@ div.sim__panel-toggle:hover, div.sim__legend-toggle:hover { color: var(--color-s
 .sim__row-money .sim__icon { margin: 0 2px 0 6px; }
 .sim__row-money .sim__icon:first-child { margin-left: 0; }
 /* Centred on the name's 20px line; 22px wide so ranks 1–99 keep column 2 at one x in every row. */
-.sim__rank { grid-column: 1; grid-row: 1; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; height: 18px; min-width: 22px; margin-top: 1px; padding: 0 4px; border-radius: 6px; background: var(--color-surface-hover); color: var(--color-subtle); font-style: normal; font-size: 11px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+.sim__rank { grid-column: 1; grid-row: 1; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; height: 18px; min-width: 22px; margin-top: 1px; padding: 1.4px 4px 0; border-radius: 6px; background: var(--color-surface-hover); color: var(--color-subtle); font-style: normal; font-size: 11px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
 .sim__rank--sold { background: var(--color-success-soft); color: var(--color-success-fg); }
 
 
@@ -284,6 +284,12 @@ div.sim__panel-toggle:hover, div.sim__legend-toggle:hover { color: var(--color-s
 /* Chat corner: its floor sign, the unread bubble on each head, the chip on the shop tag. */
 .sim__spot--chat { background: rgba(212, 236, 247, .92); color: #11707a; }
 .sim__bubble { position: absolute; transform: translate(-50%, -100%); pointer-events: none; overflow: visible; filter: drop-shadow(0 1px 1px rgba(0,0,0,.2)); }
+/* Small labels on the floor (chip, stale, +n, floor signs, room marks, flight labels, list rank — not the building's sign, measured centred): this
+   Thai font keeps room under each line for lower vowels, so a label with equal padding shows its
+   text high. Each one moves its text down by half the measured offset — more top padding, the
+   same amount off the line-height, so the label keeps its size. Measured 11-11 in the page: the
+   space from the digits' top to the inner top edge vs the baseline to the inner bottom edge,
+   every label of each kind; before, chip / stale −3, +n −2.6, floor sign −1.65, rank −1.4 px. */
 /* Customer situation (owner 11-11): the bubble's colour, as a dot in the chat card's
    per-colour counts, the shop card's chat lines and the legend. The person badge on a
    bubble's corner = a collector holds the contract (drawn in the bubble's own SVG). Colours come from src/lib/situation.ts. */
@@ -294,7 +300,7 @@ div.sim__panel-toggle:hover, div.sim__legend-toggle:hover { color: var(--color-s
 /* Company building (§6h): its sign, room numbers, chat bubbles. */
 .sim__hq-sign { position: absolute; transform: translate(-10%, -100%); pointer-events: none; white-space: nowrap; padding: 2px 10px; border-radius: 6px; background: #1f2a33; color: #fff; font-size: 12px; font-weight: 700; }
 .sim__hq-warn { display: block; font-style: normal; font-weight: 600; font-size: 10.5px; color: #ffd27a; }
-.sim__hq-mark { position: absolute; transform: translate(-50%, -100%); pointer-events: none; white-space: nowrap; padding: 0 5px; border: 1.5px solid #9aa5ad; border-radius: 8px; background: #fff; font-size: 10.5px; font-weight: 700; line-height: 15px; color: #5f6d77; }
+.sim__hq-mark { position: absolute; transform: translate(-50%, -100%); pointer-events: none; white-space: nowrap; padding: 3px 5px 0; border: 1.5px solid #9aa5ad; border-radius: 8px; background: #fff; font-size: 10.5px; font-weight: 700; line-height: 12px; color: #5f6d77; }
 .sim__hq-mark--day { transform: translate(-50%, -50%); border: none; background: rgba(255,255,255,.85); font-weight: 600; }
 .sim__hq-mark--today { color: #2e7d40; }
 .sim__hq-mark--clear { transform: translate(-50%, -50%); border: none; background: rgba(255,255,255,.9); color: #2e7d40; }
@@ -305,15 +311,15 @@ div.sim__panel-toggle:hover, div.sim__legend-toggle:hover { color: var(--color-s
 @keyframes sim-bob { 0%, 100% { margin-top: 0; } 50% { margin-top: -4px; } }
 @media (prefers-reduced-motion: reduce) { .sim__hq-bubble { animation: none; } }
 /* Crowds: files left from earlier days, and the "+n" past what is drawn. */
-.sim__stale { position: absolute; transform: translate(-50%, -100%); pointer-events: none; white-space: nowrap; padding: 0 6px; border: 1.5px solid #b3943f; border-radius: 8px; background: #fff8e6; color: #7a5d16; font-size: 10.5px; font-weight: 700; line-height: 15px; }
-.sim__more { position: absolute; transform: translate(-50%, -100%); pointer-events: none; white-space: nowrap; min-width: 26px; padding: 1px 7px; border-radius: 10px; background: #1f2a33; color: #fff; font-size: 12px; font-weight: 700; text-align: center; }
+.sim__stale { position: absolute; transform: translate(-50%, -100%); pointer-events: none; white-space: nowrap; padding: 3px 6px 0; border: 1.5px solid #b3943f; border-radius: 8px; background: #fff8e6; color: #7a5d16; font-size: 10.5px; font-weight: 700; line-height: 12px; }
+.sim__more { position: absolute; transform: translate(-50%, -100%); pointer-events: none; white-space: nowrap; min-width: 26px; padding: 3.3px 7px 1px; border-radius: 10px; background: #1f2a33; color: #fff; font-size: 12px; font-weight: 700; line-height: 15.7px; text-align: center; }
 .sim__more--chat { background: #11707a; }
 /* Envelopes and bank notes flying between a shop and the company building (§3). Moved by
    simulationFlights.ts writing transform each frame; above the tags, under the open label. */
 .sim__flights { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .sim__flight { position: absolute; left: 0; top: 0; display: flex; flex-direction: column-reverse; align-items: center; will-change: transform, opacity; filter: drop-shadow(0 2px 2px rgba(20, 40, 50, .3)); }
 .sim__flight svg { display: block; }
-.sim__flight-label { margin-bottom: 1px; padding: 0 6px; border: 1.5px solid #3f9153; border-radius: 8px; background: #fff; color: #2e7d40; font-size: 12px; font-weight: 700; line-height: 16px; white-space: nowrap; }
+.sim__flight-label { margin-bottom: 1px; padding: 3px 6px 0; border: 1.5px solid #3f9153; border-radius: 8px; background: #fff; color: #2e7d40; font-size: 12px; font-weight: 700; line-height: 13px; white-space: nowrap; }
 .sim__legend-flight { display: inline-flex; flex: none; }
 .sim__legend-flight svg { width: 20px; height: auto; }
 
