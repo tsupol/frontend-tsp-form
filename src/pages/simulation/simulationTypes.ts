@@ -5,6 +5,8 @@
 // arrive as null together with a false can_see_* flag (§3) — the flag, never
 // the role, decides what is drawn.
 
+import { situationText } from '../../lib/situation';
+
 export const SIMULATION_PERMISSION = 'REPORT.SIMULATION.VIEW';
 export const SIMULATION_PATH = '/admin/simulation';
 
@@ -55,6 +57,14 @@ export interface SimChat {
   unread: number;
   /** Minutes since the oldest unread message. */
   age_min: number;
+  /** mig 1653 — the customer's situation, same value as v_branch_chat_list. Colours the
+   *  bubble (src/lib/situation.ts); null = the contract no longer collects. */
+  situation_code?: string | null;
+  /** Days overdue · 0 = not overdue. */
+  overdue_days?: number | null;
+  /** mig 1654 — the collector holding the contract; null = nobody. Holding ≠ overdue. */
+  collector_user_id?: number | null;
+  collector_name?: string | null;
 }
 
 export type HqPoolKind = 'CREDIT' | 'PAYOUT' | 'CUSTOMER_SERVICE';
@@ -291,6 +301,23 @@ export function ageText(t: T, min: number) {
   if (min < 60) return t('simulation.ageMin', { n: min });
   if (min < 1440) return t('simulation.ageHour', { n: Math.floor(min / 60) });
   return t('simulation.ageDay', { n: Math.floor(min / 1440) });
+}
+
+/** A waiting chat customer in one line for the shop card's list (§2e, owner 11-11):
+ *  `CT-… · Overdue 12 days · with nongpleng · 3 unread messages · waiting 5 min`.
+ *  The note on the floor is two lines and builds its own parts (SimulationScene). */
+export function chatterText(
+  t: T,
+  c: { code: string; unread: number; age: number; situation: string; overdueDays: number; collector: string },
+) {
+  return t('simulation.chatRow', {
+    code: c.code,
+    sit: situationText(t, c.situation || null, c.overdueDays),
+    held: c.collector ? t('simulation.chatHeld', { name: c.collector }) : '',
+    n: c.unread,
+    count: c.unread,
+    age: ageText(t, c.age),
+  });
 }
 
 // ── Scene palette: the floor is an illustration, so it keeps its own colours ──

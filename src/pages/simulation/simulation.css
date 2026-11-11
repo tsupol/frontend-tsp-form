@@ -15,7 +15,11 @@
 .sim__spot, .sim__chip, .sim__pile-icon { position: absolute; transform: translate(-50%, -100%); pointer-events: none; white-space: nowrap; }
 .sim__spot { transform: translate(-50%, -50%); padding: 0 6px; border-radius: 6px; background: rgba(255, 255, 255, .82); font-size: 11px; font-weight: 600; color: #5f6d77; }
 .sim__chip { padding: 0 6px; border: 1.5px solid; border-radius: 999px; background: #fff; font-size: 10.5px; font-weight: 600; line-height: 15px; }
-.sim__chip--on { padding: 2px 9px; font-size: 12px; line-height: 16px; z-index: 1; box-shadow: 0 1px 4px rgba(20, 40, 50, .24); }
+/* Top padding > bottom: the Thai font keeps room under each line for lower vowels (ุ ู), so
+   equal padding left the text visibly closer to the top edge (measured 4px above vs 9px below). */
+/* Rounded corners, not the one-line pill's round ends: on a two-line note those ends curve
+   into the text and eat the side padding. */
+.sim__chip--on { padding: 5px 12px 3px; border-radius: 10px; background: var(--color-surface-elevated); font-size: 12px; line-height: 16px; z-index: 1; box-shadow: 0 1px 4px rgba(20, 40, 50, .24); }
 .sim__pile-icon { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border: 1.5px solid; border-radius: 50%; background: #fff; }
 
 .sim__tag { position: absolute; transform: translate(-50%, -50%) scale(var(--sim-tag-scale, 1)); display: flex; flex-direction: column; gap: 1px; padding: 2px 8px; border: 1px solid var(--color-line); border-radius: 8px; background: var(--color-surface); color: var(--color-fg); font: inherit; font-size: 12px; white-space: nowrap; box-shadow: 0 1px 4px rgba(20, 40, 50, .24); cursor: pointer; }
@@ -250,12 +254,28 @@ div.sim__panel-toggle:hover, div.sim__legend-toggle:hover { color: var(--color-s
 }
 .sim__waiter-sub { display: block; margin-left: 13px; font-size: 11px; color: var(--color-subtle); }
 /* A tapped customer's label carries the model and AT- too: wrap rather than run off an iPad's edge. */
-.sim__chip--on { white-space: normal; max-width: min(320px, 86vw); width: max-content; text-align: center; }
+.sim__chip--on { white-space: normal; max-width: min(320px, 86vw); width: max-content; text-align: left; color: var(--color-fg); }
+/* Two-line note (owner 11-11): header = dot + status in the person's colour + code, body in the
+   normal text colour. The header colour is nudged lighter on the dark card and darker on the
+   light one so it stays readable on both. */
+.sim__note-dot { display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 50%; background: var(--note); vertical-align: 0; }
+.sim__note-head { display: block; }
+.sim__note-head b { font-weight: 700; color: color-mix(in srgb, var(--note) 78%, #fff); }
+[data-theme="light"] .sim__note-head b { color: color-mix(in srgb, var(--note) 82%, #000); }
+.sim__note-code { font-weight: 500; color: var(--color-subtle); }
+.sim__note-body { display: block; font-weight: 500; }
 /* Chat waiting (§6g): the seated customers' teal, a chip after the people count. */
 .sim__chat-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; background: #1fa3ad; }
 /* Chat corner: its floor sign, the unread bubble on each head, the chip on the shop tag. */
 .sim__spot--chat { background: rgba(212, 236, 247, .92); color: #11707a; }
 .sim__bubble { position: absolute; transform: translate(-50%, -100%); pointer-events: none; overflow: visible; filter: drop-shadow(0 1px 1px rgba(0,0,0,.2)); }
+/* Customer situation (owner 11-11): the bubble's colour, as a dot in the chat card's
+   per-colour counts, the shop card's chat lines and the legend. The person badge on a
+   bubble's corner = a collector holds the contract (drawn in the bubble's own SVG). Colours come from src/lib/situation.ts. */
+.sim__sit-dot, .sim__waiter i.sim__sit-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: 0; }
+.sim__sitmix { display: flex; flex-wrap: wrap; align-items: center; column-gap: 8px; row-gap: 2px; }
+.sim__sitmix > span { white-space: nowrap; display: inline-flex; align-items: center; }
+.sim__legend-held { display: inline-block; vertical-align: -2px; margin-right: 5px; }
 /* Company building (§6h): its sign, room numbers, chat bubbles. */
 .sim__hq-sign { position: absolute; transform: translate(-10%, -100%); pointer-events: none; white-space: nowrap; padding: 2px 10px; border-radius: 6px; background: #1f2a33; color: #fff; font-size: 12px; font-weight: 700; }
 .sim__hq-warn { display: block; font-style: normal; font-weight: 600; font-size: 10.5px; color: #ffd27a; }

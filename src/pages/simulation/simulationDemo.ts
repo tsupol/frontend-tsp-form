@@ -16,7 +16,9 @@ const MIX: [number, number, number, number, number, number, number][] = [
   [5, 3, 8, 4, 2, 2, 3], [3, 2, 2, 2, 1, 9, 0], [7, 4, 10, 6, 2, 0, 6], [1, 0, 1, 0, 0, 4, 2],
   [3, 4, 6, 5, 2, 1, 2], [0, 1, 0, 1, 0, 12, 0], [4, 3, 9, 9, 4, 3, 8], [2, 2, 4, 3, 1, 0, 1],
 ];
-const STATES: [string, number][] = [['DRAFT', 1], ['PENDING_APPROVAL', 2], ['PENDING_SIGN', 3], ['PENDING_PAYMENT', 4]];
+/** [situation_code, overdue_days] for demo chat rows — one of each colour. */
+const DEMO_SITUATIONS: [string | null, number][] = [['OVERDUE', 12], ['CURRENT', 0], ['DUE_TODAY', 0], ['CURRENT', 0], ['IN_GRACE', 2], ['PAUSED', 0], ['OVERDUE', 40], [null, 0]];
+const STATES: [string, number][] =[['DRAFT', 1], ['PENDING_APPROVAL', 2], ['PENDING_SIGN', 3], ['PENDING_PAYMENT', 4]];
 
 /** Minutes since midnight (Thai time) of the answer, so "today" ages stay today. */
 function minutesToday(iso: string) {
@@ -52,7 +54,12 @@ export function busyDemo(d: SimulationData): SimulationData {
       waiting.push({ id: id++, branch_id: bid, code: `CT-DEMO-S${id}`, state: k % 3 ? 'PENDING_SIGN' : 'PENDING_APPROVAL', age_min: today + 600 + k * 1440, months: 12, product: 'Apple iPhone 15 128GB', asset: '' });
     }
     for (let k = 0; k < m[6]; k++) {
-      chat.push({ id: id++, branch_id: bid, code: `CT-DEMO-C${id}`, unread: (k % 4) + 1, age_min: Math.min(today, 10 + k * 13) });
+      // Cycle through every situation colour, with a collector on some rows (green ones too).
+      const sit = DEMO_SITUATIONS[(bid + k) % DEMO_SITUATIONS.length];
+      chat.push({
+        id: id++, branch_id: bid, code: `CT-DEMO-C${id}`, unread: (k % 4) + 1, age_min: Math.min(today, 10 + k * 13),
+        situation_code: sit[0], overdue_days: sit[1], collector_name: (bid + k) % 3 === 0 ? 'demo.collector' : null,
+      });
     }
     return {
       ...template,

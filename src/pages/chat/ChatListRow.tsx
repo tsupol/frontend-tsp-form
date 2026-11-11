@@ -1,7 +1,9 @@
 import type { TFunction } from 'i18next';
 import { Badge, Tooltip } from 'tsp-form';
-import { Image as ImageIcon, Pin } from 'lucide-react';
+import { Image as ImageIcon, Pin, UserRound } from 'lucide-react';
 import { formatSmart } from '../../lib/format';
+import { collectorColor } from '../../lib/situation';
+import { ChatSituationFlag } from './ChatSituationFlag';
 import { chatStatusBadgeColor, contractStateBadgeColor, contractStateLabel } from './chatStatus';
 import type { ChatInboxRow } from './chatTypes';
 
@@ -26,17 +28,29 @@ interface Props {
 export function ChatListRow({ row, selected, onSelect, showBranch, lang, t, compact }: Props) {
   const isImage = row.last_message_type === 'IMAGE';
 
+  // A div acting as the button: the situation flag inside is a real button of its
+  // own (it opens the detail box), and a <button> can't contain another.
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       className={`text-left px-3 py-2.5 border-b border-line cursor-pointer transition-colors ${
         selected ? 'bg-primary-soft' : 'hover:bg-surface-hover'
       }`}
       onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(); }
+      }}
     >
       <div className="flex items-start justify-between gap-2 min-w-0">
-        <div className="text-sm font-medium truncate min-w-0">
-          {row.customer_name ?? '—'}
+        <div className="flex items-center gap-1 min-w-0">
+          {/* Customer situation flag — every row, green included (owner 11-11).
+              A never-chatted search hit has no view row, so no situation to show. */}
+          {!row.is_stub && <ChatSituationFlag row={row} t={t} />}
+          <div className="text-sm font-medium truncate min-w-0">
+            {row.customer_name ?? '—'}
+          </div>
         </div>
         {/* Timestamp and unread count sit on ONE line — stacking them cost the
             row an extra line, so unread threads were taller than read ones and
@@ -74,6 +88,19 @@ export function ChatListRow({ row, selected, onSelect, showBranch, lang, t, comp
             {t(`chat.status.${row.chat_status}`)}
           </Badge>
         )}
+        {/* Who holds the contract as collector — every held row, so staff know who
+            to hand money questions to. Flag colour when not green; muted on a green
+            row, where the job is just still with them after payment (owner 11-11). */}
+        {row.collector_name && (
+          <span
+            className="inline-flex items-center gap-0.5 text-[11px] min-w-0 max-w-full"
+            style={{ color: collectorColor(row.situation_code) }}
+            data-testid="chat-row-collector"
+          >
+            <UserRound size={11} className="shrink-0" />
+            <span className="truncate">{row.collector_name}</span>
+          </span>
+        )}
         {/* Search hit that has never been chatted. Says so plainly so the row
             doesn't read as an empty conversation. */}
         {row.is_stub && (
@@ -101,6 +128,6 @@ export function ChatListRow({ row, selected, onSelect, showBranch, lang, t, comp
           </div>
         </Tooltip>
       )}
-    </button>
+    </div>
   );
 }

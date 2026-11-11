@@ -22,9 +22,10 @@ import { HQ_COLOR, trafficCounts } from './simulationWorld';
 import { flightSvg, type FlightKind } from './simulationFlights';
 import {
   AMBER, BLUE, FLOOR, GREEN, PILES, PURPLE, SIMULATION_PERMISSION, SOLD_EDGE,
-  ageText, annualAtRate, annualPct, assetOf, baht, bangkokClock, codeOf, companyEdge, downPct, downPctOf, flagColor, gradeLabel, plainNum, stateColor, stateLabel, termsOf,
+  ageText, annualAtRate, chatterText, annualPct, assetOf, baht, bangkokClock, codeOf, companyEdge, downPct, downPctOf, flagColor, gradeLabel, plainNum, stateColor, stateLabel, termsOf,
   type PileKey, type SimBranch,
 } from './simulationTypes';
+import { SITUATION_ORDER, situationColor, situationText } from '../../lib/situation';
 import './simulation.css';
 
 // Simulation / ภาพจำลอง — UI_SUMMARY/156_SIMULATION.md, work order
@@ -99,13 +100,14 @@ function useClock() {
   return now;
 }
 
-function Kpi({ label, value, unit, sub, sub2, icon }: { label: string; value: ReactNode; unit?: string; sub?: string; sub2?: string; icon?: ReactNode }) {
+function Kpi({ label, value, unit, sub, sub2, icon, extra }: { label: string; value: ReactNode; unit?: string; sub?: string; sub2?: string; icon?: ReactNode; extra?: ReactNode }) {
   return (
     <div className="sim__kpi">
       <label>{icon}{label}</label>
       <strong>{value}{unit && <span> {unit}</span>}</strong>
       {sub && <small>{sub}</small>}
       {sub2 && <small>{sub2}</small>}
+      {extra}
     </div>
   );
 }
@@ -261,6 +263,13 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
   const chatIn = (id: number) => chat.filter(c => c.branch_id === id);
   const chatUnread = chat.reduce((s, c) => s + c.unread, 0);
   const chatLongest = Math.max(0, ...chat.map(c => c.age_min));
+  // Waiting customers per bubble colour (owner 11-11: "จำนวนแยกตามสี"), worst first. The
+  // grey ones — paused, paid off, no longer collecting (null) — share one colour, so one count.
+  const chatMix = useMemo(() => {
+    const colourKey = (code: string | null | undefined) => (code === 'OVERDUE' || code === 'IN_GRACE' || code === 'DUE_TODAY' || code === 'CURRENT' ? code : null);
+    const keys = [...SITUATION_ORDER.filter(k => colourKey(k)), null] as (string | null)[];
+    return keys.map(k => [k, chat.filter(c => colourKey(c.situation_code) === k).length] as const).filter(([, n]) => n > 0);
+  }, [chat]);
   // The company building (§2f): the flag alone decides; false = no building, no room kept for it.
   const hq = data?.can_see_hq ? data.hq ?? null : null;
   const hqPool = hq && pickedHq != null ? hq.pools[pickedHq] ?? null : null;
@@ -405,7 +414,13 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
                   sub2={staleTotal > 0 ? t('simulation.kpi.staleSub', { n: staleTotal }) : undefined} />
                 {canChat && (
                   <Kpi label={t('simulation.kpi.chat')} value={chat.length} unit={t('simulation.unit.people', { count: chat.length })}
-                    sub={chat.length > 0 ? t('simulation.kpi.chatSub', { n: chatUnread, age: ageText(t, chatLongest), count: chatUnread }) : undefined} />
+                    sub={chat.length > 0 ? t('simulation.kpi.chatSub', { n: chatUnread, age: ageText(t, chatLongest), count: chatUnread }) : undefined}
+                    extra={chatMix.length > 0 && (
+                      // How many waiting customers per situation colour (owner 11-11), worst first.
+                      <small className="sim__sitmix" data-testid="sim-chat-sitmix">{chatMix.map(([k, n]) => (
+                        <span key={k ?? 'NONE'}><i className="sim__sit-dot" style={{ background: situationColor(k) }} />{n}</span>
+                      ))}</small>
+                    )} />
                 )}
                 <Kpi label={t('simulation.kpi.contracts')} value={openedRows.length} unit={t('simulation.unit.contracts', { count: openedRows.length })} sub={grades} />
                 {isFund ? (
@@ -583,7 +598,8 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
                 })}
                 {chatIn(detail.id).map(c => (
                   <div key={`chat-${c.id}`} className="sim__waiter" data-testid="sim-chat-row">
-                    <i className="sim__chat-dot" />{t('simulation.chatRow', { code: c.code, n: c.unread, age: ageText(t, c.age_min), count: c.unread })}
+                    <i className="sim__sit-dot" style={{ background: situationColor(c.situation_code) }} />
+                    {chatterText(t, { code: c.code, unread: c.unread, age: c.age_min, situation: c.situation_code ?? '', overdueDays: c.overdue_days ?? 0, collector: c.collector_name ?? '' })}
                   </div>
                 ))}
                 {/* Not signed yet (NOTICE 1635 §1): the same lines as an opened contract,
@@ -649,6 +665,17 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
                     <span key={s}><i style={{ background: stateColor(s) }} />{stateLabel(t, s)}</span>
                   ))}
                   {canChat && <span className="sim__legend-wide"><i className="sim__chat-dot" />{t('simulation.legend.chat', { n: chat.length })}</span>}
+                  {canChat && (
+                    // The bubble over a chat customer's head takes their situation colour (owner 11-11).
+                    <span className="sim__legend-wide sim__sitmix">
+                      {t('simulation.legend.bubble')}
+                      {(['OVERDUE', 'IN_GRACE', 'DUE_TODAY', 'CURRENT'] as const).map(k => (
+                        <span key={k}><i className="sim__sit-dot" style={{ background: situationColor(k) }} />{situationText(t, k)}</span>
+                      ))}
+                      <span><i className="sim__sit-dot" style={{ background: situationColor(null) }} />{t('simulation.legend.bubbleOther')}</span>
+                    </span>
+                  )}
+                  {canChat && <span className="sim__legend-wide"><svg className="sim__legend-held" width={13} height={13} viewBox="-7.5 -7.5 15 15" aria-hidden="true"><circle r={6.5} fill="#fff" stroke="#d64541" strokeWidth={1.3} /><circle cy={-1.9} r={1.9} fill="#d64541" /><path d="M-3.3 3.6 a3.3 2.8 0 0 1 6.6 0z" fill="#d64541" /></svg>{t('simulation.legend.held')}</span>}
                   <span className="sim__legend-wide">{t('simulation.legend.outside')}</span>
                   <span className="sim__legend-wide"><Folder color="#e3d3a8" />{t('simulation.legend.stale')}</span>
                   <small className="sim__legend-wide">{t('simulation.legend.customersNote')}</small>

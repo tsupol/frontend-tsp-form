@@ -77,6 +77,11 @@ export interface Chatter extends ChatSeat {
   code: string;
   unread: number;
   age: number;
+  /** situation_code ('' when null) — the bubble's colour. */
+  situation: string;
+  overdueDays: number;
+  /** Collector holding the contract ('' = nobody). */
+  collector: string;
 }
 
 /** chat[] seated in each shop's chat corner (§6g) — or, when the building is shown and the
@@ -111,7 +116,8 @@ export function useChatters(data: SimulationData | null): Chatter[] {
         taken.add(`${at}:${spot}`);
         seats.current.set(r.id, spot);
       }
-      return { id: r.id, branchId: r.branch_id, spot, room: roomOf.get(r.branch_id), code: r.code, unread: r.unread, age: r.age_min };
+      return { id: r.id, branchId: r.branch_id, spot, room: roomOf.get(r.branch_id), code: r.code, unread: r.unread, age: r.age_min,
+        situation: r.situation_code ?? '', overdueDays: r.overdue_days ?? 0, collector: r.collector_name ?? '' };
     });
   }, [data]);
 }

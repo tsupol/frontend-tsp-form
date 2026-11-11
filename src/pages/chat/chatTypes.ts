@@ -77,6 +77,25 @@ export interface ChatInboxRow {
    *  not fund staff, and there is no "mine" view at all. Never re-derive it. */
   is_mine?: boolean | null;
 
+  /** The collector holding the contract (§5b). null = nobody. Holding ≠ overdue:
+   *  the job stays with them after the customer pays, so never read arrears from it. */
+  collector_user_id?: number | null;
+  collector_name?: string | null;
+
+  // Customer situation flag (mig 1652, owner 11-11) — every row has one, green included.
+  // situation_code alone decides the colour (src/lib/situation.ts); the rest fill the
+  // detail box behind the flag. null = the contract no longer collects.
+  situation_code?: string | null;
+  /** Oldest unpaid installment (past-due ones included): "next due" on a current row,
+   *  "overdue since" on an overdue one. */
+  next_due_date?: string | null;
+  next_due_amount?: number | null;
+  overdue_count?: number | null;
+  overdue_days?: number | null;
+  overdue_amount?: number | null;
+  last_payment_date?: string | null;
+  appointment_date?: string | null;
+
   // awaiting_staff_reply / is_overdue (mig 1636) are still in the view but not read:
   // the "ยังไม่ได้ตอบ" badge they drove was removed (owner 11-09) — chat_status is the signal.
 

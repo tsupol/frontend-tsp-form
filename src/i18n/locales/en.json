@@ -9578,7 +9578,31 @@
     "IN_GRACE": "In grace period",
     "OVERDUE": "Overdue",
     "PAUSED": "Paused",
-    "COMPLETED": "Completed"
+    "COMPLETED": "Completed",
+    "NONE": "No longer collecting",
+    "withDays_one": "{{label}} {{count}} day",
+    "withDays_other": "{{label}} {{count}} days",
+    "desc": {
+      "CURRENT": "Pays on time, nothing overdue. A good customer writing in probably needs help with something else.",
+      "DUE_TODAY": "An installment is due today.",
+      "IN_GRACE": "Past the due date but still within the grace period (1–3 days).",
+      "OVERDUE": "Overdue — installments past the grace period are unpaid.",
+      "PAUSED": "Payments are paused on this contract.",
+      "COMPLETED": "All installments are paid.",
+      "NONE": "This contract no longer collects installments."
+    },
+    "fact": {
+      "nextDue": "Next installment",
+      "dueToday": "Due today",
+      "lastPaid": "Last paid",
+      "overdue": "Unpaid",
+      "since": "Since installment",
+      "appointment": "Promised to pay",
+      "contractState": "Contract",
+      "collector": "With collector",
+      "installments_one": "{{count}} installment",
+      "installments_other": "{{count}} installments"
+    }
   },
   "slipAutoReply": {
     "navLabel": "Slip auto-reply",
@@ -11030,13 +11054,11 @@
       "settlementUnchecked": "unchecked",
       "none": "None"
     },
-    "chatNote_one": "{{code}} · {{n}} message awaiting reply · waiting {{age}}",
-    "chatNote_other": "{{code}} · {{n}} messages awaiting reply · waiting {{age}}",
     "financedShort": "Financed",
     "saleUplift": "Sale {{sale}} + uplift {{uplift}}",
     "chatChip": "Chat {{n}}",
-    "chatRow_one": "{{code}} · {{n}} unread message · waiting {{age}}",
-    "chatRow_other": "{{code}} · {{n}} unread messages · waiting {{age}}",
+    "chatRow_one": "{{code}} · {{sit}}{{held}} · {{n}} unread message · waiting {{age}}",
+    "chatRow_other": "{{code}} · {{sit}}{{held}} · {{n}} unread messages · waiting {{age}}",
     "smallScreen": "Open on a larger screen (iPad or computer) to see the simulation",
     "noBranches": "No branches in your scope yet",
     "loadError": "Can't read the data. Retrying automatically",
@@ -11173,7 +11195,10 @@
       "payout": "Paid-out pile",
       "cars": "1 car = 1 contract opened today ({{n}})",
       "motos": "Motorcycle = ฿100 of retail sales ({{n}})",
-      "walkers": "Person on the footpath = ฿100 of service fees ({{n}})"
+      "walkers": "Person on the footpath = ฿100 of service fees ({{n}})",
+      "bubble": "Bubble colour:",
+      "bubbleOther": "Paused / paid off / closed",
+      "held": "A collector holds the contract"
     },
     "collection": {
       "open": "View installment collection",
@@ -11199,7 +11224,12 @@
       "open": "Contracts opened",
       "title": "Contracts opened",
       "empty": "No contracts opened this month yet"
-    }
+    },
+    "chatHeld": " · with {{name}}",
+    "noteHeld": "with {{name}}",
+    "noteUnread_one": "{{n}} message awaiting reply",
+    "noteUnread_other": "{{n}} messages awaiting reply",
+    "noteWait": "waiting {{age}}"
   },
   "deviceLocation": {
     "button": "View location",

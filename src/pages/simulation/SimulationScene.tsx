@@ -6,6 +6,7 @@ import type { Chatter, Customer } from './useCustomers';
 import { FlightLayer, flightsBetween, snapshotOf, type HqSnapshot } from './simulationFlights';
 import { SimScore, SimTile } from './SimTile';
 import { ageText, baht, codeOf, compactBaht, stateColor, stateLabel, type SimBranch, type SimHq } from './simulationTypes';
+import { collectorColor, situationColor, situationText } from '../../lib/situation';
 
 // The still picture of the shops (156 §6). One shop per branch, each customer in it is a
 // real contract. simulationWorld draws it; this file owns pan and zoom and the HTML
@@ -319,18 +320,28 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
   const showIcons = view.k >= ICON_K;
   const showDetail = view.k >= DETAIL_K;
 
-  // What the tapped or pointed-at thing says, placed just above it.
-  let note: { text: string; color: string; at: { left: number; top: number } } | null = null;
+  // What the tapped or pointed-at thing says, placed just above it. A person's note has two
+  // lines (owner 11-11): a header in their colour — status, then the contract code — and the
+  // details below in the normal text colour; colouring the whole note made it hard to read.
+  let note: { head?: string; code?: string; text: string; color: string; at: { left: number; top: number } } | null = null;
   if (focus.key?.startsWith('a-')) {
     // Someone in the chat corner (hits carry the contract id negated).
     const c = chatters.find(x => `a-${x.id}` === focus.key);
     const at = c && world.current?.chatAt(c);
-    if (c && at) note = { text: t('simulation.chatNote', { code: c.code, n: c.unread, age: ageText(t, c.age), count: c.unread }), color: CHAT_COLOR, at: place(at[0], at[1] + 0.35, at[2]) };
+    if (c && at) note = {
+      head: situationText(t, c.situation || null, c.overdueDays), code: c.code,
+      text: [c.collector ? t('simulation.noteHeld', { name: c.collector }) : '', t('simulation.noteUnread', { n: c.unread, count: c.unread }), t('simulation.noteWait', { age: ageText(t, c.age) })].filter(Boolean).join(' · '),
+      color: situationColor(c.situation), at: place(at[0], at[1] + 0.35, at[2]),
+    };
   } else if (focus.key?.startsWith('a')) {
     const c = customers.find(x => `a${x.id}` === focus.key);
     const at = c && world.current?.customerAt(c);
     // The model on the contract and the device's AT-, once either exists (mig 1624).
-    if (c && at) note = { text: [codeOf(c.code, c.months), stateLabel(t, c.state), ageText(t, c.age), c.product, c.asset].filter(Boolean).join(' · '), color: stateColor(c.state), at: place(at[0], at[1] + 0.12, at[2]) };
+    if (c && at) note = {
+      head: stateLabel(t, c.state), code: codeOf(c.code, c.months),
+      text: [ageText(t, c.age), c.product, c.asset].filter(Boolean).join(' · '),
+      color: stateColor(c.state), at: place(at[0], at[1] + 0.12, at[2]),
+    };
   } else if (focus.key?.startsWith('s')) {
     // An empty chair: which zone it is, and how many wait in that zone now.
     const [bid, zone, x, z] = focus.key.slice(1).split(':');
@@ -375,7 +386,7 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
         const pos = world.current?.chatAt(c);
         if (!pos || focus.key === `a-${c.id}`) return null;
         const at = place(pos[0], pos[1] + 0.05, pos[2]);
-        return onScreen(at) ? <ChatBubble key={`c${c.id}`} n={c.unread} at={at} code={c.code} /> : null;
+        return onScreen(at) ? <ChatBubble key={`c${c.id}`} c={c} at={at} /> : null;
       })}
       {/* Files left from earlier days: the count over each stack, at every zoom. */}
       {stalePiles.map(p => {
@@ -490,7 +501,20 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
       {note && (() => {
         const half = Math.min(160, size.w * 0.43);
         const left = Math.min(Math.max(note.at.left, half + 4), size.w - half - 4);
-        return <span className="sim__chip sim__chip--on" style={{ ...note.at, left, color: note.color, borderColor: note.color }}>{note.text}</span>;
+        // --note feeds the border, the dot and the header colour (adjusted per theme in CSS).
+        const style = { ...note.at, left, borderColor: note.color, '--note': note.color } as CSSProperties;
+        return (
+          <span className="sim__chip sim__chip--on" style={style} data-testid="sim-note">
+            {note.head ? (
+              <>
+                <span className="sim__note-head"><i className="sim__note-dot" /><b>{note.head}</b>{note.code && <span className="sim__note-code"> · {note.code}</span>}</span>
+                {note.text && <span className="sim__note-body">{note.text}</span>}
+              </>
+            ) : (
+              <><i className="sim__note-dot" />{note.text}</>
+            )}
+          </span>
+        );
       })()}
     </div>
   );
@@ -513,18 +537,34 @@ function hqTagLine(t: Tr, p: SimHq['pools'][number]): string {
 }
 
 /** The unread count over a chatter's head: one speech-bubble outline, body and tail drawn
- *  as a single path so the border runs unbroken into the tail that points at the head. */
-function ChatBubble({ n, at, code }: { n: number; at: { left: number; top: number }; code: string }) {
-  const text = String(n);
+ *  as a single path so the border runs unbroken into the tail that points at the head.
+ *  Filled with the customer's situation colour, number in white (owner 11-11) — all-red
+ *  bubbles made an overdue customer look like everyone else. A collector holding the
+ *  contract = a small person badge on the bubble's top-left corner (owner 11-11 picked it over
+ *  an icon beside the bubble, which floated into the neighbours in a crowded room): flag
+ *  colour, muted grey on a green bubble. */
+function ChatBubble({ c, at }: { c: Chatter; at: { left: number; top: number } }) {
+  const text = String(c.unread);
   const w = 14 + text.length * 7;
   const h = 17;
   const r = 5;
   const tail = 5;
   const d = `M${r},1 H${w - r} Q${w - 1},1 ${w - 1},${r} V${h - r} Q${w - 1},${h} ${w - r},${h} H${w / 2 + 4} L${w / 2},${h + tail} L${w / 2 - 4},${h} H${r} Q1,${h} 1,${h - r} V${r} Q1,1 ${r},1 Z`;
+  const held = collectorColor(c.situation);
   return (
-    <svg className="sim__bubble" style={at} width={w} height={h + tail + 1} viewBox={`0 0 ${w} ${h + tail + 1}`} data-chat={code} aria-hidden="true">
-      <path d={d} fill="#fff" stroke="#e5484d" strokeWidth={1.5} strokeLinejoin="round" />
-      <text x={w / 2} y={h / 2 + 4} textAnchor="middle" fontSize={11} fontWeight={700} fill="#d63a40">{text}</text>
+    <svg className="sim__bubble" style={at} width={w} height={h + tail + 1} viewBox={`0 0 ${w} ${h + tail + 1}`}
+      data-chat={c.code} data-situation={c.situation || 'NONE'} data-held={c.collector ? 'true' : undefined} aria-hidden="true">
+      <path d={d} fill={situationColor(c.situation)} stroke="#fff" strokeWidth={1.5} strokeLinejoin="round" />
+      {/* Baseline puts the digit's ink (8px tall at 11px) on the body's middle, y = (1 + h) / 2.
+          The old h / 2 + 4 sat the digit 1px high — it read as crowding the top edge. */}
+      <text x={w / 2} y={(1 + h) / 2 + 4} textAnchor="middle" fontSize={11} fontWeight={700} fill="#fff">{text}</text>
+      {c.collector && (
+        <g transform="translate(1.5 1.5) scale(0.75)">
+          <circle r={6.5} fill="#fff" stroke={held} strokeWidth={1.4} />
+          <circle cy={-1.9} r={1.9} fill={held} />
+          <path d="M-3.3 3.6 a3.3 2.8 0 0 1 6.6 0z" fill={held} />
+        </g>
+      )}
     </svg>
   );
 }
