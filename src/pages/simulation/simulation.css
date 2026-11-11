@@ -48,12 +48,13 @@
    it in plain text of the same colour. 0 turns slate whatever the kind.
    Baseline-aligned, never centred: the word, the digits and the text the tile sits next to share
    one baseline (the parent row aligns on baseline too). The box is placed round its digit with
-   4px above it — measured 11-09 from pixels: box centre = digit centre within 1 screen pixel.
+   3px above it — re-measured 11-11 in the page (digit baseline vs the box): 4px left the digit
+   4.8px from the top and 2.2px from the bottom, so it read low (owner 11-11); 3px gives 3.8 / 3.2.
    (The old centred boxes needed by-eye nudges for Thai and still sat 2px low.)
    Boxes are dark enough for white digits at 4.9–5.4:1 (owner 11-09: the old amber box read
    2.2:1); same box in both themes, only the word lightens in dark. */
 .sim__tile { display: inline-flex; align-items: baseline; gap: 3px; font-style: normal; font-size: 11px; font-weight: 600; white-space: nowrap; }
-.sim__tile > b { display: inline-flex; align-items: baseline; justify-content: center; box-sizing: border-box; height: 16px; min-width: 16px; padding: 4px 4px 0; border-radius: 4px;
+.sim__tile > b { display: inline-flex; align-items: baseline; justify-content: center; box-sizing: border-box; height: 16px; min-width: 16px; padding: 3px 4px 0; border-radius: 4px;
   font-size: 11px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; color: #fff; }
 .sim__tile--stale { color: #9a5b00; } .sim__tile--stale > b { background: #9a5b00; }
 .sim__tile--chat { color: #0f7a84; }  .sim__tile--chat > b { background: #0f7a84; }
