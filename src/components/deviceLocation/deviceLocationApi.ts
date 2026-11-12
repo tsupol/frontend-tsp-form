@@ -194,7 +194,13 @@ export interface CustomerMapPin {
   };
   fixes_total: number;
   residence_status: ResidenceStatus | null;
+  /** Why a keyword found this contract (same reasons as fn_contract_search); null without a keyword. */
+  match: { reason: MapMatchReason; mode: string; prio: number; asset_id?: number } | null;
 }
+
+export type MapMatchReason = 'CONTRACT' | 'DEVICE' | 'FORMER_DEVICE' | 'TARGET_DEVICE' | 'CUSTOMER' | 'CO_LESSEE';
+
+export interface CustomerMapBranch { branch_id: number; name: string; company_id: number; pins: number; no_fix: number }
 
 export interface CustomerMap {
   scope: {
@@ -204,19 +210,42 @@ export interface CustomerMap {
     repo_company_ids: number[];
     company_id: number | null;
     branch_id: number | null;
+    /** The days used this time (nnf-mdm mig 462). */
+    min_overdue_days: number;
+    /** The viewer's floor: lower choices are lifted to this. */
+    permission_min_overdue_days: number;
+    requested_min_overdue_days: number | null;
+    /** The keyword actually used (trimmed); null = none or under 2 characters. */
+    keyword: string | null;
   };
-  totals: { contracts: number; with_fix: number; no_fix: number };
-  branches: { branch_id: number; name: string; company_id: number; pins: number; no_fix: number }[];
+  totals: { contracts: number; with_fix: number; no_fix: number; below_min_days: number };
+  /** true = over pin_limit: pins is empty, totals and branches still come. */
+  too_many: boolean;
+  pin_limit: number;
+  branches: CustomerMapBranch[];
   pins: CustomerMapPin[];
 }
 
-/** One read = one logged look at everyone's location: read on open and on the
- *  refresh button only. Filters are applied to the loaded pins, not re-read. */
-export function useCustomerMap(enabled: boolean) {
+export interface CustomerMapParams {
+  /** null = not sent (the DB uses max(permission, 3)). */
+  days: number | null;
+  branchId: number | null;
+  keyword: string | null;
+}
+
+/** One read = one logged look at those pins (PDPA): read when the days, branch
+ *  or a submitted keyword change and on the refresh button — never on a timer,
+ *  never per keystroke. */
+export function useCustomerMap(enabled: boolean, params: CustomerMapParams) {
   return useQuery({
-    queryKey: ['mdm-location-map'],
-    queryFn: () => apiClient.rpc<CustomerMap>('fn_mdm_location_map', {}),
+    queryKey: ['mdm-location-map', params],
+    queryFn: () => apiClient.rpc<CustomerMap>('fn_mdm_location_map', {
+      ...(params.days != null ? { p_min_overdue_days: params.days } : {}),
+      ...(params.branchId != null ? { p_branch_id: params.branchId } : {}),
+      ...(params.keyword ? { p_keyword: params.keyword } : {}),
+    }),
     enabled,
+    placeholderData: keepPreviousData,
     staleTime: 0,
     gcTime: 0,
     refetchOnWindowFocus: false,
