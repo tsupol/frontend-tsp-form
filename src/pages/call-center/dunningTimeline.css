@@ -1,0 +1,44 @@
+/* Dunning history timeline (DunningTimeline.tsx): a line down the left, a round
+   icon per event on it, a day header where the Bangkok day changes. */
+.cc-tl { list-style: none; margin: 0; padding: 0; position: relative; }
+/* The line runs through the centre of the 26px icons. */
+.cc-tl::before { content: ''; position: absolute; left: 12px; top: 6px; bottom: 6px; width: 2px; background: var(--color-line); border-radius: 1px; }
+
+.cc-tl-day {
+  position: relative; margin: 10px 0 6px; padding-left: 36px;
+  font-size: 12px; font-weight: 600; color: var(--color-subtle);
+}
+.cc-tl-day:first-child { margin-top: 0; }
+/* A short tick on the line marks where the day starts. */
+.cc-tl-day::before { content: ''; position: absolute; left: 7px; top: 50%; width: 12px; height: 2px; background: var(--color-subtle); border-radius: 1px; }
+
+.cc-tl-item { position: relative; display: flex; gap: 10px; padding: 0 0 12px; }
+.cc-tl-item:last-child { padding-bottom: 0; }
+.cc-tl-dot {
+  position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--color-surface); border: 1.5px solid var(--color-primary); color: var(--color-primary);
+}
+.cc-tl-item > div { padding-top: 3px; }
+/* Hand-over / money / end-of-case: smaller and grey. */
+.cc-tl-item--minor .cc-tl-dot { width: 20px; height: 20px; margin: 3px; border-color: var(--color-line); color: var(--color-subtle); }
+.cc-tl-item--minor .cc-tl-dot svg { width: 12px; height: 12px; }
+.cc-tl-item--minor > div { padding-top: 4px; }
+
+/* Summary box (SummaryBox): 4 lines tall, the text pinned to the bottom so the
+   newest lines show and the old part is cut off above (column-reverse). */
+.cc-sum-tail { display: flex; flex-direction: column-reverse; max-height: 5rem; overflow: hidden; }
+.cc-sum-tail--cut {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 1.1rem);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 1.1rem);
+}
+
+.cc-tl-link {
+  display: block;
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-size: 12px; color: var(--color-primary); text-decoration: underline; text-underline-offset: 2px;
+}
+/* #2563eb is too dark to read as text on the dark surface: the lighter blue there. */
+[data-theme="dark"] .cc-tl-link,
+[data-theme="dark"] .cc-tl-dot { color: var(--color-primary-fade); border-color: var(--color-primary-fade); }
+[data-theme="dark"] .cc-tl-item--minor .cc-tl-dot { color: var(--color-subtle); border-color: var(--color-line); }

@@ -85,6 +85,11 @@ export interface BookRow {
   late_fee_days: number;
   appointment_note: string | null;
   appointment_id: number | null;
+  /** Serial of the MDM binding in use — the device the customer holds, loaner first
+   *  (mig 1659). The relief button takes this, never device_serial. null = not on MDM. */
+  mdm_serial: string | null;
+  /** 24-hour relief still running, until when (mig 1659). null = none. Shown as-is. */
+  relief_until: string | null;
 }
 
 /** One installment — v_installments. Use payment_state, NEVER status. */

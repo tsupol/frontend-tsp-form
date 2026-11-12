@@ -48,6 +48,12 @@
 .dq-tag-head { color: #b8322f; }
 .dq-tag-tail { color: #52616b; }
 .dq-tag-promise { color: #0f8f7a; }
+/* 24-hour relief (owner 11-12): a purple hourglass next to the head + "ผ่อนปรนถึง …" under the feet.
+   Marker only — the line and place don't change. */
+.dq-tag-relief { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border-radius: 50%; background: #7c3aed; color: #fff; font-style: normal; }
+.dq-tag-foot .dq-tag-relief-until { color: #7c3aed; }
+.dq-relief-count { display: inline-flex; align-items: center; gap: 4px; color: #7c3aed; }
+[data-theme="dark"] .dq-relief-count { color: #b79cf5; }
 
 
 /* Shout: speech bubble + sound rings over the customer's head. */
@@ -77,12 +83,28 @@
 @media (prefers-reduced-motion: reduce) { .dq-shout b, .dq-shout i, .dq-paid i, .dq-paid b, .dq-paid span { animation: none; } }
 
 .dq-lanesign {
-  position: absolute; display: flex; flex-direction: column; align-items: center; min-width: 64px; line-height: 1.15;
-  padding: 2px 8px; border: 2.5px solid; border-radius: 10px; background: #fff; font-size: 13px;
-  white-space: nowrap; pointer-events: none; transform-origin: center bottom; box-shadow: 0 2px 5px rgba(20, 40, 50, .18);
+  position: absolute; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 76px;
+  padding: 9px 14px 6px; border: 2.5px solid; border-radius: 12px; background: #fff; font-size: 13px; line-height: 1.2;
+  white-space: nowrap; pointer-events: none; transform-origin: center bottom; box-shadow: 0 2px 6px rgba(20, 40, 50, .18);
 }
-.dq-lanesign--compact { min-width: 34px; padding: 0 6px; }
-.dq-lanesign span { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.dq-lanesign b { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; }
+.dq-lanesign span { font-size: 22px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+/* Padding is uneven on purpose: Thai keeps room under each line, so equal padding left the ink
+   7 px from the top and 10 px from the bottom (measured). 9/6 puts it ~8/9.
+   Promise lanes (นัด · นัดวันนี้ · ผิดนัด): filled with the lane's tone + calendar icon, so they read apart
+   from the white day-lane signs at a glance (owner 11-12). Fill / text colour come inline. */
+.dq-lanesign--mark { box-shadow: 0 3px 9px rgba(20, 40, 50, .32); }
+/* Zoomed out: number only (+ the icon on promise lanes) — still room around it. */
+.dq-lanesign--compact { flex-direction: row; gap: 4px; min-width: 40px; padding: 5px 9px; }
+.dq-lanesign--compact span { font-size: 18px; }
+.dq-laneicon { flex: none; }
+/* The same three in the count bar: a filled pill, room above/below the text inside the sm button. */
+.dq-lanecount-mark {
+  display: inline-flex; align-items: center; gap: 5px; padding: 5px 11px 4px 9px; border-radius: 999px;
+  color: #fff; line-height: 1.35;
+}
+/* The pill carries its own side room, so the ghost button around it only needs a sliver — keeps the bar on one row. */
+.dq-chip-mark { padding-inline: 3px; }
 .dq-countersign {
   position: absolute; display: flex; flex-direction: column; align-items: center; padding: 5px 14px; border-radius: 10px;
   background: #1f2d3a; color: #fff; font-size: 16px; white-space: nowrap; pointer-events: none;

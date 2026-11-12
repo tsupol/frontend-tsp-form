@@ -33,14 +33,14 @@ import { SubTabPause } from './mdm/SubTabPause';
 import { MdmDangerZone } from './mdm/MdmDangerZone';
 import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { DeviceLocationButton } from '../../components/deviceLocation/DeviceLocationDialog';
-import type { AssetMdmStatus, MdmReliefStatus } from './mdm/mdmApi';
+import type { AssetMdmStatus } from './mdm/mdmApi';
 
 type MdmSubTab = 'enroll' | 'status' | 'dunning' | 'wallpaper' | 'appControl' | 'lostMode' | 'pause' | 'danger';
 
 /** Which sub-tabs to show, given enrollment + per-device permissions (§12). */
 function visibleSubTabs(
   status: AssetMdmStatus | null,
-  relief: MdmReliefStatus | null | undefined,
+  mayRelief: boolean,
   danger: { reveal: boolean; deviceCommands: boolean },
 ): MdmSubTab[] {
   // Pause (§9) is DB-only and allowed even before enrollment (§12 exception).
@@ -57,8 +57,10 @@ function visibleSubTabs(
   }
   const tabs: MdmSubTab[] = ['enroll', 'status'];
   // The 24-hour relief lives with dunning, and more roles may press it than
-  // may enforce — whoever may press gets the sub-tab (IMPLEMENT relief_24h).
-  if (status.may_dunning || relief?.can_grant) tabs.push('dunning');
+  // may enforce. Whoever holds the permission gets the sub-tab even before the
+  // device reaches hard — the button is there, greyed with the reason
+  // (IMPLEMENT 2026-11-12 relief_24h_for_collectors §2: gating on can_grant hid it).
+  if (status.may_dunning || mayRelief) tabs.push('dunning');
   if (status.may_wallpaper) tabs.push('wallpaper');
   if (status.may_app_control) tabs.push('appControl');
   if (status.may_lost_mode || status.may_location) tabs.push('lostMode');
@@ -99,9 +101,10 @@ export function AssetMdmTab({ assetId, onRefresh, onAddSerial }: {
   const { hasPermission } = useMyPermissions();
   const mayReveal = hasPermission('MDM.ACTIVATION_LOCK_REVEAL');
   const mayDeviceCommands = hasPermission('MDM.ERASE') || hasPermission('MDM.PROFILE_REMOVE');
+  const mayRelief = hasPermission('MDM.RELIEF_24H');
   const tabs = useMemo(
-    () => visibleSubTabs(status ?? null, relief, { reveal: mayReveal, deviceCommands: mayDeviceCommands }),
-    [status, relief, mayReveal, mayDeviceCommands],
+    () => visibleSubTabs(status ?? null, mayRelief, { reveal: mayReveal, deviceCommands: mayDeviceCommands }),
+    [status, mayRelief, mayReveal, mayDeviceCommands],
   );
 
   // Land on status when enrolled, enroll otherwise (§0). Kept in state so the

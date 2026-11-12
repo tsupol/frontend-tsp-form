@@ -7,10 +7,12 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, type MouseEvent as RMouseEvent, type PointerEvent as RPointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from 'tsp-form';
-import { House, Minus, Plus, Skull, Star } from 'lucide-react';
+import { Hourglass, House, Minus, Plus, Skull, Star } from 'lucide-react';
 import { situationColor } from '../../../lib/situation';
 import { DEPTH, FIGURE_H, HEIGHT_PX, LANE_MIN, PX, SIGN_Y, QueueWorld, layoutQueue, project } from './queueWorld';
-import { LANES, baht, contactShort, promiseShort, type QueueLane, type QueuePerson } from './queueApi';
+import { LANES, baht, contactShort, isPromiseLane, promiseShort, type QueueLane, type QueuePerson } from './queueApi';
+import { LaneIcon } from './LaneIcon';
+import { reliefUntilText } from '../../../lib/relief';
 import { PAID_MS, SHOUT_MS, WALK_MS, type Fx } from './queueGeom';
 
 export interface Counter {
@@ -108,7 +110,7 @@ export const QueueScene = forwardRef<SceneHandle, {
       ...staff,
       ...spots.map(s => ({
         id: s.p.id, x: s.x, z: s.z, gender: s.p.gender, ring: situationColor(s.p.situation_code), focused: s.p.focused,
-        wash: match && !match.has(s.p.id) ? 0.78 : s.p.recent && s.p.lane !== 'PROMISED' && s.p.id !== picked ? 0.45 : 0,
+        wash: match && !match.has(s.p.id) ? 0.78 : s.p.recent && !isPromiseLane(s.p.lane) && s.p.id !== picked ? 0.45 : 0,
       })),
     ]);
   }, [spots, c.clerks, w, match, picked]);
@@ -353,7 +355,7 @@ export const QueueScene = forwardRef<SceneHandle, {
         {spots.map(s => {
           const p = s.p;
           const dim = !!match && !match.has(p.id);
-          const faded = p.recent && p.lane !== 'PROMISED' && p.id !== picked;
+          const faded = p.recent && !isPromiseLane(p.lane) && p.id !== picked;
           const [px, py] = project(s.x, 0, s.z);
           return (
             <div key={p.id} data-lid={p.id} className="dq-tag"
@@ -365,12 +367,14 @@ export const QueueScene = forwardRef<SceneHandle, {
                 </i>
                 <span className={p.contact_hours == null ? 'dq-tag-never' : ''}>{contactShort(t, p.contact_hours)}</span>
                 {p.chat_unread > 0 && <em className="dq-tag-chat">{p.chat_unread}</em>}
+                {p.relief_until && <i className="dq-tag-relief"><Hourglass size={9} strokeWidth={2.6} /></i>}
               </div>
-              {(s.head || s.tail || p.lane === 'PROMISED') && (
+              {(s.head || s.tail || p.lane === 'PROMISED' || p.relief_until) && (
                 <div className="dq-tag-foot">
                   {s.head && <span className="dq-tag-head">{t('dunningQueue.head')}</span>}
                   {s.tail && <span className="dq-tag-tail">{t('dunningQueue.tail')}</span>}
                   {p.lane === 'PROMISED' && <span className="dq-tag-promise">{promiseShort(t, p.days_left)}</span>}
+                  {p.relief_until && <span className="dq-tag-relief-until">{reliefUntilText(t, p.relief_until)}</span>}
                 </div>
               )}
             </div>
@@ -381,9 +385,13 @@ export const QueueScene = forwardRef<SceneHandle, {
       {LANES.map((L, li) => {
         const n = c.people.filter(p => p.lane === L.lane).length;
         return (
-          <div key={L.lane} className={`dq-lanesign${compactSigns ? ' dq-lanesign--compact' : ''}`}
-            style={{ ...screen(laneX[li], SIGN_Y, -0.25), borderColor: L.tone, color: L.tone, opacity: n ? 1 : 0.5, transform: `translate(-50%, -100%) scale(${ts})` }}>
-            {!compactSigns && <b>{t(`dunningQueue.lane.${L.lane}`)}</b>}<span>{n}</span>
+          // Promise lanes: solid sign + calendar icon, so they read apart from the day lanes (owner 11-12).
+          <div key={L.lane} className={`dq-lanesign${compactSigns ? ' dq-lanesign--compact' : ''}${L.mark ? ' dq-lanesign--mark' : ''}`}
+            style={{ ...screen(laneX[li], SIGN_Y, -0.25), borderColor: L.tone, color: L.mark ? '#fff' : L.tone, background: L.mark ? L.tone : undefined, opacity: n ? 1 : 0.5, transform: `translate(-50%, -100%) scale(${ts})` }}>
+            {compactSigns
+              ? L.mark && <LaneIcon mark={L.mark} size={13} />
+              : <b>{L.mark && <LaneIcon mark={L.mark} />}{t(`dunningQueue.lane.${L.lane}`)}</b>}
+            <span>{n}</span>
           </div>
         );
       })}

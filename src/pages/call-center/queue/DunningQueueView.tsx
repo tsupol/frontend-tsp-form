@@ -8,7 +8,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button, DataTable, PopOver, Select, Tooltip } from 'tsp-form';
-import { AlertTriangle, CircleHelp, Maximize2, Minimize2, Play, Star, Trash2, X } from 'lucide-react';
+import { AlertTriangle, CircleHelp, Hourglass, Maximize2, Minimize2, Play, Star, Trash2, X } from 'lucide-react';
+import { RELIEF_COLOR } from '../../../lib/relief';
 import { useAuth } from '../../../contexts/AuthContext';
 import { situationColor, situationText } from '../../../lib/situation';
 import { DateTime } from '../../../components/DateTime';
@@ -22,9 +23,10 @@ import { SimWindow } from '../../simulation/SimWindow';
 import { useWindowStack } from '../../simulation/useWindowStack';
 import '../../simulation/simulation.css';
 import {
-  LANES, baht, contactLong, queueKey, useDunningQueue,
+  LANES, baht, contactLong, isPromiseLane, queueKey, useDunningQueue,
   type QueueData, type QueueLane, type QueuePerson,
 } from './queueApi';
+import { LaneIcon } from './LaneIcon';
 import './queue.css';
 
 const LANE_ORDER: QueueLane[] = [...LANES.map(L => L.lane), 'LONG'];
@@ -210,7 +212,7 @@ export function DunningQueueView({ isMobile }: { isMobile: boolean }) {
   const tipOf = (p: QueuePerson) => {
     const state = p.lane === 'BROKEN'
       ? t('dunningQueue.brokenDaysN', { n: p.broken_days })
-      : p.lane === 'PROMISED'
+      : isPromiseLane(p.lane)
         ? `${t('dunningQueue.promise')} ${formatDateTime(p.promise_date, i18n.language, false)}`
         : situationText(t, p.situation_code, p.overdue_days);
     return [p.code, p.name, state, baht(p.overdue_amount), contactLong(t, p.contact_hours)];
@@ -222,6 +224,7 @@ export function DunningQueueView({ isMobile }: { isMobile: boolean }) {
   const chats = shown.reduce((s, p) => s + p.chat_unread, 0);
   const focusN = shown.filter(p => p.focused).length;
   const unassignedN = shown.filter(p => p.collector_id === 0).length;
+  const reliefN = shown.filter(p => p.relief_until).length;
 
   const listPeople = !list || !counter ? [] : list.kind === 'bin'
     ? counter.bin
@@ -334,6 +337,7 @@ export function DunningQueueView({ isMobile }: { isMobile: boolean }) {
             <div>{t('dunningQueue.legendFocus')}</div>
             <div>{t('dunningQueue.legendFlag')}</div>
             <div>{t('dunningQueue.legendBin')}</div>
+            <div><i style={{ background: RELIEF_COLOR, borderRadius: '50%' }} />{t('dunningQueue.legendRelief')}</div>
           </div>
         </PopOver>
         <div className="dq-updated">
@@ -351,13 +355,16 @@ export function DunningQueueView({ isMobile }: { isMobile: boolean }) {
           <span className="dq-total"><b>{t('dunningQueue.peopleN', { n: shown.length })}</b> · {baht(total)}</span>
           {/* Tap a line's count → the scene pans to that line. */}
           {LANES.map(L => (
-            <Button key={L.lane} size="sm" variant="ghost" onClick={() => sceneRef.current?.showLane(L.lane)}>
-              <span className="dq-lanecount" style={{ ['--tone' as string]: L.tone }}>{t(`dunningQueue.lane.${L.lane}`)} <b>{count(L.lane)}</b></span>
+            <Button key={L.lane} size="sm" variant="ghost" className={L.mark ? 'dq-chip-mark' : undefined} onClick={() => sceneRef.current?.showLane(L.lane)}>
+              {L.mark
+                ? <span className="dq-lanecount-mark" style={{ background: L.tone }}><LaneIcon mark={L.mark} size={13} />{t(`dunningQueue.lane.${L.lane}`)} <b>{count(L.lane)}</b></span>
+                : <span className="dq-lanecount" style={{ ['--tone' as string]: L.tone }}>{t(`dunningQueue.lane.${L.lane}`)} <b>{count(L.lane)}</b></span>}
             </Button>
           ))}
           <Button size="sm" variant="ghost" startIcon={<Trash2 size={14} />} onClick={() => setList(l => (l?.kind === 'bin' ? null : { kind: 'bin' }))}>
             {t('dunningQueue.lane.LONG')} <b className="ml-1">{count('LONG')}</b>
           </Button>
+          {reliefN > 0 && <span className="dq-relief-count text-sm px-2"><Hourglass size={14} />{t('dunningQueue.reliefN')} <b>{reliefN}</b></span>}
           {chats > 0 && <span className="text-sm text-info-fg px-2">{t('dunningQueue.chatUnread')} <b>{chats}</b></span>}
           {unassignedN > 0 && <span className="text-sm text-danger-fg px-2">{t('dunningQueue.unassigned')} <b>{unassignedN}</b></span>}
         </div>

@@ -8,18 +8,21 @@
 // It reverts by itself if unpaid; anything lighter (promise, slip, payment)
 // still wins. Pressing again restarts the 24 hours.
 //
-// Everything shown comes from fn_mdm_relief_24h_status: whether to show the
-// button (`can_grant`), its label, the top-of-tab banner, the "device silent"
+// Everything shown comes from fn_mdm_relief_24h_status: whether the button can
+// be pressed (`can_grant`), its label, the top-of-tab banner, the "device silent"
 // warning — the `*_th` fields are printed as they come, never composed here.
+// The button itself is shown to everyone holding MDM.RELIEF_24H (IMPLEMENT
+// 2026-11-12 relief_24h_for_collectors §3.2b), greyed with a reason otherwise.
 // Pressing is a queued command like every MDM action: the reply says it was
 // SENT, and the device follows when it next checks in.
 // ============================================================================
 
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { TFunction } from 'i18next';
 import { Button, Modal, TextArea } from 'tsp-form';
-import { Hourglass, AlertTriangle } from 'lucide-react';
+import { Hourglass, AlertTriangle, Loader2, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { ModalErrorBand } from '../../../components/ModalErrorBand';
 import { ActionDoneView } from '../../contracts/ActionDoneView';
@@ -28,6 +31,7 @@ import {
   type MdmReliefStatus, type MdmReliefGrantResult,
 } from './mdmApi';
 import { MDM_NO_CACHE } from './useMdmStatus';
+import { useMyPermissions } from '../../../hooks/useMyPermissions';
 
 /** The relief state of one device. Starts with `mdm-` so the tab's manual
  *  refresh reloads it with everything else. */
@@ -55,53 +59,123 @@ export function MdmReliefBar({ relief }: { relief: MdmReliefStatus | null | unde
   );
 }
 
-/** Sub-tab 3's relief card: the button, with what the staffer should know first. */
-export function MdmReliefPanel({ serial, relief, onGranted }: {
+/** Which line goes under the button, and whether it can be pressed — work order
+ *  2026-11-12 relief_24h_for_collectors §3.2b, first match wins. Every value comes
+ *  from the status read; the screen only picks the sentence. */
+function reliefState(t: TFunction, r: MdmReliefStatus): { enabled: boolean; note: string | null; noteTone: 'warning' | 'subtle' } {
+  if (r.can_grant && !r.active) return { enabled: true, note: r.warning_th, noteTone: 'warning' };
+  if (r.can_grant && r.active) {
+    return { enabled: true, note: [r.banner_th, t('asset.mdm.relief.againNote')].filter(Boolean).join(' · '), noteTone: 'subtle' };
+  }
+  if (r.overdue_days == null) return { enabled: false, note: t('asset.mdm.relief.notInDunning'), noteTone: 'subtle' };
+  if (!r.on_hard && r.active) return { enabled: false, note: r.banner_th, noteTone: 'subtle' };
+  if (!r.on_hard) {
+    // MDM counts 0 days while a promise stands (and early in the overdue), even when
+    // the queue shows more — "ตอนนี้ค้าง 0 วัน" beside "ค้าง 21 วัน" reads as a bug,
+    // so for 0 the number is left out.
+    if (r.overdue_days === 0) {
+      return { enabled: false, noteTone: 'subtle', note: t('asset.mdm.relief.notHardZero', { from: r.hard_from_days ?? '—' }) };
+    }
+    return {
+      enabled: false, noteTone: 'subtle',
+      note: r.hard_from_days != null
+        ? t('asset.mdm.relief.notHard', { from: r.hard_from_days, days: r.overdue_days })
+        : t('asset.mdm.relief.notHardNoFrom', { days: r.overdue_days }),
+    };
+  }
+  return { enabled: false, note: t('asset.mdm.relief.outsideScope'), noteTone: 'subtle' };
+}
+
+/** The 24-hour relief button, in the same place every time (owner 11-12: collectors
+ *  kept asking where it went). Shown to anyone holding MDM.RELIEF_24H for a device
+ *  bound to MDM; pressable only when the DB says `can_grant`, otherwise greyed with
+ *  the reason written under it (no tooltip — iPads have no hover). Used in the MDM
+ *  sub-tab, the collector detail and the dunning-queue panel.
+ *  `bare` drops the title + description, for the collector panels. */
+export function MdmReliefPanel({ serial, onGranted, bare = false }: {
+  /** The serial the customer holds (loaner first). null = not bound to MDM → nothing shown. */
   serial: string | null;
-  relief: MdmReliefStatus | null | undefined;
-  onGranted: () => void;
+  onGranted?: () => void;
+  bare?: boolean;
 }) {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const { hasPermission } = useMyPermissions();
+  const mayPress = hasPermission('MDM.RELIEF_24H');
+  const { data: relief, isLoading, error, refetch, isFetching } = useMdmRelief(serial, mayPress);
   const [open, setOpen] = useState(false);
-  // The window stays mounted while open even if the next status read drops
-  // the button (the device left hard meanwhile) — it keeps the last state.
+  // The window stays mounted while open even if the next status read greys the
+  // button (the device left hard meanwhile) — it keeps the last state.
   const lastRelief = useRef(relief);
   if (relief) lastRelief.current = relief;
   const shown = relief ?? lastRelief.current;
+
+  if (!mayPress || !serial) return null;
+  const parsed = error ? parseMdmError(error, t) : null;
+  // The device is not in the MDM at all — nothing to relieve, nothing to say.
+  if (parsed?.code === 'MDM.NOT_FOUND.ASSET_FOR_SERIAL') return null;
+
+  const label = relief?.label_th || t('asset.mdm.relief.button');
+  const state = relief ? reliefState(t, relief) : null;
+  const granted = () => {
+    refetch();
+    // The person gets the relief mark in the queue and the book (relief_until).
+    queryClient.invalidateQueries({ queryKey: ['cc', 'book'] });
+    onGranted?.();
+  };
+
   return (
     <>
-      {relief?.can_grant && serial && (
-    <div className="border border-line rounded-md p-4 flex flex-col gap-2">
-      <div className="flex items-center gap-2">
-        <Hourglass size={16} className="text-warning-fg" />
-        <span className="text-sm font-semibold">{relief.label_th}</span>
+      <div className="border border-line rounded-md p-3 flex flex-col gap-2" data-relief-box>
+        {!bare && (
+          <>
+            <div className="flex items-center gap-2">
+              <Hourglass size={16} className="text-warning-fg" />
+              <span className="text-sm font-semibold">{label}</span>
+            </div>
+            <p className="text-xs text-subtle">{t('asset.mdm.relief.desc')}</p>
+          </>
+        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            size="sm"
+            color={state?.enabled ? 'primary' : undefined}
+            variant={state?.enabled ? undefined : 'outline'}
+            startIcon={isLoading ? <Loader2 size={14} className="animate-spin" /> : <Hourglass size={14} />}
+            disabled={!state?.enabled}
+            data-action="RELIEF_24H"
+            data-blocked-reason={state && !state.enabled ? (state.note ?? '') : undefined}
+            onClick={() => setOpen(true)}
+          >
+            {label}
+          </Button>
+          {state?.enabled && relief?.overdue_days != null && relief.hard_from_days != null && (
+            <span className="text-xs text-subtle tabular-nums">
+              {t('asset.mdm.relief.overdue', { days: relief.overdue_days, from: relief.hard_from_days })}
+            </span>
+          )}
+          {parsed && (
+            <Button size="sm" variant="ghost" startIcon={<RefreshCw size={14} />} disabled={isFetching} onClick={() => refetch()}>
+              {t('common.retry')}
+            </Button>
+          )}
+        </div>
+        {parsed ? (
+          <p className="text-xs text-danger-fg">{t('asset.mdm.relief.loadFailed')}</p>
+        ) : state?.note ? (
+          <p className={`text-xs inline-flex items-start gap-1.5 ${state.noteTone === 'warning' ? 'text-warning-fg' : 'text-subtle'}`}>
+            {state.noteTone === 'warning' && <AlertTriangle size={13} className="shrink-0 mt-0.5" />}
+            {state.note}
+          </p>
+        ) : null}
       </div>
-      <p className="text-xs text-subtle">{t('asset.mdm.relief.desc')}</p>
-      {relief.overdue_days != null && relief.hard_from_days != null && (
-        <p className="text-xs text-subtle tabular-nums">
-          {t('asset.mdm.relief.overdue', { days: relief.overdue_days, from: relief.hard_from_days })}
-        </p>
-      )}
-      {relief.warning_th && (
-        <p className="text-xs text-warning-fg inline-flex items-start gap-1.5">
-          <AlertTriangle size={13} className="shrink-0 mt-0.5" />
-          {relief.warning_th}
-        </p>
-      )}
-      <div>
-        <Button size="sm" color="primary" startIcon={<Hourglass size={14} />} onClick={() => setOpen(true)}>
-          {relief.label_th}
-        </Button>
-      </div>
-    </div>
-      )}
-      {shown && serial && (
+      {shown && (
         <MdmReliefDialog
           open={open}
           serial={serial}
           relief={shown}
           onClose={() => setOpen(false)}
-          onGranted={onGranted}
+          onGranted={granted}
         />
       )}
     </>

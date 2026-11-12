@@ -5,7 +5,8 @@
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Badge, Tooltip } from 'tsp-form';
-import { AlertTriangle, Cpu, User, Wrench, Store, Repeat, CalendarClock, ExternalLink } from 'lucide-react';
+import { AlertTriangle, Cpu, User, Wrench, Store, Repeat, CalendarClock, ExternalLink, Hourglass } from 'lucide-react';
+import { RELIEF_COLOR, reliefUntilText } from '../../lib/relief';
 import { DateTime } from '../../components/DateTime';
 import { flagTone, type FlagLevelRef } from './callCenterApi';
 
@@ -193,6 +194,23 @@ export function AppointmentBadge({ date }: { date: string | null }) {
   return (
     <Badge size="sm" color="success" startIcon={<CalendarClock size={11} />}>
       {t('callCenter.appointmentOn')} <DateTime value={date} showTime={false} />
+    </Badge>
+  );
+}
+
+/** 24-hour relief still running — purple, with when it ends (IMPLEMENT 2026-11-12
+ *  relief_24h_for_collectors §5). Same colour as the mark on the queue floor. */
+export function ReliefBadge({ until }: { until: string | null }) {
+  const { t } = useTranslation();
+  if (!until) return null;
+  return (
+    <Badge
+      size="sm"
+      startIcon={<Hourglass size={11} />}
+      style={{ ['--color-badge-default-bg' as string]: RELIEF_COLOR, ['--color-badge-default-fg' as string]: '#fff' }}
+      data-testid="cc-relief-badge"
+    >
+      {reliefUntilText(t, until)}
     </Badge>
   );
 }

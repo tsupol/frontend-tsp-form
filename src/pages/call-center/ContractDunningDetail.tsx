@@ -10,7 +10,7 @@ import { Badge, Button, Select, TextArea, useSnackbarContext } from 'tsp-form';
 import {
   Phone, Pencil, CheckCircle, XCircle,
   Users, Save, Clock, Flag, CalendarClock,
-  MessageSquare, Cloud, Truck, Undo2,
+  MessageSquare, Cloud, Truck, Undo2, Info,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useChatDock } from '../../contexts/ChatDockContext';
@@ -20,7 +20,7 @@ import {
   ccKeys, useFlagLevels, useActorEventTypes, useActionResults,
   useActiveAppointment, useContractIcloud,
   focusAdd, focusRemove, logDunningAction, setDunningSummary, overdueColor,
-  type BookRow, type InstallmentRow, type ContactBook, type TimelineRow,
+  type BookRow, type InstallmentRow, type ContactBook,
 } from './callCenterApi';
 import {
   FlagPair, SkipReasonBadge, DunningStatusBadge,
@@ -33,6 +33,8 @@ import { DeviceSignalsPanel, deviceSignalsKey, useDeviceSignals } from '../../co
 import { DetailLine } from '../../components/DetailLine';
 import { ContactValue } from '../../components/ContactValue';
 import { contactHref } from '../../lib/contactLink';
+import { MdmReliefPanel } from '../inventory/mdm/MdmReliefPanel';
+import { DunningTimeline, useSummaryTail } from './DunningTimeline';
 
 type DetailTab = 'overview' | 'installments' | 'contacts' | 'history';
 const TABS: DetailTab[] = ['overview', 'installments', 'contacts', 'history'];
@@ -47,6 +49,16 @@ function SummaryBlock({ row }: { row: BookRow }) {
   const [draft, setDraft] = useState(row.summary ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const { tailProps, toggle } = useSummaryTail(editing ? null : row.summary);
+  const editorRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = editorRef.current;
+    if (!editing || !el) return;
+    const end = el.value.length;
+    el.focus();
+    el.setSelectionRange(end, end);
+    el.scrollTop = el.scrollHeight;
+  }, [editing]);
 
   useEffect(() => { setDraft(row.summary ?? ''); setEditing(false); }, [row.contract_id, row.summary]);
 
@@ -74,6 +86,7 @@ function SummaryBlock({ row }: { row: BookRow }) {
     <div className="bg-warning-soft border border-warning-border rounded-md px-3 py-2.5">
       <div className="flex items-center justify-between gap-2 mb-1">
         <span className="text-xs font-medium text-subtle">{t('callCenter.summary')}</span>
+        {!editing && toggle && <span className="ml-auto">{toggle}</span>}
         {!editing && (
           <button
             className="text-xs text-primary-fg hover:underline inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
@@ -85,13 +98,15 @@ function SummaryBlock({ row }: { row: BookRow }) {
       </div>
       {editing ? (
         <div className="flex flex-col gap-2">
+          {/* Tall enough for the note (4–12 lines, then it scrolls), and opened with the
+              caret after the last line — collectors add each day's line at the bottom. */}
           <TextArea
+            ref={editorRef}
             className="w-full"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder={t('callCenter.summaryPlaceholder')}
-            rows={3}
-            autoFocus
+            rows={Math.min(12, Math.max(4, draft.split(/\r?\n/).length + 1))}
           />
           {error && <div className="alert alert-danger"><XCircle size={16} /><span>{error}</span></div>}
           <div className="flex gap-2">
@@ -104,14 +119,16 @@ function SummaryBlock({ row }: { row: BookRow }) {
           </div>
         </div>
       ) : (
-        <button
-          className="text-sm text-left w-full bg-transparent border-none p-0 cursor-text whitespace-pre-wrap"
-          onClick={() => setEditing(true)}
-        >
-          {row.summary
-            ? row.summary
-            : <span className="text-subtler italic">{t('callCenter.summaryEmpty')}</span>}
-        </button>
+        <div {...tailProps}>
+          <button
+            className="text-sm text-left w-full bg-transparent border-none p-0 cursor-text whitespace-pre-wrap"
+            onClick={() => setEditing(true)}
+          >
+            {row.summary
+              ? row.summary
+              : <span className="text-subtler italic">{t('callCenter.summaryEmpty')}</span>}
+          </button>
+        </div>
       )}
       {row.summary_at && !editing && (
         <div className="text-xs text-subtle mt-1.5 flex items-center gap-1">
@@ -306,6 +323,10 @@ function OverviewTab({ row, hideLog }: { row: BookRow; hideLog?: boolean }) {
           </Button>
         )}
       </div>
+
+      {/* 24-hour relief: near the promise, because it happens when the customer
+          calls to say they'll transfer. The queue panel draws its own (hideLog). */}
+      {!hideLog && <MdmReliefPanel serial={row.mdm_serial} onGranted={refreshRow} bare />}
 
       {/* Money */}
       <div className="grid grid-cols-2 gap-3 text-sm">
@@ -567,52 +588,10 @@ function ContactsTab({ contractId }: { contractId: number }) {
 
 // ── History tab (immutable timeline) ────────────────────────────────────────
 
-function HistoryTab({ contractId }: { contractId: number }) {
-  const { t } = useTranslation();
-  const { data, isLoading } = useQuery({
-    queryKey: ccKeys.timeline(contractId),
-    queryFn: () => apiClient.get<TimelineRow[]>(`/v_contract_dunning_timeline?contract_id=eq.${contractId}&order=created_at.desc`),
-  });
-
-  if (isLoading) return <div className="p-4 text-subtle">{t('common.loading')}</div>;
-  if (!data || data.length === 0) return <div className="p-4 text-subtler">{t('callCenter.noHistory')}</div>;
-
+function HistoryTab({ row }: { row: BookRow }) {
   return (
     <div className="p-4">
-      <div className="divide-y divide-line">
-        {data.map(evt => {
-          const actor = evt.is_system || !evt.actor_username ? t('callCenter.systemActor') : evt.actor_username;
-          const note = typeof evt.payload?.note === 'string' ? evt.payload.note : null;
-          const summaryFrom = evt.event_type === 'SUMMARY_UPDATED' && typeof evt.payload?.from === 'string' ? evt.payload.from : null;
-          const summaryTo = evt.event_type === 'SUMMARY_UPDATED' && typeof evt.payload?.to === 'string' ? evt.payload.to : null;
-          return (
-            <div key={evt.id} className="flex gap-3 py-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-medium">
-                    {t(`callCenter.event.${evt.event_type}`, { defaultValue: evt.event_type })}
-                  </span>
-                  {evt.result_code && (
-                    <Badge size="sm" color={evt.result_code.startsWith('REACHED') || evt.result_code === 'MET' ? 'success' : 'default'}>
-                      {t(`callCenter.result_code.${evt.result_code}`, { defaultValue: evt.result_code })}
-                    </Badge>
-                  )}
-                  <span className="text-xs text-subtle">{actor}</span>
-                </div>
-                {note && <div className="text-sm text-subtle mt-1 whitespace-pre-wrap">{note}</div>}
-                {summaryFrom != null && (
-                  <div className="text-xs text-subtle mt-1">
-                    <span className="text-subtler">{t('callCenter.summaryFrom')}:</span> {summaryFrom || '—'}
-                    {' → '}
-                    <span className="text-subtler">{t('callCenter.summaryTo')}:</span> {summaryTo || '—'}
-                  </div>
-                )}
-                <div className="text-xs text-subtler mt-1"><DateTime value={evt.created_at} /></div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <DunningTimeline contractId={row.contract_id} summary={{ text: row.summary, at: row.summary_at }} />
     </div>
   );
 }
@@ -681,6 +660,14 @@ export function ContractDunningDetail({
   // works for them (its RPCs check permission themselves).
   if (embedded && !isError && !row) {
     return <div className="px-4 py-3 text-xs text-subtler">{t('dunningQueue.detailOwnerOnly')}</div>;
+  }
+  // Opened by URL (?contract=) for a contract someone else holds: say so, not "error".
+  if (!isError && !row) {
+    return (
+      <div className="p-4" data-not-in-book>
+        <div className="alert alert-info"><Info size={18} /><span>{t('callCenter.notInMyBook')}</span></div>
+      </div>
+    );
   }
   if (isError || !row) {
     return (
@@ -755,7 +742,7 @@ export function ContractDunningDetail({
         {activeTab === 'overview' && <OverviewTab row={row} hideLog={embedded} />}
         {activeTab === 'installments' && <InstallmentsTab contractId={contractId} />}
         {activeTab === 'contacts' && <ContactsTab contractId={contractId} />}
-        {activeTab === 'history' && <HistoryTab contractId={contractId} />}
+        {activeTab === 'history' && <HistoryTab row={row} />}
       </div>
     </div>
   );

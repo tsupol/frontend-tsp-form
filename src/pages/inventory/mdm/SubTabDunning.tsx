@@ -186,8 +186,8 @@ export function SubTabDunning({
       </div>
       )}
 
-      {/* 24-hour relief — shown when the DB says this user may press it. */}
-      <MdmReliefPanel serial={status.serial_number} relief={relief} onGranted={onReliefChanged} />
+      {/* 24-hour relief — always there for MDM.RELIEF_24H holders, greyed + reason when it can't be pressed. */}
+      <MdmReliefPanel serial={status.serial_number} onGranted={onReliefChanged} />
 
       {/* Confirm dialog — stands in for the missing preview (§5.2). Shows the
           image that WILL be sent (enforce) + names the device. */}

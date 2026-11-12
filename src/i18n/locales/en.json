@@ -1609,7 +1609,18 @@
         "overdue": "{{days}} days overdue · restricted from day {{from}}",
         "reasonLabel": "Reason",
         "reasonPlaceholder": "Customer called to transfer a payment",
-        "doneHeadline": "24-hour relief sent"
+        "doneHeadline": "24-hour relief sent",
+        "button": "24-hour relief",
+        "againNote": "Pressing again restarts the 24 hours from now",
+        "notInDunning": "This device isn't in dunning — no relief needed",
+        "notHard": "Usable once the bank apps are blocked (from {{from}} days overdue) · now {{days}} days — the customer can still open their bank app",
+        "notHardNoFrom": "Usable once the bank apps are blocked · now {{days}} days overdue — the customer can still open their bank app",
+        "outsideScope": "This device is outside your branch / collection pool — ask a branch manager or company admin",
+        "loadFailed": "Couldn't load the relief status — retry",
+        "untilToday": "Relief until {{time}}",
+        "untilTomorrow": "Relief until tomorrow {{time}}",
+        "untilNote": "If still unpaid when it ends, the device restricts the apps again by itself",
+        "notHardZero": "Usable once the bank apps are blocked (from {{from}} days overdue) — the bank apps are open now, the customer can transfer"
       }
     },
     "icloud_appleOnly": "iCloud applies to Apple devices only.",
@@ -2740,7 +2751,17 @@
       "REPO_ATTEMPT": "Repossession attempt",
       "GAVE_UP": "Gave up",
       "REPO_NOTE": "Repo note",
-      "LEGAL_FINISHED": "Legal finished"
+      "LEGAL_FINISHED": "Legal finished",
+      "RELEASED": "Released from collector",
+      "TRADE_REJECTED": "Transfer rejected",
+      "TRADE_CANCELLED": "Transfer offer cancelled",
+      "STAGE_CHANGED": "Work stage changed",
+      "DUNNING_SKIPPED": "Dunning skipped",
+      "SENT": "Notification sent",
+      "DELIVERED": "Notification received",
+      "LETTER_ISSUED": "Demand letter issued",
+      "PAYMENT": "Payment received",
+      "CONTRACT_TERMINATED": "Contract ended"
     },
     "result_code": {
       "NO_ANSWER": "No answer",
@@ -2756,7 +2777,10 @@
       "NOT_HOME": "Not home",
       "MOVED": "Moved",
       "DONE": "Done",
-      "FAILED": "Failed"
+      "FAILED": "Failed",
+      "ADDR_UNREACHABLE": "Could not reach the address",
+      "ADDR_NO_TARGET": "At the address, customer not found",
+      "SUCCESS": "Found, device repossessed"
     },
     "contactType": {
       "FACEBOOK": "Facebook",
@@ -2790,7 +2814,24 @@
       "unchanged": "Already in that status — nothing changed"
     },
     "untouchedBadge": "Not contacted",
-    "neglectUntouched": "Not contacted ({{count}})"
+    "neglectUntouched": "Not contacted ({{count}})",
+    "staffActor": "Staff",
+    "notInMyBook": "This contract is not in your book — only the collector holding it can open it here.",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "summaryLatest": "Latest summary",
+    "timelineTitle": "Dunning history",
+    "timelineOpen": "View history",
+    "timelineOpenN": "View history ({{n}})",
+    "timelineShowSystem": "Show system events (flag changes · notifications)",
+    "timelineMore": "Load more",
+    "timelineLoadFailed": "Could not load the history — press retry",
+    "timelinePromise": "Promised for",
+    "timelineExpand": "Show all · before edit",
+    "timelineCollapse": "Collapse",
+    "timelineBefore": "Before edit",
+    "timelineShowAll": "Show all",
+    "summaryNone": "No summary yet"
   },
   "channel": {
     "PURCHASE": "Purchase",
@@ -11407,7 +11448,28 @@
       "resident": "Lives here",
       "stale": "Fix older than {{days}} days"
     },
-    "pickHint": "Pick a contract in the list or a pin on the map to open it in Google Maps"
+    "pickHint": "Pick a contract in the list or a pin on the map to open it in Google Maps",
+    "daysAll": "All contracts",
+    "daysOption": "Overdue ≥ {{n}} days",
+    "showDays": "Show {{label}}",
+    "searchPlaceholder": "Search contract / device / customer, then Enter",
+    "searchClear": "Clear search",
+    "searchTooShort": "Type at least 2 characters",
+    "match": {
+      "CONTRACT": "Contract no.",
+      "DEVICE": "Current device",
+      "FORMER_DEVICE": "Former device",
+      "TARGET_DEVICE": "Target device",
+      "CUSTOMER": "Lessee",
+      "CO_LESSEE": "Co-lessee"
+    },
+    "tooMany": "{{count}} contracts have a location — more than the map can show ({{limit}})",
+    "tooManyHint": "Search, pick a branch or raise the overdue days to narrow it down",
+    "pickBranch": "Pick a branch",
+    "belowMin": "{{count}} more contracts are overdue less than {{days}} days",
+    "emptyDays": "No pins overdue ≥ {{days}} days",
+    "emptyKeyword": "Nothing found for \"{{keyword}}\"",
+    "emptyKeywordDays": "Nothing found for \"{{keyword}}\" overdue ≥ {{days}} days"
   },
   "downPct": {
     "label": "Down %",
@@ -11494,6 +11556,7 @@
       "QUEUE_4": "21–27 days",
       "QUEUE_5": "28–41 days",
       "PROMISED": "Promised",
+      "PROMISED_TODAY": "Promised today",
       "BROKEN": "Broken promise",
       "LONG": "Over 41 days"
     },
@@ -11562,6 +11625,8 @@
     "exitFull": "Exit full screen",
     "fullHint": "Fill the whole screen — Esc to come back",
     "exitFullHint": "Back to the normal page (Esc)",
-    "noNext": "Everyone here has been opened — press \"Start at the head\" for a new round"
+    "noNext": "Everyone here has been opened — press \"Start at the head\" for a new round",
+    "reliefN": "Relief",
+    "legendRelief": "24-hour relief (bank apps open for now) — the end time is under the feet"
   }
 }

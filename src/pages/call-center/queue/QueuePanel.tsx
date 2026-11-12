@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Badge, Button, TextArea, Tooltip, useSnackbarContext } from 'tsp-form';
+import { Badge, Button, Modal, TextArea, Tooltip, useSnackbarContext } from 'tsp-form';
 import {
   ArrowRight, CheckCircle, Flag, MessageSquare, Megaphone, PartyPopper,
   Phone, Star, StarOff, ArrowRightLeft, X, XCircle,
@@ -23,9 +23,12 @@ import {
   type ContactBook,
 } from '../callCenterApi';
 import { FlagChangeModal, PromiseModal, RowTransferModal } from '../DunningActions';
+import { ReliefBadge } from '../ccBadges';
 import { ContractDunningDetail } from '../ContractDunningDetail';
+import { DunningTimeline, SummaryBox, TimelinePeek } from '../DunningTimeline';
 import { fetchMdmStory } from '../../inventory/mdm/mdmApi';
 import { MdmStoryBox } from '../../inventory/mdm/MdmStoryBox';
+import { MdmReliefPanel } from '../../inventory/mdm/MdmReliefPanel';
 import { LANES, baht, contactLong, type QueueBranch, type QueuePerson } from './queueApi';
 
 const EVENTS = ['CALL', 'TOLD_REFERENCE', 'FIELD_VISIT', 'NOTE'] as const;
@@ -161,6 +164,7 @@ export function QueuePanel({
   const [flagOpen, setFlagOpen] = useState(false);
   const [promiseOpen, setPromiseOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [focusBusy, setFocusBusy] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   // The container (window or sheet body) is the one scroll area.
@@ -186,6 +190,7 @@ export function QueuePanel({
     queryClient.invalidateQueries({ queryKey: ccKeys.bookRow(p.id) });
     queryClient.invalidateQueries({ queryKey: ccKeys.timeline(p.id) });
     queryClient.invalidateQueries({ queryKey: ccKeys.appointment(p.id) });
+    queryClient.invalidateQueries({ queryKey: ['cc', 'queue-mdm', p.asset_id] });
   };
 
   // Pressing a number dials it and opens the result form for that kind of call.
@@ -248,6 +253,12 @@ export function QueuePanel({
             {p.flag_manual !== 'WHITE' && <span className="text-subtle text-xs">({t('dunningQueue.flagManual')})</span>}
           </span>
         </div>
+        {p.relief_until && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <ReliefBadge until={p.relief_until} />
+            <span className="text-xs text-subtle">{t('asset.mdm.relief.untilNote')}</span>
+          </div>
+        )}
         {p.promise_date && (
           <div className="text-subtle">
             {p.lane === 'BROKEN' ? t('dunningQueue.brokenPromise') : t('dunningQueue.promise')}{' '}
@@ -286,12 +297,11 @@ export function QueuePanel({
       </div>
 
       {/* Summary note — one note the collector overwrites, shown line by line. */}
-      {p.summary && (
-        <div className="bg-warning-soft border border-warning-border rounded-md px-3 py-2">
-          <div className="text-xs text-subtle mb-0.5">{t('callCenter.summary')}</div>
-          <div className="text-sm whitespace-pre-line">{p.summary}</div>
-        </div>
-      )}
+      {p.summary && <SummaryBox title={t('callCenter.summary')} text={p.summary} />}
+
+      {/* What happened last time, before calling (RECOMMEND 2026-11-12 §5a–b): the last
+          three events here, the whole timeline one press away. */}
+      <TimelinePeek contractId={p.id} onOpen={() => setHistoryOpen(true)} />
 
       {/* Other numbers: calling a reference logs "told a reference". */}
       {(tels.length > 1 || (contacts?.references?.length ?? 0) > 0) && (
@@ -323,6 +333,10 @@ export function QueuePanel({
         <div className="text-xs text-subtler">{t('dunningQueue.noDevice')}</div>
       )}
 
+      {/* 24-hour relief — from the queue row's serial, so a supervisor opening someone
+          else's customer has it too (the detail below needs the viewer's own book). */}
+      <MdmReliefPanel serial={p.serial} onGranted={refresh} bare />
+
       <div className="flex items-center gap-1.5 flex-wrap">
         <Button size="sm" variant="outline" startIcon={<ArrowRightLeft size={14} />} onClick={() => setTransferOpen(true)}>
           {t('dunningQueue.transfer')}
@@ -341,6 +355,17 @@ export function QueuePanel({
         <ContractDunningDetail contractId={p.id} isMobile={isMobile} embedded />
       </div>
 
+      <Modal open={historyOpen} onClose={() => setHistoryOpen(false)} maxWidth="34rem" width="100%">
+        <div className="modal-header">
+          <h2 className="modal-title inline-flex items-center gap-2 min-w-0">
+            <span className="truncate">{t('callCenter.timelineTitle')} · {p.code}</span>
+          </h2>
+          <button type="button" className="modal-close-btn" onClick={() => setHistoryOpen(false)}>×</button>
+        </div>
+        <div className="modal-content">
+          <DunningTimeline contractId={p.id} summary={{ text: p.summary || null, by: p.summary_by || null, at: p.summary_at }} />
+        </div>
+      </Modal>
       <FlagChangeModal open={flagOpen} contractId={p.id} currentManual={p.flag_manual} onClose={() => setFlagOpen(false)} onChanged={refresh} />
       <PromiseModal open={promiseOpen} contractId={p.id} onClose={() => setPromiseOpen(false)} onSaved={refresh} />
       <RowTransferModal

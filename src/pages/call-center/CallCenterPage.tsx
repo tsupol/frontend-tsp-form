@@ -15,7 +15,7 @@ import {
   ccKeys, useFlagLevels, focusAdd, focusRemove, overdueColor,
   type BookRow, type TradeRow, type TradeInboxRow,
 } from './callCenterApi';
-import { FlagPair, SkipReasonBadge, AppointmentBadge, DeviceContextBadges, DeviceLink } from './ccBadges';
+import { FlagPair, SkipReasonBadge, AppointmentBadge, DeviceContextBadges, DeviceLink, ReliefBadge } from './ccBadges';
 import { RowTransferModal } from './DunningActions';
 import { ContractDunningDetail } from './ContractDunningDetail';
 import { TransferView, TransferOfferDetail } from './TransferView';
@@ -530,6 +530,7 @@ export function CallCenterPage() {
                             )}
                             <SkipReasonBadge reason={c.dunning_skip_reason} />
                             <AppointmentBadge date={c.open_promise_date} />
+                            <ReliefBadge until={c.relief_until} />
                             <DeviceContextBadges inRepair={c.device_in_repair} deposited={c.device_deposited} hasLoaner={c.has_loaner} />
                           </div>
                           {c.overdue_amount > 0 && (
