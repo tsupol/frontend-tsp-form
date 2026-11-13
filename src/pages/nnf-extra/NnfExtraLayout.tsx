@@ -7,7 +7,7 @@ import { type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Badge } from 'tsp-form';
-import { Smartphone, MonitorSmartphone, ListChecks, MapPinned, Map as MapIcon, MonitorX, LockKeyhole } from 'lucide-react';
+import { Smartphone, MonitorSmartphone, ListChecks, MapPinned, Map as MapIcon, MonitorX, LockKeyhole, ScanEye } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLocationViewCan } from '../../components/deviceLocation/deviceLocationApi';
@@ -40,7 +40,8 @@ export function NnfExtraLayout({ children }: { children: ReactNode }) {
       ? [{ path: '/admin/nnf-extra/silent-watch', labelKey: 'nav.silentWatch', icon: MonitorX, count: silentWatchCount, prefix: true }]
       : []),
     ...(!isDealPartner
-      ? [{ path: '/admin/nnf-extra/lost-mode-stuck', labelKey: 'nav.lostModeStuck', icon: LockKeyhole, count: lostModeStuckCount }]
+      ? [{ path: '/admin/nnf-extra/lost-mode-stuck', labelKey: 'nav.lostModeStuck', icon: LockKeyhole, count: lostModeStuckCount },
+         { path: '/admin/nnf-extra/device-watch', labelKey: 'nav.deviceWatch', icon: ScanEye }]
       : []),
     ...DETECTION_ITEMS,
     ...(locationCan?.can_view ? [CUSTOMER_MAP_ITEM] : []),

@@ -1,0 +1,37 @@
+/* เฝ้าเครื่อง — on top of the dunning queue's styles (queue.css: stage, tags, signs, zoom,
+   window, sheet). The picture keeps its own light palette in both themes, like the queue. */
+
+/* Small round marks inside the tag over a head: checked (green) · never located (grey) · locked (red). */
+.dw-mark {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 12px; height: 12px; border-radius: 50%; color: #fff; font-style: normal;
+}
+.dw-mark--ok { background: #15803d; }
+.dw-mark--nofix { background: #64748b; }
+.dw-mark--lock { background: #dc2626; }
+.dq-legend .dw-mark { margin-left: 0; }
+.dq-tag-foot .dw-foot-wait { color: #0f766e; }
+
+/* Under a lane sign's count: work count, or when the lane becomes work. */
+.dw-sign-note { font-size: 11px; font-weight: 600; opacity: .9; }
+
+/* "เงียบ 2 วัน" … at the road's left edge. */
+.dw-band {
+  position: absolute; padding: 1px 6px; border-radius: 5px; background: rgba(255, 255, 255, .9); color: #33414c;
+  font-size: 12px; font-weight: 700; white-space: nowrap; pointer-events: none; transform-origin: right center;
+  box-shadow: 0 1px 3px rgba(20, 40, 50, .2);
+}
+
+/* Counts row. */
+.dw-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; font-size: 13px; color: var(--color-fg); white-space: nowrap; }
+.dw-chip b { font-variant-numeric: tabular-nums; }
+a.dw-chip { border-radius: 6px; text-decoration: none; }
+a.dw-chip:hover { background: var(--color-surface-hover); }
+.dw-chip--stuck { color: var(--color-danger-fg); }
+.dw-chip--task { color: #c2410c; }
+[data-theme="dark"] .dw-chip--task { color: #fb923c; }
+.dw-chip--warn { color: var(--color-danger-fg); font-weight: 600; }
+.dw-sep { width: 1px; height: 16px; margin: 0 4px; background: var(--color-line); }
+
+/* "Nothing silent or stuck" sits over the empty picture without catching the drag. */
+.dw-empty { pointer-events: none; align-items: flex-start; padding-top: 18%; }

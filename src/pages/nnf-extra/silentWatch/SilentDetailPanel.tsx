@@ -37,16 +37,46 @@ const LocationMap = lazy(() => import('../../../components/deviceLocation/Locati
 
 const ANSWERED_PREVIEW = 8;
 
-export function SilentDetailPanel({ episodeId }: { episodeId: number }) {
+/** `embedded`: inside the device-watch scene's card (UI 165) — the card's title bar names the
+ *  row, the card scrolls as a whole, and the check form sits right under the overview so it
+ *  is in reach without scrolling past the map. */
+export function SilentDetailPanel({ episodeId, embedded = false }: { episodeId: number; embedded?: boolean }) {
   const { t } = useTranslation();
   const { data, error, isLoading, isFetching, refetch } = useSilentTaskDetail(episodeId);
+
+  if (embedded) {
+    if (error) {
+      return (
+        <div className="alert alert-danger">
+          <XCircle size={16} />
+          <span className="alert-description">{error instanceof ApiError ? translateApiError(error, t) : t('common.error')}</span>
+        </div>
+      );
+    }
+    if (isLoading || !data) return <div className="py-10 flex justify-center text-subtler"><Loader2 size={20} className="animate-spin" /></div>;
+    return (
+      <div className={`flex flex-col gap-3 ${isFetching ? 'opacity-60' : ''} transition-opacity`}>
+        <ClosedBand d={data} />
+        <HeadSection d={data} />
+        <CheckLogBar d={data} boxed />
+        <ContactSection d={data} />
+        <LocationSection d={data} />
+        <DeviceTraceSection d={data} />
+        <AppChatSection d={data} />
+        <DeviceSection d={data} />
+        <ChecksSection d={data} />
+        <HistorySection d={data} />
+      </div>
+    );
+  }
 
   return (
     <>
       <div className="flex-none flex items-center h-panel-header-h px-4 border-b border-line gap-2 min-w-0">
         {data ? (
           <>
-            <EntityCodeLink to={`/admin/contracts/search/${data.contract.id}`} code={data.contract.code} className="font-mono text-sm font-medium truncate" />
+            {/* No link icon here: in a narrow header it was the part that got cut off. The code is still the link. */}
+            <EntityCodeLink to={`/admin/contracts/search/${data.contract.id}`} code={data.contract.code} icon={null} className="font-mono text-sm font-medium shrink-0" />
             <span className="text-sm text-subtle truncate">{data.customer.name ?? '—'}</span>
             {data.is_test_data && <TestDataBadge />}
           </>
@@ -524,7 +554,7 @@ function HistorySection({ d }: { d: SilentTaskDetail }) {
 /** The result buttons come from `result_codes[]`; a code with `note_required`
  *  cannot be sent without a note. Saved results do not take the row off the
  *  queue — only the device coming back does. */
-function CheckLogBar({ d }: { d: SilentTaskDetail }) {
+function CheckLogBar({ d, boxed = false }: { d: SilentTaskDetail; boxed?: boolean }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const { addSnackbar } = useSnackbarContext();
@@ -538,7 +568,7 @@ function CheckLogBar({ d }: { d: SilentTaskDetail }) {
 
   if (!d.can_log) {
     return (
-      <div className="flex-none border-t border-line px-4 py-3 text-sm text-subtle">
+      <div className={boxed ? 'rounded-md border border-line px-3 py-2 text-sm text-subtle' : 'flex-none border-t border-line px-4 py-3 text-sm text-subtle'}>
         {t('silentWatch.cannotLog')}
       </div>
     );
@@ -571,7 +601,7 @@ function CheckLogBar({ d }: { d: SilentTaskDetail }) {
   };
 
   return (
-    <div className="flex-none border-t border-line px-4 py-3 flex flex-col gap-2 bg-surface" data-testid="silent-log-bar">
+    <div className={`${boxed ? 'rounded-md border border-line px-3 py-3' : 'flex-none border-t border-line px-4 py-3'} flex flex-col gap-2 bg-surface`} data-testid="silent-log-bar">
       <div className="flex items-center gap-2">
         <span className="text-sm font-medium">{t('silentWatch.logTitle')}</span>
         <span className="text-xs text-subtle">{t('silentWatch.autoCloseNote')}</span>

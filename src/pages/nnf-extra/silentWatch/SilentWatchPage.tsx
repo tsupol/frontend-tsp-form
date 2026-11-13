@@ -8,11 +8,11 @@
 // a notification opens straight on the row.
 
 import { useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button, DataTable, Input, MobileHeader, PageNav, PageNavPanel, Select, Switch, Tooltip } from 'tsp-form';
-import { ArrowLeft, ArrowRightFromLine, MapPinOff, RefreshCw, Search, ShieldOff, X, MonitorX } from 'lucide-react';
+import { ArrowLeft, ArrowRightFromLine, MapPinOff, RefreshCw, Search, ShieldOff, X, MonitorX, ScanEye } from 'lucide-react';
 import { DateTime } from '../../../components/DateTime';
 import { EntityCodeLink } from '../../../components/EntityCodeLink';
 import { ApiError } from '../../../lib/api';
@@ -109,7 +109,10 @@ export function SilentWatchPage() {
             <div className="flex-none px-4 py-2.5 border-b border-line flex items-center gap-3">
               <h1 className="heading-2 shrink-0">{t('silentWatch.title')}</h1>
               <span className="text-sm text-subtle truncate">{t('silentWatch.subtitle')}</span>
-              <div className="ml-auto">
+              <div className="ml-auto flex items-center gap-2">
+                <Link to="/admin/nnf-extra/device-watch" className="btn btn-outline-default btn-sm inline-flex items-center gap-1.5 no-underline shrink-0" data-testid="device-watch-link">
+                  <ScanEye size={14} />{t('deviceWatch.open')}
+                </Link>
                 <Tooltip content={t('silentWatch.reload')} placement="bottom">
                   <Button
                     variant="ghost"

@@ -50,7 +50,7 @@ import {
   MessageSquare,
   PictureInPicture2,
   // NNF Extra (NNF App console + NNF MDM)
-  Smartphone, Sparkles, MonitorSmartphone, MonitorX, LockKeyhole,
+  Smartphone, Sparkles, MonitorSmartphone, MonitorX, LockKeyhole, ScanEye,
   // Dev sandbox
   FlaskConical, PenLine, Image as ImageIcon, Bell,
   // Signatories (v2)
@@ -487,7 +487,9 @@ export const AppSideNav = () => {
           : []),
         // Every staff role sees it (owner 11-13); a shop session has no list yet.
         ...(!isDealPartner
-          ? [{ key: 'lost-mode-stuck', ...iconWithCount(<LockKeyhole size="1rem" />, lostModeStuckCount), label: t('nav.lostModeStuck'), path: '/admin/nnf-extra/lost-mode-stuck' }]
+          ? [{ key: 'lost-mode-stuck', ...iconWithCount(<LockKeyhole size="1rem" />, lostModeStuckCount), label: t('nav.lostModeStuck'), path: '/admin/nnf-extra/lost-mode-stuck' },
+             // The picture of both (UI 165): every staff member, the silent part only for can_view.
+             { key: 'device-watch', icon: <ScanEye size="1rem" />, label: t('nav.deviceWatch'), path: '/admin/nnf-extra/device-watch' }]
           : []),
         { key: 'nnf-mdm', icon: <MonitorSmartphone size="1rem" />, label: t('nav.mdmDetection'), path: '/admin/nnf-extra/mdm' },
         { key: 'nnf-app', icon: <Smartphone size="1rem" />, label: t('nav.appDetection'), path: '/admin/nnf-extra/app' },

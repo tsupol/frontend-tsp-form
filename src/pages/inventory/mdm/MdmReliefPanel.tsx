@@ -67,20 +67,29 @@ function reliefState(t: TFunction, r: MdmReliefStatus): { enabled: boolean; note
   if (r.can_grant && r.active) {
     return { enabled: true, note: [r.banner_th, t('asset.mdm.relief.againNote')].filter(Boolean).join(' · '), noteTone: 'subtle' };
   }
-  if (r.overdue_days == null) return { enabled: false, note: t('asset.mdm.relief.notInDunning'), noteTone: 'subtle' };
+  // Row 3 (NOTICE 469): not in dunning — the backend says why in its own words.
+  if (r.ladder_reason === 'NOT_CARE') return { enabled: false, note: r.ladder_reason_th, noteTone: 'subtle' };
+  if (r.ladder_days == null) return { enabled: false, note: t('asset.mdm.relief.notInDunning'), noteTone: 'subtle' };
   if (!r.on_hard && r.active) return { enabled: false, note: r.banner_th, noteTone: 'subtle' };
   if (!r.on_hard) {
-    // MDM counts 0 days while a promise stands (and early in the overdue), even when
-    // the queue shows more — "ตอนนี้ค้าง 0 วัน" beside "ค้าง 21 วัน" reads as a bug,
-    // so for 0 the number is left out.
-    if (r.overdue_days === 0) {
+    const days = r.contract_overdue_days;
+    // Row 5 (NOTICE 469): the ladder counts fewer days than the contract (a promise,
+    // GRACE, a holiday) — print the backend's reason and the real count beside it.
+    // Never work the reason out from the two numbers.
+    if (r.ladder_reason) {
+      return {
+        enabled: false, noteTone: 'subtle',
+        note: [r.ladder_reason_th, days != null ? t('asset.mdm.relief.realOverdue', { days }) : null].filter(Boolean).join(' · '),
+      };
+    }
+    if (days == null || days === 0) {
       return { enabled: false, noteTone: 'subtle', note: t('asset.mdm.relief.notHardZero', { from: r.hard_from_days ?? '—' }) };
     }
     return {
       enabled: false, noteTone: 'subtle',
       note: r.hard_from_days != null
-        ? t('asset.mdm.relief.notHard', { from: r.hard_from_days, days: r.overdue_days })
-        : t('asset.mdm.relief.notHardNoFrom', { days: r.overdue_days }),
+        ? t('asset.mdm.relief.notHard', { from: r.hard_from_days, days })
+        : t('asset.mdm.relief.notHardNoFrom', { days }),
     };
   }
   return { enabled: false, note: t('asset.mdm.relief.outsideScope'), noteTone: 'subtle' };
@@ -149,9 +158,9 @@ export function MdmReliefPanel({ serial, onGranted, bare = false }: {
           >
             {label}
           </Button>
-          {state?.enabled && relief?.overdue_days != null && relief.hard_from_days != null && (
+          {state?.enabled && relief?.contract_overdue_days != null && relief.hard_from_days != null && (
             <span className="text-xs text-subtle tabular-nums">
-              {t('asset.mdm.relief.overdue', { days: relief.overdue_days, from: relief.hard_from_days })}
+              {t('asset.mdm.relief.overdue', { days: relief.contract_overdue_days, from: relief.hard_from_days })}
             </span>
           )}
           {parsed && (
@@ -245,9 +254,9 @@ function MdmReliefDialog({ open, serial, relief, onClose, onGranted }: {
             <div className="modal-content">
               <div className="px-3 py-2.5 rounded-md bg-surface border border-line">
                 <div className="font-medium text-sm font-mono">{serial}</div>
-                {relief.overdue_days != null && relief.hard_from_days != null && (
+                {relief.contract_overdue_days != null && relief.hard_from_days != null && (
                   <div className="text-xs text-subtle">
-                    {t('asset.mdm.relief.overdue', { days: relief.overdue_days, from: relief.hard_from_days })}
+                    {t('asset.mdm.relief.overdue', { days: relief.contract_overdue_days, from: relief.hard_from_days })}
                   </div>
                 )}
               </div>

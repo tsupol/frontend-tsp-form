@@ -81,6 +81,7 @@ import { LocationAccessPage } from './pages/nnf-extra/LocationAccessPage';
 import { CustomerMapPage } from './pages/nnf-extra/CustomerMapPage';
 import { SilentWatchPage } from './pages/nnf-extra/silentWatch/SilentWatchPage';
 import { LostModeStuckPage } from './pages/nnf-extra/LostModeStuckPage';
+import { DeviceWatchPage } from './pages/nnf-extra/deviceWatch/DeviceWatchPage';
 import { PaymentSubmissionsPage } from './pages/PaymentSubmissionsPage';
 import { ContractsLayout } from './pages/contracts/ContractsLayout';
 import { ContractSearchPage } from './pages/contracts/ContractSearchPage';
@@ -1366,6 +1367,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <NnfExtraLayout><LostModeStuckPage /></NnfExtraLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/nnf-extra/device-watch"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <NnfExtraLayout><DeviceWatchPage /></NnfExtraLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

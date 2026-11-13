@@ -43,7 +43,7 @@ export interface LostModeStuckList {
   items: LostModeStuckRow[];
 }
 
-export function useLostModeStuckList() {
+export function useLostModeStuckList(opts: { poll?: number } = {}) {
   const { user, isDealPartner } = useAuth();
   const scope = defaultScopeFor(user);
   return useQuery({
@@ -51,6 +51,7 @@ export function useLostModeStuckList() {
     queryFn: () => apiClient.rpc<LostModeStuckList>('fn_lost_mode_stuck_list', scopeCounterParams(scope)),
     // A shop session cannot call it yet (164 §2).
     enabled: !!user && !isDealPartner,
+    refetchInterval: opts.poll,
     retry: false,
   });
 }

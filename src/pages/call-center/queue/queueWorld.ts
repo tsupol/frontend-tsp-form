@@ -112,9 +112,9 @@ export function layoutQueue(people: QueuePerson[]): Laid {
 }
 
 // ── Geometry (shared) ───────────────────────────────────────────────────────
-const UNIT_BOX = new BoxGeometry(1, 1, 1);
+export const UNIT_BOX = new BoxGeometry(1, 1, 1);
 const UNIT_BALL = new SphereGeometry(1, 20, 14);
-const UNIT_CYL = new CylinderGeometry(1, 1, 1, 16);
+export const UNIT_CYL = new CylinderGeometry(1, 1, 1, 16);
 const ARM = new CapsuleGeometry(0.05, 0.33, 6, 12);
 const HAIR_BACK = new CapsuleGeometry(0.156, 0.171, 6, 12);
 const HAIR_SIDE = new CapsuleGeometry(0.057, 0.171, 6, 12);
@@ -186,7 +186,7 @@ const STRIDE = 0.8;
 export type QueueHit = { kind: 'person'; id: number } | { kind: 'bin' } | null;
 
 export class QueueWorld {
-  private renderer: WebGLRenderer;
+  protected renderer: WebGLRenderer;
   private scene = new Scene();
   private camera = new OrthographicCamera(-1, 1, 1, -1, 40, 420);
   private lambert = new MeshLambertMaterial({ color: '#ffffff' });
@@ -195,8 +195,9 @@ export class QueueWorld {
   private focusMesh: InstancedMesh;
   private selRing: Mesh;
   private cone: Mesh;
-  private staticRoot = new Group();
-  private staticMats: Material[] = [];
+  // Protected: the device-watch scene (nnf-extra/deviceWatch) builds its own floor on the same world.
+  protected staticRoot = new Group();
+  protected staticMats: Material[] = [];
   private binMesh: Mesh | null = null;
   private figures: Figure[] = [];
   private byId = new Map<number, Figure>();
@@ -498,7 +499,7 @@ export class QueueWorld {
   }
 
   // ── Frame loop: idle sway, walking, effects ──
-  private start() {
+  protected start() {
     if (this.raf) return;
     const frame = (t: number) => {
       this.raf = 0;

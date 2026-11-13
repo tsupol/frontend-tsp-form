@@ -13,7 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, DataTable, MobileHeader, PageNav, PageNavPanel, Select, Tooltip } from 'tsp-form';
 import {
-  ArrowRightFromLine, Battery, Store, CheckCircle2, Cpu, ExternalLink, Lock, RefreshCw, Smartphone, UserCog, Info,
+  ArrowRightFromLine, Battery, Store, ScanEye, CheckCircle2, Cpu, ExternalLink, Lock, RefreshCw, Smartphone, UserCog, Info,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { EntityCodeLink } from '../../components/EntityCodeLink';
@@ -103,7 +103,10 @@ export function LostModeStuckPage() {
                   {t('lostModeStuck.countLine', { system: data.counts.system, staff: data.counts.staff })}
                 </span>
               )}
-              <div className="ml-auto">
+              <div className="ml-auto flex items-center gap-2">
+                <Link to="/admin/nnf-extra/device-watch" className="btn btn-outline-default btn-sm inline-flex items-center gap-1.5 no-underline shrink-0" data-testid="device-watch-link">
+                  <ScanEye size={14} />{t('deviceWatch.open')}
+                </Link>
                 <Tooltip content={t('lostModeStuck.reload')} placement="bottom">
                   <Button variant="ghost" size="sm" aria-label={t('lostModeStuck.reload')} startIcon={<RefreshCw size={14} className={isFetching ? 'animate-spin' : ''} />} disabled={isFetching} onClick={refresh} />
                 </Tooltip>
@@ -188,7 +191,8 @@ const REASON_COLOR: Record<string, 'danger' | 'warning' | 'info' | 'default'> = 
   STAFF: 'default',
 };
 
-function StuckRow({ r }: { r: LostModeStuckRow }) {
+/** One stuck device: why, how long, last contact, what to do. Also the device-watch scene's card. */
+export function StuckRow({ r }: { r: LostModeStuckRow }) {
   const { t } = useTranslation();
   const lockedFor = useLockedFor();
   const isStaff = r.reason_code === 'STAFF';

@@ -1620,7 +1620,8 @@
         "untilToday": "Relief until {{time}}",
         "untilTomorrow": "Relief until tomorrow {{time}}",
         "untilNote": "If still unpaid when it ends, the device restricts the apps again by itself",
-        "notHardZero": "Usable once the bank apps are blocked (from {{from}} days overdue) — the bank apps are open now, the customer can transfer"
+        "notHardZero": "Usable once the bank apps are blocked (from {{from}} days overdue) — the bank apps are open now, the customer can transfer",
+        "realOverdue": "really {{days}} days overdue"
       }
     },
     "icloud_appleOnly": "iCloud applies to Apple devices only.",
@@ -6411,7 +6412,8 @@
     "locationAccess": "Location Access",
     "customerMap": "Customer Map",
     "silentWatch": "Silent Watch",
-    "lostModeStuck": "Lost Mode Stuck"
+    "lostModeStuck": "Lost Mode Stuck",
+    "deviceWatch": "Device Watch"
   },
   "nnfApp": {
     "title": "NNF App",
@@ -11874,5 +11876,50 @@
     },
     "allBranches": "All branches",
     "emptyFiltered": "Nothing under this filter"
+  },
+  "deviceWatch": {
+    "title": "Device watch",
+    "open": "See as a picture",
+    "allBranches": "All branches",
+    "peopleN": "{{n}} people",
+    "subAll": "Stuck {{stuck}} · Silent {{silent}} ({{tasks}} tasks)",
+    "subStuck": "Stuck {{stuck}}",
+    "stuck": {
+      "SYSTEM": "Locked by the system",
+      "STAFF": "Locked by staff"
+    },
+    "tasksN": "Repo tasks {{n}}",
+    "becomesTask": "Task after {{d}} silent days",
+    "overdueNote": "Collectors handle these",
+    "band": "Silent {{dur}}",
+    "waitNet": "Waiting for internet",
+    "isTask": "Repo task",
+    "isWatch": "Watching",
+    "short": {
+      "m": "{{n}}m",
+      "h": "{{n}}h",
+      "d": "{{n}}d"
+    },
+    "chip": {
+      "stuck": "Stuck",
+      "silent": "Silent",
+      "tasks": "Repo tasks",
+      "unchecked": "Unchecked",
+      "watch": "Watching",
+      "neverFix": "Tasks never located"
+    },
+    "legend": {
+      "overHead": "Over the head = how long locked / silent · red number = nobody has checked yet",
+      "stuck": "Red ring + padlock = stuck in Lost Mode",
+      "task": "Orange ring, full colour = repo task",
+      "faded": "Faded = watching (not a task yet, or overdue — collectors handle it)",
+      "checked": "Someone has checked",
+      "noFix": "Never located (tasks only)",
+      "distance": "The longer silent, the farther from the shop"
+    },
+    "emptyAll": "No silent or stuck devices",
+    "emptyStuck": "No device stuck in Lost Mode",
+    "silentGone": "The device is back in contact — it has left the picture",
+    "loadFailed": "Could not load — press reload"
   }
 }

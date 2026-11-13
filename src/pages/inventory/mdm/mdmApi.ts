@@ -1042,7 +1042,18 @@ export interface MdmReliefStatus {
   device_silent: boolean;
   last_checkin_at: string | null;
   warning_th: string | null;
-  overdue_days: number | null;
+  // `overdue_days` is deprecated (nnf-mdm 469) and no longer read: it is the
+  // restriction ladder's count, 0 during a promise or GRACE, so it disagreed with
+  // the dunning queue. BE drops it once the DONE says the screen stopped reading it.
+  /** Days the contract is really overdue — the same number as the dunning queue. null = no contract. */
+  contract_overdue_days: number | null;
+  /** Days the device-restriction ladder counts (on_hard / can_grant follow it). null = not in dunning. */
+  ladder_days: number | null;
+  /** Why ladder_days differs from contract_overdue_days; null = they are equal.
+   *  GRACE · PROMISE · APPOINTMENT · HOLIDAY · NOT_CARE */
+  ladder_reason: string | null;
+  /** That reason as a ready Thai sentence; null when ladder_reason is null. */
+  ladder_reason_th: string | null;
   hard_from_days: number | null;
   /** Last ten, only for those who may press. */
   history: MdmReliefHistoryRow[];
