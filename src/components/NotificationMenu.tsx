@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import i18n from 'i18next';
 import { Badge, PopOver, Tooltip } from 'tsp-form';
 import {
   Bell, MessageSquare, FileText, CreditCard, AlertTriangle, CheckCheck,
@@ -59,6 +60,14 @@ export type NotificationRow = {
     purpose?: string;
     source_label?: string;
     sms_text?: string;
+    // Silent device became work (UI_SUMMARY 163 §3) / device stuck in Lost Mode (164 §4).
+    episode_id?: number;
+    level_hours?: number;
+    silent_days?: number;
+    asset_id?: number;
+    reason_code?: string;
+    elapsed?: string;
+    elapsed_en?: string;
     // Shop credit request (mig 1449). reason_text is "reason name — note",
     // only on a returned request.
     case_id?: number;
@@ -167,6 +176,16 @@ export function deeplinkFor(row: NotificationRow): string | null {
   // ABM enrollment OTP — not contract-related; the full SMS lives on the
   // ABM account OTP screen (UI_SUMMARY/137).
   if (evt === 'abm_otp_received') return '/admin/company/abm-otp';
+  // A silent device became work (UI_SUMMARY 163 §3): the console, on that row.
+  if (evt === 'silent_device_task_staff') {
+    const eid = row.payload?.episode_id;
+    return eid ? `/admin/nnf-extra/silent-watch/${eid}` : '/admin/nnf-extra/silent-watch';
+  }
+  // A device stuck in Lost Mode (164 §4): the board, that device marked.
+  if (evt === 'lost_mode_stuck_staff') {
+    const aid = row.payload?.asset_id;
+    return aid ? `/admin/nnf-extra/lost-mode-stuck?asset=${aid}` : '/admin/nnf-extra/lost-mode-stuck';
+  }
   // Bank SMS: the inbox, already filtered to the phone that sent it.
   if (evt === 'sms_received') {
     const sid = row.payload?.source_id;
@@ -198,7 +217,8 @@ export function deeplinkFor(row: NotificationRow): string | null {
 
 // Events that are not about a contract, so the "customer · contract code"
 // subtitle never applies to them even though the FE does have a title template.
-const NON_CONTRACT_EVENTS = new Set(['abm_otp_received', 'sms_received']);
+// The two device-watch events name the contract in their title already.
+const NON_CONTRACT_EVENTS = new Set(['abm_otp_received', 'sms_received', 'silent_device_task_staff', 'lost_mode_stuck_staff']);
 
 // True when the contract-shaped subtitle (customer · contract code) applies.
 // Events with no FE template at all, and events known not to concern a
@@ -231,6 +251,16 @@ export function titleFor(row: NotificationRow, t: ReturnType<typeof useTranslati
     return code
       ? t('notifCenter.event.abm_otp_received', { code })
       : t('notifCenter.event.abm_otp_received_nocode');
+  }
+  // Silent device / stuck Lost Mode: the contract and how long, from the payload.
+  if (evt === 'silent_device_task_staff') {
+    return t('notifCenter.event.silent_device_task_staff', {
+      days: row.payload?.silent_days ?? '?', code: row.payload?.contract_code ?? '',
+    });
+  }
+  if (evt === 'lost_mode_stuck_staff') {
+    const elapsed = (i18n.language === 'th' ? row.payload?.elapsed : row.payload?.elapsed_en) ?? row.payload?.elapsed ?? '';
+    return t('notifCenter.event.lost_mode_stuck_staff', { elapsed, code: row.payload?.contract_code ?? '' });
   }
   // Bank SMS: the admin's own words for that phone, as it was when sent.
   if (evt === 'sms_received') {

@@ -50,7 +50,7 @@ import {
   MessageSquare,
   PictureInPicture2,
   // NNF Extra (NNF App console + NNF MDM)
-  Smartphone, Sparkles, MonitorSmartphone,
+  Smartphone, Sparkles, MonitorSmartphone, MonitorX, LockKeyhole,
   // Dev sandbox
   FlaskConical, PenLine, Image as ImageIcon, Bell,
   // Signatories (v2)
@@ -69,6 +69,7 @@ import {
   Map as MapIcon,
 } from 'lucide-react';
 import { useLocationViewCan } from './components/deviceLocation/deviceLocationApi';
+import { useSilentWatchCan } from './pages/nnf-extra/silentWatch/silentWatchApi';
 import { useAuth } from './contexts/AuthContext';
 import { filterSideNavForShop } from './lib/shopMenu';
 import { SHOP_STAGES, SHOP_STAGE_GROUP_LABEL } from './lib/shopStages';
@@ -221,6 +222,9 @@ export const AppSideNav = () => {
   const locationCan = useLocationViewCan().data;
   const canGrantLocation = locationCan?.can_grant === true;
   const canViewLocation = locationCan?.can_view === true;
+  // Silent watch: only the RPC knows — the repo team reaches it through the
+  // company's repo right, which no permission row shows (UI_SUMMARY 163 §2).
+  const canViewSilent = useSilentWatchCan().data?.can_view === true;
   // Company inventory approves POs and buybacks only (NOTICE 2026-10-30), so its
   // badge counts those kinds rather than counters.pending_approvals.
   const approvalScope = useApprovalScope();
@@ -302,6 +306,8 @@ export const AppSideNav = () => {
     legalWaitCount,
     unreadNotifCount,
     fundDayUnclosedCount,
+    silentWatchCount,
+    lostModeStuckCount,
   } = useNavCounts();
 
   // Render an icon with an optional count badge.
@@ -469,11 +475,20 @@ export const AppSideNav = () => {
     // the screens is Thai as normal. Visible wherever NNF App was visible.
     {
       key: 'nnf-extra',
-      icon: <Sparkles size="1rem" />,
+      // Device-watch work waiting: silent devices nobody checked + devices
+      // stuck in Lost Mode (both from the counters RPC, 163 §3 / 164 §2).
+      ...iconWithCount(<Sparkles size="1rem" />, (canViewSilent ? silentWatchCount : 0) + (isDealPartner ? 0 : lostModeStuckCount)),
       label: t('nav.nnfExtra'),
       path: '/admin/nnf-extra/mdm-devices',
       children: [
         { key: 'mdm-devices', icon: <ListChecks size="1rem" />, label: t('nav.mdmDevices'), path: '/admin/nnf-extra/mdm-devices' },
+        ...(canViewSilent
+          ? [{ key: 'silent-watch', ...iconWithCount(<MonitorX size="1rem" />, silentWatchCount), label: t('nav.silentWatch'), path: '/admin/nnf-extra/silent-watch' }]
+          : []),
+        // Every staff role sees it (owner 11-13); a shop session has no list yet.
+        ...(!isDealPartner
+          ? [{ key: 'lost-mode-stuck', ...iconWithCount(<LockKeyhole size="1rem" />, lostModeStuckCount), label: t('nav.lostModeStuck'), path: '/admin/nnf-extra/lost-mode-stuck' }]
+          : []),
         { key: 'nnf-mdm', icon: <MonitorSmartphone size="1rem" />, label: t('nav.mdmDetection'), path: '/admin/nnf-extra/mdm' },
         { key: 'nnf-app', icon: <Smartphone size="1rem" />, label: t('nav.appDetection'), path: '/admin/nnf-extra/app' },
         ...(canViewLocation

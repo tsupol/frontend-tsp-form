@@ -193,6 +193,11 @@ export function useNavCounts() {
     unassignedNoCollectorCount: unassignedCount ?? 0,
     fundDayUnclosedCount: fundUnclosedCount ?? 0,
     legalWaitCount: n('repo_pool'),
+    // Silent devices nobody has checked yet, in the caller's own scope — a
+    // personal number like my_book, not tied to the scope params (163 §3).
+    silentWatchCount: n('silent_watch'),
+    // Devices stuck in Lost Mode under the scope sent (164 §2) — every staff role.
+    lostModeStuckCount: n('lost_mode_stuck'),
     unreadNotifCount: n('notifications'),
   };
 }

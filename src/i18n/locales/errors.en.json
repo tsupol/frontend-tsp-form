@@ -1478,5 +1478,17 @@
   "notif.validation.tg_token_invalid": "That is not a bot key (digits:letters)",
   "notif.validation.tg_setting_invalid": "Invalid setting ({{field}})",
   "notif.state.tg_bot_not_verified": "Wait for the key check to pass before binding a group",
-  "notif.state.tg_not_active": "Cannot send yet — bind a group first"
+  "notif.state.tg_not_active": "Cannot send yet — bind a group first",
+  "MDM.AUTH.SILENT_WATCH_NOT_GRANTED": "You do not have the right to see silent-device work",
+  "mdm.auth.silent_watch_not_granted": "You do not have the right to see silent-device work",
+  "MDM.AUTH.SILENT_WATCH_NOT_VISIBLE": "This item is outside the companies or branches you look after",
+  "mdm.auth.silent_watch_not_visible": "This item is outside the companies or branches you look after",
+  "MDM.NOT_FOUND.SILENT_EPISODE": "This silent-device item was not found",
+  "mdm.not_found.silent_episode": "This silent-device item was not found",
+  "MDM.STATE.SILENT_EPISODE_CLOSED": "This task is already closed (the device came back or the contract ended) — no more results can be saved",
+  "mdm.state.silent_episode_closed": "This task is already closed (the device came back or the contract ended) — no more results can be saved",
+  "MDM.VALIDATION.SILENT_RESULT_INVALID": "The chosen check result is not valid",
+  "mdm.validation.silent_result_invalid": "The chosen check result is not valid",
+  "MDM.VALIDATION.SILENT_NOTE_REQUIRED": "“Anomaly found” needs a description",
+  "mdm.validation.silent_note_required": "“Anomaly found” needs a description"
 }

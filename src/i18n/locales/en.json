@@ -4327,7 +4327,13 @@
       "all": "All",
       "wholeCompany": "Whole company",
       "wholeHolding": "Whole holding"
-    }
+    },
+    "lostModeStuck": "Devices stuck in Lost Mode",
+    "lostModeStuckSub": "The customer cannot use the phone — call to help",
+    "noLostModeStuck": "No device stuck in Lost Mode",
+    "silentWatch": "Silent devices",
+    "silentWatchSub": "Not checked by anyone yet",
+    "noSilentWatch": "No unchecked silent devices"
   },
   "reportSide": {
     "label": "Show reports for",
@@ -6403,7 +6409,9 @@
     "fundBankAccounts": "Fund bank accounts",
     "fundPartnerPayoutAccounts": "Shop payout accounts",
     "locationAccess": "Location Access",
-    "customerMap": "Customer Map"
+    "customerMap": "Customer Map",
+    "silentWatch": "Silent Watch",
+    "lostModeStuck": "Lost Mode Stuck"
   },
   "nnfApp": {
     "title": "NNF App",
@@ -6530,7 +6538,9 @@
       "partner_case_withdrawn_staff": "Shop withdrew its credit case",
       "partner_settlement_in_payout_staff": "Close-out is in the payout run",
       "partner_settlement_paid_staff": "Fund paid the shop",
-      "partner_settlement_void_staff": "Close-out cancelled"
+      "partner_settlement_void_staff": "Close-out cancelled",
+      "silent_device_task_staff": "Device silent {{days}} days · {{code}}",
+      "lost_mode_stuck_staff": "Device stuck in Lost Mode {{elapsed}} · {{code}}"
     },
     "signingType": {
       "ADDENDUM": "addendum",
@@ -11628,5 +11638,241 @@
     "noNext": "Everyone here has been opened — press \"Start at the head\" for a new round",
     "reliefN": "Relief",
     "legendRelief": "24-hour relief (bank apps open for now) — the end time is under the feet"
+  },
+  "silentWatch": {
+    "title": "Silent devices",
+    "subtitle": "Devices that have not contacted the system for 48 h or more — look, judge and record on one page",
+    "reload": "Reload",
+    "testData": "Test data",
+    "view": {
+      "TASK": "Tasks",
+      "WATCH": "Watching",
+      "CLOSED": "History"
+    },
+    "empty": {
+      "TASK": "No silent-device tasks",
+      "WATCH": "Nothing being watched",
+      "CLOSED": "No history yet"
+    },
+    "emptySearch": "Nothing matches the search",
+    "searchPlaceholder": "Contract, name, phone, serial, IMEI — press Enter",
+    "searchTooShort": "Type at least 2 characters",
+    "allBranches": "All branches",
+    "uncheckedOnly": "Unchecked",
+    "selectHint": "Pick a row on the left to see it",
+    "noAccess": "You cannot see silent-device work",
+    "noAccessHint": "This work is open to the repo team and people given the right only",
+    "dur": {
+      "hours": "{{h}} h",
+      "days": "{{d}} d",
+      "daysHours": "{{d}} d {{h}} h"
+    },
+    "silentFor": "Silent {{dur}}",
+    "level": {
+      "days": "Level {{d}} d",
+      "hours": "Level {{h}} h"
+    },
+    "group": {
+      "PRE_FIRST_DUE": "First instalment not paid",
+      "PAYING": "Paying",
+      "OVERDUE": "Overdue"
+    },
+    "result": {
+      "REACHED_OK": "Reached, all normal",
+      "NOT_REACHED": "Could not reach",
+      "SUSPICIOUS": "Suspicious",
+      "FLIGHT_RISK": "Flight risk",
+      "FIELD_VISITED": "Field visit done",
+      "ANOMALY_FOUND": "Anomaly found"
+    },
+    "closeReason": {
+      "DEVICE_RETURNED": "Device came back",
+      "CONTRACT_ENDED": "Contract ended / device changed",
+      "UNENROLLED": "Device left MDM"
+    },
+    "closed": {
+      "DEVICE_RETURNED": "The device is back in contact — this task is closed",
+      "CONTRACT_ENDED": "The contract ended or the device changed — this task is closed",
+      "UNENROLLED": "The device left MDM — this task is closed",
+      "afterCheck": "came back after a check",
+      "onItsOwn": "came back on its own"
+    },
+    "isTask": "Task",
+    "isWatch": "Watching (not a task yet)",
+    "neverLocatedShort": "Never located",
+    "silentBefore": "Silent {{n}} times",
+    "unchecked": "Not checked yet",
+    "nextDueShort": "Next due",
+    "overdueDays": "{{n}} days overdue",
+    "notOverdue": "Not overdue",
+    "sec": {
+      "head": "Overview",
+      "contact": "Contact",
+      "location": "Location",
+      "trace": "Device trace",
+      "appChat": "App and chat",
+      "device": "Device",
+      "checks": "Check results ({{n}})",
+      "history": "This customer's silent periods ({{n}})"
+    },
+    "f": {
+      "silentSince": "Silent since",
+      "contractDay": "Contract day",
+      "contract": "Contract",
+      "installments": "Paid",
+      "nextDue": "Next due",
+      "overdue": "Overdue",
+      "outstanding": "Outstanding",
+      "shop": "Shop",
+      "openedBy": "Opened by",
+      "customer": "Customer",
+      "tel": "Phone",
+      "tel2": "Second phone",
+      "lastSeen": "Last contact",
+      "battery": "Battery",
+      "appUsed": "App last used",
+      "appLogin": "App last login",
+      "chat": "Chat",
+      "customerChat": "Customer last chat",
+      "staffChat": "Staff last reply",
+      "model": "Model",
+      "orgLock": "Company lock",
+      "nnfApp": "NNF app",
+      "lostMode": "Lost Mode"
+    },
+    "bool": {
+      "orgLock": {
+        "yes": "Applied",
+        "no": "Not applied"
+      },
+      "nnfApp": {
+        "yes": "Installed",
+        "no": "Not installed"
+      },
+      "lostMode": {
+        "yes": "On",
+        "no": "Off"
+      }
+    },
+    "contractDayValue": "Silent from day {{n}} of the contract",
+    "paidOf": "{{paid}} / {{total}} instalments",
+    "perInstallment": "{{amount}} each",
+    "noContact": "No contact details",
+    "references": "References",
+    "noReferences": "No references",
+    "addresses": "Addresses",
+    "noAddresses": "No address",
+    "contactType": {
+      "MOBILE": "Mobile",
+      "PHONE": "Phone",
+      "FACEBOOK": "Facebook",
+      "LINE": "LINE",
+      "EMAIL": "Email"
+    },
+    "addressType": {
+      "HOME": "Home",
+      "WORK": "Work",
+      "CURRENT": "Current",
+      "ID_CARD": "ID card"
+    },
+    "neverLocated": "Never located",
+    "neverLocatedTried": "The system asked for a location {{n}} times and never got one",
+    "neverLocatedNoTry": "The system has never had a location for this device",
+    "locate": {
+      "attempts": "Asked {{n}} times",
+      "answered": "got {{n}}",
+      "offline": "device offline {{n}}",
+      "last": "last"
+    },
+    "residence": {
+      "RESIDENT": "Usual address (same place {{n}} mornings)",
+      "SCATTERED": "A different place each morning",
+      "NOT_YET": "Fewer than 3 mornings ({{n}}/3) — no address yet"
+    },
+    "clusterLabel": "Place {{no}} · {{fixes}} fixes · {{days}} days · {{mornings}} mornings",
+    "source": {
+      "activeDay": "Health check, day {{n}}",
+      "NO_FIX_YET": "No location yet (retry)",
+      "PRE_DUE_5": "Morning check before due",
+      "OVERDUE_3": "Dunning (3 days overdue)",
+      "OVERDUE_DAILY": "Daily dunning",
+      "OVERDUE_EVENING": "Evening dunning",
+      "HANDOVER": "At handover (shop location)",
+      "STAFF": "Staff request"
+    },
+    "batteryNote": "before going silent",
+    "sims": "SIMs the device reported",
+    "noSims": "The device never reported a SIM",
+    "simMatches": "Matches the customer's number",
+    "simNotMatches": "Not the customer's number",
+    "simAlsoSeen": "This number was also in the device of another contract:",
+    "answered": "Times the device answered ({{n}})",
+    "noAnswered": "No record of the device answering",
+    "commands": "{{n}} commands",
+    "showAll": "Show all ({{n}})",
+    "showLess": "Show less",
+    "never": "Never",
+    "noChat": "No chat",
+    "chatTotal": "{{n}} messages",
+    "openChat": "Open chat",
+    "notChecked": "Never checked",
+    "noChecks": "No check result recorded yet",
+    "otherEpisode": "Other silent period",
+    "firstTime": "This customer's first silent period",
+    "thisOne": "This one",
+    "since": "From",
+    "lasted": "lasted {{dur}}",
+    "logTitle": "Record a check",
+    "autoCloseNote": "The task closes by itself when the device comes back",
+    "notePlaceholder": "Note (optional)",
+    "noteRequired": "Describe what you found (required)",
+    "noteRequiredHint": "This result needs a description",
+    "save": "Save result",
+    "saved": "Saved \"{{result}}\"",
+    "cannotLog": "This task is closed — no more results can be saved",
+    "lastCheck": "Last check"
+  },
+  "lostModeStuck": {
+    "title": "Devices stuck in Lost Mode",
+    "reload": "Reload",
+    "intro": "Devices locked in Lost Mode for more than {{min}} minutes — the customer cannot use them · a row leaves by itself when the device unlocks",
+    "countLine": "System {{system}} · Staff {{staff}}",
+    "empty": "No device stuck in Lost Mode",
+    "focusGone": "This device has unlocked",
+    "lockedFor": "Locked {{dur}}",
+    "dur": {
+      "d": "{{d}} d",
+      "dh": "{{d}} d {{h}} h",
+      "h": "{{h}} h",
+      "hm": "{{h}} h {{m}} min",
+      "m": "{{m}} min"
+    },
+    "reason": {
+      "SYSTEM_HEALTH_CHECK": "Stuck after a device health check",
+      "SYSTEM_DUNNING": "Stuck after a dunning round",
+      "SYSTEM_HANDOVER": "Stuck after the handover check",
+      "STAFF": "Lost Mode ordered by staff"
+    },
+    "orderedBy": "by {{user}}",
+    "overdue": "{{n}} days overdue",
+    "lastSeen": "Last contact",
+    "advice": {
+      "CONNECT_INTERNET": "Call the customer: turn the phone on where it has a Wi-Fi it joined before, or top up mobile data — it unlocks by itself within minutes (the release is already waiting)",
+      "RELEASE_BY_STAFF": "No release ordered yet — ask {{user}} whether it still needs to be locked, or have someone with the right release Lost Mode on the device page"
+    },
+    "someoneWithRight": "someone who can release Lost Mode",
+    "script": {
+      "SYSTEM_HEALTH_CHECK": "Sorry, your phone stayed locked after a routine system check. Please turn it on where it has a Wi-Fi it joined before, or top up mobile data — it will unlock by itself within a few minutes.",
+      "SYSTEM_DUNNING": "Your phone is stuck locked. Please turn it on where it has a Wi-Fi it joined before, or top up mobile data — it will unlock by itself within a few minutes.",
+      "SYSTEM_HANDOVER": "Please connect to the shop's Wi-Fi — the phone will unlock by itself within a few minutes."
+    },
+    "copyScript": "Copy the message for the customer",
+    "tab": {
+      "all": "All",
+      "system": "System",
+      "staff": "Staff"
+    },
+    "allBranches": "All branches",
+    "emptyFiltered": "Nothing under this filter"
   }
 }

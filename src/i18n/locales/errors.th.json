@@ -1479,5 +1479,17 @@
   "notif.validation.tg_token_invalid": "ข้อความที่วางไม่ใช่กุญแจ bot (รูปแบบ ตัวเลข:ตัวอักษร)",
   "notif.validation.tg_setting_invalid": "ค่าที่ตั้งไม่ถูกต้อง ({{field}})",
   "notif.state.tg_bot_not_verified": "ต้องรอตรวจกุญแจผ่านก่อนจึงผูกกลุ่มได้",
-  "notif.state.tg_not_active": "ยังส่งไม่ได้ ต้องผูกกลุ่มก่อน"
+  "notif.state.tg_not_active": "ยังส่งไม่ได้ ต้องผูกกลุ่มก่อน",
+  "MDM.AUTH.SILENT_WATCH_NOT_GRANTED": "คุณไม่มีสิทธิ์ดูงานเครื่องเงียบ",
+  "mdm.auth.silent_watch_not_granted": "คุณไม่มีสิทธิ์ดูงานเครื่องเงียบ",
+  "MDM.AUTH.SILENT_WATCH_NOT_VISIBLE": "รายการนี้อยู่นอกบริษัทหรือสาขาที่คุณดูแล",
+  "mdm.auth.silent_watch_not_visible": "รายการนี้อยู่นอกบริษัทหรือสาขาที่คุณดูแล",
+  "MDM.NOT_FOUND.SILENT_EPISODE": "ไม่พบรายการเครื่องเงียบนี้",
+  "mdm.not_found.silent_episode": "ไม่พบรายการเครื่องเงียบนี้",
+  "MDM.STATE.SILENT_EPISODE_CLOSED": "งานนี้ปิดไปแล้ว (เครื่องกลับมาติดต่อหรือสัญญาสิ้นสุด) — บันทึกผลเพิ่มไม่ได้",
+  "mdm.state.silent_episode_closed": "งานนี้ปิดไปแล้ว (เครื่องกลับมาติดต่อหรือสัญญาสิ้นสุด) — บันทึกผลเพิ่มไม่ได้",
+  "MDM.VALIDATION.SILENT_RESULT_INVALID": "ผลตรวจที่เลือกไม่ถูกต้อง",
+  "mdm.validation.silent_result_invalid": "ผลตรวจที่เลือกไม่ถูกต้อง",
+  "MDM.VALIDATION.SILENT_NOTE_REQUIRED": "ผล “พบความผิดปกติ” ต้องใส่คำอธิบาย",
+  "mdm.validation.silent_note_required": "ผล “พบความผิดปกติ” ต้องใส่คำอธิบาย"
 }

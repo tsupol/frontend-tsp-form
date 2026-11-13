@@ -4323,7 +4323,13 @@
       "all": "ทั้งหมด",
       "wholeCompany": "ทั้ง Company",
       "wholeHolding": "ทั้ง holding"
-    }
+    },
+    "lostModeStuck": "เครื่องค้าง Lost Mode",
+    "lostModeStuckSub": "ลูกค้าใช้เครื่องไม่ได้ — โทรช่วยลูกค้า",
+    "noLostModeStuck": "ไม่มีเครื่องค้าง Lost Mode",
+    "silentWatch": "เครื่องเงียบผิดปกติ",
+    "silentWatchSub": "ยังไม่มีใครตรวจ",
+    "noSilentWatch": "ไม่มีงานเครื่องเงียบที่ยังไม่ตรวจ"
   },
   "reportSide": {
     "label": "ดูรายงาน",
@@ -6398,7 +6404,9 @@
     "fundBankAccounts": "บัญชีธนาคารของกองทุน",
     "fundPartnerPayoutAccounts": "บัญชีรับเงินจากกองทุน",
     "locationAccess": "Location Access",
-    "customerMap": "Customer Map"
+    "customerMap": "Customer Map",
+    "silentWatch": "Silent Watch",
+    "lostModeStuck": "Lost Mode Stuck"
   },
   "nnfApp": {
     "title": "แอป NNF",
@@ -6523,7 +6531,9 @@
       "partner_case_withdrawn_staff": "ร้านถอนใบขออนุมัติสินเชื่อ",
       "partner_settlement_in_payout_staff": "ใบปิดงานเข้ารอบจ่ายแล้ว",
       "partner_settlement_paid_staff": "กองทุนจ่ายเงินให้ร้านแล้ว",
-      "partner_settlement_void_staff": "ใบปิดงานถูกยกเลิก"
+      "partner_settlement_void_staff": "ใบปิดงานถูกยกเลิก",
+      "silent_device_task_staff": "เครื่องเงียบ {{days}} วัน · {{code}}",
+      "lost_mode_stuck_staff": "เครื่องค้าง Lost Mode {{elapsed}} · {{code}}"
     },
     "signingType": {
       "ADDENDUM": "เพิ่มเติม",
@@ -11592,5 +11602,241 @@
     "noNext": "เปิดครบทุกคนในแถวแล้ว — กด \"เริ่มที่หัวแถว\" เพื่อเริ่มรอบใหม่",
     "reliefN": "ผ่อนปรน",
     "legendRelief": "ผ่อนปรน 24 ชม. (แอปธนาคารเปิดชั่วคราว) — ใต้เท้าบอกเวลาหมด"
+  },
+  "silentWatch": {
+    "title": "เครื่องเงียบผิดปกติ",
+    "subtitle": "เครื่องที่ไม่ติดต่อระบบ 48 ชม. ขึ้นไป — ดู ประเมิน บันทึกผลได้ในหน้าเดียว",
+    "reload": "โหลดใหม่",
+    "testData": "ข้อมูลทดสอบ",
+    "view": {
+      "TASK": "งาน",
+      "WATCH": "เฝ้าดู",
+      "CLOSED": "ประวัติ"
+    },
+    "empty": {
+      "TASK": "ไม่มีงานเครื่องเงียบ",
+      "WATCH": "ไม่มีเครื่องที่เฝ้าดูอยู่",
+      "CLOSED": "ยังไม่มีประวัติ"
+    },
+    "emptySearch": "ไม่พบรายการที่ค้นหา",
+    "searchPlaceholder": "เลขสัญญา ชื่อ เบอร์ Serial IMEI แล้วกด Enter",
+    "searchTooShort": "พิมพ์อย่างน้อย 2 ตัวอักษร",
+    "allBranches": "ทุกสาขา",
+    "uncheckedOnly": "ยังไม่ตรวจ",
+    "selectHint": "เลือกรายการทางซ้ายเพื่อดูข้อมูล",
+    "noAccess": "ไม่มีสิทธิ์ดูงานเครื่องเงียบ",
+    "noAccessHint": "งานนี้เปิดให้ทีมยึดและคนที่ได้รับสิทธิ์เท่านั้น",
+    "dur": {
+      "hours": "{{h}} ชม.",
+      "days": "{{d}} วัน",
+      "daysHours": "{{d}} วัน {{h}} ชม."
+    },
+    "silentFor": "เงียบ {{dur}}",
+    "level": {
+      "days": "ระดับ {{d}} วัน",
+      "hours": "ระดับ {{h}} ชม."
+    },
+    "group": {
+      "PRE_FIRST_DUE": "ยังไม่จ่ายงวดแรก",
+      "PAYING": "จ่ายปกติ",
+      "OVERDUE": "ค้างชำระ"
+    },
+    "result": {
+      "REACHED_OK": "ติดต่อได้ปกติ",
+      "NOT_REACHED": "ติดต่อไม่ได้",
+      "SUSPICIOUS": "ต้องสงสัย",
+      "FLIGHT_RISK": "เสี่ยงหนีหาย",
+      "FIELD_VISITED": "ลงพื้นที่แล้ว",
+      "ANOMALY_FOUND": "พบความผิดปกติ"
+    },
+    "closeReason": {
+      "DEVICE_RETURNED": "เครื่องกลับมาติดต่อ",
+      "CONTRACT_ENDED": "สัญญาสิ้นสุด / เปลี่ยนเครื่อง",
+      "UNENROLLED": "เครื่องออกจากระบบ MDM"
+    },
+    "closed": {
+      "DEVICE_RETURNED": "เครื่องกลับมาติดต่อแล้ว — งานนี้ปิดแล้ว",
+      "CONTRACT_ENDED": "สัญญาสิ้นสุดหรือเปลี่ยนเครื่องแล้ว — งานนี้ปิดแล้ว",
+      "UNENROLLED": "เครื่องออกจากระบบ MDM แล้ว — งานนี้ปิดแล้ว",
+      "afterCheck": "กลับมาหลังมีคนตรวจ",
+      "onItsOwn": "กลับมาเอง"
+    },
+    "isTask": "เป็นงาน",
+    "isWatch": "เฝ้าดู (ยังไม่เป็นงาน)",
+    "neverLocatedShort": "ไม่เคยได้พิกัด",
+    "silentBefore": "เคยเงียบ {{n}} ครั้ง",
+    "unchecked": "ยังไม่มีใครตรวจ",
+    "nextDueShort": "งวดถัดไป",
+    "overdueDays": "ค้าง {{n}} วัน",
+    "notOverdue": "ไม่ค้าง",
+    "sec": {
+      "head": "ภาพรวม",
+      "contact": "ติดต่อ",
+      "location": "พิกัด",
+      "trace": "ร่องรอยเครื่อง",
+      "appChat": "แอปและแชท",
+      "device": "ตัวเครื่อง",
+      "checks": "ผลตรวจ ({{n}})",
+      "history": "ประวัติเงียบของลูกค้าคนนี้ ({{n}})"
+    },
+    "f": {
+      "silentSince": "เงียบตั้งแต่",
+      "contractDay": "ช่วงของสัญญา",
+      "contract": "สัญญา",
+      "installments": "ผ่อนแล้ว",
+      "nextDue": "งวดถัดไป",
+      "overdue": "ค้างชำระ",
+      "outstanding": "ยอดคงเหลือ",
+      "shop": "ร้าน",
+      "openedBy": "พนักงานที่เปิด",
+      "customer": "ลูกค้า",
+      "tel": "เบอร์",
+      "tel2": "เบอร์สำรอง",
+      "lastSeen": "ติดต่อล่าสุด",
+      "battery": "แบต",
+      "appUsed": "ใช้แอปล่าสุด",
+      "appLogin": "เข้าแอปล่าสุด",
+      "chat": "แชท",
+      "customerChat": "ลูกค้าแชทล่าสุด",
+      "staffChat": "พนักงานตอบล่าสุด",
+      "model": "รุ่น",
+      "orgLock": "ล็อกของบริษัท",
+      "nnfApp": "แอป NNF",
+      "lostMode": "Lost Mode"
+    },
+    "bool": {
+      "orgLock": {
+        "yes": "ติดอยู่",
+        "no": "ไม่ติด"
+      },
+      "nnfApp": {
+        "yes": "มีในเครื่อง",
+        "no": "ไม่มีในเครื่อง"
+      },
+      "lostMode": {
+        "yes": "เปิดอยู่",
+        "no": "ปิด"
+      }
+    },
+    "contractDayValue": "เงียบตั้งแต่วันที่ {{n}} ของสัญญา",
+    "paidOf": "{{paid}} / {{total}} งวด",
+    "perInstallment": "งวดละ {{amount}}",
+    "noContact": "ไม่มีข้อมูลติดต่อ",
+    "references": "บุคคลอ้างอิง",
+    "noReferences": "ไม่มีบุคคลอ้างอิง",
+    "addresses": "ที่อยู่",
+    "noAddresses": "ไม่มีที่อยู่",
+    "contactType": {
+      "MOBILE": "มือถือ",
+      "PHONE": "โทรศัพท์",
+      "FACEBOOK": "Facebook",
+      "LINE": "LINE",
+      "EMAIL": "อีเมล"
+    },
+    "addressType": {
+      "HOME": "บ้าน",
+      "WORK": "ที่ทำงาน",
+      "CURRENT": "ที่อยู่ปัจจุบัน",
+      "ID_CARD": "ตามบัตร"
+    },
+    "neverLocated": "ไม่เคยได้พิกัด",
+    "neverLocatedTried": "ระบบพยายามขอพิกัด {{n}} ครั้ง ไม่ได้เลย",
+    "neverLocatedNoTry": "ระบบยังไม่เคยได้พิกัดของเครื่องนี้",
+    "locate": {
+      "attempts": "ขอพิกัด {{n}} ครั้ง",
+      "answered": "ได้ {{n}}",
+      "offline": "เครื่องออฟไลน์ {{n}}",
+      "last": "ครั้งล่าสุด"
+    },
+    "residence": {
+      "RESIDENT": "ที่อยู่ประจำ (เช้าซ้ำจุดเดิม {{n}} เช้า)",
+      "SCATTERED": "เช้าแต่ละวันอยู่คนละที่",
+      "NOT_YET": "ยังไม่ครบ 3 เช้า ({{n}}/3) — ยังสรุปที่อยู่ไม่ได้"
+    },
+    "clusterLabel": "จุดที่ {{no}} · {{fixes}} พิกัด · {{days}} วัน · {{mornings}} เช้า",
+    "source": {
+      "activeDay": "ตรวจสุขภาพเครื่อง วันที่ {{n}}",
+      "NO_FIX_YET": "ยังไม่มีพิกัด (ขอซ้ำ)",
+      "PRE_DUE_5": "ตรวจเช้าก่อนครบงวด",
+      "OVERDUE_3": "รอบทวง (ค้าง 3 วัน)",
+      "OVERDUE_DAILY": "รอบทวงรายวัน",
+      "OVERDUE_EVENING": "รอบทวงตอนเย็น",
+      "HANDOVER": "ตอนส่งมอบที่ร้าน (พิกัดร้าน)",
+      "STAFF": "พนักงานสั่งเอง"
+    },
+    "batteryNote": "ก่อนเงียบ",
+    "sims": "ซิมที่เครื่องรายงาน",
+    "noSims": "เครื่องไม่เคยรายงานซิม",
+    "simMatches": "ตรงกับเบอร์ลูกค้า",
+    "simNotMatches": "ไม่ตรงกับเบอร์ลูกค้า",
+    "simAlsoSeen": "เบอร์นี้เคยอยู่ในเครื่องของสัญญาอื่น:",
+    "answered": "เวลาที่เครื่องตอบคำสั่ง ({{n}})",
+    "noAnswered": "ไม่มีบันทึกว่าเครื่องตอบคำสั่ง",
+    "commands": "{{n}} คำสั่ง",
+    "showAll": "ดูทั้งหมด ({{n}})",
+    "showLess": "ย่อ",
+    "never": "ไม่เคย",
+    "noChat": "ไม่มีแชท",
+    "chatTotal": "{{n}} ข้อความ",
+    "openChat": "เปิดแชท",
+    "notChecked": "ยังไม่เคยตรวจ",
+    "noChecks": "ยังไม่มีใครบันทึกผลตรวจ",
+    "otherEpisode": "ช่วงเงียบอื่น",
+    "firstTime": "เงียบครั้งแรกของลูกค้าคนนี้",
+    "thisOne": "ครั้งนี้",
+    "since": "เริ่ม",
+    "lasted": "นาน {{dur}}",
+    "logTitle": "บันทึกผลตรวจ",
+    "autoCloseNote": "งานจะปิดเองเมื่อเครื่องกลับมาติดต่อ",
+    "notePlaceholder": "หมายเหตุ (ไม่บังคับ)",
+    "noteRequired": "อธิบายสิ่งที่พบ (บังคับ)",
+    "noteRequiredHint": "ผลนี้ต้องใส่คำอธิบาย",
+    "save": "บันทึกผล",
+    "saved": "บันทึกผล \"{{result}}\" แล้ว",
+    "cannotLog": "งานนี้ปิดแล้ว บันทึกผลเพิ่มไม่ได้",
+    "lastCheck": "ตรวจล่าสุด"
+  },
+  "lostModeStuck": {
+    "title": "เครื่องค้าง Lost Mode",
+    "reload": "โหลดใหม่",
+    "intro": "เครื่องที่ถูกล็อก Lost Mode เกิน {{min}} นาที ลูกค้าใช้เครื่องไม่ได้ · รายการหายเองเมื่อเครื่องปลดล็อก",
+    "countLine": "ระบบสั่ง {{system}} · พนักงานสั่ง {{staff}}",
+    "empty": "ไม่มีเครื่องค้าง Lost Mode",
+    "focusGone": "เครื่องนี้ปลดล็อกแล้ว",
+    "lockedFor": "ล็อกมา {{dur}}",
+    "dur": {
+      "d": "{{d}} วัน",
+      "dh": "{{d}} วัน {{h}} ชม.",
+      "h": "{{h}} ชม.",
+      "hm": "{{h}} ชม. {{m}} นาที",
+      "m": "{{m}} นาที"
+    },
+    "reason": {
+      "SYSTEM_HEALTH_CHECK": "ค้างจากระบบตรวจสุขภาพเครื่อง",
+      "SYSTEM_DUNNING": "ค้างจากรอบทวง",
+      "SYSTEM_HANDOVER": "ค้างจากการตรวจตอนส่งมอบ",
+      "STAFF": "พนักงานสั่ง Lost Mode เอง"
+    },
+    "orderedBy": "สั่งโดย {{user}}",
+    "overdue": "ค้างชำระ {{n}} วัน",
+    "lastSeen": "ติดต่อล่าสุด",
+    "advice": {
+      "CONNECT_INTERNET": "โทรแจ้งลูกค้า: เปิดเครื่องในที่ที่มี Wi-Fi ที่เครื่องเคยต่อ หรือเติมเน็ตซิม เครื่องจะปลดล็อกเองภายในไม่กี่นาที (คำสั่งปลดรออยู่แล้ว)",
+      "RELEASE_BY_STAFF": "ยังไม่มีคำสั่งปลด — ติดต่อ {{user}} ว่ายังต้องล็อกอยู่ไหม หรือให้ผู้มีสิทธิ์กดปลด Lost Mode ที่หน้าเครื่อง"
+    },
+    "someoneWithRight": "ผู้มีสิทธิ์ปลด Lost Mode",
+    "script": {
+      "SYSTEM_HEALTH_CHECK": "ขออภัยค่ะ เครื่องของคุณถูกล็อกค้างจากการตรวจระบบตามปกติ กรุณาเปิดเครื่องในที่ที่มี Wi-Fi ที่เครื่องเคยเชื่อมต่อ หรือเติมอินเทอร์เน็ตซิม เครื่องจะปลดล็อกเองภายในไม่กี่นาทีค่ะ",
+      "SYSTEM_DUNNING": "เครื่องของคุณถูกล็อกค้างอยู่ กรุณาเปิดเครื่องในที่ที่มี Wi-Fi ที่เครื่องเคยเชื่อมต่อ หรือเติมอินเทอร์เน็ตซิม เครื่องจะปลดล็อกเองภายในไม่กี่นาทีค่ะ",
+      "SYSTEM_HANDOVER": "กรุณาเชื่อมต่อ Wi-Fi ของร้าน เครื่องจะปลดล็อกเองภายในไม่กี่นาทีค่ะ"
+    },
+    "copyScript": "คัดลอกข้อความสำหรับแจ้งลูกค้า",
+    "tab": {
+      "all": "ทั้งหมด",
+      "system": "ระบบสั่ง",
+      "staff": "พนักงานสั่ง"
+    },
+    "allBranches": "ทุกสาขา",
+    "emptyFiltered": "ไม่มีรายการในตัวกรองนี้"
   }
 }

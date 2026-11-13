@@ -79,6 +79,8 @@ import { MdmDevicesPage } from './pages/nnf-extra/MdmDevicesPage';
 import { NnfExtraLayout } from './pages/nnf-extra/NnfExtraLayout';
 import { LocationAccessPage } from './pages/nnf-extra/LocationAccessPage';
 import { CustomerMapPage } from './pages/nnf-extra/CustomerMapPage';
+import { SilentWatchPage } from './pages/nnf-extra/silentWatch/SilentWatchPage';
+import { LostModeStuckPage } from './pages/nnf-extra/LostModeStuckPage';
 import { PaymentSubmissionsPage } from './pages/PaymentSubmissionsPage';
 import { ContractsLayout } from './pages/contracts/ContractsLayout';
 import { ContractSearchPage } from './pages/contracts/ContractSearchPage';
@@ -1344,6 +1346,26 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <NnfExtraLayout><CustomerMapPage /></NnfExtraLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/nnf-extra/silent-watch/:episodeId?"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <NnfExtraLayout><SilentWatchPage /></NnfExtraLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/nnf-extra/lost-mode-stuck"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <NnfExtraLayout><LostModeStuckPage /></NnfExtraLayout>
             </AdminLayout>
           </ProtectedRoute>
         }

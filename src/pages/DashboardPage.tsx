@@ -22,6 +22,8 @@ import {
   CalendarRange,
   Trophy,
   Store,
+  LockKeyhole,
+  MonitorX,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../lib/api';
 import { fmtCurrency } from '../lib/format';
@@ -45,11 +47,13 @@ import { SimulationLink } from './simulation/SimulationLink';
 import { AccountQrModal, type AccountQr } from '../components/AccountQrModal';
 import { useBranchPaymentAccounts, type BranchPaymentAccount } from '../components/BranchPaymentAccountField';
 import { BankAccountLine } from '../components/BankAccountLine';
+import { useSilentWatchCan } from './nnf-extra/silentWatch/silentWatchApi';
 import {
   defaultScopeFor,
   scopeQuery,
   scopeQueryRollup,
   scopeKey,
+  scopeCounterParams,
   todaySummaryView,
   type Scope,
 } from '../lib/scope';
@@ -265,6 +269,21 @@ export function DashboardPage() {
     refetchInterval: 60_000,
   });
   const closeoutCount = closeoutsQuery.data?.totalCount ?? 0;
+
+  // Device-watch cards (UI_SUMMARY 163 §3 / 164 §2), both from the counters RPC.
+  // Same query key as the side menu's, so at the default scope it is one fetch.
+  // `lost_mode_stuck` follows the scope sent; `silent_watch` is the viewer's own
+  // number whatever the scope. Every staff role sees the Lost Mode card (owner
+  // 11-13); the silent card only for whoever the console is open to.
+  const countersQuery = useQuery({
+    queryKey: ['nav', 'counters', sk],
+    queryFn: () => apiClient.rpc<{ counters: Record<string, number> }>('fn_branch_dashboard_counters', scopeCounterParams(scope)),
+    refetchInterval: 300_000,
+    retry: false,
+  });
+  const lostModeStuckCount = countersQuery.data?.counters?.lost_mode_stuck ?? 0;
+  const silentWatchCount = countersQuery.data?.counters?.silent_watch ?? 0;
+  const canViewSilent = useSilentWatchCan().data?.can_view === true;
 
   const unclosedRow = unclosedQuery.data?.[0];
   const approvalsRow = approvalsQuery.data?.[0];
@@ -496,13 +515,40 @@ export function DashboardPage() {
         </div>
 
         {/* ── Action band ──────────────────────────────────────────────── */}
-        {(showMoneyWork || canApprove || canReviewPartnerCases || canCheckCloseouts) && (
+        {/* Always shown for staff: the Lost Mode card is for every role. */}
         <section className="mb-6">
           <h2 className="text-sm font-semibold text-subtle mb-3 uppercase tracking-wide">
             {t('dashboard.actionRequired')}
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            <CountCard
+              icon={<LockKeyhole size={20} />}
+              title={t('dashboard.lostModeStuck')}
+              count={lostModeStuckCount}
+              isLoading={countersQuery.isLoading}
+              isError={countersQuery.isError}
+              error={countersQuery.error}
+              subtitle={lostModeStuckCount > 0 ? t('dashboard.lostModeStuckSub') : undefined}
+              to="/admin/nnf-extra/lost-mode-stuck"
+              emptyText={t('dashboard.noLostModeStuck')}
+              dangerWhenNonZero
+            />
+
+            {canViewSilent && (
+              <CountCard
+                icon={<MonitorX size={20} />}
+                title={t('dashboard.silentWatch')}
+                count={silentWatchCount}
+                isLoading={countersQuery.isLoading}
+                isError={countersQuery.isError}
+                error={countersQuery.error}
+                subtitle={silentWatchCount > 0 ? t('dashboard.silentWatchSub') : undefined}
+                to="/admin/nnf-extra/silent-watch"
+                emptyText={t('dashboard.noSilentWatch')}
+              />
+            )}
+
             {canReviewPartnerCases && (
               <CountCard
                 icon={<Store size={20} />}
@@ -609,7 +655,6 @@ export function DashboardPage() {
             )}
           </div>
         </section>
-        )}
 
         {/* ── Pending tasks ─────────────────────────────────────────────── */}
         {/* Always render both cards (zero shows a green-check empty state, like
