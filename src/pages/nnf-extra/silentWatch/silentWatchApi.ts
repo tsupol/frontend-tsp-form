@@ -70,6 +70,9 @@ export interface SilentTaskList {
 export interface SilentFix {
   id: number; lat: number; lon: number; accuracy_m: number | null; reported_at: string;
   when: LocationWhen; source_code: string; map_url: string;
+  /** Every phone of the contract (nnf-mdm 473): which phone, whether the
+   *  customer holds it now, and where it was when the fix was taken. */
+  asset_id?: number; held_now?: boolean; asset_bucket?: string | null; with_customer?: boolean | null;
 }
 export interface SilentCluster {
   cluster_no: number; fixes: number; days: number; mornings: number; lat: number; lon: number;

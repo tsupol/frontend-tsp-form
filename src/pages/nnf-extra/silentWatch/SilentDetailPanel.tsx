@@ -14,8 +14,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, TextArea, Tooltip, useSnackbarContext } from 'tsp-form';
 import {
   AlertTriangle, CheckCircle, Clock, ExternalLink, History, Loader2, MapPin, MapPinOff, MessageSquare,
-  Phone, RefreshCw, Save, Smartphone, Sunrise, Users, XCircle, Activity, Store, Home,
+  Phone, RefreshCw, Save, Smartphone, Sunrise, Users, XCircle, Activity, Store, Home, Wrench,
 } from 'lucide-react';
+import { useBucketName } from '../../../components/deviceLocation/deviceLocationApi';
 import { DateTime } from '../../../components/DateTime';
 import { DetailLine, DetailSection } from '../../../components/DetailLine';
 import { EntityCodeLink } from '../../../components/EntityCodeLink';
@@ -259,14 +260,20 @@ function LocationSection({ d }: { d: SilentTaskDetail }) {
   const { t } = useTranslation();
   const when = useLocationWhen();
   const sourceLabel = useSourceLabel();
+  const bucketName = useBucketName();
   const loc = d.location;
   const [selectedId, setSelectedId] = useState<number | null>(null);
   useEffect(() => { setSelectedId(null); }, [d.episode.episode_id]);
 
   const mapFixes = useMemo(() => loc.fixes.map((f) => ({
     id: f.id, lat: f.lat, lon: f.lon, clusterNo: null,
-    label: `${when.at(f.when)} · ${sourceLabel(f.source_code)}`,
-  })), [loc.fixes]); // eslint-disable-line react-hooks/exhaustive-deps
+    away: f.with_customer === false,
+    label: [
+      `${when.at(f.when)} · ${sourceLabel(f.source_code)}`,
+      f.held_now === false ? t('silentWatch.otherPhone') : null,
+      f.with_customer === false ? bucketName(f.asset_bucket) : null,
+    ].filter(Boolean).join(' · '),
+  })), [loc.fixes, bucketName]); // eslint-disable-line react-hooks/exhaustive-deps
   const mapClusters = useMemo(() => loc.clusters.map((c) => ({
     clusterNo: c.cluster_no, lat: c.lat, lon: c.lon, radiusM: c.radius_m, fixes: c.fixes,
     label: t('silentWatch.clusterLabel', { no: c.cluster_no, fixes: c.fixes, days: c.days, mornings: c.mornings }),
@@ -332,12 +339,22 @@ function LocationSection({ d }: { d: SilentTaskDetail }) {
                   f.id === selectedId ? 'bg-table-row-selected' : 'bg-transparent hover:bg-surface-hover'
                 }`}
               >
-                <span className="min-w-0 flex-1 flex flex-col">
+                <span className="min-w-0 flex-1 flex flex-col gap-0.5">
                   <span className="truncate">{when.at(f.when)}</span>
-                  <span className="text-xs text-subtle inline-flex items-center gap-1">
+                  <span className="text-xs leading-5 text-subtle inline-flex items-center gap-1">
                     {when.ago(f.when)}
-                    {f.when.is_morning && <Sunrise size={12} className="text-warning-fg" aria-label={t('deviceLocation.morning')} />}
+                    {f.when.is_morning && <Sunrise size={12} className="text-warning-fg -translate-y-0.5" aria-label={t('deviceLocation.morning')} />}
                   </span>
+                  {(f.held_now === false || f.with_customer === false) && (
+                    <span className="flex flex-wrap gap-1 pt-0.5">
+                      {f.held_now === false && <Badge size="xs" color="info">{t('silentWatch.otherPhone')}</Badge>}
+                      {f.with_customer === false && (
+                        <Badge size="xs" color="warning" data-away-bucket={f.asset_bucket ?? ''}>
+                          <span className="inline-flex items-center gap-0.5"><Wrench size={10} />{bucketName(f.asset_bucket) || '—'}</span>
+                        </Badge>
+                      )}
+                    </span>
+                  )}
                 </span>
                 <span className="text-xs text-subtle shrink-0">{sourceLabel(f.source_code)}</span>
                 <span className="text-xs tabular-nums text-subtle shrink-0 w-14 text-right">

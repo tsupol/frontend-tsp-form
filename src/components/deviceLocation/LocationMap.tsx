@@ -6,7 +6,7 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { clusterColor } from './mapColors';
+import { AWAY_COLOR, clusterColor } from './mapColors';
 import { ShowAllButton } from './ShowAllButton';
 
 export interface MapPoint {
@@ -23,6 +23,9 @@ export interface MapFix {
   clusterNo: number | null;
   /** Shown on hover. */
   label: string;
+  /** Taken while the phone was not with the customer (e.g. in repair): drawn
+   *  as a hollow grey dot so it does not read as a place the customer was. */
+  away?: boolean;
 }
 
 export interface MapCluster {
@@ -144,7 +147,10 @@ export default function LocationMap({
     }
     for (const f of fixes) {
       const color = clusterColor(f.clusterNo);
-      L.circleMarker([f.lat, f.lon], { radius: 6, color: '#ffffff', weight: 1.5, fillColor: color, fillOpacity: 0.95 })
+      const style: L.CircleMarkerOptions = f.away
+        ? { radius: 6, color: AWAY_COLOR, weight: 2.5, dashArray: '3 2', fillColor: '#ffffff', fillOpacity: 0.9 }
+        : { radius: 6, color: '#ffffff', weight: 1.5, fillColor: color, fillOpacity: 0.95 };
+      L.circleMarker([f.lat, f.lon], style)
         .bindTooltip(f.label, { direction: 'top' })
         .on('click', () => onSelectRef.current?.(f.id))
         .addTo(fl);

@@ -5,21 +5,25 @@
 //           and under it when that fix was taken (weekday, date, time, days ago)
 // Above both, the backend's verdict on where the customer lives (159 §1b) and a
 // one-line summary. Every figure, day and group comes from the RPC (mig 434).
+// Contract page (nnf-mdm 473): fixes of every phone the contract has used —
+// primary, loaner, former — each row naming its phone, and a fix taken while the
+// phone was away from the customer (e.g. in repair) labelled, never hidden.
 
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Badge, Button, DataTable, Modal, Tooltip } from 'tsp-form';
-import { AlertTriangle, ExternalLink, Home, Loader2, MapPin, MapPinOff, RefreshCw, Sunrise } from 'lucide-react';
+import { AlertTriangle, ExternalLink, Home, Loader2, MapPin, MapPinOff, RefreshCw, Smartphone, Sunrise, Wrench } from 'lucide-react';
 import { ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { DateTime } from '../DateTime';
 import {
-  useDeviceLocations, useLocationViewCan,
-  type DeviceLocations, type LocationCluster, type LocationRow, type LocationTarget, type ResidenceVerdict,
+  useBucketName, useDeviceLocations, useLocationViewCan,
+  type DeviceLocations, type LocationCluster, type LocationPhone, type LocationRow, type LocationRowPhone,
+  type LocationTarget, type PhoneRole, type ResidenceVerdict,
 } from './deviceLocationApi';
 import { useLocationWhen } from './locationWhen';
-import { clusterColor } from './mapColors';
+import { AWAY_COLOR, clusterColor } from './mapColors';
 import type { MapFocus } from './LocationMap';
 
 const LocationMap = lazy(() => import('./LocationMap'));
@@ -34,8 +38,34 @@ function errorText(err: unknown, t: ReturnType<typeof useTranslation>['t']): str
   return translateApiError(err, t);
 }
 
-function ClusterDot({ no }: { no: number | null }) {
+function ClusterDot({ no, away }: { no: number | null; away?: boolean }) {
+  if (away) {
+    return <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0 border-2 border-dashed bg-transparent" style={{ borderColor: AWAY_COLOR }} aria-hidden />;
+  }
   return <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ background: clusterColor(no) }} aria-hidden />;
+}
+
+const ROLE_COLOR: Record<PhoneRole, 'default' | 'info' | 'secondary'> = { PRIMARY: 'default', LOANER: 'info', FORMER: 'secondary' };
+
+/** Which phone gave a fix: "เครื่องสำรอง · NQ0XWNNWN3". */
+function PhoneTag({ phone }: { phone: LocationRowPhone }) {
+  const { t } = useTranslation();
+  return (
+    <Badge size="xs" color={ROLE_COLOR[phone.role] ?? 'default'} data-phone-role={phone.role}>
+      {t(`deviceLocation.phone.role.${phone.role}`, { defaultValue: phone.role })}
+      {phone.serial_number ? ` · ${phone.serial_number}` : null}
+    </Badge>
+  );
+}
+
+/** Where the phone was when a fix was taken, shown only when it was not with the customer. */
+function AwayTag({ bucket }: { bucket: string | null | undefined }) {
+  const bucketName = useBucketName();
+  return (
+    <Badge size="xs" color="warning" data-away-bucket={bucket ?? ''}>
+      <span className="inline-flex items-center gap-0.5"><Wrench size={10} />{bucketName(bucket) || '—'}</span>
+    </Badge>
+  );
 }
 
 export function DeviceLocationDialog({ open, target, lastFixAt, onClose }: {
@@ -48,11 +78,14 @@ export function DeviceLocationDialog({ open, target, lastFixAt, onClose }: {
 }) {
   const { t } = useTranslation();
   const when = useLocationWhen();
+  const bucketName = useBucketName();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [focus, setFocus] = useState<MapFocus | null>(null);
+  /** One phone picked from the phone list; null = every phone. */
+  const [phoneId, setPhoneId] = useState<number | null>(null);
 
   useEffect(() => {
-    if (open) { setSelectedId(null); setFocus(null); }
+    if (open) { setSelectedId(null); setFocus(null); setPhoneId(null); }
   }, [open]);
 
   const { data, error, isLoading, isFetching, refetch } = useDeviceLocations(target, open);
@@ -66,7 +99,14 @@ export function DeviceLocationDialog({ open, target, lastFixAt, onClose }: {
     seenFix.current = lastFixAt;
   }, [open, lastFixAt]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const rows = data?.rows ?? [];
+  const phones = data?.phones ?? [];
+  const multiPhone = phones.length > 1;
+  // Picking a phone only narrows what is listed and drawn; groups and the home
+  // verdict stay the contract's, as the backend worked them out.
+  const rows = useMemo(() => {
+    const all = data?.rows ?? [];
+    return phoneId == null ? all : all.filter((r) => r.phone?.asset_id === phoneId);
+  }, [data?.rows, phoneId]);
   const clusters = data?.clusters ?? [];
   // Opens on the newest; a fix that is gone after a refresh falls back to it.
   const selected: LocationRow | null = rows.find((r) => r.id === selectedId) ?? rows[0] ?? null;
@@ -77,8 +117,15 @@ export function DeviceLocationDialog({ open, target, lastFixAt, onClose }: {
 
   const mapFixes = useMemo(() => rows.map((r) => ({
     id: r.id, lat: r.lat, lon: r.lon, clusterNo: r.cluster_no,
-    label: `${when.at(r.when)} · ${when.ago(r.when)}`,
-  })), [rows]); // eslint-disable-line react-hooks/exhaustive-deps
+    away: r.with_customer === false,
+    label: [
+      `${when.at(r.when)} · ${when.ago(r.when)}`,
+      multiPhone && r.phone
+        ? `${t(`deviceLocation.phone.role.${r.phone.role}`, { defaultValue: r.phone.role })}${r.phone.serial_number ? ` ${r.phone.serial_number}` : ''}`
+        : null,
+      r.with_customer === false ? bucketName(r.asset_bucket) : null,
+    ].filter(Boolean).join(' · '),
+  })), [rows, multiPhone, bucketName]); // eslint-disable-line react-hooks/exhaustive-deps
   const mapClusters = useMemo(() => clusters.map((c) => ({
     clusterNo: c.cluster_no, lat: c.lat, lon: c.lon, radiusM: c.radius_m, fixes: c.fixes,
     label: t('deviceLocation.cluster.mapLabel', { no: c.cluster_no, fixes: c.fixes, days: c.days }),
@@ -145,7 +192,7 @@ export function DeviceLocationDialog({ open, target, lastFixAt, onClose }: {
                   showAllLabel={t('deviceLocation.showAll')}
                 />
               </Suspense>
-              {selected && <div className="shrink-0"><FixCard row={selected} /></div>}
+              {selected && <div className="shrink-0"><FixCard row={selected} multiPhone={multiPhone} /></div>}
             </div>
 
             {/* Left half: the answer stays on top, groups and fixes scroll under it. */}
@@ -161,6 +208,12 @@ export function DeviceLocationDialog({ open, target, lastFixAt, onClose }: {
                       <span><span className="font-medium text-fg">{summary.days}</span> {t('deviceLocation.summary.days')}</span>
                       <span>{when.day(summary.first_when)} – {when.day(summary.last_when)}</span>
                       <span><span className="font-medium text-fg">{summary.clusters}</span> {t('deviceLocation.summary.clusters')}</span>
+                      {multiPhone && (
+                        <span><span className="font-medium text-fg">{phones.length}</span> {t('deviceLocation.summary.phones')}</span>
+                      )}
+                      {(summary.away_fixes ?? 0) > 0 && (
+                        <span className="text-warning-fg">{t('deviceLocation.summary.away', { n: summary.away_fixes })}</span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -169,6 +222,13 @@ export function DeviceLocationDialog({ open, target, lastFixAt, onClose }: {
                 {/* Top spacing that scrolls away: padding on the scroller would
                     leave a strip above the sticky header where rows show through. */}
                 <div aria-hidden className="max-md:hidden shrink-0 h-0" />
+                {multiPhone && (
+                  <PhoneList
+                    phones={phones}
+                    pickedId={phoneId}
+                    onPick={(id) => { setPhoneId((cur) => (cur === id ? null : id)); setSelectedId(null); }}
+                  />
+                )}
                 {clusters.length > 0 && (
                   <ClusterList clusters={clusters} onPick={(c) => focusOn(c.lat, c.lon, c.radius_m)} />
                 )}
@@ -194,16 +254,22 @@ export function DeviceLocationDialog({ open, target, lastFixAt, onClose }: {
                           className={`${ROW_GRID} w-full text-left px-3 py-1.5 text-sm cursor-pointer bg-transparent border-none`}
                           onClick={() => setSelectedId(r.id)}
                         >
-                          <ClusterDot no={r.cluster_no} />
-                          <span className="min-w-0 flex flex-col">
+                          <ClusterDot no={r.cluster_no} away={r.with_customer === false} />
+                          <span className="min-w-0 flex flex-col gap-0.5">
                             <span className="truncate">{when.at(r.when)}</span>
-                            <span className="text-xs text-subtle inline-flex items-center gap-1">
+                            <span className="text-xs leading-5 text-subtle inline-flex items-center gap-1">
                               {when.ago(r.when)}
-                              {r.when.is_morning && <Sunrise size={12} className="text-warning-fg" aria-label={t('deviceLocation.morning')} />}
+                              {r.when.is_morning && <Sunrise size={12} className="text-warning-fg -translate-y-0.5" aria-label={t('deviceLocation.morning')} />}
                             </span>
                           </span>
-                          <span className="min-w-0 text-xs text-subtle">
-                            {t(`deviceLocation.source.${r.source_code}`, { defaultValue: r.source_code })}
+                          <span className="min-w-0 text-xs text-subtle flex flex-col items-start gap-0.5">
+                            <span>{t(`deviceLocation.source.${r.source_code}`, { defaultValue: r.source_code })}</span>
+                            {(multiPhone && r.phone) || r.with_customer === false ? (
+                              <span className="flex flex-wrap gap-1">
+                                {multiPhone && r.phone && <PhoneTag phone={r.phone} />}
+                                {r.with_customer === false && <AwayTag bucket={r.asset_bucket} />}
+                              </span>
+                            ) : null}
                           </span>
                           <span className="text-right text-xs tabular-nums text-subtle">
                             {r.accuracy_m != null ? t('deviceLocation.accuracyValue', { m: Math.round(r.accuracy_m) }) : '—'}
@@ -227,9 +293,10 @@ export function DeviceLocationDialog({ open, target, lastFixAt, onClose }: {
 }
 
 /** When the chosen fix was taken, where it came from and how sure it is. */
-function FixCard({ row }: { row: LocationRow }) {
+function FixCard({ row, multiPhone }: { row: LocationRow; multiPhone: boolean }) {
   const { t } = useTranslation();
   const when = useLocationWhen();
+  const away = row.with_customer === false;
   return (
     <div className="px-3 py-2 rounded-md border border-line bg-surface flex flex-col gap-1" data-testid="location-fix-card">
       <div className="flex items-center gap-2 flex-wrap">
@@ -243,10 +310,18 @@ function FixCard({ row }: { row: LocationRow }) {
         <span>{t(`deviceLocation.source.${row.source_code}`, { defaultValue: row.source_code })}</span>
         {row.accuracy_m != null && <span>{t('deviceLocation.accuracyValue', { m: Math.round(row.accuracy_m) })}</span>}
         <span className="inline-flex items-center gap-1">
-          <ClusterDot no={row.cluster_no} />
-          {row.cluster_no != null ? t('deviceLocation.cluster.name', { no: row.cluster_no }) : t('deviceLocation.cluster.none')}
+          <ClusterDot no={row.cluster_no} away={away} />
+          {away ? t('deviceLocation.cluster.away')
+            : row.cluster_no != null ? t('deviceLocation.cluster.name', { no: row.cluster_no }) : t('deviceLocation.cluster.none')}
         </span>
       </div>
+      {((multiPhone && row.phone) || away) && (
+        <div className="flex items-center gap-1.5 flex-wrap text-xs text-subtle" data-testid="location-fix-phone">
+          {multiPhone && row.phone && <PhoneTag phone={row.phone} />}
+          {multiPhone && row.phone && <span>{row.phone.asset_code}</span>}
+          {away && <AwayTag bucket={row.asset_bucket} />}
+        </div>
+      )}
       <div className="flex items-center justify-between gap-3 text-xs text-subtle flex-wrap">
         <span className="font-mono">{row.lat}, {row.lon}</span>
         <a href={row.map_url} target="_blank" rel="noreferrer" className="text-primary-fg hover:underline inline-flex items-center gap-1 shrink-0">
@@ -295,12 +370,74 @@ function ClusterList({ clusters, onPick }: { clusters: LocationCluster[]; onPick
   );
 }
 
+/** Every phone the contract has used, the one held now first. Picking one shows
+ *  only its fixes; picking it again shows every phone. */
+function PhoneList({ phones, pickedId, onPick }: {
+  phones: LocationPhone[];
+  pickedId: number | null;
+  onPick: (assetId: number) => void;
+}) {
+  const { t } = useTranslation();
+  const bucketName = useBucketName();
+  return (
+    <div className="border border-line rounded-md shrink-0" data-testid="location-phones">
+      <div className="px-3 py-1.5 text-xs font-medium text-subtle border-b border-line flex items-center gap-2">
+        <span>{t('deviceLocation.phone.title', { count: phones.length })}</span>
+        {pickedId == null ? (
+          <span className="font-normal text-subtler">{t('deviceLocation.phone.pickHint')}</span>
+        ) : (
+          <button
+            type="button"
+            className="ml-auto text-xs font-normal text-primary-fg hover:underline bg-transparent border-none p-0 cursor-pointer"
+            onClick={() => onPick(pickedId)}
+          >
+            {t('deviceLocation.phone.showEvery')}
+          </button>
+        )}
+      </div>
+      <div className="divide-y divide-line">
+        {phones.map((p) => (
+          <button
+            key={p.asset_id}
+            type="button"
+            data-asset-id={p.asset_id}
+            data-state={p.asset_id === pickedId ? 'selected' : undefined}
+            className={`w-full text-left px-3 py-1.5 flex items-start gap-2 border-none cursor-pointer ${
+              p.asset_id === pickedId ? 'bg-table-row-selected' : 'bg-transparent hover:bg-surface-hover'
+            }`}
+            onClick={() => onPick(p.asset_id)}
+          >
+            <Smartphone size={14} className="mt-0.5 shrink-0 text-subtle" />
+            <span className="min-w-0 flex flex-col gap-0.5">
+              <span className="text-sm flex items-center gap-1.5 flex-wrap">
+                <span className="font-medium">{t(`deviceLocation.phone.role.${p.role}`, { defaultValue: p.role })}</span>
+                {p.serial_number && <span className="font-mono text-xs">SN {p.serial_number}</span>}
+                {p.held_now && <Badge size="xs" color="success">{t('deviceLocation.phone.heldNow')}</Badge>}
+              </span>
+              <span className="text-xs text-subtle">
+                {[
+                  p.product_display_name,
+                  t('deviceLocation.phone.fixes', { n: p.fixes }),
+                  !p.held_now && p.current_bucket ? t('deviceLocation.phone.nowAt', { bucket: bucketName(p.current_bucket) }) : null,
+                ].filter(Boolean).join(' · ')}
+              </span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** The phone and its contract, as one line under the window's title. */
 function DeviceLine({ data }: { data: DeviceLocations }) {
   const { t } = useTranslation();
   const { device, contract } = data;
+  // An unbound phone answers no serial on `device`; the phone list still has it.
+  const serial = device?.serial_number ?? data.phones?.find((p) => p.asset_id === device?.asset_id)?.serial_number ?? null;
+  const unbound = !!device && !device.is_bound && data.phones != null && data.total > 0;
   return (
-    <div className="text-xs text-subtle flex items-center gap-x-3 gap-y-0.5 flex-wrap font-normal" data-testid="location-device-line">
+    <div className="text-xs text-subtle flex items-baseline gap-x-3 gap-y-0.5 flex-wrap font-normal" data-testid="location-device-line">
       {device && (
         // A new tab: this window sits on a page the person is working on.
         <Link to={`/admin/inventory/assets/${device.asset_id}`} target="_blank" className="text-primary-fg hover:underline inline-flex items-center gap-1">
@@ -308,8 +445,9 @@ function DeviceLine({ data }: { data: DeviceLocations }) {
         </Link>
       )}
       {device?.product_display_name && <span className="text-fg">{device.product_display_name}</span>}
-      {device?.serial_number && <span className="font-mono">SN {device.serial_number}</span>}
+      {serial && <span className="font-mono">SN {serial}</span>}
       {contract && <span>{t('deviceLocation.contract')} {contract.code}</span>}
+      {unbound && <Badge size="xs" color="default" data-testid="location-unbound">{t('deviceLocation.unbound')}</Badge>}
       {device?.last_seen_at && <span>{t('deviceLocation.lastSeen')} <DateTime value={device.last_seen_at} /></span>}
     </div>
   );

@@ -5,6 +5,9 @@
 const CLUSTER_COLORS = ['#2563eb', '#9333ea', '#ea580c', '#0891b2', '#ca8a04', '#db2777'];
 const NO_CLUSTER_COLOR = '#6b7280';
 
+// A fix taken while the phone was not with the customer (in repair, at a shop).
+export const AWAY_COLOR = '#6b7280';
+
 export function clusterColor(clusterNo: number | null): string {
   return clusterNo == null ? NO_CLUSTER_COLOR : CLUSTER_COLORS[(clusterNo - 1) % CLUSTER_COLORS.length];
 }

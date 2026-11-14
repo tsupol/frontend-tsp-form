@@ -11347,7 +11347,9 @@
     "summary": {
       "fixes": "fixes",
       "days": "days",
-      "clusters": "groups"
+      "clusters": "groups",
+      "phones": "phones",
+      "away": "{{n}} taken while the phone was away from the customer"
     },
     "cluster": {
       "title": "Groups of fixes ({{count}})",
@@ -11355,9 +11357,24 @@
       "none": "No group",
       "stats": "{{fixes}} fixes · {{days}} days · {{mornings}} mornings · radius {{m}} m",
       "span": "First {{first}} · last {{last}} ({{ago}})",
-      "mapLabel": "Group {{no}} · {{fixes}} fixes · {{days}} days"
+      "mapLabel": "Group {{no}} · {{fixes}} fixes · {{days}} days",
+      "away": "Not counted as the customer's place (phone not with the customer)"
     },
-    "showAll": "Show all"
+    "showAll": "Show all",
+    "unbound": "Removed from MDM",
+    "phone": {
+      "title": "This contract's phones ({{count}})",
+      "pickHint": "Pick a phone to see only its locations",
+      "showEvery": "Show every phone",
+      "heldNow": "Customer holds it now",
+      "fixes": "{{n}} locations",
+      "nowAt": "Now: {{bucket}}",
+      "role": {
+        "PRIMARY": "Primary phone",
+        "LOANER": "Loaner phone",
+        "FORMER": "Former phone"
+      }
+    }
   },
   "icloudMenu": {
     "title": "iCloud (Apple ID) menu",
@@ -11481,7 +11498,8 @@
     "belowMin": "{{count}} more contracts are overdue less than {{days}} days",
     "emptyDays": "No pins overdue ≥ {{days}} days",
     "emptyKeyword": "Nothing found for \"{{keyword}}\"",
-    "emptyKeywordDays": "Nothing found for \"{{keyword}}\" overdue ≥ {{days}} days"
+    "emptyKeywordDays": "Nothing found for \"{{keyword}}\" overdue ≥ {{days}} days",
+    "otherPhone": "From another phone of the contract, not the one the customer holds now"
   },
   "downPct": {
     "label": "Down %",
@@ -11832,7 +11850,8 @@
     "save": "Save result",
     "saved": "Saved \"{{result}}\"",
     "cannotLog": "This task is closed — no more results can be saved",
-    "lastCheck": "Last check"
+    "lastCheck": "Last check",
+    "otherPhone": "Another phone of the contract"
   },
   "lostModeStuck": {
     "title": "Devices stuck in Lost Mode",

@@ -4,6 +4,8 @@
 // customer's location, so it runs only when someone opens the window, changes
 // page or presses refresh: never on focus, never on a timer.
 
+import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -64,6 +66,35 @@ export interface LocationRow {
   source_code: string;
   rule_key: string | null;
   map_url: string;
+  /** Contract page only (nnf-mdm 473): the phone that gave this fix. */
+  phone?: LocationRowPhone | null;
+  /** Where that phone was when the fix was taken (v_ref_buckets code). */
+  asset_bucket?: string | null;
+  /** false = the phone was not with the customer (e.g. in repair): shown with a
+   *  label, never hidden, and left out of groups and the home verdict. */
+  with_customer?: boolean | null;
+}
+
+/** PRIMARY = the contract's own phone · LOANER = lent while it was repaired ·
+ *  FORMER = a phone swapped out earlier. */
+export type PhoneRole = 'PRIMARY' | 'LOANER' | 'FORMER';
+
+export interface LocationRowPhone {
+  asset_id: number;
+  asset_code: string;
+  serial_number: string | null;
+  role: PhoneRole;
+  /** true = the phone the customer holds now. */
+  held_now: boolean;
+}
+
+export interface LocationPhone extends LocationRowPhone {
+  product_display_name: string | null;
+  /** Where the phone is now. */
+  current_bucket: string | null;
+  fixes: number;
+  first_at: string | null;
+  last_at: string | null;
 }
 
 /** Fixes within 300 m of each other, from every fix of the device; 1 = most fixes. */
@@ -91,6 +122,10 @@ export interface LocationSummary {
   last_at: string | null;
   first_when: LocationWhen | null;
   last_when: LocationWhen | null;
+  /** Fixes taken while the phone was not with the customer (nnf-mdm 473). */
+  away_fixes?: number;
+  /** How many phones the contract's fixes came from. */
+  phones?: number;
 }
 
 export interface ResidenceVerdict {
@@ -128,6 +163,8 @@ export interface DeviceLocations {
   limit: number;
   offset: number;
   rows: LocationRow[];
+  /** Contract page only: every phone of the contract, the one held now first. */
+  phones?: LocationPhone[] | null;
 }
 
 export interface LocationTarget {
@@ -135,18 +172,28 @@ export interface LocationTarget {
   assetId?: number | null;
 }
 
-// The backend keeps the newest 50 fixes per device, so one read of 50 is all
-// of them: the map draws every fix (mig 434), no paging.
-const ALL_FIXES = 50;
+// A contract keeps its newest 200 fixes over all its phones (nnf-mdm 472), a
+// device page 50; one page is at most 100. The map draws every fix, so the
+// window reads every page in turn when it opens (at most 2 reads).
+const PAGE = 100;
+const MAX_PAGES = 3;
+
+async function readAllFixes(target: LocationTarget): Promise<DeviceLocations> {
+  const by = target.contractId != null ? { p_contract_id: target.contractId } : { p_asset_id: target.assetId };
+  const first = await apiClient.rpc<DeviceLocations>('fn_mdm_device_locations', { ...by, p_limit: PAGE, p_offset: 0 });
+  let rows = first.rows ?? [];
+  for (let page = 1; page < MAX_PAGES && rows.length < first.total; page++) {
+    const next = await apiClient.rpc<DeviceLocations>('fn_mdm_device_locations', { ...by, p_limit: PAGE, p_offset: rows.length });
+    if (!next.rows?.length) break;
+    rows = rows.concat(next.rows);
+  }
+  return { ...first, rows };
+}
 
 export function useDeviceLocations(target: LocationTarget, enabled: boolean) {
   return useQuery({
     queryKey: ['mdm-device-locations', target.contractId ?? null, target.assetId ?? null],
-    queryFn: () => apiClient.rpc<DeviceLocations>('fn_mdm_device_locations', {
-      ...(target.contractId != null ? { p_contract_id: target.contractId } : { p_asset_id: target.assetId }),
-      p_limit: ALL_FIXES,
-      p_offset: 0,
-    }),
+    queryFn: () => readAllFixes(target),
     enabled,
     // No cache and no background reads: each read is an audited look.
     staleTime: 0,
@@ -156,6 +203,27 @@ export function useDeviceLocations(target: LocationTarget, enabled: boolean) {
     retry: false,
     placeholderData: keepPreviousData,
   });
+}
+
+// ── Where a phone is, by v_ref_buckets code (IN_REPAIR → "ส่งซ่อม") ──────────
+
+interface RefBucket { code: string; name_th: string; name_en: string }
+
+/** Bucket name in the screen's language, from v_ref_buckets — never written
+ *  into the screen. Unknown code → the code itself. */
+export function useBucketName() {
+  const { i18n } = useTranslation();
+  const { data = [] } = useQuery({
+    queryKey: ['ref-buckets'],
+    queryFn: () => apiClient.get<RefBucket[]>('/v_ref_buckets?select=code,name_th,name_en'),
+    staleTime: Infinity,
+  });
+  const th = i18n.language.startsWith('th');
+  return useCallback((code: string | null | undefined) => {
+    if (!code) return '';
+    const b = data.find((x) => x.code === code);
+    return b ? (th ? b.name_th : b.name_en) : code;
+  }, [data, th]);
 }
 
 // ── Every contract's newest fix on one map (fn_mdm_location_map, mig 434) ────
@@ -191,6 +259,10 @@ export interface CustomerMapPin {
     fix_age_sec: number | null;
     source_code: string;
     map_url: string;
+    /** The phone that gave this pin (nnf-mdm 473). */
+    asset_id?: number;
+    /** false = the pin came from another phone of the contract, not the one held now. */
+    held_now?: boolean;
   };
   fixes_total: number;
   residence_status: ResidenceStatus | null;

@@ -308,6 +308,9 @@ function PinRow({ pin, onPick, onOpen }: { pin: CustomerMapPin; onPick: () => vo
           {when.at(fix.when)} · <span className={fix.when.days_ago > STALE_FIX_DAYS ? 'text-warning-fg' : ''}>{when.ago(fix.when)}</span>
           {' · '}{t('customerMap.fixesTotal', { n: pin.fixes_total })}
         </div>
+        {fix.held_now === false && (
+          <div className="text-xs text-info-fg" data-testid="customer-map-other-phone">{t('customerMap.otherPhone')}</div>
+        )}
         <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
           {contract.overdue_days > 0 ? (
             <Badge size="xs" color={contract.overdue_days >= 7 ? 'danger' : 'warning'}>
