@@ -155,8 +155,7 @@ export function ChatPage() {
     setBranchFilterState(id);
     try { if (id == null) localStorage.removeItem(BRANCH_FILTER_KEY); else localStorage.setItem(BRANCH_FILTER_KEY, String(id)); } catch { /* private mode */ }
   };
-  const branchId = canFilterBranch ? branchFilter : null;
-  const { data: branchOptions = [] } = useQuery({
+  const { data: branchOptions = [], isSuccess: branchOptionsOk, isError: branchOptionsFailed } = useQuery({
     queryKey: ['chat-branch-options'],
     // Only the branches this user can see (the view's own scope); a fund's list may hold
     // branches with no chat yet — picking one gives an empty list, which is correct.
@@ -164,6 +163,19 @@ export function ChatPage() {
     enabled: canFilterBranch,
     staleTime: 10 * 60_000,
   });
+  // The remembered branch counts only while it is one of THIS account's branches
+  // (BUG 2026-11-15 stale_branch_filter: a branch picked under another account in the
+  // same browser was sent on every request, so the list came back empty with a blank
+  // filter box). Until the branch list is in, a remembered pick holds the inbox back
+  // rather than asking for a branch this account may not see.
+  const branchOptionsSettled = branchOptionsOk || branchOptionsFailed;
+  const branchFilterValid = branchFilter != null && branchOptions.some(o => o.id === branchFilter);
+  const branchFilterPending = canFilterBranch && branchFilter != null && !branchOptionsSettled;
+  const branchId = canFilterBranch && branchFilterValid ? branchFilter : null;
+  useEffect(() => {
+    if (canFilterBranch && branchOptionsSettled && branchFilter != null && !branchFilterValid) setBranchFilter(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canFilterBranch, branchOptionsSettled, branchFilter, branchFilterValid]);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [lightboxKey, setLightboxKey] = useState<string | null>(null);
@@ -213,7 +225,7 @@ export function ChatPage() {
       queryUrl,
       { page: pageIndex + 1, pageSize },
     ),
-    enabled: !isSearchMode,
+    enabled: !isSearchMode && !branchFilterPending,
     placeholderData: keepPreviousData,
   });
 
@@ -573,7 +585,10 @@ export function ChatPage() {
               <div className={`flex-1 min-h-0 overflow-auto better-scroll ${isFetching ? 'opacity-60 transition-opacity' : 'transition-opacity'}`}>
                 {rows.length === 0 ? (
                   <div className="p-8 text-center text-subtle text-sm">
-                    {isSearchMode ? t('chat.searchEmpty') : t('chat.empty')}
+                    {/* No answer yet (first load, or held back for the branch list) is not
+                        "no chats" — an empty-looking list is what hid the stale filter. */}
+                    {!isSearchMode && inbox.isPending ? t('common.loading')
+                      : isSearchMode ? t('chat.searchEmpty') : t('chat.empty')}
                   </div>
                 ) : (
                   <div className="flex flex-col">

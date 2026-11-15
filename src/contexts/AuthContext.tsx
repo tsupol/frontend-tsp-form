@@ -328,6 +328,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // now wrong. Unlike login/logout this stays in-app (no reload to wipe the
     // heap), so drop the cache by hand; mounted pages refetch.
     queryClient.clear();
+    // Same reason for remembered pickers: branch/company ids and the reconcile branch
+    // scope of the old holding would filter the new one down to nothing.
+    authService.clearUserScopedState();
     // Use holding_id from server response as single source of truth; the org
     // block (branch_type/db_role/names) was persisted by authService.
     setUser(prev => prev

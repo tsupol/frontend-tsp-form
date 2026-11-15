@@ -52,6 +52,17 @@ export function DunningQueueView({ isMobile }: { isMobile: boolean }) {
   const [collectorSel, setCollectorSel] = useState('');
   const branchId = branchSel ? Number(branchSel) : null;
   const { data, error, isFetching, dataUpdatedAt } = useDunningQueue(branchId);
+  // The remembered branch counts only while it is one of THIS account's branches — the
+  // answer's branches[] lists them whatever was asked (BUG 2026-11-15 stale_branch_filter:
+  // a pick from another account in this browser gave an empty queue). Not one of them →
+  // forget it and ask again for everything.
+  useEffect(() => {
+    if (!data || !branchSel) return;
+    if (!data.branches.some(b => String(b.id) === branchSel)) {
+      setBranchSel('');
+      try { localStorage.removeItem(BRANCH_KEY); } catch { /* not remembered */ }
+    }
+  }, [data, branchSel]);
 
   const [picked, setPicked] = useState<number | null>(null);
   /** The "+N" list of a line longer than the floor shows. */

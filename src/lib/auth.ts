@@ -321,6 +321,13 @@ export const authService = {
       'asset-print-queue-v1',   // AssetsPage print queue
       'chatDock',               // ChatDockContext: open contract + position
       'priceCheck_recent',      // PriceCheckPage recents
+      // Remembered scope pickers — an id of a branch/company the next account may not see
+      // (BUG 2026-11-15 stale_branch_filter). Each page also checks its pick against the
+      // account's own list; clearing here keeps one person's pick from becoming another's default.
+      'chat.branchFilter',      // ChatPage branch filter
+      'dunningQueue.branch',    // DunningQueueView branch filter
+      'deviceWatch.branch',     // DeviceWatchPage branch filter
+      'nnf.simulation.company', // SimulationPage company tab
     ];
     const sessionKeys = [
       'accounting.reconcile.branchScope',
