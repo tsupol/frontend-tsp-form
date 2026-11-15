@@ -11971,5 +11971,22 @@
       "CUSTOMER_SUBMIT": "Customer sent the slip",
       "BRANCH_SUBMIT": "Branch sent for the customer"
     }
+  },
+  "priceGuide": {
+    "title": "Price guide",
+    "new": "New",
+    "used": "Used",
+    "window30": "Last 30 days · {{n}} contracts",
+    "window60": "No contracts for this model in the last 30 days, showing the last 60 days · {{n}} contracts",
+    "down": "Down",
+    "installment": "Installment",
+    "months": "Months",
+    "contracts": "Contracts",
+    "current": "Current price",
+    "more": "+ {{n}} more prices ({{m}} contracts)",
+    "note": "Prices the same company used for this model. For reference only, not a required price.",
+    "noModel": "Pick a model first to see the price guide",
+    "notFound": "No contracts for this model in the last 60 days",
+    "hint": "How the same company priced this model"
   }
 }

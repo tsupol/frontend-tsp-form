@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Input, Select, Badge, Button, MaskedInput, Tooltip, useSnackbarContext } from 'tsp-form';
+import { Input, Select, Badge, Button, Chevron, MaskedInput, Tooltip, useSnackbarContext } from 'tsp-form';
 import { ScanBarcode, XCircle, X, Calculator, Info, CheckCircle, Package, BookOpen, AlertTriangle, ChevronsRight } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
 import { fmtCurrency } from '../../../lib/format';
@@ -18,6 +18,7 @@ import { lookupBarcode } from '../../../lib/barcodeLookup';
 import { translateApiError } from '../../../lib/apiErrors';
 import { SearchInput } from '../../../components/SearchInput';
 import { isSearchable } from '../../../lib/searchKeyword';
+import { PriceGuideDisclosure } from './PriceGuide';
 
 /** Hard cap on installment term, mirroring the backend guard (mig 1030). */
 const TERM_MONTHS_MAX = 60;
@@ -146,7 +147,11 @@ export function PanelProductPlan(_props: Props) {
   // the catalog "promised but not in stock" path is internal-only (design
   // v3.1 §1; owner 09-10). The approval freeze on the BE side will hold the
   // chosen device; here we keep the picking stock-only.
-  const { isDealPartner } = useAuth();
+  const { isDealPartner, user } = useAuth();
+  // "ราคาอ้างอิง" on the FIN2 plan: only for staff of an operating company
+  // (UI_SUMMARY 167 §4 — fund companies and deal-partner shops never see it),
+  // and only when the staff member opens it.
+  const canSeePriceGuide = user?.company_type === 'OPERATING' && !isDealPartner;
 
   // ── Grade check before a shop's contract points at a device ─────────
   // While a contract holds the device its grade can't be changed (mig 1484), so
@@ -1276,11 +1281,7 @@ export function PanelProductPlan(_props: Props) {
           fn_contract_set_fin1_plan, and the product has to be on the contract
           before that RPC will answer. */}
       {fin1Available && (mode === 'used' ? localTargetAssetId : localVariantId) && (
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <Badge size="sm" color="info">FIN1</Badge>
-            <span className="text-sm font-medium">{t('priceCheck.fin1Desc')}</span>
-          </div>
+        <PlanSection model="FIN1" title={t('priceCheck.fin1Desc')}>
           {fin1Open && contract?.id && contractIsFin1 && productOnContract ? (
             <Fin1PlanEditor
               // Re-mount on a device change: the editor probes the contract
@@ -1308,7 +1309,7 @@ export function PanelProductPlan(_props: Props) {
               }}
             />
           ) : (
-            <div className="border border-line rounded-lg p-4 flex flex-col gap-3">
+            <div className="flex flex-col gap-3">
               <span className="text-sm text-subtle">{fin1StartHint}</span>
               {fin1Error && (
                 <div className="alert alert-danger">
@@ -1328,29 +1329,31 @@ export function PanelProductPlan(_props: Props) {
               </div>
             </div>
           )}
-        </div>
+        </PlanSection>
       )}
 
       {/* ── Quote tables ────────────────────────────────────────────── */}
       {((mode === 'new' && localVariantId) || (mode === 'used' && localTargetAssetId)) && dedupedQuotes.length > 0 && (
         <div className="flex flex-col gap-5">
           {fin1Enabled && fin1Rows.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <Badge size="sm" color="info">FIN1</Badge>
-                <span className="text-sm font-medium">{t('priceCheck.fin1Desc')}</span>
-              </div>
+            <PlanSection model="FIN1" title={t('priceCheck.fin1Desc')}>
               <QuoteTable rows={fin1Rows} terms={fin1Terms} type="fin1" isSelected={isSelected} onSelect={(r) => setLocalQuote(toQuote(r, 'FIN1'))} t={t} />
-            </div>
+            </PlanSection>
           )}
 
           {fin2Enabled && fin2Rows.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <Badge size="sm" color="warning">FIN2</Badge>
-                <span className="text-sm font-medium">{t('priceCheck.fin2Desc')}</span>
-              </div>
+            <PlanSection model="FIN2" title={t('priceCheck.fin2Desc')}>
               <QuoteTable rows={fin2Rows} terms={fin2Terms} type="fin2" isSelected={isSelected} onSelect={(r) => setLocalQuote(toQuote(r, 'FIN2'))} t={t} />
+              {canSeePriceGuide && (contract?.id ?? wizardData.contractId) != null && (
+                // Right above the agreed-price box: look, then decide.
+                // The model on screen, saved or not (mig 1678).
+                <PriceGuideDisclosure
+                  contractId={(contract?.id ?? wizardData.contractId)!}
+                  modelId={mode === 'used' ? (selectedAsset?.model_id ?? localModelId) : localModelId}
+                  isUsedAsset={mode === 'used'
+                    && (selectedAsset ? selectedAsset.condition_grade === 'USED_A' || selectedAsset.condition_grade === 'USED_B' : !!contract?.is_used_asset)}
+                />
+              )}
               <Fin2Calculator fin2Rows={fin2Rows} fin2Terms={fin2Terms} t={t} saving={saving} onUse={(r) => {
                 void handleConfirm({
                   variant_id: localVariantId!,
@@ -1369,7 +1372,7 @@ export function PanelProductPlan(_props: Props) {
                   base_term_months: r.baseTerm,
                 });
               }} />
-            </div>
+            </PlanSection>
           )}
 
           {fin2Unconfigured && fin2Rows.length === 0 && (
@@ -1534,6 +1537,36 @@ export function PanelProductPlan(_props: Props) {
   );
 }
 
+// ── Plan section ────────────────────────────────────────────────────────
+// One card per plan (FIN1 / FIN2): a header bar naming the plan, then its
+// tables and tools, so the two plans read as two separate choices. The header
+// folds the card; the body stays mounted while folded so a half-set FIN1 plan
+// or a typed agreed price is still there when it opens again.
+
+function PlanSection({ model, title, children }: { model: 'FIN1' | 'FIN2'; title: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(true);
+  return (
+    // shrink-0: the panel body is a flex column that scrolls, and an
+    // overflow-hidden child would otherwise be squeezed to nothing.
+    <section className="shrink-0 border border-line rounded-lg overflow-hidden" data-plan={model}>
+      <button
+        type="button"
+        // bg-surface = the library's header fill (--color-table-header-bg);
+        // surface-hover is its hover colour, used here only on hover.
+        className={`w-full flex items-center gap-2 px-4 py-2.5 bg-surface hover:bg-surface-hover transition-colors text-left cursor-pointer ${open ? 'border-b border-line' : ''}`}
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        data-testid="plan-section-toggle"
+      >
+        <Badge size="sm" color={model === 'FIN1' ? 'info' : 'warning'}>{model}</Badge>
+        <h3 className="text-sm font-semibold">{title}</h3>
+        <Chevron direction="down" open={open} size={18} className="ml-auto shrink-0 text-subtle" />
+      </button>
+      <div className={`p-4 flex flex-col gap-3 ${open ? '' : 'hidden'}`}>{children}</div>
+    </section>
+  );
+}
+
 // ── Quote table ─────────────────────────────────────────────────────────
 
 function QuoteTable({ rows, terms, type, isSelected, onSelect, t }: {
@@ -1547,7 +1580,7 @@ function QuoteTable({ rows, terms, type, isSelected, onSelect, t }: {
     <div className="border border-line rounded-lg overflow-hidden">
       <table className="w-full text-sm">
         <thead>
-          <tr className="bg-surface-hover text-subtle text-xs">
+          <tr className="bg-surface text-subtle text-xs">
             <th className="text-left px-4 py-2 font-medium">{t('priceCheck.term')}</th>
             <th className="text-right px-4 py-2 font-medium">{t('priceCheck.downPayment')}</th>
             <th className="text-right px-4 py-2 font-medium">{t('priceCheck.installment')}</th>
@@ -1712,7 +1745,7 @@ function Fin2Calculator({ fin2Rows, fin2Terms, t, saving, onUse }: {
   }, [resolved, termMonths, installmentAmount, clampedDown, total, financed, fin2Terms]);
 
   return (
-    <div className="mt-3 border border-primary rounded-lg p-4 bg-primary-soft">
+    <div className="border border-primary rounded-lg p-4 bg-primary-soft">
       <div className="flex items-center gap-1.5 mb-3">
         <Calculator size={14} className="text-primary-fg" />
         <span className="text-sm font-medium text-primary-fg">{t('contract.agreedPrice', { defaultValue: 'Agreed price' })}</span>

@@ -1058,7 +1058,7 @@ function ScheduleTable({ plan, t }: { plan: Fin1PlanResponse; t: TFn }) {
 
   return (
     <div className="border border-line rounded-md overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2 bg-surface-hover">
+      <div className="flex items-center justify-between px-4 py-2 bg-surface">
         <span className="text-xs font-medium text-subtle">{t('fin1Plan.scheduleTitle')}</span>
         {rows.length > COLLAPSED + 1 && (
           <button
@@ -1092,7 +1092,7 @@ function ScheduleTable({ plan, t }: { plan: Fin1PlanResponse; t: TFn }) {
 function CheckList({ check, t }: { check: Fin1Check; t: TFn }) {
   return (
     <div className="border border-line rounded-md overflow-hidden">
-      <div className="flex items-center gap-2 px-4 py-2 bg-surface-hover">
+      <div className="flex items-center gap-2 px-4 py-2 bg-surface">
         <span className="text-xs font-medium text-subtle">{t('fin1Plan.checkTitle')}</span>
         {check.ok && check.in_rate_now ? (
           <span className="text-xs text-success-fg inline-flex items-center gap-1">
