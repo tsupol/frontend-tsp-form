@@ -133,6 +133,9 @@ div.sim__panel-toggle:hover, div.sim__legend-toggle:hover { color: var(--color-s
 .sim__panel--closed { bottom: auto; width: auto; }
 .sim__panel--closed .sim__panel-toggle { border-bottom: 0; }
 .sim__panel h3 { flex: none; margin: 0; padding: 8px 12px 6px; font-size: 13px; }
+/* 156 §7c: the whole-company button pair on the branch card, and the line saying what it covers. */
+.sim__panel h3 small { display: block; font-size: 11px; font-weight: 400; color: var(--color-subtle); }
+.sim__overview-actions { flex: none; display: flex; gap: 8px; padding: 0 12px 8px; border-bottom: 1px solid var(--color-line); }
 /* A shop row: the rank in column 1 (first line only), every line in column 2, so they all
    start at the name's x. The name is one line (ellipsis when it can't fit). */
 .sim__row { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 8px; row-gap: 3px; align-items: start; width: 100%; padding: 8px 12px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }

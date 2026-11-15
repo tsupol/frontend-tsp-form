@@ -24,7 +24,7 @@ import { flightSvg, type FlightKind } from './simulationFlights';
 import {
   AMBER, BLUE, FLOOR, GREEN, PILES, PURPLE, SIMULATION_PERMISSION, SOLD_EDGE,
   ageText, annualAtRate, chatterText, annualPct, assetOf, baht, bangkokClock, codeOf, companyEdge, downPct, downPctOf, gradeLabel, plainNum, stateColor, stateLabel, termsOf,
-  type PileKey, type SimBranch,
+  type PileKey, type SimBranch, type SimPanelTarget,
 } from './simulationTypes';
 import { SITUATION_ORDER, situationColor, situationText } from '../../lib/situation';
 import './simulation.css';
@@ -217,8 +217,10 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
 
   const [company, setCompany] = useState<number | null>(readCompany);
   const [picked, setPicked] = useState<number | null>(null);
-  // One window at a time beside the shop card: opened contracts, or collection (§7 · §7b).
-  const [win, setWin] = useState<{ kind: 'opened' | 'collect'; id: number } | null>(null);
+  // One window at a time: opened contracts, or collection (§7 · §7b) — of the picked shop
+  // (scope 'branch', follows the selection) or of the whole company from the branch card's
+  // buttons (scope 'company', §7c: stays put while shops are picked).
+  const [win, setWin] = useState<{ kind: 'opened' | 'collect'; scope: 'branch' | 'company'; id: number } | null>(null);
   // A tapped person's window (SimPersonWindow): tapping the same person again closes it.
   const [person, setPerson] = useState<PersonPick | null>(null);
   const pickPerson = (p: PersonPick) => setPerson(cur => (cur && cur.kind === p.kind && cur.id === p.id ? null : p));
@@ -288,14 +290,18 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
     const next = id === picked ? null : id;
     setPicked(next);
     setPickedHq(null);
-    if (win) setWin(next == null ? null : { ...win, id: next });
+    if (win?.scope === 'branch') setWin(next == null ? null : { ...win, id: next });
   };
   // Arrow keys in the list move the selection, so they must never toggle it off.
   const pickRow = (id: number) => {
     setPicked(id);
     setPickedHq(null);
-    if (win) setWin({ ...win, id });
+    if (win?.scope === 'branch') setWin({ ...win, id });
   };
+  // The shop card's pair and the branch card's pair share the one window: pressing the open
+  // one again closes it, any other replaces it.
+  const toggleWin = (kind: 'opened' | 'collect', scope: 'branch' | 'company', id: number) =>
+    setWin(w => (w?.kind === kind && w.scope === scope && w.id === id ? null : { kind, scope, id }));
   const switchCompany = (id: number) => {
     setCompany(id);
     saveCompany(id);
@@ -307,7 +313,7 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
   const pickHq = (i: number) => {
     setPickedHq(v => (v === i ? null : i));
     setPicked(null);
-    setWin(null);
+    setWin(w => (w?.scope === 'company' ? w : null));
   };
 
   // In the shop now = today's contracts; earlier days' are counted apart as files left.
@@ -330,8 +336,23 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
     [branches, canProfit],
   );
   const detail = branches.find(b => b.id === picked) ?? null;
-  const collectBranch = win?.kind === 'collect' ? branches.find(b => b.id === win.id) ?? null : null;
-  const openedBranch = win?.kind === 'opened' ? branches.find(b => b.id === win.id) ?? null : null;
+  // Keyed on the ids, not the array: the live data refetches on a timer, and a new target
+  // object each time would redraw the window's chart (its bars replay their animation).
+  const branchIdsKey = branches.map(b => b.id).join(',');
+  const companyTarget = useMemo<SimPanelTarget | null>(
+    () => (current ? {
+      scope: 'company', companyId: current.id, name: current.name, companyType: current.company_type,
+      branchIds: branchIdsKey ? branchIdsKey.split(',').map(Number) : [],
+    } : null),
+    [current?.id, current?.name, current?.company_type, branchIdsKey], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const winBranch = win?.scope === 'branch' ? branches.find(b => b.id === win.id) ?? null : null;
+  const winTarget: SimPanelTarget | null = win?.scope === 'company'
+    ? (companyTarget?.scope === 'company' && companyTarget.companyId === win.id ? companyTarget : null)
+    : winBranch ? { scope: 'branch', branch: winBranch } : null;
+  // The whole-company pair (§7c): company level and up only — can_see_profit, never role_code.
+  const companyOn = (kind: 'opened' | 'collect') => win?.scope === 'company' && win.kind === kind;
+  const shopOn = (kind: 'opened' | 'collect') => win?.scope === 'branch' && win.kind === kind;
   const grades = t('simulation.gradeSplit', { n: newCount, m: openedRows.length - newCount });
 
   const empty = !!data && companies.length === 0;
@@ -458,7 +479,26 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
                   </>
                 )}
               </div>
-              <h3>{t('simulation.branches')}</h3>
+              <h3>
+                {t('simulation.branches')}
+                {/* The branch card lists many branches, so buttons on it mean the whole company
+                    (owner 11-15) — the small line says so. */}
+                {canProfit && current && <small>{t('simulation.companyButtonsHint', { name: current.name, count: branches.length })}</small>}
+              </h3>
+              {canProfit && current && (
+                <div className="sim__overview-actions" data-testid="sim-company-actions">
+                  <Button color={companyOn('opened') ? 'primary' : undefined} variant={companyOn('opened') ? undefined : 'outline'} size="sm" className="flex-1"
+                    data-testid="sim-company-opened" onClick={() => toggleWin('opened', 'company', current.id)}>
+                    {t('simulation.opened.open')}
+                  </Button>
+                  {canCollect && (
+                    <Button color={companyOn('collect') ? 'primary' : undefined} variant={companyOn('collect') ? undefined : 'outline'} size="sm" className="flex-1"
+                      data-testid="sim-company-collect" onClick={() => toggleWin('collect', 'company', current.id)}>
+                      {t('simulation.collection.openShort')}
+                    </Button>
+                  )}
+                </div>
+              )}
               <DataTable<SimBranch>
                 data={ranked}
                 enablePagination={false}
@@ -524,13 +564,13 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
                 {/* เปิดสัญญา for everyone, เก็บค่างวด when can_see_collection — side by side,
                     the open one filled; pressing it again closes it. */}
                 <div className="flex gap-2 mb-2">
-                  <Button color={win?.kind === 'opened' ? 'primary' : undefined} variant={win?.kind === 'opened' ? undefined : 'outline'} size="sm" className="flex-1" data-testid="sim-open-opened"
-                    onClick={() => setWin(w => (w?.kind === 'opened' ? null : { kind: 'opened', id: detail.id }))}>
+                  <Button color={shopOn('opened') ? 'primary' : undefined} variant={shopOn('opened') ? undefined : 'outline'} size="sm" className="flex-1" data-testid="sim-open-opened"
+                    onClick={() => toggleWin('opened', 'branch', detail.id)}>
                     {t('simulation.opened.open')}
                   </Button>
                   {canCollect && (
-                    <Button color={win?.kind === 'collect' ? 'primary' : undefined} variant={win?.kind === 'collect' ? undefined : 'outline'} size="sm" className="flex-1"
-                      onClick={() => setWin(w => (w?.kind === 'collect' ? null : { kind: 'collect', id: detail.id }))}>
+                    <Button color={shopOn('collect') ? 'primary' : undefined} variant={shopOn('collect') ? undefined : 'outline'} size="sm" className="flex-1"
+                      onClick={() => toggleWin('collect', 'branch', detail.id)}>
                       {t('simulation.collection.openShort')}
                     </Button>
                   )}
@@ -638,11 +678,11 @@ function SimulationFloor({ ready, isMobile }: { ready: boolean; isMobile: boolea
               <HqPoolCard hq={hq} pool={hqPool} branches={branches} canChat={canChat} stack={stack} onClose={() => setPickedHq(null)} />
             )}
 
-            {collectBranch && canCollect && (
-              <SimulationCollection branch={collectBranch} generatedAt={data.generated_at} stack={stack} onClose={() => setWin(null)} />
+            {winTarget && (winTarget.scope === 'branch' || canProfit) && win?.kind === 'collect' && canCollect && (
+              <SimulationCollection target={winTarget} generatedAt={data.generated_at} stack={stack} onClose={() => setWin(null)} />
             )}
-            {openedBranch && (
-              <SimulationOpened branch={openedBranch} generatedAt={data.generated_at} stack={stack} onClose={() => setWin(null)} />
+            {winTarget && (winTarget.scope === 'branch' || canProfit) && win?.kind === 'opened' && (
+              <SimulationOpened target={winTarget} generatedAt={data.generated_at} stack={stack} onClose={() => setWin(null)} />
             )}
 
             {/* What the picture's colours and things mean, in three groups. Folds down to its bar

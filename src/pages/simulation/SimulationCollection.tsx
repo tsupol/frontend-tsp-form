@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { apiClient } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
-import { baht, bangkokYearMonth, compactBaht, monthStart, type CollectionMonth, type SimBranch } from './simulationTypes';
+import { baht, bangkokYearMonth, compactBaht, monthStart, panelTargetKey, type CollectionMonth, type SimPanelTarget } from './simulationTypes';
 import { SimWindow } from './SimWindow';
 import type { WindowStack } from './useWindowStack';
 
@@ -32,7 +32,28 @@ function barPath(x: number, y: number, w: number, h: number) {
 
 const pctText = (p: number | null) => (p == null ? '—' : `${p.toFixed(1)}%`);
 
-export function SimulationCollection({ branch, generatedAt, stack, onClose }: { branch: SimBranch; generatedAt: string; stack: WindowStack; onClose: () => void }) {
+/** Whole company (§7c): the RPC answers one row per month per branch — one row per month,
+ *  summed. The % is taken from the sums (Σcollected × 100 ÷ Σexpected, 0 expected → null),
+ *  never an average of the rows' collection_pct. */
+function sumByMonth(rows: CollectionMonth[]): CollectionMonth[] {
+  const by = new Map<string, CollectionMonth>();
+  for (const r of rows) {
+    const k = r.month.slice(0, 10);
+    const m = by.get(k);
+    if (!m) { by.set(k, { ...r, month: k }); continue; }
+    m.expected_total += Number(r.expected_total);
+    m.collected_total += Number(r.collected_total);
+    m.collected_on_time += Number(r.collected_on_time);
+    m.collected_late += Number(r.collected_late);
+    m.installments_due += Number(r.installments_due);
+    m.installments_paid += Number(r.installments_paid);
+  }
+  return [...by.values()]
+    .map(m => ({ ...m, collection_pct: m.expected_total > 0 ? Math.round((m.collected_total * 1000) / m.expected_total) / 10 : null }))
+    .sort((a, b) => a.month.localeCompare(b.month));
+}
+
+export function SimulationCollection({ target, generatedAt, stack, onClose }: { target: SimPanelTarget; generatedAt: string; stack: WindowStack; onClose: () => void }) {
   const { t, i18n } = useTranslation();
   const [rows, setRows] = useState<CollectionMonth[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -42,18 +63,28 @@ export function SimulationCollection({ branch, generatedAt, stack, onClose }: { 
   const thisMonth = monthStart(year, month, 0);
   const from = monthStart(year, month, -3);
   const to = monthStart(year, month, 2);
+  const key = panelTargetKey(target);
 
   useEffect(() => {
     let alive = true;
     setRows(null);
     setError(null);
     setHover(null);
-    apiClient.rpc<CollectionMonth[]>('fn_installments_collection_monthly', { p_month_from: from, p_month_to: to, p_branch_id: branch.id })
-      .then(r => { if (alive) setRows(r); })
+    // Whole company: p_company_id is the company on screen; a company-level user asking for
+    // another company still gets their own (the JWT wins), so nothing more to filter.
+    const params = target.scope === 'branch'
+      ? { p_month_from: from, p_month_to: to, p_branch_id: target.branch.id }
+      : { p_month_from: from, p_month_to: to, p_company_id: target.companyId, p_branch_id: null };
+    apiClient.rpc<CollectionMonth[]>('fn_installments_collection_monthly', params)
+      .then(r => { if (alive) setRows(target.scope === 'company' ? sumByMonth(r) : r); })
       .catch(err => { if (alive) setError(translateApiError(err, t)); });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [branch.id, from, to]);
+  }, [key, from, to]);
+
+  const name = target.scope === 'branch'
+    ? target.branch.name
+    : `${target.name} · ${t('simulation.wholeCompany', { count: target.branchIds.length })}`;
 
   const locale = i18n.language === 'th' ? 'th-TH' : 'en-GB';
   const monthLabel = (m: string) => new Date(`${m.slice(0, 7)}-01T00:00:00`).toLocaleDateString(locale, { month: 'short', year: '2-digit' });
@@ -70,9 +101,10 @@ export function SimulationCollection({ branch, generatedAt, stack, onClose }: { 
   const hasAny = months.some(m => m.expected_total > 0);
 
   return (
-    <SimWindow id="collect" stack={stack} onClose={onClose} className="sim__collect" role="dialog" aria-label={`${t('simulation.collection.title')} ${branch.name}`}
+    <SimWindow id="collect" stack={stack} onClose={onClose} className="sim__collect" role="dialog" aria-label={`${t('simulation.collection.title')} ${name}`}
+      data-testid="sim-collect-window" data-scope={target.scope}
       head={<h3>
-        {t('simulation.collection.title')} · {branch.name}
+        {t('simulation.collection.title')} · {name}
         <small>{t('simulation.collection.subtitle')}</small>
       </h3>}>
 

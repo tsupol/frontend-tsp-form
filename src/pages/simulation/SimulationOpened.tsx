@@ -5,42 +5,64 @@ import { TrendingUp } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import {
-  ChartLegend, ContractsOpenedChart, OpenedMetricStrip, openedMetricCells, useDayPoints, useMonthTotals,
+  ChartLegend, ContractsOpenedChart, OpenedMetricStrip, openedMetricCells, useBranchRowsByDay, useDayPoints, useMonthTotals,
   type MonthlyRow,
 } from '../../components/ContractsOpenedChart';
 import { MonthPicker } from '../../components/MonthPicker';
 import { DownPctBadge } from '../../components/DownPctBadge';
-import { bangkokYearMonth, monthStart, type SimBranch } from './simulationTypes';
+import { bangkokYearMonth, monthStart, panelTargetKey, type SimPanelTarget } from './simulationTypes';
 import { SimWindow } from './SimWindow';
 import type { WindowStack } from './useWindowStack';
 
 // The opened-contracts window (156 §7b · NOTICE 2026-11-09 opened button): the same daily
-// bars and month cards as the dashboard's chart, for the picked shop, starting at the
-// current month and stepping back with ‹ ›. Floats like the collection window and follows
-// the selection. Which figures appear is the RPC's call (null for this viewer → no card);
-// ค่างวดทั้งหมด is left out (owner 11-09) so the cards sit in two rows. The month is the
-// app's MonthPicker (same as the dashboard), in the title row, capped at this month.
+// bars and month cards as the dashboard's chart, starting at the current month and stepping
+// back with ‹ ›. Floats like the collection window. Which figures appear is the RPC's call
+// (null for this viewer → no card); ค่างวดทั้งหมด is left out (owner 11-09) so the cards sit
+// in two rows. The month is the app's MonthPicker (same as the dashboard), capped at this month.
+//
+// Two targets: the picked shop (follows the selection), or the whole company from the
+// branch card's buttons (§7c, owner 11-15). The RPC answers one row per day per branch
+// either way; useDayPoints / useMonthTotals sum them, so every % is taken from the sums.
 
-export function SimulationOpened({ branch, generatedAt, stack, onClose }: { branch: SimBranch; generatedAt: string; stack: WindowStack; onClose: () => void }) {
+export function SimulationOpened({ target, generatedAt, stack, onClose }: { target: SimPanelTarget; generatedAt: string; stack: WindowStack; onClose: () => void }) {
   const { t, i18n } = useTranslation();
   const { year, month } = bangkokYearMonth(generatedAt);
   const current = new Date(year, month - 1, 1);
   const [picked, setPicked] = useState(current);
   const pMonth = monthStart(picked.getFullYear(), picked.getMonth() + 1, 0);
+  const wide = target.scope === 'company';
 
   const q = useQuery({
-    queryKey: ['simulation', 'opened-monthly', branch.id, pMonth],
-    queryFn: () => apiClient.rpc<MonthlyRow[]>('fn_contracts_opened_monthly', { p_month: pMonth, p_branch_id: branch.id }),
+    queryKey: ['simulation', 'opened-monthly', panelTargetKey(target), pMonth],
+    queryFn: () => apiClient.rpc<MonthlyRow[]>('fn_contracts_opened_monthly', {
+      p_month: pMonth,
+      p_branch_id: target.scope === 'branch' ? target.branch.id : null,
+    }),
     placeholderData: keepPreviousData,
     staleTime: 5 * 60_000,
   });
 
-  const points = useDayPoints(q.data ?? []);
+  // Whole company: the RPC has no company parameter, and a holding user's answer covers every
+  // company of the holding — keep only the rows of this company's branches (§7c, NOTICE §1).
+  const branchIds = target.scope === 'company' ? target.branchIds : null;
+  const rows = useMemo(() => {
+    const all = q.data ?? [];
+    if (!branchIds) return all;
+    const keep = new Set(branchIds);
+    return all.filter(r => keep.has(r.branch_id));
+  }, [q.data, branchIds]);
+
+  const points = useDayPoints(rows);
   const totals = useMonthTotals(points);
+  // Whole company: the bar's hover lists each branch's share of that day, like the dashboard's all-branches chart.
+  const byDay = useBranchRowsByDay(rows);
+
+  // ค่าคอม: a deal-partner shop's own; for the whole company, a fund's commission is the sum over
+  // all its shops, while an operating company's is always 0 (internal branches) — no card.
+  const showCommission = target.scope === 'branch' ? target.branch.type !== 'INTERNAL' : target.companyType === 'FINANCIER';
 
   const cells = useMemo(() => {
-    // An internal branch always gets commission 0 from the RPC (not null) — no card for it.
-    const list = openedMetricCells({ ...totals, installment: null }, t, { commission: branch.type !== 'INTERNAL' });
+    const list = openedMetricCells({ ...totals, installment: null }, t, { commission: showCommission });
     // ดาวน์: the % of the device price over the month — Σdown × 100 ÷ (Σfinanced + Σdown), the
     // notice's formula (never an average of the daily down_pct) — drawn as the same badge the
     // down % has everywhere else (#12), beside the baht.
@@ -58,14 +80,17 @@ export function SimulationOpened({ branch, generatedAt, stack, onClose }: { bran
       list.splice(at < 0 ? list.length : at, 0, comm);
     }
     return list;
-  }, [totals, t, branch.type]);
+  }, [totals, t, showCommission]);
 
   const error = q.error ? translateApiError(q.error, t) : null;
+  const name = target.scope === 'branch'
+    ? target.branch.name
+    : `${target.name} · ${t('simulation.wholeCompany', { count: target.branchIds.length })}`;
 
   return (
     <SimWindow id="opened" stack={stack} onClose={onClose} className="sim__collect sim__opened-win"
-      role="dialog" aria-label={`${t('simulation.opened.title')} ${branch.name}`} data-testid="sim-opened-window"
-      head={<h3>{t('simulation.opened.title')} · {branch.name}</h3>}>
+      role="dialog" aria-label={`${t('simulation.opened.title')} ${name}`} data-testid="sim-opened-window" data-scope={target.scope}
+      head={<h3>{t('simulation.opened.title')} · {name}</h3>}>
       {/* The month sits at the top of the body, right-aligned (owner 11-10: not in the title bar). */}
       <div className="sim__opened-month" data-testid="sim-opened-month">
         <MonthPicker value={picked} onChange={setPicked} lang={i18n.language} max={current} />
@@ -89,7 +114,7 @@ export function SimulationOpened({ branch, generatedAt, stack, onClose }: { bran
               />
               <div className="sim__opened-chart better-scroll">
                 <div className="h-[240px] min-w-[520px]">
-                  <ContractsOpenedChart points={points} showCommission={branch.type !== 'INTERNAL'} countLabels />
+                  <ContractsOpenedChart points={points} branchRowsByDay={wide ? byDay : undefined} showCommission={showCommission} countLabels />
                 </div>
               </div>
             </>

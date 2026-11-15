@@ -241,6 +241,22 @@ export interface CollectionMonth {
   installments_paid: number;
 }
 
+/** What the opened-contracts / collection windows show (156 §7c, owner 11-15): the picked
+ *  shop, or the whole company from the button pair on the branch card. */
+export type SimPanelTarget =
+  | { scope: 'branch'; branch: SimBranch }
+  | {
+    scope: 'company';
+    companyId: number;
+    name: string;
+    companyType: CompanyType;
+    /** branches[] of fn_simulation_live — a holding user's opened-contracts rows cover every
+     *  company of the holding, so only rows of these branches are kept. */
+    branchIds: number[];
+  };
+
+export const panelTargetKey = (t: SimPanelTarget) => (t.scope === 'branch' ? `b${t.branch.id}` : `c${t.companyId}`);
+
 const BANGKOK = 'Asia/Bangkok';
 
 /** `YYYY-MM` of an ISO instant in Thai time — "this month" of the screen comes from generated_at, never the device clock. */
