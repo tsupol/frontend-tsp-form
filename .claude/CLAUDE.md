@@ -66,13 +66,15 @@ nfUI_FEEDBACK` (pull first), commit, push, and end the reply with a fenced block
 >
 > This rule applies even when "it would be cleaner" to early-return. It is not negotiable. Repeated mistake — re-read this every time before writing a new `<Modal>`.
 
-When using tsp-form components, follow this lookup order:
+The goal is one consistent app built from tsp-form. Look things up in this order:
 
-1. **This project first:** Check existing usage in `src/` — reuse the same patterns for consistency
-2. **Examples:** `D:\dev\tsp-form\src\example\` — check here for usage patterns if no existing usage in this project
-3. **Component source:** `D:\dev\tsp-form\src\components\` — only if examples don't clarify enough
+1. **This project:** find the same thing already built in `src/` and match it, so screens stay alike. Match it only if it is made of tsp-form components. A hand-made copy (library classes on a plain element, CSS imitating a button, badge or notice) is not a pattern: build yours from the component and fix the copy too.
+2. **Examples:** `D:\dev\tsp-form\src\example\`
+3. **Component source:** `D:\dev\tsp-form\src\components\` — read it whenever you use a prop or slot you haven't used before; it is short.
 4. **Context/hooks:** `D:\dev\tsp-form\src\context\`
 5. **CLAUDE.md:** `D:\dev\tsp-form\.claude\CLAUDE.md` — for conventions
+
+If no component does what you need, stop and propose adding it to tsp-form. Never imitate one with its classes or your own CSS.
 
 Form patterns, PopOver, Alert/Snackbar, icon buttons, etc. — all in the global `tsp-form-guide.md`. Project-specific component rules (BranchPinInput, alert-danger error display, masked/date inputs, color tokens, inline links) — `.claude/tsp-form-guide-here.md`. Don't restate either here.
 
