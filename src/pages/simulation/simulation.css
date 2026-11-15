@@ -311,7 +311,10 @@ div.sim__panel-toggle:hover, div.sim__legend-toggle:hover { color: var(--color-s
 @keyframes sim-bob { 0%, 100% { margin-top: 0; } 50% { margin-top: -4px; } }
 @media (prefers-reduced-motion: reduce) { .sim__hq-bubble { animation: none; } }
 /* Crowds: files left from earlier days, and the "+n" past what is drawn. */
-.sim__stale { position: absolute; transform: translate(-50%, -100%); pointer-events: none; white-space: nowrap; padding: 3px 6px 0; border: 1.5px solid #b3943f; border-radius: 8px; background: #fff8e6; color: #7a5d16; font-size: 10.5px; font-weight: 700; line-height: 12px; }
+/* Same geometry as the queue's head tag: 16px line, 10.5px text moved down by the theme's
+   --text-shift-y; the border is an inset ring so it takes no room from the line. */
+.sim__stale { position: absolute; transform: translate(-50%, -100%); pointer-events: none; white-space: nowrap; display: inline-flex; align-items: center; padding: 0 7px; box-shadow: inset 0 0 0 1.5px #b3943f; border-radius: 8px; background: #fff8e6; color: #7a5d16; font-size: 10.5px; font-weight: 700; line-height: 16px; }
+.sim__stale > span { transform: translateY(var(--text-shift-y, 0px)); }
 .sim__more { position: absolute; transform: translate(-50%, -100%); pointer-events: none; white-space: nowrap; min-width: 26px; padding: 3.3px 7px 1px; border-radius: 10px; background: #1f2a33; color: #fff; font-size: 12px; font-weight: 700; line-height: 15.7px; text-align: center; }
 .sim__more--chat { background: #11707a; }
 /* Envelopes and bank notes flying between a shop and the company building (§3). Moved by

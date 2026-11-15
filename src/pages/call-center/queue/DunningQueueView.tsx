@@ -335,9 +335,9 @@ export function DunningQueueView({ isMobile }: { isMobile: boolean }) {
         </PopOver>
         <div className="dq-updated">
           {error ? (
-            <span className="text-warning-fg inline-flex items-center gap-1"><AlertTriangle size={13} />{t('dunningQueue.refreshFailed')}</span>
+            <span className="text-warning-fg inline-flex items-center gap-1"><AlertTriangle size={13} /><span className="dq-shift">{t('dunningQueue.refreshFailed')}</span></span>
           ) : dataUpdatedAt ? (
-            <span className={isFetching ? 'opacity-60' : ''}>{t('dunningQueue.updatedAt')} <DateTime value={new Date(dataUpdatedAt).toISOString()} /></span>
+            <span className={`dq-shift${isFetching ? ' opacity-60' : ''}`}>{t('dunningQueue.updatedAt')} <DateTime value={new Date(dataUpdatedAt).toISOString()} /></span>
           ) : null}
         </div>
       </div>

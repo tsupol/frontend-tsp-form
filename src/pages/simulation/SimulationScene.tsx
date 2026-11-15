@@ -454,7 +454,7 @@ export const SimulationScene = forwardRef<SceneHandle, SceneProps>(function Simu
       {/* Files left from earlier days: the count over each stack, at every zoom. */}
       {stalePiles.map(p => {
         const at = place(p.x, p.y + 0.25, p.z);
-        return onScreen(at) && focus.key !== `t${p.branchId}:${p.station}` ? <span key={`t${p.branchId}${p.station}`} className="sim__stale" style={at}>{t('simulation.staleChip', { n: p.n })}</span> : null;
+        return onScreen(at) && focus.key !== `t${p.branchId}:${p.station}` ? <span key={`t${p.branchId}${p.station}`} className="sim__stale" style={at}><span>{t('simulation.staleChip', { n: p.n })}</span></span> : null;
       })}
       {/* More people than the line outside holds / more chatters than the corner shows. */}
       {more.map(m => {

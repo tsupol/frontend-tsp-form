@@ -13,7 +13,26 @@ import { DEPTH, FIGURE_H, HEIGHT_PX, LANE_MIN, PX, SIGN_Y, QueueWorld, layoutQue
 import { LANES, baht, contactShort, isPromiseLane, promiseShort, type QueueLane, type QueuePerson } from './queueApi';
 import { LaneIcon } from './LaneIcon';
 import { RepoBadge } from './RepoBadge';
-import { reliefUntilText } from '../../../lib/relief';
+import { RELIEF_COLOR, reliefUntilText } from '../../../lib/relief';
+import { REPO_LOOK } from './repoLook';
+
+/** The colour of the round chip that ends a head tag (repo · relief · chat count, in that
+ *  order of who sits last) — the tag's thin outline takes it. No chip, no outline. */
+const CHAT_COLOR = '#1b9aaa';
+
+/** A day lane's name "7–13 วัน": the days in bigger type than the word after them, so the
+ *  range reads first. Names that don't start with a number are drawn as they are. */
+function LaneName({ text }: { text: string }) {
+  const m = /^([\d–+-]+)\s*(.*)$/.exec(text);
+  if (!m) return <>{text}</>;
+  // One element, so the sign's icon gap doesn't push "วัน" away from its number.
+  return <span className="dq-lanename"><span className="dq-lanename-num">{m[1]}</span>{m[2] && <small className="dq-lanename-unit">{m[2]}</small>}</span>;
+}
+const endColor = (p: QueuePerson): string | undefined =>
+  p.repo_state !== 'NONE' ? REPO_LOOK[p.repo_state].color
+    : p.relief_until ? RELIEF_COLOR
+      : p.chat_unread > 0 ? CHAT_COLOR
+        : undefined;
 import { PAID_MS, SHOUT_MS, WALK_MS, type Fx } from './queueGeom';
 
 export interface Counter {
@@ -357,7 +376,7 @@ export const QueueScene = forwardRef<SceneHandle, {
           return (
             <div key={p.id} data-lid={p.id} className="dq-tag"
               style={{ transform: `translate(${view.ox + px * view.k}px, ${view.oy + py * view.k}px)`, opacity: dim ? 0.25 : faded ? 0.6 : 1 }}>
-              <div className="dq-tag-top" onClick={() => onPick(p.id)}>
+              <div className="dq-tag-top" style={{ ['--end' as string]: endColor(p) }} onClick={() => onPick(p.id)}>
                 {p.focused && <Star size={11} className="dq-tag-star" />}
                 <i className="dq-tag-flag" style={{ background: p.flag_color, opacity: p.flag_level === 'WHITE' ? 0.45 : 1 }}>
                   {p.flag_manual !== 'WHITE' && <b />}
@@ -385,11 +404,12 @@ export const QueueScene = forwardRef<SceneHandle, {
         return (
           // Promise lanes: solid sign + calendar icon, so they read apart from the day lanes (owner 11-12).
           <div key={L.lane} className={`dq-lanesign${compactSigns ? ' dq-lanesign--compact' : ''}${L.mark ? ' dq-lanesign--mark' : ''}`}
-            style={{ ...screen(laneX[li], SIGN_Y, -0.25), borderColor: L.tone, color: L.mark ? '#fff' : L.tone, background: L.mark ? L.tone : undefined, opacity: n ? 1 : 0.5, transform: `translate(-50%, -100%) scale(${ts})` }}>
+            style={{ ...screen(laneX[li], SIGN_Y, -0.25), borderColor: L.tone, color: L.mark ? '#fff' : '#1f2d3a', background: L.mark ? L.tone : undefined, opacity: n ? 1 : 0.5, transform: `translate(-50%, -100%) scale(${ts})` }}>
             {compactSigns
               ? L.mark && <LaneIcon mark={L.mark} size={13} />
-              : <b>{L.mark && <LaneIcon mark={L.mark} />}{t(`dunningQueue.lane.${L.lane}`)}</b>}
-            <span>{n}</span>
+              : <b>{L.mark && <LaneIcon mark={L.mark} />}<LaneName text={t(`dunningQueue.lane.${L.lane}`)} /></b>}
+            {/* Day lanes: the name in the normal text colour, the count in the lane's (border) colour. */}
+            <span style={L.mark ? undefined : { color: L.tone }}>{n}</span>
           </div>
         );
       })}

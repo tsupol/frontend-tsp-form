@@ -8,9 +8,12 @@
 
 .dq-bar {
   flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
-  padding: 8px 16px; border-bottom: 1px solid var(--color-line);
+  /* The project's filter-row spacing (PageNav template: p-2), same in the chips row below. */
+  padding: 8px; border-bottom: 1px solid var(--color-line);
 }
-.dq-updated { margin-left: auto; font-size: 12px; color: var(--color-subtle); white-space: nowrap; }
+.dq-updated { margin-left: auto; display: inline-flex; align-items: center; font-size: 12px; color: var(--color-subtle); white-space: nowrap; }
+/* Thai words move down by the theme's --text-shift-y, as in the buttons beside them. */
+.dq-shift { transform: translateY(var(--text-shift-y, 0px)); }
 
 
 
@@ -30,25 +33,28 @@
 
 /* One tag per person, anchored at the feet; its top part sits above the head (--fh = figure height on screen). */
 .dq-tags { position: absolute; inset: 0; pointer-events: none; }
-.dq-tag { position: absolute; left: 0; top: 0; width: 0; height: 0; transition: opacity .3s; will-change: transform; }
+.dq-tag { --tag-h: 16px; /* the head tag and the round chips in it */ position: absolute; left: 0; top: 0; width: 0; height: 0; transition: opacity .3s; will-change: transform; }
 .dq-tag-top {
   position: absolute; left: 0; bottom: var(--fh, 60px); transform: translateX(-50%);
   display: inline-flex; align-items: center; gap: 2px; padding: 0 4px 0 3px; border-radius: 999px;
-  background: rgba(255, 255, 255, .92); color: #1f2d3a; font-size: 11px; font-weight: 700; line-height: 15px;
-  white-space: nowrap; font-variant-numeric: tabular-nums; box-shadow: 0 1px 3px rgba(20, 40, 50, .25);
+  background: rgba(255, 255, 255, .92); color: #1f2d3a; font-size: 10.5px; font-weight: 700; line-height: var(--tag-h);
+  white-space: nowrap; font-variant-numeric: tabular-nums;
+  /* A 1px outline in the colour of the chip at the tag's end (--end, set per person), drawn
+     as a shadow so the tag keeps its size. No end chip → no outline. */
+  box-shadow: 0 0 0 1px var(--end, transparent), 0 1px 3px rgba(20, 40, 50, .25);
   pointer-events: auto; cursor: pointer;
 }
 .dq-tag-never { color: #b8322f; }
 /* Thai text sits high in this font: the words move down by the theme's --text-shift-y, the
    same variable and the same way (translateY) tsp-form's Button moves its label. */
 .dq-tag-top > span { transform: translateY(var(--text-shift-y, 0px)); }
-/* A round chip at the end (repo, relief, chat count) is the tag's own right end: same 15px
-   height as the tag, no padding after it, so its circle lines up with the tag's round end. */
+/* A round chip at the end (repo, relief, chat count) is the tag's own right end: same height
+   as the tag, no padding after it, so its circle lines up with the tag's round end. */
 .dq-tag-top:has(> .dq-tag-repo:last-child, > .dq-tag-relief:last-child, > .dq-tag-chat:last-child) { padding-right: 0; }
 .dq-tag-flag { position: relative; display: inline-block; width: 8px; height: 8px; border-radius: 2px; border: 1px solid rgba(0, 0, 0, .25); }
 .dq-tag-flag b { position: absolute; left: 1.5px; top: 1.5px; width: 3px; height: 3px; border-radius: 50%; background: #fff; }
 .dq-tag-star { color: #f5b301; fill: #f5b301; }
-.dq-tag-chat { font-style: normal; min-width: 15px; height: 15px; padding: 0 3px; border-radius: 8px; background: #1b9aaa; color: #fff; font-size: 10px; line-height: 15px; text-align: center; }
+.dq-tag-chat { font-style: normal; min-width: var(--tag-h); height: var(--tag-h); padding: 0 3px; border-radius: 8px; background: #1b9aaa; /* = CHAT_COLOR in QueueScene */ color: #fff; font-size: 10px; line-height: var(--tag-h); text-align: center; }
 .dq-tag-foot { position: absolute; left: 0; top: 10px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 1px; white-space: nowrap; pointer-events: none; }
 .dq-tag-foot span { font-size: 11px; font-weight: 700; line-height: 14px; padding: 0 4px; border-radius: 4px; background: rgba(255, 255, 255, .85); }
 .dq-tag-head { color: #b8322f; }
@@ -56,13 +62,13 @@
 .dq-tag-promise { color: #0f8f7a; }
 /* 24-hour relief (owner 11-12): a purple hourglass next to the head + "ผ่อนปรนถึง …" under the feet.
    Marker only — the line and place don't change. */
-.dq-tag-relief { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border-radius: 50%; background: #7c3aed; color: #fff; font-style: normal; }
+.dq-tag-relief { display: inline-flex; align-items: center; justify-content: center; width: var(--tag-h); height: var(--tag-h); border-radius: 50%; background: #7c3aed; color: #fff; font-style: normal; }
 .dq-tag-foot .dq-tag-relief-until { color: #7c3aed; }
 .dq-relief-count { display: inline-flex; align-items: center; gap: 4px; color: #7c3aed; }
 [data-theme="dark"] .dq-relief-count { color: #b79cf5; }
 /* Repo team (mig 1681): a round chip in the row over the head — with the repo team · sent
    back by them · with legal. Same size as the relief hourglass. */
-.dq-tag-repo { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border-radius: 50%; color: #fff; font-style: normal; flex-shrink: 0; }
+.dq-tag-repo { display: inline-flex; align-items: center; justify-content: center; width: var(--tag-h); height: var(--tag-h); border-radius: 50%; color: #fff; font-style: normal; flex-shrink: 0; }
 .dq-legend .dq-tag-repo { width: 15px; height: 15px; border-radius: 50%; margin-left: 0; }
 .dq-repo-label { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
 
@@ -94,20 +100,27 @@
 @media (prefers-reduced-motion: reduce) { .dq-shout b, .dq-shout i, .dq-paid i, .dq-paid b, .dq-paid span { animation: none; } }
 
 .dq-lanesign {
-  position: absolute; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 76px;
-  padding: 9px 14px 6px; border: 2.5px solid; border-radius: 12px; background: #fff; font-size: 13px; line-height: 1.2;
+  position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-width: 76px;
+  padding: 4px 14px 5px; border: 2.5px solid; border-radius: 12px; background: #fff; font-size: 13px; line-height: 1.2;
   white-space: nowrap; pointer-events: none; transform-origin: center bottom; box-shadow: 0 2px 6px rgba(20, 40, 50, .18);
 }
 .dq-lanesign b { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; }
-.dq-lanesign span { font-size: 22px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
-/* Padding is uneven on purpose: Thai keeps room under each line, so equal padding left the ink
-   7 px from the top and 10 px from the bottom (measured). 9/6 puts it ~8/9.
+.dq-lanesign > span { font-size: 22px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+/* The words and the number move down by the theme's --text-shift-y (Thai keeps room under each
+   line), the same way as the head tags and tsp-form's Button. Padding 4/5 is measured, not even:
+   the name's line (15px range + 11px word) carries room above its letters and the count's line
+   room under its digits; with 4/5 the ink sits about 7.4 px from the top and 7.1 from the bottom.
    Promise lanes (นัด · นัดวันนี้ · ผิดนัด): filled with the lane's tone + calendar icon, so they read apart
    from the white day-lane signs at a glance (owner 11-12). Fill / text colour come inline. */
 .dq-lanesign--mark { box-shadow: 0 3px 9px rgba(20, 40, 50, .32); }
+.dq-lanesign > b, .dq-lanesign > span { transform: translateY(var(--text-shift-y, 0px)); }
+/* Day lanes: the range bigger than the word "วัน". */
+.dq-lanesign b { align-items: baseline; }
+.dq-lanename-num { font-size: 15px; font-weight: 800; }
+.dq-lanename-unit { font-size: 11px; font-weight: 700; margin-left: 2px; }
 /* Zoomed out: number only (+ the icon on promise lanes) — still room around it. */
 .dq-lanesign--compact { flex-direction: row; gap: 4px; min-width: 40px; padding: 5px 9px; }
-.dq-lanesign--compact span { font-size: 18px; }
+.dq-lanesign--compact > span { font-size: 18px; }
 .dq-laneicon { flex: none; }
 .dq-countersign {
   position: absolute; display: flex; flex-direction: column; align-items: center; padding: 5px 14px; border-radius: 10px;
@@ -169,8 +182,8 @@
 
 /* Counts row under the toolbar (each lane count is a ghost Button). */
 .dq-chips {
-  flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 2px 4px;
-  padding: 4px 16px; border-bottom: 1px solid var(--color-line); font-size: 13px;
+  flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  padding: 8px; border-bottom: 1px solid var(--color-line); font-size: 13px;
 }
 .dq-chips b { font-variant-numeric: tabular-nums; }
 
