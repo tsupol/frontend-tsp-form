@@ -66,6 +66,36 @@ export function ChatSituationFlag({ row, t }: { row: ChatInboxRow; t: TFunction 
   );
 }
 
+/** "ค้าง N งวด · D วัน · ฿X" — what is owed, readable without opening the flag (owner 11-15,
+ *  UI 66 §5b). Only when is_overdue; all three figures as the view sends them (the amount is
+ *  what is still short after part payments, never rebuilt from the installments); a paused
+ *  contract carries overdue installments with 0 days → no day part. Chat row + room header. */
+export function ChatOverdueLine({ row, t, className = '' }: { row: ChatInboxRow; t: TFunction; className?: string }) {
+  if (row.is_overdue !== true) return null;
+  return (
+    <span className={`font-medium ${className}`} style={{ color: situationColor(row.situation_code) }} data-testid="chat-overdue-line">
+      {[
+        t('chat.overdueLine.count', { count: row.overdue_count ?? 0 }),
+        row.overdue_days ? t('chat.overdueLine.days', { count: row.overdue_days }) : null,
+        `฿${fmtCurrency(row.overdue_amount ?? 0)}`,
+      ].filter(Boolean).join(' · ')}
+    </span>
+  );
+}
+
+/** Who holds the contract as collector — flag colour when not green, muted on a green row,
+ *  where the job is just still with them after payment (owner 11-11). Chat row + room header. */
+export function ChatCollectorName({ row, className = '' }: { row: ChatInboxRow; className?: string }) {
+  if (!row.collector_name) return null;
+  return (
+    <span className={`inline-flex items-center gap-0.5 min-w-0 max-w-full ${className}`} style={{ color: collectorColor(row.situation_code) }}
+      data-testid="chat-collector">
+      <UserRound size={11} className="shrink-0" />
+      <span className="truncate">{row.collector_name}</span>
+    </span>
+  );
+}
+
 function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
     <>

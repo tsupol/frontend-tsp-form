@@ -1,9 +1,8 @@
 import type { TFunction } from 'i18next';
 import { Badge, Tooltip } from 'tsp-form';
-import { Image as ImageIcon, Pin, UserRound } from 'lucide-react';
-import { fmtCurrency, formatSmart } from '../../lib/format';
-import { collectorColor, situationColor } from '../../lib/situation';
-import { ChatSituationFlag } from './ChatSituationFlag';
+import { Image as ImageIcon, Pin } from 'lucide-react';
+import { formatSmart } from '../../lib/format';
+import { ChatCollectorName, ChatOverdueLine, ChatSituationFlag } from './ChatSituationFlag';
 import { chatStatusBadgeColor, contractStateBadgeColor, contractStateLabel } from './chatStatus';
 import type { ChatInboxRow } from './chatTypes';
 
@@ -91,16 +90,7 @@ export function ChatListRow({ row, selected, onSelect, showBranch, lang, t, comp
         {/* Who holds the contract as collector — every held row, so staff know who
             to hand money questions to. Flag colour when not green; muted on a green
             row, where the job is just still with them after payment (owner 11-11). */}
-        {row.collector_name && (
-          <span
-            className="inline-flex items-center gap-0.5 text-[11px] min-w-0 max-w-full"
-            style={{ color: collectorColor(row.situation_code) }}
-            data-testid="chat-row-collector"
-          >
-            <UserRound size={11} className="shrink-0" />
-            <span className="truncate">{row.collector_name}</span>
-          </span>
-        )}
+        <ChatCollectorName row={row} className="text-[11px]" />
         {/* Search hit that has never been chatted. Says so plainly so the row
             doesn't read as an empty conversation. */}
         {row.is_stub && (
@@ -109,22 +99,9 @@ export function ChatListRow({ row, selected, onSelect, showBranch, lang, t, comp
       </div>
 
       {/* What is owed, on the row itself so staff can scan the list without
-          opening each flag (owner 11-15, UI 66 §5b). All three figures as the
-          view sends them: overdue_amount is what is still short after part
-          payments, so it must never be rebuilt from the installments. */}
+          opening each flag (owner 11-15, UI 66 §5b). */}
       {row.is_overdue === true && (
-        <div
-          className="text-[11px] font-medium truncate mt-0.5"
-          style={{ color: situationColor(row.situation_code) }}
-          data-testid="chat-row-overdue"
-        >
-          {[
-            t('chat.overdueLine.count', { count: row.overdue_count ?? 0 }),
-            // Paused contracts carry overdue installments with 0 days → no day part.
-            row.overdue_days ? t('chat.overdueLine.days', { count: row.overdue_days }) : null,
-            `฿${fmtCurrency(row.overdue_amount ?? 0)}`,
-          ].filter(Boolean).join(' · ')}
-        </div>
+        <div className="text-[11px] truncate mt-0.5"><ChatOverdueLine row={row} t={t} /></div>
       )}
 
       <div className="text-xs text-subtle truncate mt-0.5">
