@@ -11940,5 +11940,36 @@
     "emptyStuck": "No device stuck in Lost Mode",
     "silentGone": "The device is back in contact — it has left the picture",
     "loadFailed": "Could not load — press reload"
+  },
+  "installmentPayments": {
+    "open": "Payments",
+    "title": "Payments of installment {{n}}",
+    "due": "Due",
+    "paidOf": "Paid",
+    "count": "{{n}} payments",
+    "slips": "{{n}} with slip",
+    "noSlips": "{{n}} without slip",
+    "reversedCount": "{{n}} reversed",
+    "empty": "No payment for this installment yet",
+    "kind": {
+      "EARLY_PAYOFF": "Early payoff"
+    },
+    "reversed": "Reversed",
+    "reversedAt": "Reversed",
+    "bill": "Bill",
+    "billTotal": "Bill total",
+    "toThis": "to this installment",
+    "alsoPays": "This bill also paid:",
+    "alsoPaysItem": "installment {{n}} ฿{{amount}}",
+    "parts": "This bill was paid in {{n}} parts",
+    "slip": "Slip",
+    "transferAt": "transferred",
+    "noImage": "no image",
+    "slipHidden": "Has a slip, but this account cannot open it",
+    "recordedBy": "Recorded by",
+    "channel": {
+      "CUSTOMER_SUBMIT": "Customer sent the slip",
+      "BRANCH_SUBMIT": "Branch sent for the customer"
+    }
   }
 }

@@ -5,7 +5,8 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Badge, Button, Input, Modal, TextArea, Tooltip, useSnackbarContext, resizeToVariants } from 'tsp-form';
-import { Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, Download, Pause, Play, Square, Ban, Settings2, AlertTriangle, CalendarClock, UserCheck, MessageSquare, ShieldAlert } from 'lucide-react';
+import { Copy, Check, Pencil, Truck, CheckCircle, XCircle, Loader2, Camera, Smartphone, Plus, UserPlus, UserMinus, Phone, IdCard, Trash2, ExternalLink, Printer, Download, Pause, Play, Square, Ban, Settings2, AlertTriangle, CalendarClock, UserCheck, MessageSquare, ShieldAlert, Receipt } from 'lucide-react';
+import { InstallmentPaymentsModal } from '../../components/installmentPayments/InstallmentPaymentsModal';
 import { GenerateContractPdfModal } from './GenerateContractPdfModal';
 import type { BeMediaContractDoc } from '../../lib/beMedia';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -1543,6 +1544,7 @@ function InstallmentsTab({ contractId, contract, t }: {
     queryKey: ['contract-installments', contractId],
     queryFn: () => apiClient.get<Installment[]>(`/v_installments?contract_id=eq.${contractId}&order=pay_no`),
   });
+  const [paymentsOf, setPaymentsOf] = useState<number | null>(null);
 
   // Settling early marks every instalment paid in full, so the column adds up
   // to more than the customer handed over. Without this line the two readings
@@ -1563,6 +1565,7 @@ function InstallmentsTab({ contractId, contract, t }: {
               <th className="text-right px-3 py-2 font-medium text-subtle">{t('contract.amount')}</th>
               <th className="text-right px-3 py-2 font-medium text-subtle">{t('contract.paid')}</th>
               <th className="text-left px-3 py-2 font-medium text-subtle">{t('common.status')}</th>
+              <th className="px-3 py-2" aria-label={t('installmentPayments.open')} />
             </tr>
           </thead>
           <tbody>
@@ -1585,11 +1588,25 @@ function InstallmentsTab({ contractId, contract, t }: {
                     <div className="text-xs text-subtle mt-0.5"><DateTime value={inst.paid_at} /></div>
                   )}
                 </td>
+                <td className="px-3 py-2 text-right">
+                  {/* No money in this installment yet → nothing to show (mig 1668 §3.1). */}
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    startIcon={<Receipt size={14} />}
+                    disabled={!(inst.paid_amount > 0)}
+                    onClick={() => setPaymentsOf(inst.id)}
+                    data-testid="installment-payments-open"
+                  >
+                    {t('installmentPayments.open')}
+                  </Button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      <InstallmentPaymentsModal installmentId={paymentsOf} onClose={() => setPaymentsOf(null)} />
       {payoffDiscount > 0 && (
         <div className="mt-2 px-3 py-2 rounded-md bg-surface border border-line text-xs text-subtle flex flex-wrap gap-x-3 gap-y-1">
           <span className="font-medium">{t('contract.complete_reason_earlyPayoff')}</span>

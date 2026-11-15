@@ -10,7 +10,7 @@ import { Badge, Button, Select, TextArea, useSnackbarContext } from 'tsp-form';
 import {
   Phone, Pencil, CheckCircle, XCircle,
   Users, Save, Clock, Flag, CalendarClock,
-  MessageSquare, Cloud, Truck, Undo2, Info,
+  MessageSquare, Cloud, Truck, Undo2, Info, Receipt,
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { useChatDock } from '../../contexts/ChatDockContext';
@@ -34,6 +34,7 @@ import { DetailLine } from '../../components/DetailLine';
 import { ContactValue } from '../../components/ContactValue';
 import { contactHref } from '../../lib/contactLink';
 import { MdmReliefPanel } from '../inventory/mdm/MdmReliefPanel';
+import { InstallmentPaymentsModal } from '../../components/installmentPayments/InstallmentPaymentsModal';
 import { DunningTimeline, useSummaryTail } from './DunningTimeline';
 
 type DetailTab = 'overview' | 'installments' | 'contacts' | 'history';
@@ -478,6 +479,7 @@ function InstallmentsTab({ contractId }: { contractId: number }) {
     queryKey: ccKeys.installments(contractId),
     queryFn: () => apiClient.get<InstallmentRow[]>(`/v_installments?contract_id=eq.${contractId}&order=pay_no.asc`),
   });
+  const [paymentsOf, setPaymentsOf] = useState<number | null>(null);
 
   if (isLoading) return <div className="p-4 text-subtle">{t('common.loading')}</div>;
   if (!data || data.length === 0) return <div className="p-4 text-subtler">{t('callCenter.noInstallments')}</div>;
@@ -503,9 +505,22 @@ function InstallmentsTab({ contractId }: { contractId: number }) {
             <Badge size="sm" color={paymentStateColor(inst.payment_state)}>
               {t(`callCenter.paymentState.${inst.payment_state}`, { defaultValue: inst.payment_state })}
             </Badge>
+            {/* No money in this installment yet → nothing to show (mig 1668 §3.1). */}
+            <Button
+              variant="ghost"
+              size="xs"
+              startIcon={<Receipt size={14} />}
+              disabled={!(inst.paid_amount > 0)}
+              onClick={() => setPaymentsOf(inst.id)}
+              data-testid="installment-payments-open"
+              className="shrink-0"
+            >
+              {t('installmentPayments.open')}
+            </Button>
           </div>
         ))}
       </div>
+      <InstallmentPaymentsModal installmentId={paymentsOf} onClose={() => setPaymentsOf(null)} />
     </div>
   );
 }
