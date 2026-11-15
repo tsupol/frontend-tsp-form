@@ -19,6 +19,7 @@ import {
 import { RepoLogAttemptModal } from './RepoLogAttemptModal';
 import { RepoGiveUpModal } from './RepoGiveUpModal';
 import { RepoNoteActionModal, type NoteActionConfig } from './RepoNoteActionModal';
+import { NOTE_ACTIONS } from './repoNoteActions';
 import { RepoPrintModal, type RepoPrintDoc } from './RepoPrintModal';
 import { beMediaRepoAuthorityPdf, beMediaRepoContractPdf, openPdfInNewTab } from '../../lib/beMedia';
 import { RepoIcloudRevealModal, CopyRow } from './RepoIcloudRevealModal';
@@ -27,23 +28,6 @@ import { RepoAlbum } from './RepoAlbum';
 import { RepoLocateSection } from './RepoLocateSection';
 import { DetailLine, DetailSection } from '../../components/DetailLine';
 import { DeviceSignalsPanel, useDeviceSignals } from '../../components/DeviceSignalsPanel';
-
-// Note-driven actions handled by the one reusable modal (keyed by action_code).
-const NOTE_ACTIONS: Partial<Record<RepoActionCode, NoteActionConfig>> = {
-  REPO_ADD_NOTE: { rpc: 'ops_repo_add_note', keyStem: 'addNote', noteRequired: true, tone: 'neutral' },
-  REPO_REVERT_ACTIVE: {
-    rpc: 'ops_repo_revert_active', keyStem: 'revertActive', noteRequired: true, tone: 'success',
-    transition: { from: 'WAIT_FOR_REPO', to: 'ACTIVE', toColor: 'success' },
-  },
-  LEGAL_FINISH: {
-    rpc: 'ops_legal_finish', keyStem: 'legalFinish', noteRequired: true, tone: 'success', confirmColor: 'primary',
-    transition: { from: 'WAIT_FOR_LEGAL', to: 'LEGAL_COMPLETED', toColor: 'success' },
-  },
-  LEGAL_RETURN_TO_REPO: {
-    rpc: 'ops_legal_return_to_repo', keyStem: 'legalReturn', noteRequired: true, tone: 'warning',
-    transition: { from: 'WAIT_FOR_LEGAL', to: 'WAIT_FOR_REPO', toColor: 'warning' },
-  },
-};
 
 // Actions handled inline (focus toggle) or dedicated modals — not the note modal.
 const INLINE_OR_DEDICATED = new Set<RepoActionCode>([

@@ -1491,5 +1491,8 @@
   "MDM.VALIDATION.SILENT_RESULT_INVALID": "ผลตรวจที่เลือกไม่ถูกต้อง",
   "mdm.validation.silent_result_invalid": "ผลตรวจที่เลือกไม่ถูกต้อง",
   "MDM.VALIDATION.SILENT_NOTE_REQUIRED": "ผล “พบความผิดปกติ” ต้องใส่คำอธิบาย",
-  "mdm.validation.silent_note_required": "ผล “พบความผิดปกติ” ต้องใส่คำอธิบาย"
+  "mdm.validation.silent_note_required": "ผล “พบความผิดปกติ” ต้องใส่คำอธิบาย",
+  "OPS.STATE.NOT_IN_WAIT_FOR_REPO": "งานนี้ไม่ได้อยู่ในคิวรอยึดแล้ว",
+  "OPS.VALIDATION.UNKNOWN_REPO_RESULT": "ผลการลงพื้นที่ไม่ถูกต้อง",
+  "OPS.VALIDATION.NOTE_REQUIRED": "กรุณาเขียนโน้ต"
 }

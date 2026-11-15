@@ -1490,5 +1490,8 @@
   "MDM.VALIDATION.SILENT_RESULT_INVALID": "The chosen check result is not valid",
   "mdm.validation.silent_result_invalid": "The chosen check result is not valid",
   "MDM.VALIDATION.SILENT_NOTE_REQUIRED": "“Anomaly found” needs a description",
-  "mdm.validation.silent_note_required": "“Anomaly found” needs a description"
+  "mdm.validation.silent_note_required": "“Anomaly found” needs a description",
+  "OPS.STATE.NOT_IN_WAIT_FOR_REPO": "This job is no longer waiting for repossession",
+  "OPS.VALIDATION.UNKNOWN_REPO_RESULT": "Unknown visit result",
+  "OPS.VALIDATION.NOTE_REQUIRED": "Please write a note"
 }

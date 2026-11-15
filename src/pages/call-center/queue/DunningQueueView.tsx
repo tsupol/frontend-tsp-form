@@ -12,7 +12,6 @@ import { AlertTriangle, CircleHelp, Hourglass, Maximize2, Minimize2, Play, Star,
 import { RELIEF_COLOR } from '../../../lib/relief';
 import { useAuth } from '../../../contexts/AuthContext';
 import { situationColor, situationText } from '../../../lib/situation';
-import { DateTime } from '../../../components/DateTime';
 import { formatDateTime } from '../../../lib/format';
 import { QueueScene, type Counter, type SceneHandle } from './QueueScene';
 import { honk, PAID_MS, SHOUT_MS, type Fx } from './queueGeom';
@@ -27,6 +26,7 @@ import {
   type QueueData, type QueueLane, type QueuePerson,
 } from './queueApi';
 import { LaneIcon } from './LaneIcon';
+import { UpdatedStatus } from './UpdatedStatus';
 import { RepoLabel } from './RepoBadge';
 import './queue.css';
 
@@ -333,13 +333,7 @@ export function DunningQueueView({ isMobile }: { isMobile: boolean }) {
             <div><i style={{ background: RELIEF_COLOR, borderRadius: '50%' }} />{t('dunningQueue.legendRelief')}</div>
           </div>
         </PopOver>
-        <div className="dq-updated">
-          {error ? (
-            <span className="text-warning-fg inline-flex items-center gap-1"><AlertTriangle size={13} /><span className="dq-shift">{t('dunningQueue.refreshFailed')}</span></span>
-          ) : dataUpdatedAt ? (
-            <span className={`dq-shift${isFetching ? ' opacity-60' : ''}`}>{t('dunningQueue.updatedAt')} <DateTime value={new Date(dataUpdatedAt).toISOString()} /></span>
-          ) : null}
-        </div>
+        <UpdatedStatus error={!!error} fetching={isFetching} updatedAt={dataUpdatedAt} />
       </div>
 
       {/* ── Lane chips: counts of what is on screen; tap = pan to that line ── */}

@@ -5,7 +5,7 @@
 import { useMemo, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ListChecks, ShieldCheck, FileSignature } from 'lucide-react';
+import { ListChecks, ShieldCheck, FileSignature, Warehouse } from 'lucide-react';
 import { useNavGuard } from '../../contexts/NavGuardContext';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -28,6 +28,7 @@ export function RepoLayout({ children }: { children: ReactNode }) {
   const navItems: NavItem[] = useMemo(() => [
     { type: 'group', labelKey: 'nav.groupRepoWork' },
     { type: 'link', path: '/admin/repo/pool', labelKey: 'nav.repoPool', icon: ListChecks },
+    { type: 'link', path: '/admin/repo/yard', labelKey: 'nav.repoYard', icon: Warehouse },
     { type: 'link', path: '/admin/repo/authority', labelKey: 'nav.repoAuthority', icon: FileSignature },
     ...(isAdmin ? [
       { type: 'group' as const, labelKey: 'nav.groupRepoAdmin' },

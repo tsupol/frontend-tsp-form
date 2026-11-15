@@ -1,0 +1,22 @@
+/* ลานงานยึด — on top of the dunning queue's styles (queue.css: stage, head tags, signs, zoom,
+   window, sheet). The picture keeps its own light palette in both themes, like the queue. */
+
+/* The shop that sent the job, first in the head tag, in the shop's colour; long names cut. */
+.dq-tag-top > .yd-shop { max-width: 84px; overflow: hidden; text-overflow: ellipsis; margin-right: 2px; }
+
+/* Under a lane sign's count: how many nobody has picked. */
+.yd-sign-note { font-size: 11px; font-weight: 600; color: #52616b; }
+
+/* "งานใหม่ 1" … at the yard's left edge, level with the band. */
+.yd-band {
+  position: absolute; padding: 1px 6px; border-radius: 5px; background: rgba(255, 255, 255, .9);
+  font-size: 12px; font-weight: 700; white-space: nowrap; pointer-events: none; transform-origin: right center;
+  box-shadow: 0 1px 3px rgba(20, 40, 50, .2);
+}
+
+/* Counts row. */
+.yd-count { font-size: 13px; white-space: nowrap; }
+.yd-count b { font-variant-numeric: tabular-nums; }
+
+/* "No jobs" sits over the empty picture without catching the drag. */
+.yd-empty { pointer-events: none; align-items: flex-start; padding-top: 18%; }

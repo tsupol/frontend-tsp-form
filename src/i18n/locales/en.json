@@ -6413,7 +6413,8 @@
     "customerMap": "Customer Map",
     "silentWatch": "Silent Watch",
     "lostModeStuck": "Lost Mode Stuck",
-    "deviceWatch": "Device Watch"
+    "deviceWatch": "Device Watch",
+    "repoYard": "Repo yard"
   },
   "nnfApp": {
     "title": "NNF App",
@@ -8615,7 +8616,15 @@
       "followOnPanel": "Progress shows in the Device & app panel on the job.",
       "noAnswer": "The device didn't answer within an hour — press again to retry."
     },
-    "reasonMinLength": "Please give a reason of at least {{min}} characters"
+    "reasonMinLength": "Please give a reason of at least {{min}} characters",
+    "returnToCollector": {
+      "title": "Send back to collectors",
+      "intro": "The job goes back to the collectors and stands in their “sent back by repo” line",
+      "noteLabel": "Reason (the collector will read this)",
+      "notePlaceholder": "e.g. the customer called back and wants to keep paying",
+      "confirm": "Send back",
+      "done_headline": "Sent back to the collectors"
+    }
   },
   "reports": {
     "title": "Daily Reports",
@@ -11998,5 +12007,82 @@
     "noModel": "Pick a model first to see the price guide",
     "notFound": "No contracts for this model in the last 60 days",
     "hint": "How the same company priced this model"
+  },
+  "repoYard": {
+    "title": "Repo yard",
+    "allCompanies": "All companies",
+    "companyPick": "Pick a company",
+    "shops": "Jobs from shop:",
+    "sub": "{{n}} jobs · {{free}} not picked · {{fix}} located",
+    "jobsN": "{{n}} repo jobs",
+    "pickedN": "Picked",
+    "withFix": "Located",
+    "bySystem": "Moved by the system (no reason)",
+    "nobodyPicked": "Not picked by anyone",
+    "pickedBy": "Picked by {{names}}",
+    "daysShort": "{{n}}d",
+    "hoursShort": "{{n}}h",
+    "inQueueDays": "{{n}} days in the queue",
+    "attemptsN": "{{n}} attempts",
+    "markFix": "Device located",
+    "markLocked": "Device locked",
+    "freeN": "{{n}} free",
+    "lane": {
+      "FIX_RECENT": "Located in {{d}} days",
+      "FIX_OLD": "Located, but old",
+      "MDM_ALIVE": "Device answers, no location",
+      "MDM_SILENT": "MDM, but silent",
+      "NO_MDM": "No MDM"
+    },
+    "band": {
+      "NEW": "New (≤{{d}} days)",
+      "FREE": "Not picked yet",
+      "PICKED": "Picked, not worked",
+      "WORKED": "Worked"
+    },
+    "legend": {
+      "overHead": "Over the head: the shop that sent it · days in the queue",
+      "red": "Days in red = nobody has picked it",
+      "mine": "Picked by me",
+      "others": "Picked by others (faded)",
+      "attempts": "Number in the dark circle = attempts",
+      "lanes": "Lanes left to right = easy to hard to find"
+    },
+    "card": {
+      "job": "Job",
+      "shop": "Shop",
+      "inQueue": "Queued",
+      "sentBy": "Sent by",
+      "pickedBy": "Picked by",
+      "attempts": "Attempts",
+      "note": "Note",
+      "customer": "Customer",
+      "name": "Name",
+      "phone": "Phone",
+      "area": "Area",
+      "overdue": "Overdue",
+      "device": "Device",
+      "product": "Product",
+      "location": "Location"
+    },
+    "sentBySystem": "Moved into the queue by the system - no message from the collectors",
+    "overdueDays": "{{n}} days",
+    "outstanding": "฿{{amount}} outstanding",
+    "loaner": "Loaner",
+    "noMdm": "No MDM",
+    "lastSeen": "Last seen",
+    "unknown": "unknown",
+    "lostModeOn": "Lost Mode on",
+    "battery": "battery {{n}}%",
+    "fixes": "{{n}} points",
+    "lastFix": "latest",
+    "noFix": "No location",
+    "pickUp": "Pick up",
+    "putDown": "Put down",
+    "sendBack": "Send back to collectors",
+    "openDetail": "Job detail page",
+    "gone": "This job has left the repo queue",
+    "empty": "No repo jobs",
+    "loadFailed": "Could not load the repo yard"
   }
 }

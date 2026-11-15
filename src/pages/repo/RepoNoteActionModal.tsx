@@ -16,6 +16,9 @@ export interface NoteActionConfig {
   rpc: string;
   keyStem: string;              // repo.<stem>.title / .noteLabel / .done_headline ...
   noteRequired: boolean;
+  /** The backend decides per person whether a note is needed (and how long): never marked
+   *  optional here; a minimum is learned from its refusal. */
+  noteByServer?: boolean;
   tone?: 'success' | 'warning' | 'danger' | 'neutral';
   transition?: ActionDoneStateTransition;
   confirmColor?: 'primary' | 'danger' | 'warning';
@@ -132,7 +135,7 @@ export function RepoNoteActionModal({ open, config, contractId, contractCode, on
                 <div className="flex flex-col">
                   <label className="form-label">
                     {t(`repo.${stem}.noteLabel`)}
-                    {!config.noteRequired && <span className="text-subtler font-normal"> ({t('common.optional')})</span>}
+                    {!config.noteRequired && !config.noteByServer && <span className="text-subtler font-normal"> ({t('common.optional')})</span>}
                   </label>
                   <TextArea
                     value={note}
@@ -140,9 +143,9 @@ export function RepoNoteActionModal({ open, config, contractId, contractCode, on
                     rows={3}
                     placeholder={t(`repo.${stem}.notePlaceholder`)}
                   />
-                  {config.noteRequired && (
+                  {minLen != null && (
                     <div className="text-[11px] text-subtle mt-1">
-                      {t('repo.noteHint', { min: MIN_NOTE_LEN, count: noteLen })}
+                      {t('repo.noteHint', { min: minLen, count: noteLen })}
                     </div>
                   )}
                 </div>

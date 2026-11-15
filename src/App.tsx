@@ -113,6 +113,7 @@ import { UnassignableContractsPage } from './pages/collections/UnassignableContr
 import { CollectionPoolsPage } from './pages/collections/CollectionPoolsPage';
 import { RepoLayout } from './pages/repo/RepoLayout';
 import { RepoPoolPage } from './pages/repo/RepoPoolPage';
+import { RepoYardPage } from './pages/repo/yard/RepoYardPage';
 import { RepoGrantsPage } from './pages/repo/RepoGrantsPage';
 import { RepoAuthorityPage } from './pages/repo/RepoAuthorityPage';
 import { TimelineOverviewPage } from './pages/collections/TimelineOverviewPage';
@@ -1510,6 +1511,16 @@ function App() {
           <ProtectedRoute>
             <AdminLayout>
               <RepoLayout><RepoPoolPage /></RepoLayout>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/repo/yard"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <RepoLayout><RepoYardPage /></RepoLayout>
             </AdminLayout>
           </ProtectedRoute>
         }
