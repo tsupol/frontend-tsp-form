@@ -96,8 +96,14 @@ export interface ChatInboxRow {
   last_payment_date?: string | null;
   appointment_date?: string | null;
 
-  // awaiting_staff_reply / is_overdue (mig 1636) are still in the view but not read:
-  // the "ยังไม่ได้ตอบ" badge they drove was removed (owner 11-09) — chat_status is the signal.
+  /** true = an installment is past due and not fully paid → the row shows
+   *  "ค้าง N งวด · D วัน · ฿X" (owner 11-15, UI 66 §5b). null = not collecting.
+   *  The only gate for that line — never situation_code or overdue_days
+   *  (a paused contract can be overdue under a grey flag). */
+  is_overdue?: boolean | null;
+
+  // awaiting_staff_reply (mig 1636) is still in the view but not read: the
+  // "ยังไม่ได้ตอบ" badge it drove was removed (owner 11-09) — chat_status is the signal.
 
   /** FE-only, never from the view. True for a search hit that has no chat row
    *  yet — the contract exists but nobody has ever messaged about it. Opening

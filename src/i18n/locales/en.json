@@ -2849,6 +2849,11 @@
     "searchPlaceholder": "Name, contract, phone, IMEI, serial",
     "searchEmpty": "Nothing matched that search",
     "noChatYet": "No chat yet",
+    "overdueLine": {
+      "count": "{{count}} overdue",
+      "days_one": "{{count}} day",
+      "days_other": "{{count}} days"
+    },
     "startConversation": "Open to send the first message",
     "unread": "Unread",
     "unreadOnly": "Unread only",

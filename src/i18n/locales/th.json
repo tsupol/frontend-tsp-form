@@ -2846,6 +2846,10 @@
     "searchPlaceholder": "ชื่อ เลขสัญญา เบอร์โทร IMEI ซีเรียล",
     "searchEmpty": "ไม่พบผลลัพธ์ที่ตรงกับคำค้น",
     "noChatYet": "ยังไม่มีแชท",
+    "overdueLine": {
+      "count": "ค้าง {{count}} งวด",
+      "days": "{{count}} วัน"
+    },
     "startConversation": "กดเพื่อเริ่มส่งข้อความแรก",
     "unread": "ยังไม่อ่าน",
     "unreadOnly": "เฉพาะที่ยังไม่อ่าน",
