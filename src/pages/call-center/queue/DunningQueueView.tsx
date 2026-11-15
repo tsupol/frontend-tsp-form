@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button, DataTable, PopOver, Select, Tooltip } from 'tsp-form';
-import { AlertTriangle, CircleHelp, Hourglass, Maximize2, Minimize2, Play, Star, Trash2, X } from 'lucide-react';
+import { AlertTriangle, CircleHelp, Hourglass, Maximize2, Minimize2, Play, Star, X } from 'lucide-react';
 import { RELIEF_COLOR } from '../../../lib/relief';
 import { useAuth } from '../../../contexts/AuthContext';
 import { situationColor, situationText } from '../../../lib/situation';
@@ -27,9 +27,10 @@ import {
   type QueueData, type QueueLane, type QueuePerson,
 } from './queueApi';
 import { LaneIcon } from './LaneIcon';
+import { RepoLabel } from './RepoBadge';
 import './queue.css';
 
-const LANE_ORDER: QueueLane[] = [...LANES.map(L => L.lane), 'LONG'];
+const LANE_ORDER: QueueLane[] = LANES.map(L => L.lane);
 const FLAG_LEVELS = ['RED', 'ORANGE', 'YELLOW', 'GREEN', 'WHITE'] as const;
 const FLAG_HEX: Record<string, string> = { RED: '#DC2626', ORANGE: '#F97316', YELLOW: '#EAB308', GREEN: '#16A34A', WHITE: '#9CA3AF' };
 const BRANCH_KEY = 'dunningQueue.branch';
@@ -53,7 +54,8 @@ export function DunningQueueView({ isMobile }: { isMobile: boolean }) {
   const { data, error, isFetching, dataUpdatedAt } = useDunningQueue(branchId);
 
   const [picked, setPicked] = useState<number | null>(null);
-  const [list, setList] = useState<{ kind: 'bin' } | { kind: 'more'; lane: QueueLane } | null>(null);
+  /** The "+N" list of a line longer than the floor shows. */
+  const [list, setList] = useState<{ lane: QueueLane } | null>(null);
   const [focusOnly, setFocusOnly] = useState(false);
   const [flags, setFlags] = useState<Set<string>>(new Set());
   const [legendOpen, setLegendOpen] = useState(false);
@@ -122,13 +124,9 @@ export function DunningQueueView({ isMobile }: { isMobile: boolean }) {
         ? (collectors.find(x => x.id === collectorId)?.name || t('dunningQueue.unassigned'))
         : isOverseer ? branchName : (shown[0]?.collector_name || user?.username || ''),
       clerks: collectorId != null ? (collectorId === 0 ? 0 : 1) : new Set(shown.filter(p => p.collector_id !== 0).map(p => p.collector_id)).size,
-      people: [], bin: [], amount: 0,
+      people: shown, amount: 0,
     };
-    for (const p of shown) {
-      if (p.lane === 'LONG') c.bin.push(p); else c.people.push(p);
-      c.amount += p.overdue_amount;
-    }
-    c.bin.sort((a, b) => a.pos - b.pos);
+    for (const p of shown) c.amount += p.overdue_amount;
     return c;
   }, [shown, collectorId, collectors, branchId, data?.branches, isOverseer, user, t]);
 
@@ -169,15 +167,12 @@ export function DunningQueueView({ isMobile }: { isMobile: boolean }) {
   // "Next person": the first one in line order (this line first, then the following lines)
   // who hasn't been opened yet in this sitting. Without the "opened" memory it bounced
   // between the first two of a line whenever nobody logged a result in between.
-  // It stays where the person is: someone on the floor leads to the next one on the floor
-  // (never into the bin — those people aren't drawn, the scene would show nothing); someone
-  // opened from the bin list leads to the next one in the bin. When everyone there has been
-  // opened, there is no next (the button greys out) — "Start at the head" begins a new round.
+  // When everyone has been opened, there is no next (the button greys out) — "Start at the
+  // head" begins a new round, from the "ทีมยึดส่งกลับ" line first.
   const opened = useRef(new Set<number>());
-  const FLOOR_LANES = LANE_ORDER.filter(l => l !== 'LONG');
   const nextOf = (cur: QueuePerson | null): QueuePerson | null => {
     const pool = shown.filter(p => (!match || match.has(p.id)) && p.id !== cur?.id && !opened.current.has(p.id));
-    const lanes = cur?.lane === 'LONG' ? (['LONG'] as QueueLane[]) : FLOOR_LANES;
+    const lanes = LANE_ORDER;
     const start = cur ? Math.max(0, lanes.indexOf(cur.lane)) : 0;
     for (let i = 0; i < lanes.length; i++) {
       const lane = lanes[(start + i) % lanes.length];
@@ -226,9 +221,7 @@ export function DunningQueueView({ isMobile }: { isMobile: boolean }) {
   const unassignedN = shown.filter(p => p.collector_id === 0).length;
   const reliefN = shown.filter(p => p.relief_until).length;
 
-  const listPeople = !list || !counter ? [] : list.kind === 'bin'
-    ? counter.bin
-    : counter.people.filter(p => p.lane === list.lane).sort((a, b) => a.pos - b.pos).slice(48);
+  const listPeople = !list || !counter ? [] : counter.people.filter(p => p.lane === list.lane).sort((a, b) => a.pos - b.pos).slice(48);
 
   const branchOptions = (data?.branches ?? []).map(b => ({ value: String(b.id), label: `${b.code} · ${b.name}` }));
   const collectorOptions = collectors.map(c => ({
@@ -236,7 +229,7 @@ export function DunningQueueView({ isMobile }: { isMobile: boolean }) {
     label: `${c.id ? c.name : t('dunningQueue.unassigned')} · ${t('dunningQueue.peopleN', { n: c.n })}`,
   }));
 
-  const canStart = shown.some(p => p.lane !== 'LONG' && (!match || match.has(p.id)));
+  const canStart = shown.some(p => !match || match.has(p.id));
 
   return (
     <div className={`dq${full ? ' dq--full' : ''}`}>
@@ -336,7 +329,7 @@ export function DunningQueueView({ isMobile }: { isMobile: boolean }) {
             <div>{t('dunningQueue.legendFaded')}</div>
             <div>{t('dunningQueue.legendFocus')}</div>
             <div>{t('dunningQueue.legendFlag')}</div>
-            <div>{t('dunningQueue.legendBin')}</div>
+            <div>{(['WITH_REPO', 'RETURNED', 'WITH_LEGAL'] as const).map(k => <RepoLabel key={k} state={k} />)}</div>
             <div><i style={{ background: RELIEF_COLOR, borderRadius: '50%' }} />{t('dunningQueue.legendRelief')}</div>
           </div>
         </PopOver>
@@ -354,16 +347,20 @@ export function DunningQueueView({ isMobile }: { isMobile: boolean }) {
         <div className="dq-chips">
           <span className="dq-total"><b>{t('dunningQueue.peopleN', { n: shown.length })}</b> · {baht(total)}</span>
           {/* Tap a line's count → the scene pans to that line. */}
+          {/* Plain library buttons, the lane's colour only on the icon — same as the flag filter buttons above. */}
           {LANES.map(L => (
-            <Button key={L.lane} size="sm" variant="ghost" className={L.mark ? 'dq-chip-mark' : undefined} onClick={() => sceneRef.current?.showLane(L.lane)}>
-              {L.mark
-                ? <span className="dq-lanecount-mark" style={{ background: L.tone }}><LaneIcon mark={L.mark} size={13} />{t(`dunningQueue.lane.${L.lane}`)} <b>{count(L.lane)}</b></span>
-                : <span className="dq-lanecount" style={{ ['--tone' as string]: L.tone }}>{t(`dunningQueue.lane.${L.lane}`)} <b>{count(L.lane)}</b></span>}
+            <Button
+              key={L.lane}
+              size="sm"
+              variant="outline"
+              startIcon={L.mark
+                ? <LaneIcon mark={L.mark} size={14} color={L.tone} />
+                : <i className="dq-swatch" style={{ background: L.tone }} />}
+              onClick={() => sceneRef.current?.showLane(L.lane)}
+            >
+              {t(`dunningQueue.lane.${L.lane}`)} <b>{count(L.lane)}</b>
             </Button>
           ))}
-          <Button size="sm" variant="ghost" startIcon={<Trash2 size={14} />} onClick={() => setList(l => (l?.kind === 'bin' ? null : { kind: 'bin' }))}>
-            {t('dunningQueue.lane.LONG')} <b className="ml-1">{count('LONG')}</b>
-          </Button>
           {reliefN > 0 && <span className="dq-relief-count text-sm px-2"><Hourglass size={14} />{t('dunningQueue.reliefN')} <b>{reliefN}</b></span>}
           {chats > 0 && <span className="text-sm text-info-fg px-2">{t('dunningQueue.chatUnread')} <b>{chats}</b></span>}
           {unassignedN > 0 && <span className="text-sm text-danger-fg px-2">{t('dunningQueue.unassigned')} <b>{unassignedN}</b></span>}
@@ -380,8 +377,7 @@ export function DunningQueueView({ isMobile }: { isMobile: boolean }) {
             match={match}
             fx={fx}
             onPick={pick}
-            onBin={() => setList(l => (l?.kind === 'bin' ? null : { kind: 'bin' }))}
-            onMore={(lane) => setList({ kind: 'more', lane })}
+            onMore={(lane) => setList({ lane })}
             tipOf={tipOf}
             blocker={blocker}
           />
@@ -390,14 +386,12 @@ export function DunningQueueView({ isMobile }: { isMobile: boolean }) {
         {data && !counter && <div className="dq-empty dq-empty--yay">{t('dunningQueue.emptyYay')}</div>}
         {!data && error && <div className="dq-empty"><div className="alert alert-danger"><AlertTriangle size={16} /><span>{t('dunningQueue.loadFailed')}</span></div></div>}
 
-        {/* Bin / "+N" list */}
+        {/* "+N" list of a long line */}
         {list && counter && listPeople.length > 0 && (
           <div className="dq-list" onPointerDown={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2 px-3 py-2 border-b border-line">
               <b className="text-sm flex-1 min-w-0 truncate">
-                {list.kind === 'bin'
-                  ? t('dunningQueue.binTitle', { n: counter.bin.length, amount: baht(counter.bin.reduce((s, p) => s + p.overdue_amount, 0)) })
-                  : t('dunningQueue.moreTitle', { lane: t(`dunningQueue.lane.${list.lane}`), n: listPeople.length })}
+                {t('dunningQueue.moreTitle', { lane: t(`dunningQueue.lane.${list.lane}`), n: listPeople.length })}
               </b>
               <Button size="sm" variant="ghost" startIcon={<X size={14} />} onClick={() => setList(null)} aria-label={t('common.close')} />
             </div>

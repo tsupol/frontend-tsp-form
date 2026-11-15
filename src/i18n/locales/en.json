@@ -8614,7 +8614,8 @@
       },
       "followOnPanel": "Progress shows in the Device & app panel on the job.",
       "noAnswer": "The device didn't answer within an hour — press again to retry."
-    }
+    },
+    "reasonMinLength": "Please give a reason of at least {{min}} characters"
   },
   "reports": {
     "title": "Daily Reports",
@@ -11576,19 +11577,19 @@
     "promiseInDays": "Promised +{{n}} d",
     "head": "Head",
     "tail": "End",
-    "binTip": "Overdue over 41 days (no promise): {{n}} contracts · {{amount}}",
     "shoutWord": "Pay up~!",
     "paidWord": "Paid!",
     "lane": {
+      "REPO_RETURNED": "Sent back by repo",
       "QUEUE_1": "1–6 days",
       "QUEUE_2": "7–13 days",
       "QUEUE_3": "14–20 days",
       "QUEUE_4": "21–27 days",
       "QUEUE_5": "28–41 days",
+      "QUEUE_6": "42+ days",
       "PROMISED": "Promised",
       "PROMISED_TODAY": "Promised today",
-      "BROKEN": "Broken promise",
-      "LONG": "Over 41 days"
+      "BROKEN": "Broken promise"
     },
     "unassigned": "Waiting to assign",
     "counterLine": "{{n}} people · {{amount}}",
@@ -11642,13 +11643,11 @@
     "legendFaded": "Faded = contacted in the last 24 hours.",
     "legendFocus": "Pulsing yellow ring under the feet + ★ = in your focus list.",
     "legendFlag": "Small square in the tag over the head = contract flag colour; a white dot = set by the collector.",
-    "legendBin": "Bin = overdue over 41 days with no promise.",
     "refreshFailed": "Could not update — retrying…",
     "updatedAt": "Updated",
     "chatUnread": "Unread chats",
     "emptyYay": "No overdue customers today 🎉",
     "loadFailed": "Could not load the queue",
-    "binTitle": "Over 41 days · {{n}} contracts · {{amount}}",
     "moreTitle": "{{lane}} · {{n}} more",
     "underHour": "<1h",
     "full": "Full screen",
@@ -11657,7 +11656,18 @@
     "exitFullHint": "Back to the normal page (Esc)",
     "noNext": "Everyone here has been opened — press \"Start at the head\" for a new round",
     "reliefN": "Relief",
-    "legendRelief": "24-hour relief (bank apps open for now) — the end time is under the feet"
+    "legendRelief": "24-hour relief (bank apps open for now) — the end time is under the feet",
+    "repoState": {
+      "WITH_REPO": "With the repo team",
+      "RETURNED": "Sent back by repo",
+      "WITH_LEGAL": "With legal"
+    },
+    "repoReturnedAt": "Sent back",
+    "repoReturnedBy": "by {{name}}",
+    "repoSince": "Since",
+    "repoPicked": "Picked by the repo team",
+    "repoNotPicked": "Not picked yet",
+    "repoAttempts": "{{n}} attempts"
   },
   "silentWatch": {
     "title": "Silent devices",

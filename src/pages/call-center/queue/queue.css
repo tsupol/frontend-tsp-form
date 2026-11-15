@@ -39,6 +39,12 @@
   pointer-events: auto; cursor: pointer;
 }
 .dq-tag-never { color: #b8322f; }
+/* Thai text sits high in this font: the words move down by the theme's --text-shift-y, the
+   same variable and the same way (translateY) tsp-form's Button moves its label. */
+.dq-tag-top > span { transform: translateY(var(--text-shift-y, 0px)); }
+/* A round chip at the end (repo, relief, chat count) is the tag's own right end: same 15px
+   height as the tag, no padding after it, so its circle lines up with the tag's round end. */
+.dq-tag-top:has(> .dq-tag-repo:last-child, > .dq-tag-relief:last-child, > .dq-tag-chat:last-child) { padding-right: 0; }
 .dq-tag-flag { position: relative; display: inline-block; width: 8px; height: 8px; border-radius: 2px; border: 1px solid rgba(0, 0, 0, .25); }
 .dq-tag-flag b { position: absolute; left: 1.5px; top: 1.5px; width: 3px; height: 3px; border-radius: 50%; background: #fff; }
 .dq-tag-star { color: #f5b301; fill: #f5b301; }
@@ -54,6 +60,11 @@
 .dq-tag-foot .dq-tag-relief-until { color: #7c3aed; }
 .dq-relief-count { display: inline-flex; align-items: center; gap: 4px; color: #7c3aed; }
 [data-theme="dark"] .dq-relief-count { color: #b79cf5; }
+/* Repo team (mig 1681): a round chip in the row over the head — with the repo team · sent
+   back by them · with legal. Same size as the relief hourglass. */
+.dq-tag-repo { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border-radius: 50%; color: #fff; font-style: normal; flex-shrink: 0; }
+.dq-legend .dq-tag-repo { width: 15px; height: 15px; border-radius: 50%; margin-left: 0; }
+.dq-repo-label { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
 
 
 /* Shout: speech bubble + sound rings over the customer's head. */
@@ -98,13 +109,6 @@
 .dq-lanesign--compact { flex-direction: row; gap: 4px; min-width: 40px; padding: 5px 9px; }
 .dq-lanesign--compact span { font-size: 18px; }
 .dq-laneicon { flex: none; }
-/* The same three in the count bar: a filled pill, room above/below the text inside the sm button. */
-.dq-lanecount-mark {
-  display: inline-flex; align-items: center; gap: 5px; padding: 5px 11px 4px 9px; border-radius: 999px;
-  color: #fff; line-height: 1.35;
-}
-/* The pill carries its own side room, so the ghost button around it only needs a sliver — keeps the bar on one row. */
-.dq-chip-mark { padding-inline: 3px; }
 .dq-countersign {
   position: absolute; display: flex; flex-direction: column; align-items: center; padding: 5px 14px; border-radius: 10px;
   background: #1f2d3a; color: #fff; font-size: 16px; white-space: nowrap; pointer-events: none;
@@ -159,12 +163,9 @@
 .dq-log { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--color-line); border-radius: 8px; background: var(--color-surface); }
 
 /* Floating Buttons in the scene, placed at a world point. */
-.dq-binbadge { position: absolute; transform: translate(-50%, -100%); }
 .dq-more { position: absolute; transform: translate(-50%, -50%); }
-/* Colour swatch inside a filter Button, and a lane's own colour on its count. */
+/* Colour swatch inside a filter or lane-count Button. */
 .dq-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; border: 1px solid rgba(0, 0, 0, .2); }
-.dq-lanecount { color: color-mix(in srgb, var(--tone) 85%, var(--color-fg)); }
-[data-theme="dark"] .dq-lanecount { color: color-mix(in srgb, var(--tone) 55%, #fff); }
 
 /* Counts row under the toolbar (each lane count is a ghost Button). */
 .dq-chips {

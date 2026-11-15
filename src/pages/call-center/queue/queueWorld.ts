@@ -36,7 +36,7 @@ export const HEIGHT_PX = UP.y * PX;
 
 // ── Palette (the simulation's, plus the queue's own meanings) ───────────────
 const C = {
-  grass: '#65b779', lot: '#cfcbc1', desk: '#ecdcb6', deskSide: '#d8c69c', bin: '#3f4a54', binLid: '#2b333b',
+  grass: '#65b779', lot: '#cfcbc1', desk: '#ecdcb6', deskSide: '#d8c69c',
   post: '#7d8b94', rope: '#c0392b',
   skin: ['#f1cdb0', '#e7b996', '#d9a67f'], hair: ['#3b2d24', '#5a4232', '#26211e', '#6b5a48'],
   trousers: ['#3c4a5c', '#2f3b47', '#4a5f7a', '#5b4a3c', '#3d4a3d'], shoe: '#2a2f35', eye: '#22282d',
@@ -183,7 +183,7 @@ const FACE_CAMERA = Math.PI / 4;
 const WALK_SPEED = 1.5; // m/s
 const STRIDE = 0.8;
 
-export type QueueHit = { kind: 'person'; id: number } | { kind: 'bin' } | null;
+export type QueueHit = { kind: 'person'; id: number } | null;
 
 export class QueueWorld {
   protected renderer: WebGLRenderer;
@@ -198,7 +198,6 @@ export class QueueWorld {
   // Protected: the device-watch scene (nnf-extra/deviceWatch) builds its own floor on the same world.
   protected staticRoot = new Group();
   protected staticMats: Material[] = [];
-  private binMesh: Mesh | null = null;
   private figures: Figure[] = [];
   private byId = new Map<number, Figure>();
   private capacity = 0;
@@ -295,8 +294,8 @@ export class QueueWorld {
     this.capacity = cap;
   }
 
-  // ── Static: floor, lanes, counter, ropes, bin ──
-  setLayout(laid: Laid, binCount: number, waiting: boolean) {
+  // ── Static: floor, lanes, counter, ropes ──
+  setLayout(laid: Laid, waiting: boolean) {
     this.staticRoot.clear();
     this.staticMats.forEach(m => m.dispose());
     this.staticMats = [];
@@ -359,13 +358,6 @@ export class QueueWorld {
           this.staticRoot.add(d);
         }
       }
-    }
-    // The bin beside the counter (over 41 days, no promise).
-    this.binMesh = null;
-    if (binCount > 0) {
-      const b = box(w + 0.7, 0, -0.55, 0.9, 0.95, 0.8, C.bin);
-      box(w + 0.64, 0.95, -0.6, 1.02, 0.07, 0.9, C.binLid);
-      this.binMesh = b;
     }
     this.renderer.shadowMap.needsUpdate = true;
   }
@@ -490,12 +482,7 @@ export class QueueWorld {
         break;
       }
     }
-    if (best) return best.hit;
-    if (this.binMesh) {
-      const b = this.ray.intersectObject(this.binMesh, false)[0];
-      if (b) return { kind: 'bin' };
-    }
-    return null;
+    return best ? best.hit : null;
   }
 
   // ── Frame loop: idle sway, walking, effects ──

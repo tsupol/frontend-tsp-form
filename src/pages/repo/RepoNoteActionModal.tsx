@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Button, TextArea } from 'tsp-form';
-import { XCircle, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { ActionDoneView, type ActionDoneStateTransition } from '../contracts/ActionDoneView';
 import { translateApiError } from '../../lib/apiErrors';
+import { ModalErrorBand } from '../../components/ModalErrorBand';
 
 /* Reusable note-driven repo action. Covers the actions whose only input is a note:
    REPO_ADD_NOTE, LEGAL_FINISH, LEGAL_RETURN_TO_REPO, REPO_REVERT_ACTIVE.
@@ -44,6 +45,10 @@ export function RepoNoteActionModal({ open, config, contractId, contractCode, on
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
+  // A minimum the backend asked for (CORE.VALIDATION.REASON_REQUIRED · params.min_length),
+  // learned from its refusal — never a number written here (mig 1680: the repo team must
+  // give a reason, the collector and shop manager need not).
+  const [serverMin, setServerMin] = useState<number | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -52,13 +57,15 @@ export function RepoNoteActionModal({ open, config, contractId, contractCode, on
       setError('');
       setSubmitting(false);
       setConfirmClose(false);
+      setServerMin(null);
     }
   }, [open]);
 
   const stem = config?.keyStem ?? '';
   const noteLen = note.trim().length;
   const isDirty = noteLen > 0;
-  const noteOk = config ? (!config.noteRequired || noteLen >= MIN_NOTE_LEN) : false;
+  const minLen = config?.noteRequired ? MIN_NOTE_LEN : serverMin;
+  const noteOk = config ? (minLen == null || noteLen >= minLen) : false;
   const canSubmit = !!config && noteOk && !submitting;
 
   const forceClose = () => { setConfirmClose(false); onClose(); };
@@ -80,7 +87,13 @@ export function RepoNoteActionModal({ open, config, contractId, contractCode, on
       setView('done');
       onSuccess();
     } catch (err) {
-      setError(apiErr(err, t));
+      const min = err instanceof ApiError && err.code === 'CORE.VALIDATION.REASON_REQUIRED' ? err.messageParams?.min_length : null;
+      if (typeof min === 'number') {
+        setServerMin(min);
+        setError(t('repo.reasonMinLength', { min }));
+      } else {
+        setError(apiErr(err, t));
+      }
     } finally {
       setSubmitting(false);
     }
@@ -134,14 +147,9 @@ export function RepoNoteActionModal({ open, config, contractId, contractCode, on
                   )}
                 </div>
 
-                {error && (
-                  <div className="alert alert-danger">
-                    <XCircle size={16} />
-                    <div className="alert-description">{error}</div>
-                  </div>
-                )}
               </div>
 
+              <ModalErrorBand message={error} />
               <div className="modal-footer">
                 <Button variant="outline" onClick={handleClose}>{t('common.cancel')}</Button>
                 <Button

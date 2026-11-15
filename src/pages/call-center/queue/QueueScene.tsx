@@ -1,17 +1,18 @@
 // The dunning queue scene: a WebGL canvas drawn by QueueWorld (the simulation's camera,
 // light and floor, with the queue's own people) and an HTML layer on top for everything
 // that must stay sharp at any zoom — the last-contact number over each head, flags, chat
-// counts, lane signs, the counter sign, the bin count and the two fun effects.
+// counts, repo badges, lane signs, the counter sign and the two fun effects.
 // Lane, place in line and every number come from fn_dunning_queue_live; this file draws only.
 
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, type MouseEvent as RMouseEvent, type PointerEvent as RPointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from 'tsp-form';
-import { Hourglass, House, Minus, Plus, Skull, Star } from 'lucide-react';
+import { Hourglass, House, Minus, Plus, Star } from 'lucide-react';
 import { situationColor } from '../../../lib/situation';
 import { DEPTH, FIGURE_H, HEIGHT_PX, LANE_MIN, PX, SIGN_Y, QueueWorld, layoutQueue, project } from './queueWorld';
 import { LANES, baht, contactShort, isPromiseLane, promiseShort, type QueueLane, type QueuePerson } from './queueApi';
 import { LaneIcon } from './LaneIcon';
+import { RepoBadge } from './RepoBadge';
 import { reliefUntilText } from '../../../lib/relief';
 import { PAID_MS, SHOUT_MS, WALK_MS, type Fx } from './queueGeom';
 
@@ -22,7 +23,6 @@ export interface Counter {
   name: string;
   clerks: number;
   people: QueuePerson[];
-  bin: QueuePerson[];
   amount: number;
 }
 
@@ -39,13 +39,12 @@ export const QueueScene = forwardRef<SceneHandle, {
   match: Set<number> | null;
   fx: Fx[];
   onPick: (id: number | null) => void;
-  onBin: () => void;
   onMore: (lane: QueueLane) => void;
   /** Lines of the hover note (computer only). */
   tipOf: (p: QueuePerson) => string[];
   /** Where the work panel covers the scene right now (scene pixels), or null. */
   blocker: () => { x: number; y: number; w: number; h: number } | null;
-}>(function QueueScene({ counter: c, picked, match, fx, onPick, onBin, onMore, tipOf, blocker }, ref) {
+}>(function QueueScene({ counter: c, picked, match, fx, onPick, onMore, tipOf, blocker }, ref) {
   const { t } = useTranslation();
   const wrap = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -95,8 +94,8 @@ export const QueueScene = forwardRef<SceneHandle, {
   }, []);
 
   useEffect(() => {
-    worldRef.current?.setLayout(laid, c.bin.length, c.id === 0);
-  }, [laid, c.bin.length, c.id]);
+    worldRef.current?.setLayout(laid, c.id === 0);
+  }, [laid, c.id]);
 
   // People: customers in their spots, clerks behind the counter.
   useEffect(() => {
@@ -270,7 +269,7 @@ export const QueueScene = forwardRef<SceneHandle, {
     } else gesture.current = null;
   };
   const down = (e: RPointerEvent) => {
-    if ((e.target as Element).closest('.dq-zoom, .dq-more, .dq-binbadge')) return;
+    if ((e.target as Element).closest('.dq-zoom, .dq-more')) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     if (pointers.current.size === 0) moved.current = false;
     stopGlide();
@@ -314,12 +313,10 @@ export const QueueScene = forwardRef<SceneHandle, {
   };
   const click = (e: RMouseEvent) => {
     if (moved.current) { moved.current = false; return; }
-    if ((e.target as Element).closest('.dq-zoom, .dq-more, .dq-binbadge, .dq-tag')) return;
+    if ((e.target as Element).closest('.dq-zoom, .dq-more, .dq-tag')) return;
     const p = local(e);
     const h = worldRef.current?.hit(p.x, p.y);
-    if (h?.kind === 'person') onPick(h.id);
-    else if (h?.kind === 'bin') onBin();
-    else onPick(null);
+    onPick(h?.kind === 'person' ? h.id : null);
   };
   const zoomBtn = (f: number) => {
     const a = area();
@@ -368,6 +365,7 @@ export const QueueScene = forwardRef<SceneHandle, {
                 <span className={p.contact_hours == null ? 'dq-tag-never' : ''}>{contactShort(t, p.contact_hours)}</span>
                 {p.chat_unread > 0 && <em className="dq-tag-chat">{p.chat_unread}</em>}
                 {p.relief_until && <i className="dq-tag-relief"><Hourglass size={9} strokeWidth={2.6} /></i>}
+                {p.repo_state !== 'NONE' && <RepoBadge state={p.repo_state} />}
               </div>
               {(s.head || s.tail || p.lane === 'PROMISED' || p.relief_until) && (
                 <div className="dq-tag-foot">
@@ -399,18 +397,10 @@ export const QueueScene = forwardRef<SceneHandle, {
         style={{ ...screen(-0.3, SIGN_Y + 1.1, -0.6), transform: `translate(0, -100%) scale(${ts})` }}>
         <b>{c.id === 0 ? t('dunningQueue.unassigned') : c.name}</b>
         <span>
-          {t('dunningQueue.counterLine', { n: c.people.length + c.bin.length, amount: baht(c.amount) })}
+          {t('dunningQueue.counterLine', { n: c.people.length, amount: baht(c.amount) })}
           {c.id === -1 ? ` · ${t('dunningQueue.collectorsN', { n: c.clerks })}` : ''}
         </span>
       </div>
-      {c.bin.length > 0 && (
-        <div className="dq-binbadge" style={{ ...screen(w + 1.15, 1.75, -0.15) }}>
-          <Button size="sm" variant="outline" className="dq-scene-btn" startIcon={<Skull size={14} />} onClick={(e) => { e.stopPropagation(); onBin(); }}
-            aria-label={t('dunningQueue.binTip', { n: c.bin.length, amount: baht(c.bin.reduce((a, p) => a + p.overdue_amount, 0)) })}>
-            {c.bin.length}
-          </Button>
-        </div>
-      )}
       {more.map((m, i) => (
         <div key={i} className="dq-more" style={{ ...screen(m.x, 0, m.z) }}>
           <Button size="sm" variant="outline" className="dq-scene-btn" onClick={(e) => { e.stopPropagation(); onMore(m.lane); }}>+{m.n}</Button>

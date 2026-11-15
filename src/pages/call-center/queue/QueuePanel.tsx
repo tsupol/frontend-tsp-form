@@ -30,8 +30,45 @@ import { fetchMdmStory } from '../../inventory/mdm/mdmApi';
 import { MdmStoryBox } from '../../inventory/mdm/MdmStoryBox';
 import { MdmReliefPanel } from '../../inventory/mdm/MdmReliefPanel';
 import { LANES, baht, contactLong, type QueueBranch, type QueuePerson } from './queueApi';
+import { REPO_LOOK } from './repoLook';
 
 const EVENTS = ['CALL', 'TOLD_REFERENCE', 'FIELD_VISIT', 'NOTE'] as const;
+
+/** Where the customer stands with the repo team (mig 1681). A return shows who sent it back,
+ *  when, and the repo team's reason in full — the collector has to read all of it. */
+function RepoBox({ p }: { p: QueuePerson }) {
+  const { t } = useTranslation();
+  if (p.repo_state === 'NONE') return null;
+  const { Icon } = REPO_LOOK[p.repo_state];
+  const tone = p.repo_state === 'WITH_REPO' ? 'alert-warning' : p.repo_state === 'RETURNED' ? 'alert-info' : 'alert-danger';
+  return (
+    <div className={`alert ${tone}`} data-testid="dq-repo-box" data-state={p.repo_state}>
+      <Icon size={16} />
+      <div>
+        <div className="alert-title">{t(`dunningQueue.repoState.${p.repo_state}`)}</div>
+        {p.repo_state === 'RETURNED' && (
+          <>
+            <div className="alert-description">
+              {t('dunningQueue.repoReturnedAt')} <DateTime value={p.repo_returned_at} />
+              {p.repo_returned_by && <> · {t('dunningQueue.repoReturnedBy', { name: p.repo_returned_by })}</>}
+            </div>
+            {p.repo_return_reason && <div className="alert-description whitespace-pre-wrap break-words">{p.repo_return_reason}</div>}
+          </>
+        )}
+        {p.repo_state === 'WITH_REPO' && (
+          <div className="alert-description">
+            {t('dunningQueue.repoSince')} <DateTime value={p.repo_since} />
+            {' · '}{p.repo_picked ? t('dunningQueue.repoPicked') : t('dunningQueue.repoNotPicked')}
+            {' · '}{t('dunningQueue.repoAttempts', { n: p.repo_attempt_count })}
+          </div>
+        )}
+        {p.repo_state === 'WITH_LEGAL' && (
+          <div className="alert-description">{t('dunningQueue.repoSince')} <DateTime value={p.repo_since} /></div>
+        )}
+      </div>
+    </div>
+  );
+}
 type EventCode = typeof EVENTS[number];
 
 // ── Quick log: event chip → result chip → note → save ───────────────────────
@@ -201,6 +238,12 @@ export function QueuePanel({
     });
   };
 
+  /** A number pressed: log it as the event, then hand the number to the phone. */
+  const dial = (tel: string, event: EventCode) => {
+    dialed(event);
+    window.location.href = `tel:${tel.replace(/\D/g, '')}`;
+  };
+
   const toggleFocus = async () => {
     setFocusBusy(true);
     try {
@@ -227,6 +270,9 @@ export function QueuePanel({
           <span>{paidAmount != null ? t('dunningQueue.leftPaid', { amount: baht(paidAmount) }) : t('dunningQueue.left')}</span>
         </div>
       )}
+
+      {/* With the repo team / sent back / with legal — first thing the collector reads (mig 1681). */}
+      {p.repo_state !== 'NONE' && <RepoBox p={p} />}
 
       {/* Who and where they stand — a few short lines, straight from the queue row. */}
       <div className="flex flex-col gap-1 text-sm">
@@ -269,12 +315,12 @@ export function QueuePanel({
         )}
       </div>
 
-      {/* The four things done most. A number is a tel: link (it dials), dressed as the library's button. */}
+      {/* The four things done most. A number is the library's Button: press = log the call and dial. */}
       <div className="flex items-center gap-1.5 flex-wrap">
         {tels[0] ? (
-          <a href={`tel:${tels[0].replace(/\D/g, '')}`} onClick={() => dialed('CALL')} className="btn btn-sm btn-success inline-flex items-center gap-1.5 no-underline">
-            <Phone size={14} />{formatTel(tels[0])}
-          </a>
+          <Button size="sm" color="success" startIcon={<Phone size={14} />} onClick={() => dial(tels[0], 'CALL')}>
+            {formatTel(tels[0])}
+          </Button>
         ) : null}
         <Button size="sm" variant="outline" startIcon={<MessageSquare size={14} />} onClick={() => openChat(p.id)}>
           {t('callCenter.chatCustomer')}
@@ -307,16 +353,14 @@ export function QueuePanel({
       {(tels.length > 1 || (contacts?.references?.length ?? 0) > 0) && (
         <div className="flex flex-col gap-1">
           {tels.slice(1).map(tel => (
-            <a key={tel} href={`tel:${tel.replace(/\D/g, '')}`} onClick={() => dialed('CALL')} className="btn btn-sm btn-outline-default w-full justify-between no-underline">
-              <span className="text-subtle">{t('callCenter.customerTel2')}</span>
-              <span className="inline-flex items-center gap-1 text-primary-fg"><Phone size={13} />{formatTel(tel)}</span>
-            </a>
+            <Button key={tel} size="sm" variant="outline" startIcon={<Phone size={14} />} onClick={() => dial(tel, 'CALL')} className="self-start">
+              {formatTel(tel)} <span className="text-subtle">· {t('callCenter.customerTel2')}</span>
+            </Button>
           ))}
           {contacts?.references?.filter(r => r.tel).map(r => (
-            <a key={r.reference_id} href={`tel:${r.tel!.replace(/\D/g, '')}`} onClick={() => dialed('TOLD_REFERENCE')} className="btn btn-sm btn-outline-default w-full justify-between no-underline">
-              <span className="truncate">{r.name || '—'}{r.relation ? <span className="text-subtle"> · {r.relation}</span> : null}</span>
-              <span className="inline-flex items-center gap-1 text-primary-fg shrink-0"><Phone size={13} />{formatTel(r.tel!)}</span>
-            </a>
+            <Button key={r.reference_id} size="sm" variant="outline" startIcon={<Phone size={14} />} onClick={() => dial(r.tel!, 'TOLD_REFERENCE')} className="self-start" truncate>
+              {formatTel(r.tel!)} <span className="text-subtle">· {r.name || '—'}{r.relation ? ` · ${r.relation}` : ''}</span>
+            </Button>
           ))}
         </div>
       )}

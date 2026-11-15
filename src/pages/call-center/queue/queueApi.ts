@@ -6,8 +6,12 @@ import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { apiClient } from '../../../lib/api';
 
 export type QueueLane =
-  | 'QUEUE_1' | 'QUEUE_2' | 'QUEUE_3' | 'QUEUE_4' | 'QUEUE_5'
-  | 'PROMISED' | 'PROMISED_TODAY' | 'BROKEN' | 'LONG';
+  | 'REPO_RETURNED'
+  | 'QUEUE_1' | 'QUEUE_2' | 'QUEUE_3' | 'QUEUE_4' | 'QUEUE_5' | 'QUEUE_6'
+  | 'PROMISED' | 'PROMISED_TODAY' | 'BROKEN';
+
+/** Where the contract stands with the repo team (mig 1681). NONE = no badge. */
+export type RepoState = 'NONE' | 'WITH_REPO' | 'WITH_LEGAL' | 'RETURNED';
 
 export interface QueuePerson {
   id: number;
@@ -17,9 +21,9 @@ export interface QueuePerson {
   /** 0 = waiting to be handed out (no collector yet). */
   collector_id: number;
   collector_name: string;
-  /** From the RPC's `lane_v2` (mig 1660) — see useDunningQueue. */
+  /** From the RPC's `lane_v3` (mig 1681) — see useDunningQueue. */
   lane: QueueLane;
-  /** 1 = head of the line. From the RPC's `pos_v2`. */
+  /** 1 = head of the line. From the RPC's `pos_v3`. */
   pos: number;
   /** Hours since last contact · null = never contacted. */
   contact_hours: number | null;
@@ -53,6 +57,17 @@ export interface QueuePerson {
   serial: string | null;
   /** 24-hour relief still running, until when (mig 1658). null = none. Marker only — never moves the line. */
   relief_until: string | null;
+  repo_state: RepoState;
+  /** Entered the repo / legal queue (WITH_REPO · WITH_LEGAL). */
+  repo_since: string | null;
+  repo_picked: boolean;
+  repo_attempt_count: number;
+  /** Set when RETURNED: when, by whom (display name) and the repo team's full reason. */
+  repo_returned_at: string | null;
+  repo_returned_by: string | null;
+  repo_return_reason: string | null;
+  /** Nobody has contacted them since the return (= lane REPO_RETURNED). */
+  repo_return_untouched: boolean;
 }
 
 export interface QueueBranch {
@@ -76,16 +91,22 @@ export interface QueueData {
 
 /** Promise lanes wear a solid sign with a calendar icon so they read apart from the day lanes
  *  at a glance (owner 11-12): ✓ = promised · filled day = promised today · ✕ = broken. */
-export type LaneMark = 'promise' | 'today' | 'broken';
+export type LaneMark = 'promise' | 'today' | 'broken' | 'returned';
 
-/** Lanes left → right in front of the counter. LONG is not a lane: it is the bin.
- *  Order "นัด , นัดวันนี้ , ผิดนัด" is the owner's (IMPLEMENT 2026-11-12 dunning_queue_promise_today). */
-export const LANES: { lane: Exclude<QueueLane, 'LONG'>; tone: string; floor: string; mark?: LaneMark }[] = [
+/** Lanes left → right in front of the counter. "ทีมยึดส่งกลับ" stands first, work to pick up
+ *  before the rest (IMPLEMENT 2026-11-15 dunning_queue_lanes_v3); 42+ days is a lane like the
+ *  others since the bin went away. Order "นัด , นัดวันนี้ , ผิดนัด" is the owner's
+ *  (IMPLEMENT 2026-11-12 dunning_queue_promise_today). */
+export const LANES: { lane: QueueLane; tone: string; floor: string; mark?: LaneMark }[] = [
+  // Its own colour — not a day lane's brown, not a promise colour, not the relief purple.
+  { lane: 'REPO_RETURNED', tone: '#be185d', floor: '#f8d7e7', mark: 'returned' },
   { lane: 'QUEUE_1', tone: '#9a7a0c', floor: '#f6efcf' },
   { lane: 'QUEUE_2', tone: '#a86016', floor: '#f6e4cc' },
   { lane: 'QUEUE_3', tone: '#a5481a', floor: '#f4d9c8' },
   { lane: 'QUEUE_4', tone: '#962f22', floor: '#f0cfc6' },
   { lane: 'QUEUE_5', tone: '#7a2424', floor: '#ebc6c0' },
+  // Heavier than 28–41 days: the darkest of the day lanes.
+  { lane: 'QUEUE_6', tone: '#4c1212', floor: '#dfb2ab' },
   { lane: 'PROMISED', tone: '#0f8f7a', floor: '#cfeae3', mark: 'promise' },
   // Its own colour — not the promise green, not the relief purple (#7c3aed).
   { lane: 'PROMISED_TODAY', tone: '#1d4ed8', floor: '#d6e2fb', mark: 'today' },
@@ -95,9 +116,9 @@ export const LANES: { lane: Exclude<QueueLane, 'LONG'>; tone: string; floor: str
 /** Lanes of people holding a promise — never drawn faded for a recent contact. */
 export const isPromiseLane = (l: QueueLane) => l === 'PROMISED' || l === 'PROMISED_TODAY';
 
-/** The RPC row: `lane`/`pos` are the old split (today + later promises together) and go away
- *  once we report done; `lane_v2`/`pos_v2` (mig 1660) carry PROMISED_TODAY. */
-type QueuePersonRow = Omit<QueuePerson, 'lane' | 'pos'> & { lane_v2: QueueLane; pos_v2: number };
+/** The RPC row: `lane`/`pos` and `lane_v2`/`pos_v2` are the older splits (with the LONG bin)
+ *  kept for old screens; `lane_v3`/`pos_v3` (mig 1681) are the ones drawn. */
+type QueuePersonRow = Omit<QueuePerson, 'lane' | 'pos'> & { lane_v3: QueueLane; pos_v3: number };
 
 export const queueKey = (branchId: number | null) => ['cc', 'book', 'queue', branchId] as const;
 
@@ -105,11 +126,11 @@ export const queueKey = (branchId: number | null) => ['cc', 'book', 'queue', bra
 export function useDunningQueue(branchId: number | null) {
   return useQuery({
     queryKey: queueKey(branchId),
-    // The one place the RPC's lane fields are read: lane/place come from lane_v2/pos_v2 as sent.
+    // The one place the RPC's lane fields are read: lane/place come from lane_v3/pos_v3 as sent.
     queryFn: async (): Promise<QueueData> => {
       const d = await apiClient.rpc<Omit<QueueData, 'people'> & { people: QueuePersonRow[] }>(
         'fn_dunning_queue_live', branchId ? { p_branch_id: branchId } : {});
-      return { ...d, people: d.people.map(({ lane_v2, pos_v2, ...p }) => ({ ...p, lane: lane_v2, pos: pos_v2 })) };
+      return { ...d, people: d.people.map(({ lane_v3, pos_v3, ...p }) => ({ ...p, lane: lane_v3, pos: pos_v3 })) };
     },
     placeholderData: keepPreviousData,
     refetchInterval: (q) => ((q.state.data as QueueData | undefined)?.refresh_sec ?? 15) * 1000,
