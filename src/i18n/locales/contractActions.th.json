@@ -23,6 +23,8 @@
   "TRANSFER_CANCEL": "ยกเลิกการโอน",
   "RESCHEDULE_DUE_DAY": "เลื่อนวันครบกำหนดชำระ",
   "AMEND_SIGNED_TERMS": "แก้ค่างวด / จำนวนงวด",
+  "AMEND_SIGNED_TERMS_WITH_DOWN": "แก้ค่างวด / งวด / เงินดาวน์",
+  "ADJUST_DOWN_PAYMENT": "เพิ่มเงินดาวน์",
   "UPDATE_DELIVERY": "อัปเดตการจัดส่ง",
   "APPOINTMENT_CREATE": "สร้างนัดหมาย",
   "APPOINTMENT_CANCEL": "ยกเลิกนัดหมาย",

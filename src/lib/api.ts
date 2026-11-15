@@ -22,6 +22,9 @@ export class ApiError extends Error {
    *  `active_key_exists_rotation_reserved`). Never translated by code; read
    *  the specific key you care about. */
   public ctx?: Record<string, unknown>;
+  /** Backend's `error.trace_id` — shown with the code when a screen has no
+   *  translation for it, so the user can quote it to the DB team. */
+  public traceId?: string;
 
   constructor(opts: {
     code: string;
@@ -32,8 +35,10 @@ export class ApiError extends Error {
     httpStatus?: number;
     fieldErrors?: FieldError[] | null;
     ctx?: Record<string, unknown>;
+    traceId?: string;
   }) {
     super(opts.message);
+    this.traceId = opts.traceId;
     this.name = 'ApiError';
     this.code = opts.code;
     this.messageKey = opts.messageKey;
@@ -222,6 +227,7 @@ function makeV2ApiError(err: V2Error['error'], httpStatus?: number): ApiError {
     httpStatus: status,
     fieldErrors: err.field_errors ?? null,
     ctx: err.ctx,
+    traceId: err.trace_id,
   });
 }
 

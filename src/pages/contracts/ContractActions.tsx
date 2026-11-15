@@ -64,6 +64,7 @@ import { SavingRowNote, SavingUnusedWarning, SavingUnusedConfirmDialog } from '.
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { useContractPartnerCases } from '../partner-cases/usePartnerCases';
 import { ShopCollectDownModal } from './ShopCollectDownModal';
+import { useMyPermissions } from '../../hooks/useMyPermissions';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -618,9 +619,14 @@ const FE_TO_BACKEND_ACTION: Record<ContractAction, string> = {
   expire_draft: 'EXPIRE_DRAFT',
 };
 
-const BACKEND_TO_FE_ACTION: Record<string, ContractAction> = Object.entries(FE_TO_BACKEND_ACTION)
-  .filter(([, b]) => b)
-  .reduce((acc, [fe, be]) => ({ ...acc, [be]: fe as ContractAction }), {});
+const BACKEND_TO_FE_ACTION: Record<string, ContractAction> = {
+  ...Object.entries(FE_TO_BACKEND_ACTION)
+    .filter(([, b]) => b)
+    .reduce((acc, [fe, be]) => ({ ...acc, [be]: fe as ContractAction }), {}),
+  // mig 1673: the down payment is a field of the same amend window (owner: "ใช้ปุ่มเดิม +
+  // ช่องเงินดาวน์"). A shop manager holds only this action, so it opens that window too.
+  ADJUST_DOWN_PAYMENT: 'amend_signed_terms',
+};
 
 const CATEGORY_ORDER: string[] = [
   'PAYMENT', 'FEE', 'BILLING', 'WALLET',
@@ -637,7 +643,7 @@ const FOOTER_ACTION_ALLOWLIST: ReadonlySet<string> = new Set([
   'COMPLETE_CONTRACT', 'TERMINATE_CONTRACT', 'VOID_CONTRACT',
   'EXPIRE_DRAFT',
   'TRANSFER_BRANCH', 'TRANSFER_ACCEPT', 'TRANSFER_CANCEL',
-  'RESCHEDULE_DUE_DAY', 'AMEND_SIGNED_TERMS',
+  'RESCHEDULE_DUE_DAY', 'AMEND_SIGNED_TERMS', 'ADJUST_DOWN_PAYMENT',
   'APPOINTMENT_CREATE', 'APPOINTMENT_CANCEL',
   'HOLDING_REFUND',
   'UPDATE_DELIVERY', 'ADD_NOTE',
@@ -841,6 +847,7 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
+  const { hasPermission } = useMyPermissions();
   const { openChat } = useChatDock();
   const { isDealPartner } = useAuth();
   const [activeAction, setActiveAction] = useState<ContractAction | null>(null);
@@ -974,8 +981,14 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   // response for this specific action, never hard-code it.
   const reschedulePinRequired = (actionsResp?.actions ?? [])
     .find(a => a.action_code === 'RESCHEDULE_DUE_DAY')?.pin_required ?? true;
-  const amendPinRequired = (actionsResp?.actions ?? [])
-    .find(a => a.action_code === 'AMEND_SIGNED_TERMS')?.pin_required ?? true;
+  const amendAction = (actionsResp?.actions ?? []).find(a => a.action_code === 'AMEND_SIGNED_TERMS');
+  const amendPinRequired = amendAction?.pin_required ?? true;
+  // The amend window's two halves (mig 1673): each opens on its own action, never on role.
+  const downAction = (actionsResp?.actions ?? []).find(a => a.action_code === 'ADJUST_DOWN_PAYMENT');
+  const amendTermsEditable = !!amendAction && amendAction.is_permitted !== false && amendAction.is_available;
+  const downEditable = !!downAction && downAction.is_permitted !== false && downAction.is_available;
+  // One entry button: when the user holds both, the down payment rides on the amend button.
+  const downMerged = !!amendAction && amendAction.is_permitted !== false;
 
   const handleSuccess = (msgKey: string, override?: ReactNode) => {
     setActiveAction(null);
@@ -1029,6 +1042,9 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
     .filter(a => FOOTER_ACTION_ALLOWLIST.has(a.action_code))
     .filter(a => a.blocking_reason !== 'permission_denied')
     .filter(a => a.is_permitted !== false)
+    // mig 1673: one button for the amend window — the down payment action shows on its own
+    // only for someone who cannot amend the instalments (a shop manager).
+    .filter(a => !(a.action_code === 'ADJUST_DOWN_PAYMENT' && downMerged))
     // Buttons this document replaced: showing a dead "cancel contract" beside
     // "return the device" only asks the user to try the wrong one first. The
     // reason still reaches them — it is the sentence on the return button.
@@ -1075,7 +1091,10 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
   const renderActionButton = (a: BackendContractAction, primary = false) => {
     const feAction = BACKEND_TO_FE_ACTION[a.action_code];
     const config = feAction ? ACTION_CONFIGS[feAction] : null;
-    const baseLabel = t(a.action_code, { ns: 'contractActions', defaultValue: a.action_code });
+    // The amend button also opens the down payment field when the user may change it.
+    const baseLabel = a.action_code === 'AMEND_SIGNED_TERMS' && downAction && downAction.is_permitted !== false
+      ? t('AMEND_SIGNED_TERMS_WITH_DOWN', { ns: 'contractActions' })
+      : t(a.action_code, { ns: 'contractActions', defaultValue: a.action_code });
     // The late-fee button says how much is waiting to be billed (the contract's own figure).
     const label = a.action_code === 'LATE_FEE_COLLECT' && (contract.late_fee_balance ?? 0) > 0
       ? `${baseLabel} (${fmtCurrency(contract.late_fee_balance ?? 0)})`
@@ -1474,6 +1493,10 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
         open={isAmendTerms}
         contract={contract}
         pinRequired={amendPinRequired}
+        termsEditable={amendTermsEditable}
+        downEditable={downEditable}
+        downPinRequired={downAction?.pin_required ?? true}
+        canReduceHint={hasPermission('CONTRACT.DOWN_PAYMENT_REDUCE')}
         onClose={() => setActiveAction(null)}
         onSuccess={() => {
           onRefresh();

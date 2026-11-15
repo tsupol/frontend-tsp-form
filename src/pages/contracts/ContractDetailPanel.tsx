@@ -59,6 +59,8 @@ import { BankAccountInline } from '../../components/BankAccountLine';
 // ── Types ────────────────────────────────────────────────────────────────────
 
 import { ContractDevicePriceBlock, type ContractDevicePriceFields } from './ContractDevicePrice';
+import { DownPaymentHistoryButton } from './DownPaymentHistory';
+import { useMyPermissions } from '../../hooks/useMyPermissions';
 
 /** One blacklisted party on the contract, from v_contract_detail.blacklist_hits.
  *  A blacklisted party blocks opening NEW contracts (the checklist surfaces
@@ -326,6 +328,7 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
     | 'resume'
     | 'terminate'
     | 'void'
+    | 'amend_signed_terms'
     | null
   >(null);
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
@@ -539,6 +542,7 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
             onRequestBindDevice={() => setRequestedAction('bind_device')}
             onNavigateSigning={() => handleTabChange('signing')}
             onRequestManageAction={setRequestedAction}
+            onRequestAmendTerms={() => setRequestedAction('amend_signed_terms')}
             deliveryModalOpen={deliveryModalOpen}
             setDeliveryModalOpen={setDeliveryModalOpen}
           />
@@ -903,17 +907,34 @@ function ManageContractSection({
 
 // ── Overview Tab ─────────────────────────────────────────────────────────────
 
-function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigateSigning, onRequestManageAction, deliveryModalOpen, setDeliveryModalOpen }: {
+function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigateSigning, onRequestManageAction, onRequestAmendTerms, deliveryModalOpen, setDeliveryModalOpen }: {
   contract: ContractDetail;
   t: ReturnType<typeof useTranslation>['t'];
   queryClient: ReturnType<typeof useQueryClient>;
   onRequestBindDevice: () => void;
   onNavigateSigning: () => void;
   onRequestManageAction: (action: ManageAction) => void;
+  /** Opens the footer's amend window (instalments + down payment, mig 1673). */
+  onRequestAmendTerms: () => void;
   deliveryModalOpen: boolean;
   setDeliveryModalOpen: (open: boolean) => void;
 }) {
   const { user, isDealPartner } = useAuth();
+  const { hasPermission } = useMyPermissions();
+  // The amend window beside the figures it changes (owner 11-15: not only under "เพิ่มเติม").
+  // Same capability rows as the footer; shown only when one of its two actions can run now —
+  // when neither can, the footer's button still says why.
+  const capRows = useContractActionRows(contract.id);
+  const canRun = (r: ManageActionRow | undefined) => !!r && r.is_permitted !== false && r.is_available;
+  const amendTermsOpen = canRun(capRows.get('AMEND_SIGNED_TERMS'));
+  const adjustDownOpen = canRun(capRows.get('ADJUST_DOWN_PAYMENT'));
+  const amendLabel = amendTermsOpen
+    ? t(adjustDownOpen ? 'AMEND_SIGNED_TERMS_WITH_DOWN' : 'AMEND_SIGNED_TERMS', { ns: 'contractActions' })
+    : t('ADJUST_DOWN_PAYMENT', { ns: 'contractActions' });
+  // In the down payment history box: "ปรับ" for whoever may also lower it, "เพิ่ม" otherwise.
+  const adjustDownLabel = hasPermission('CONTRACT.DOWN_PAYMENT_REDUCE')
+    ? t('downHistory.adjust')
+    : t('ADJUST_DOWN_PAYMENT', { ns: 'contractActions' });
   const isFin2 = contract.commercial_model === 'FIN2';
   const isActive = contract.state === 'ACTIVE' || contract.state === 'COMPLETED' || contract.state === 'TERMINATED';
   // Device can be bound before activation too — fn_contract_bind_device only
@@ -1225,7 +1246,15 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
 
       {/* Financial summary */}
       <div className="border border-line rounded-md px-4 py-3">
-        <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider mb-3">{t('contract.financials')}</h3>
+        <div className="flex items-center justify-between gap-2 mb-3 min-h-[1.25rem]">
+          <h3 className="text-xs font-semibold text-subtle uppercase tracking-wider">{t('contract.financials')}</h3>
+          {(amendTermsOpen || adjustDownOpen) && (
+            <Button size="sm" variant="outline" startIcon={<Pencil size={14} />} className="-my-1.5"
+              onClick={onRequestAmendTerms} data-testid="financials-amend">
+              {amendLabel}
+            </Button>
+          )}
+        </div>
         <div className="grid grid-cols-2 gap-3">
           {/* Total to collect = down + (installment × months), from the agreed rate
               snapshot. The view precomputes it as agreed_total_financed; this — not
@@ -1246,7 +1275,10 @@ function OverviewTab({ contract, t, queryClient, onRequestBindDevice, onNavigate
               drift (e.g. snapshot_down_amount=0, snapshot_installment≠agreed) and
               show wrong numbers. Per BE (Ohm, 2026-07-06): installment_amount /
               value_month / down_payment are the source of truth here. */}
-          <InfoCell label={t('contract.downPayment')} value={<span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">{fmtCurrency(contract.down_payment)}<DownPctBadge value={contract.down_pct} size="lg" /></span>} />
+          {/* The figure opens where the down payment came from (opening bill, top-ups,
+              refunds — UI 166 §4); the figure itself stays the contract's down_payment. */}
+          <InfoCell label={t('contract.downPayment')} value={<span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1"><DownPaymentHistoryButton contractId={contract.id}
+            onAdjust={adjustDownOpen ? onRequestAmendTerms : undefined} adjustLabel={adjustDownLabel}>{fmtCurrency(contract.down_payment)}</DownPaymentHistoryButton><DownPctBadge value={contract.down_pct} size="lg" /></span>} />
           {/* A non-uniform plan (FIN1, flat interest) must never be shown as
               "X × n" — the final installment is lighter and the customer will
               be told the wrong number. mig 1179 exposes the split. */}

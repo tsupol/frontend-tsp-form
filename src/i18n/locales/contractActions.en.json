@@ -23,6 +23,8 @@
   "TRANSFER_CANCEL": "Cancel transfer",
   "RESCHEDULE_DUE_DAY": "Reschedule due day",
   "AMEND_SIGNED_TERMS": "Correct instalment terms",
+  "AMEND_SIGNED_TERMS_WITH_DOWN": "Correct instalments / down payment",
+  "ADJUST_DOWN_PAYMENT": "Add to down payment",
   "UPDATE_DELIVERY": "Update delivery",
   "APPOINTMENT_CREATE": "Create appointment",
   "APPOINTMENT_CANCEL": "Cancel appointment",
