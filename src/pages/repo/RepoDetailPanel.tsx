@@ -25,7 +25,9 @@ import { beMediaRepoAuthorityPdf, beMediaRepoContractPdf, openPdfInNewTab } from
 import { RepoIcloudRevealModal, CopyRow } from './RepoIcloudRevealModal';
 import { RepoHandoverModal } from './RepoHandoverModal';
 import { RepoAlbum } from './RepoAlbum';
-import { RepoLocateSection } from './RepoLocateSection';
+import { FieldFindPanel } from '../../components/fieldFind/FieldFindPanel';
+import { DeviceLocationButton } from '../../components/deviceLocation/DeviceLocationDialog';
+import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { DetailLine, DetailSection } from '../../components/DetailLine';
 import { DeviceSignalsPanel, useDeviceSignals } from '../../components/DeviceSignalsPanel';
 
@@ -113,6 +115,7 @@ export function RepoDetailPanel({ contractId, onChanged }: {
   });
   // MDM + NNF app facts, shown under whichever device the customer holds.
   const { data: signals } = useDeviceSignals(contractId);
+  const mayFieldFind = useMyPermissions().hasPermission('MDM.FIELD_FIND');
 
   const [logOpen, setLogOpen] = useState(false);
   const [giveUpOpen, setGiveUpOpen] = useState(false);
@@ -418,15 +421,13 @@ export function RepoDetailPanel({ contractId, onChanged }: {
               </div>
             )}
             {signals?.device_is_loaner && <DeviceSignalsPanel contractId={contractId} signals={signals} bare />}
-            {/* Lock + locate (DELIVERY 2026-10-01 §3), by the device it acts on */}
-            <div className="pt-2 mt-1 border-t border-line-subtle">
-              <RepoLocateSection
-                contractId={contractId}
-                contractCode={contractCode}
-                actions={actions}
-                inPool={inPool}
-                onFocus={onFocus}
-              />
+            {/* Field find (IMPLEMENT 2026-11-16 field_find_buttons_477) replaced the old
+                lock + locate pair (REPO_LOCATE_START/STOP, §3); the location window stays. */}
+            <div className="pt-2 mt-1 border-t border-line-subtle flex flex-col gap-2">
+              {mayFieldFind && signals?.mdm_enrolled !== false && <FieldFindPanel target={{ contractId }} />}
+              <div>
+                <DeviceLocationButton contractId={contractId} lastFixAt={signals?.mdm_last_location_at ?? null} />
+              </div>
             </div>
           </DetailSection>
         )}

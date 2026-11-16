@@ -41,6 +41,7 @@ type MdmSubTab = 'enroll' | 'status' | 'dunning' | 'wallpaper' | 'appControl' | 
 function visibleSubTabs(
   status: AssetMdmStatus | null,
   mayRelief: boolean,
+  mayFieldFind: boolean,
   danger: { reveal: boolean; deviceCommands: boolean },
 ): MdmSubTab[] {
   // Pause (§9) is DB-only and allowed even before enrollment (§12 exception).
@@ -63,7 +64,7 @@ function visibleSubTabs(
   if (status.may_dunning || mayRelief) tabs.push('dunning');
   if (status.may_wallpaper) tabs.push('wallpaper');
   if (status.may_app_control) tabs.push('appControl');
-  if (status.may_lost_mode || status.may_location) tabs.push('lostMode');
+  if (status.may_lost_mode || status.may_location || mayFieldFind) tabs.push('lostMode');
   if (status.may_pause) tabs.push('pause');
   if (danger.reveal || danger.deviceCommands) tabs.push('danger');
   return tabs;
@@ -91,7 +92,7 @@ export function AssetMdmTab({ assetId, onRefresh, onAddSerial }: {
         const k = q.queryKey;
         return Array.isArray(k) && typeof k[0] === 'string'
           && (k[0].startsWith('mdm-') || k[0].startsWith('branch-mdm')
-            || k[0] === 'asset-mdm-status' || k[0] === 'asset-mdm-story');
+            || k[0] === 'asset-mdm-status' || k[0] === 'asset-mdm-story' || k[0] === 'field-find');
       },
     });
   };
@@ -102,9 +103,10 @@ export function AssetMdmTab({ assetId, onRefresh, onAddSerial }: {
   const mayReveal = hasPermission('MDM.ACTIVATION_LOCK_REVEAL');
   const mayDeviceCommands = hasPermission('MDM.ERASE') || hasPermission('MDM.PROFILE_REMOVE');
   const mayRelief = hasPermission('MDM.RELIEF_24H');
+  const mayFieldFind = hasPermission('MDM.FIELD_FIND');
   const tabs = useMemo(
-    () => visibleSubTabs(status ?? null, mayRelief, { reveal: mayReveal, deviceCommands: mayDeviceCommands }),
-    [status, mayRelief, mayReveal, mayDeviceCommands],
+    () => visibleSubTabs(status ?? null, mayRelief, mayFieldFind, { reveal: mayReveal, deviceCommands: mayDeviceCommands }),
+    [status, mayRelief, mayFieldFind, mayReveal, mayDeviceCommands],
   );
 
   // Land on status when enrolled, enroll otherwise (§0). Kept in state so the
@@ -215,6 +217,7 @@ export function AssetMdmTab({ assetId, onRefresh, onAddSerial }: {
             status={status}
             canLostMode={status.may_lost_mode}
             canLocation={status.may_location}
+            canFieldFind={mayFieldFind}
             onAck={() => refetch()}
             onNotEnrolled={goToEnroll}
           />

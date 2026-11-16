@@ -1,7 +1,9 @@
 // ============================================================================
 // Sub-tab 6 — โหมดสูญหาย & ตำแหน่ง (131 §8). Three clusters:
-//   Lost Mode: enable (template one-click — recommended — OR free-type;
-//              message + phone both required when free-typing) / disable / sound
+//   Field find: the repo team's one-press lock + locate (+ sound) — FieldFindPanel
+//              (IMPLEMENT 2026-11-16 field_find_buttons_477), on MDM.FIELD_FIND
+//   Lost Mode: enable with the standard wording (free-typing removed by the same
+//              work order §3) / disable / sound
 //   Location:  request once (only meaningful while lost mode is ON). Looking at the
 //              fixes is the one location window (the button above the sub-tabs).
 //   Loop:      continuous location loop (§8.1) — start/stop, live status polled
@@ -9,7 +11,6 @@
 //              pending_intent_count
 //
 // Gotchas honoured:
-//   - message + phone required for free-type enable (§8).
 //   - request-location gated on is_mdm_lost_mode_enabled — Apple only reports
 //     location in Lost Mode (§8).
 //   - after an action, poll with backoff (3·5·8·13·20·30s, ~2min ceiling, §8.3)
@@ -22,7 +23,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Button, TextArea, Select } from 'tsp-form';
+import { Button, Select } from 'tsp-form';
 import { PhoneInput } from '../../../components/PhoneInput';
 import { formatTel } from '../../../lib/format';
 import {
@@ -33,7 +34,7 @@ import { DateTime } from '../../../components/DateTime';
 import { RelativeDateTime } from './RelativeDateTime';
 import { useAuth } from '../../../contexts/AuthContext';
 import {
-  enableLostMode, enableLostModeFromTemplate, disableLostMode, playLostModeSound,
+  enableLostModeFromTemplate, disableLostMode, playLostModeSound,
   requestLocation, signalLocationLoop, stopLocationLoop,
   fetchLostModeCompliance, fetchActiveLoop, fetchLastLocationAt, fetchLockMessageOptions,
   type AssetMdmStatus, type MdmActiveLoop,
@@ -41,6 +42,7 @@ import {
 import { useMdmCommand } from './useMdmCommand';
 import { MDM_NO_CACHE } from './useMdmStatus';
 import { MdmErrorAlert, CommandAckNote } from './MdmSharedBits';
+import { FieldFindPanel } from '../../../components/fieldFind/FieldFindPanel';
 import { LostModePreviewModal, type LostModeScreenContent } from '../../../components/lostMode/LostModePreviewModal';
 
 const LOOP_WINDOW_SEC = 3600; // 60 min, matching ops (§8.4).
@@ -49,12 +51,15 @@ export function SubTabLostMode({
   status,
   canLostMode,
   canLocation,
+  canFieldFind,
   onAck,
   onNotEnrolled,
 }: {
   status: AssetMdmStatus;
   canLostMode: boolean;
   canLocation: boolean;
+  /** MDM.FIELD_FIND — the field-find buttons (a permission, no per-device flag). */
+  canFieldFind: boolean;
   onAck: (intentIds: number[]) => void;
   onNotEnrolled: () => void;
 }) {
@@ -63,9 +68,7 @@ export function SubTabLostMode({
   const actorId = user?.user_id ?? null;
   const cmd = useMdmCommand({ onAck, onNotEnrolled });
 
-  const [mode, setMode] = useState<'template' | 'custom'>('template');
   const [templateKey, setTemplateKey] = useState<string | null>(null);
-  const [message, setMessage] = useState('');
   const [phone, setPhone] = useState('');
 
   // Lost-mode signals — the ack-driven state machine flag, not the slow
@@ -100,25 +103,14 @@ export function SubTabLostMode({
   // What this device's lock screen would show (157 §1c): the wording and contract
   // number are the backend's, the phone is whichever one the press would send.
   const [previewOpen, setPreviewOpen] = useState(false);
-  const previewPhone = mode === 'template' ? (branchPhone || phone.trim()) : phone.trim();
+  const previewPhone = branchPhone || phone.trim();
   const previewContent: LostModeScreenContent = {
-    message: mode === 'template' ? (pickedTemplate?.message ?? '') : message.trim(),
+    message: pickedTemplate?.message ?? '',
     phone_number: previewPhone || null,
     phone_missing: !previewPhone,
     footnote: (pickedTemplate ?? templates[0])?.footnote ?? null,
     footnote_is_sample: false,
   };
-
-  // Typing your own: start from the standard wording and the branch's phone,
-  // once, without overwriting anything already typed.
-  const seeded = useRef(false);
-  useEffect(() => {
-    if (seeded.current || !msgOptions) return;
-    seeded.current = true;
-    const def = msgOptions.templates.find((tpl) => tpl.template_key === 'DEFAULT');
-    if (def) setMessage((m) => m || def.message);
-    if (msgOptions.phone_number) setPhone((p) => p || msgOptions.phone_number!.replace(/\D/g, ''));
-  }, [msgOptions]);
 
   // Active location loop (§8.1) — polled by next_poll_at (§8.2) + the same
   // 30s keep-fresh baseline (a loop another staffer starts/stops shows up too).
@@ -179,7 +171,6 @@ export function SubTabLostMode({
   // needed when neither the branch nor the company has one.
   const canEnableTemplate = !cmd.pending && actorId != null && !!templateKey
     && (!!branchPhone || phone.trim().length > 0);
-  const canEnableCustom = !cmd.pending && actorId != null && message.trim().length > 0 && phone.trim().length > 0;
 
   const loopActive = loop != null;
   // START is blocked while a loop intent is still queued (don't stack loops) or
@@ -194,6 +185,9 @@ export function SubTabLostMode({
     <div className="flex flex-col gap-4">
       <MdmErrorAlert error={cmd.error} onGoToEnroll={onNotEnrolled} />
       <CommandAckNote show={cmd.acked && !cmd.error} />
+
+      {/* ── Field find ── */}
+      {canFieldFind && <FieldFindPanel target={{ assetId: status.asset_id }} />}
 
       {/* ── Lost Mode ── */}
       {canLostMode && (
@@ -222,14 +216,8 @@ export function SubTabLostMode({
             <>
               <p className="text-xs text-subtle">{t('asset.mdm.lost.enableHint')}</p>
 
-              {/* Template vs custom. Template is the recommended primary (§8.4). */}
-              <div className="flex gap-2 text-xs">
-                <ModeTab active={mode === 'template'} onClick={() => setMode('template')} label={t('asset.mdm.lost.modeTemplate')} />
-                <ModeTab active={mode === 'custom'} onClick={() => setMode('custom')} label={t('asset.mdm.lost.modeCustom')} />
-              </div>
-
-              {mode === 'template' ? (
-                <>
+              {/* Standard wording only — typing your own was removed when the
+                  field-find buttons came in (IMPLEMENT 2026-11-16 field_find_buttons_477 §3). */}
                   <div className="flex flex-col">
                     <label className="form-label">{t('asset.mdm.lost.template')} *</label>
                     <Select
@@ -273,33 +261,6 @@ export function SubTabLostMode({
                       {t('lostMode.preview')}
                     </Button>
                   </div>
-                </>
-              ) : (
-                <>
-                  <div className="flex flex-col">
-                    <label className="form-label">{t('asset.mdm.lost.message')} *</label>
-                    <TextArea value={message} onChange={(e) => setMessage(e.target.value)} rows={2} className="w-full" placeholder={t('asset.mdm.lost.messagePlaceholder')} />
-                  </div>
-                  <div className="flex flex-col">
-                    <label className="form-label">{t('asset.mdm.lost.phone')} *</label>
-                    <PhoneInput value={phone} onChange={(raw) => setPhone(raw)} size="sm" className="w-full" placeholder={t('asset.mdm.lost.phonePlaceholder')} />
-                  </div>
-                  <div className="flex gap-2">
-                    <Button color="danger" size="sm" startIcon={<Bell size={15} />} disabled={!canEnableCustom}
-                      onClick={() => actorId != null && run(
-                        () => enableLostMode({
-                          p_asset_id: status.asset_id, p_actor_id: actorId, p_lock_message: message.trim(), p_phone_number: phone.trim(),
-                        }),
-                        () => lostBackoff.start(),
-                      )}>
-                      {t('asset.mdm.lost.enable')}
-                    </Button>
-                    <Button variant="outline" size="sm" startIcon={<Smartphone size={14} />} disabled={!message.trim()} onClick={() => setPreviewOpen(true)}>
-                      {t('lostMode.preview')}
-                    </Button>
-                  </div>
-                </>
-              )}
             </>
           ) : (
             <div className="flex gap-2">
@@ -392,20 +353,6 @@ export function SubTabLostMode({
 
       <LostModePreviewModal open={previewOpen} onClose={() => setPreviewOpen(false)} content={previewContent} />
     </div>
-  );
-}
-
-function ModeTab({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`px-2.5 py-1 rounded-md border cursor-pointer ${
-        active ? 'bg-primary-soft border-primary-border text-primary-fg font-medium' : 'bg-surface border-line text-subtle'
-      }`}
-    >
-      {label}
-    </button>
   );
 }
 

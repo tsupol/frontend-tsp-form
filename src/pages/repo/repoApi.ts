@@ -412,42 +412,6 @@ export function invalidateRepoQueries(queryClient: {
 }
 
 // ── Lock the device + follow its location (mig 1365) ───────────────────────
-// DELIVERY 2026-10-01 §3. One command sends Lost Mode and a 30-minute location
-// loop together — pressed separately, the customer sees the lock screen and
-// switches the phone off before a fix arrives. Safe to press again (a repeat
-// restarts the loop once it has ended). Progress is read from
-// v_contract_device_signals, never from these replies.
-
-export type RepoLostModeOutcome = 'SENT' | 'IN_FLIGHT' | 'ALREADY_ACTIVE' | 'NOT_ACTIVE' | string;
-export type RepoLoopOutcome = 'SENT' | 'IN_FLIGHT' | 'ALREADY_RUNNING' | string;
-
-export interface RepoLocateStartResult {
-  contract_id: number;
-  asset_id: number;
-  lost_mode: RepoLostModeOutcome;
-  lost_mode_intent_id: number | null;
-  loop: RepoLoopOutcome;
-  loop_intent_id: number | null;
-  loop_ends_at: string | null;
-}
-
-export interface RepoLocateStopResult {
-  contract_id: number;
-  asset_id: number;
-  lost_mode: RepoLostModeOutcome;
-}
-
-export function repoLocateStart(contractId: number, phone?: string | null): Promise<RepoLocateStartResult> {
-  return apiClient.rpc<RepoLocateStartResult>('ops_repo_locate_start', {
-    p_contract_id: contractId,
-    ...(phone ? { p_phone_number: phone } : {}),
-  });
-}
-
-export function repoLocateStop(contractId: number): Promise<RepoLocateStopResult> {
-  return apiClient.rpc<RepoLocateStopResult>('ops_repo_locate_stop', { p_contract_id: contractId });
-}
-
 // Why the job was sent here and when — typed by the collector when they sent it
 // (DELIVERY 2026-10-01 §2). The detail view doesn't carry it; the worklist row
 // does, and only while the job is in the pool.

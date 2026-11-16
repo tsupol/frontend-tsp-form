@@ -1494,5 +1494,12 @@
   "mdm.validation.silent_note_required": "ผล “พบความผิดปกติ” ต้องใส่คำอธิบาย",
   "OPS.STATE.NOT_IN_WAIT_FOR_REPO": "งานนี้ไม่ได้อยู่ในคิวรอยึดแล้ว",
   "OPS.VALIDATION.UNKNOWN_REPO_RESULT": "ผลการลงพื้นที่ไม่ถูกต้อง",
-  "OPS.VALIDATION.NOTE_REQUIRED": "กรุณาเขียนโน้ต"
+  "OPS.VALIDATION.NOTE_REQUIRED": "กรุณาเขียนโน้ต",
+  "MDM.STATE.FIELD_FIND_NOT_OVERDUE": "เครื่องนี้ค้าง {{overdue_days}} วัน ยังไม่ถึงเกณฑ์ ({{min_overdue_days}} วัน)",
+  "MDM.STATE.FIELD_FIND_NOT_SUPERVISED": "เครื่องนี้สั่งโหมดสูญหายไม่ได้",
+  "MDM.STATE.FIELD_FIND_NO_LOCK_TEXT": "ตั้งค่าข้อความ/เบอร์ของร้านก่อน",
+  "MDM.NOT_FOUND.FIELD_FIND_NO_OPEN_JOB": "ไม่มีงานตามหาที่เปิดอยู่",
+  "MDM.VALIDATION.FIELD_FIND_MODE": "รูปแบบการตามหาไม่ถูกต้อง",
+  "MDM.STATE.FIELD_FIND_DISABLED": "ฟังก์ชันตามหาถูกปิดอยู่",
+  "MDM.NOT_FOUND.FIELD_FIND_TARGET": "ไม่พบสัญญาหรือเครื่องที่จะตามหา"
 }

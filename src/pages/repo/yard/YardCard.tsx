@@ -1,8 +1,8 @@
 // The card of one job in the repo yard: everything the repo team needs to decide on it
 // (UI_SUMMARY 168 §3) from the yard row itself, then the actions fn_repo_available_actions
 // allows. The common ones run here (pick up / put down, log a visit, note, send back to the
-// collectors, give up to legal); the rest (location, prints, handover) live on the job's
-// detail page, one link away.
+// collectors, give up to legal) plus the field-find buttons; the rest (location window,
+// prints, handover) live on the job's detail page, one link away.
 
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -21,6 +21,8 @@ import { RepoGiveUpModal } from '../RepoGiveUpModal';
 import { RepoNoteActionModal, type NoteActionConfig } from '../RepoNoteActionModal';
 import { NOTE_ACTIONS, RETURN_TO_COLLECTOR } from '../repoNoteActions';
 import type { YardJob } from './yardApi';
+import { FieldFindPanel } from '../../../components/fieldFind/FieldFindPanel';
+import { useMyPermissions } from '../../../hooks/useMyPermissions';
 
 export function YardCard({ job: j, gone }: { job: YardJob; gone: boolean }) {
   const { t } = useTranslation();
@@ -36,6 +38,7 @@ export function YardCard({ job: j, gone }: { job: YardJob; gone: boolean }) {
   const [giveUpOpen, setGiveUpOpen] = useState(false);
   const [noteAction, setNoteAction] = useState<NoteActionConfig | null>(null);
   const [busy, setBusy] = useState(false);
+  const mayFieldFind = useMyPermissions().hasPermission('MDM.FIELD_FIND');
 
   const refresh = () => invalidateRepoQueries(qc);
   const act = (code: RepoActionCode) => actions.find((a: RepoAction) => a.action_code === code && a.is_permitted) ?? null;
@@ -117,6 +120,9 @@ export function YardCard({ job: j, gone }: { job: YardJob; gone: boolean }) {
             : <span className="text-subtle">{t('repoYard.noFix')}</span>}
         </DetailLine>
       </DetailSection>
+
+      {/* Field find — make the device show itself at the door (IMPLEMENT 2026-11-16 field_find_buttons_477). */}
+      {!gone && mayFieldFind && j.has_mdm && <FieldFindPanel target={{ contractId: j.contract_id }} />}
 
       {/* Actions — only what fn_repo_available_actions permits; unavailable ones stay, greyed. */}
       {!gone && (

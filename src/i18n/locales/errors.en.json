@@ -1493,5 +1493,12 @@
   "mdm.validation.silent_note_required": "“Anomaly found” needs a description",
   "OPS.STATE.NOT_IN_WAIT_FOR_REPO": "This job is no longer waiting for repossession",
   "OPS.VALIDATION.UNKNOWN_REPO_RESULT": "Unknown visit result",
-  "OPS.VALIDATION.NOTE_REQUIRED": "Please write a note"
+  "OPS.VALIDATION.NOTE_REQUIRED": "Please write a note",
+  "MDM.STATE.FIELD_FIND_NOT_OVERDUE": "This device is {{overdue_days}} days overdue — not yet at the threshold ({{min_overdue_days}} days).",
+  "MDM.STATE.FIELD_FIND_NOT_SUPERVISED": "Lost Mode can't be sent to this device.",
+  "MDM.STATE.FIELD_FIND_NO_LOCK_TEXT": "Set up the shop's message / phone number first.",
+  "MDM.NOT_FOUND.FIELD_FIND_NO_OPEN_JOB": "No find job is running.",
+  "MDM.VALIDATION.FIELD_FIND_MODE": "Invalid find mode.",
+  "MDM.STATE.FIELD_FIND_DISABLED": "The find function is switched off.",
+  "MDM.NOT_FOUND.FIELD_FIND_TARGET": "No contract or device found to find."
 }

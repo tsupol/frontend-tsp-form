@@ -12174,5 +12174,26 @@
     "gone": "This job has left the repo queue",
     "empty": "No repo jobs",
     "loadFailed": "Could not load the repo yard"
+  },
+  "fieldFind": {
+    "title": "Find device",
+    "hint": "Locks the device, shows that it belongs to the shop and collects its location. Runs until you press Stop.",
+    "phone": "Phone number on the lock screen (optional)",
+    "phoneHint": "Leave blank to use the shop's number",
+    "startSilent": "Track without sound",
+    "startSound": "Track with sound",
+    "stop": "Stop",
+    "runningSilent": "Finding · no sound",
+    "runningSound": "Finding · with sound",
+    "state": {
+      "waiting": "Waiting for the device…",
+      "fast": "Finding — {{n}} min left",
+      "slow": "Location every 2 hours"
+    },
+    "lastFix": "Last location",
+    "accuracy": "±{{m}} m",
+    "noFix": "No location yet",
+    "openMap": "Open map",
+    "lockScreen": "The device's lock screen shows"
   }
 }
