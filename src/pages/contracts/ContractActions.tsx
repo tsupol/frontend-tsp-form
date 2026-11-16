@@ -43,6 +43,8 @@ import { RepairRequestModal } from './RepairRequestModal';
 import { AppointmentCreateModal, AppointmentCancelModal } from './AppointmentModals';
 import { TransferBranchModal } from './TransferBranchModal';
 import { ActionDoneView, type ActionDoneDetailRow } from './ActionDoneView';
+import { VoidStepsList } from './VoidSteps';
+import { voidStepsOf, type VoidStep } from './voidStepData';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { BillDayBlockedNotice } from '../../components/BillDayPreview';
 import { useBillDatePreview, useBillDayConfirm } from '../../hooks/useBillDay';
@@ -1685,7 +1687,7 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
   // (`pin_required`, mig 600) — a company admin voids without one, a branch
   // manager with one. Same query + cache as the footer. Until it answers, or
   // for an action it doesn't list, fall back to the action's own rule.
-  const { data: actionsResp } = useQuery({
+  const { data: actionsResp, refetch: refetchActions } = useQuery({
     queryKey: ['contract-actions', contract.id],
     queryFn: () => apiClient.rpc<ContractActionsResponse>('fn_contract_available_actions', {
       p_contract_id: contract.id,
@@ -1696,6 +1698,12 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
   const backendRow = action
     ? actionsResp?.actions.find(a => a.action_code === FE_TO_BACKEND_ACTION[action])
     : undefined;
+  // ยกเลิกในวัน: every step still to do before the void, in order (mig 1685). Known before
+  // the press from the capability; the refusal (VOID_STEPS_PENDING) carries the same list.
+  const [refusedSteps, setRefusedSteps] = useState<VoidStep[] | null>(null);
+  const voidSteps = action === 'void'
+    ? refusedSteps ?? (backendRow?.blocking_reason === 'void_steps_pending' ? voidStepsOf(backendRow.blocking_params) : null)
+    : null;
   const [pinForced, setPinForced] = useState(false);
   const pinNeeded = !!config?.needsPin && (pinForced || (backendRow?.pin_required ?? true));
 
@@ -1718,7 +1726,12 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
       setErrorParams(null);
       setErrorReasons([]);
       setResult(null);
+      setRefusedSteps(null);
+      // The step list must be today's, not the 30-second cache from before the
+      // user went off to unbind / cash out.
+      if (action === 'void') void refetchActions();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, action]);
 
   // Branches for transfer
@@ -1908,6 +1921,8 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
         const translated = translateApiError(err, t);
         setError(translated || err.message);
         setErrorCode(err.code ?? err.messageKey ?? null);
+        // The list goes in the window body (it is what to do next); the band says why.
+        if (err.code === 'SALE.STATE.VOID_STEPS_PENDING') setRefusedSteps(voidStepsOf(err.messageParams));
         setErrorParams(err.messageParams ?? null);
         setErrorReasons(bindDeniedReasons(err, t));
         // TEMP (BE notice pending, 2026-11-06): for a deal-partner manager the
@@ -1936,6 +1951,9 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
     if (config.needsNewOwner && !newOwnerId) return false;
     // Holding refund is a negotiated payout — the reason must be recorded.
     if (action === 'settlement_refund' && !note.trim()) return false;
+    // fn_contract_void(p_contract_id, p_reason, p_pin): p_reason has no default (left out =
+    // PGRST202 "function not found") and the cancel refuses a blank one ("ต้องระบุเหตุผล").
+    if (action === 'void' && !reason.trim()) return false;
     return true;
   })();
 
@@ -2028,6 +2046,17 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
             {/* What a void does — the first worry is the device (BE REQUEST
                 2026-11-06 ④). The device can't still be bound here: the backend
                 refuses the void until it's unbound. */}
+            {/* ยกเลิกในวัน: what is still to do first, in order, each with the way there. */}
+            {voidSteps && (
+              <div className="mb-4 rounded-md border border-warning-border bg-warning-soft px-3 py-2.5 flex flex-col gap-2" data-testid="void-steps-box">
+                <span className="text-sm font-semibold text-warning-fg">{t('contract.voidSteps.title', { n: voidSteps.length })}</span>
+                <VoidStepsList
+                  steps={voidSteps}
+                  onGo={onNavigateTab ? (to) => { onClose(); if (to.tab === 'device') onNavigateTab('device'); else onNavigateTab('money', to.section); } : undefined}
+                />
+              </div>
+            )}
+
             {action === 'void' && (
               <div className="alert alert-warning mb-4" data-testid="void-effects">
                 <AlertTriangle size={16} className="shrink-0" />
@@ -2035,6 +2064,7 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
                   <span className="font-medium">{t('contract.voidEffects.title')}</span>
                   <ul className="list-disc pl-4 text-sm">
                     <li>{t('contract.voidEffects.bill')}</li>
+                    <li>{t('contract.voidEffects.addedDown')}</li>
                     <li>{t('contract.voidEffects.signing')}</li>
                     <li>{t('contract.voidEffects.device')}</li>
                   </ul>
@@ -2151,7 +2181,7 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
 
               {config.needsReason && (
                 <div className="flex flex-col">
-                  <label className="form-label">{t('contract.reason')}</label>
+                  <label className="form-label">{t('contract.reason')}{action === 'void' ? ' *' : ''}</label>
                   <Input
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
@@ -2282,18 +2312,35 @@ function ContractActionDoneView({
     }
 
     case 'void': {
-      // fn_contract_void → fn_bill_cancel Case D response: emits a CREDIT_NOTE
-      // reversing the CONTRACT_OPEN bill. Keys: contract_state, reason,
-      // credit_note_code/id, total_amount (negative — the reversal amount).
+      // fn_contract_void → fn_bill_cancel Case D: a CREDIT_NOTE reversing the opening bill,
+      // plus (mig 1684) one per added-down-payment bill it reversed. `refund_total` is what
+      // goes back to the customer now — the backend's sum, never added up here (§2.5).
+      // `total_amount` is the opening bill's note only, and is short of that bill when
+      // insurance was cashed out first — on purpose.
       const creditNoteCode = result.credit_note_code ? String(result.credit_note_code) : null;
       const creditNoteId = result.credit_note_id != null ? Number(result.credit_note_id) : null;
       const reversedAmount = result.total_amount != null ? Number(result.total_amount) : null;
+      const refundTotal = result.refund_total != null ? Number(result.refund_total) : null;
+      const insuranceOut = result.insurance_cashed_out != null ? Number(result.insurance_cashed_out) : 0;
+      const downReversed = Array.isArray(result.down_add_reversed)
+        ? (result.down_add_reversed as { code?: string; credit_note_code?: string; total_amount?: number }[])
+        : [];
       const rows: ActionDoneDetailRow[] = [];
       if (creditNoteCode) {
-        rows.push({ label: t('contract.action_void_done_reversedBill'), value: creditNoteCode });
+        rows.push({
+          label: t('contract.action_void_done_reversedBill'),
+          value: refundTotal != null && reversedAmount != null ? `${creditNoteCode} · ${fmtCurrency(Math.abs(reversedAmount))}` : creditNoteCode,
+        });
       }
-      if (reversedAmount != null) {
+      downReversed.forEach(d => rows.push({
+        label: t('contract.action_void_done_downReversed', { code: d.code ?? '' }),
+        value: [d.credit_note_code, d.total_amount != null ? fmtCurrency(Math.abs(Number(d.total_amount))) : null].filter(Boolean).join(' · '),
+      }));
+      if (refundTotal == null && reversedAmount != null) {
         rows.push({ label: t('contract.action_void_done_reversedAmount'), value: fmtCurrency(Math.abs(reversedAmount)), emphasis: true });
+      }
+      if (insuranceOut > 0) {
+        rows.push({ label: t('contract.action_void_done_insuranceBefore'), value: fmtCurrency(insuranceOut) });
       }
       if (result.reason) {
         rows.push({ label: t('contract.action_void_done_closeReason'), value: String(result.reason) });
@@ -2310,6 +2357,12 @@ function ContractActionDoneView({
             toColor: 'danger',
           }}
           detailRows={rows}
+          extras={refundTotal != null ? (
+            <div className="rounded-md border border-danger-border bg-danger-soft px-3 py-2.5 flex items-baseline justify-between gap-3" data-testid="void-refund-total">
+              <span className="text-sm font-medium text-danger-fg">{t('contract.action_void_done_refundTotal')}</span>
+              <span className="text-2xl font-bold text-danger-fg tabular-nums">{fmtCurrency(refundTotal)}</span>
+            </div>
+          ) : undefined}
           billId={creditNoteId}
           onClose={onClose}
         />

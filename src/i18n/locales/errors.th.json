@@ -1501,5 +1501,13 @@
   "MDM.NOT_FOUND.FIELD_FIND_NO_OPEN_JOB": "ไม่มีงานตามหาที่เปิดอยู่",
   "MDM.VALIDATION.FIELD_FIND_MODE": "รูปแบบการตามหาไม่ถูกต้อง",
   "MDM.STATE.FIELD_FIND_DISABLED": "ฟังก์ชันตามหาถูกปิดอยู่",
-  "MDM.NOT_FOUND.FIELD_FIND_TARGET": "ไม่พบสัญญาหรือเครื่องที่จะตามหา"
+  "MDM.NOT_FOUND.FIELD_FIND_TARGET": "ไม่พบสัญญาหรือเครื่องที่จะตามหา",
+  "SALE.STATE.VOID_STEPS_PENDING": "ยังยกเลิกในวันไม่ได้ — ทำตามรายการในหน้าต่างนี้ก่อน",
+  "SALE.STATE.VOID_BLOCKED_WALLET_PAID": "บิลเปิดสัญญานี้จ่ายด้วยเงินออม ยกเลิกในวันเองไม่ได้ — แจ้งผู้ดูแลระบบ",
+  "SALE.STATE.VOID_BLOCKED_DOWN_REFUND": "สัญญานี้ลดดาวน์ไปแล้ว ยกเลิกในวันเองไม่ได้ — แจ้งผู้ดูแลระบบ",
+  "SALE.STATE.TERMINATE_USE_VOID_SAME_DAY": "สัญญานี้เปิดวันนี้ ให้ใช้ “ยกเลิกในวัน” แทน",
+  "blockingReason.void_steps_pending": "มีขั้นที่ต้องทำก่อน — กดเพื่อดูรายการ",
+  "blockingReason.void_blocked_wallet_paid": "บิลเปิดสัญญาจ่ายด้วยเงินออม ยกเลิกในวันเองไม่ได้",
+  "blockingReason.void_blocked_down_refund": "สัญญานี้ลดดาวน์ไปแล้ว ยกเลิกในวันเองไม่ได้",
+  "blockingReason.terminate_use_void_same_day": "สัญญาเปิดวันนี้ ใช้ “ยกเลิกในวัน” แทน"
 }

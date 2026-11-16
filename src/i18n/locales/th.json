@@ -3414,14 +3414,34 @@
     "action_unbind_loaner": "ถอดเครื่องสำรอง",
     "action_unbind_loaner_success": "ถอดเครื่องสำรองสำเร็จ",
     "action_unbind_undo": "ยกเลิกการถอดเครื่อง",
-    "action_void": "ยกเลิกสัญญาผิดพลาด",
+    "action_void": "ยกเลิกในวัน",
     "action_void_bill": "ยกเลิกบิล",
     "action_void_bill_success": "ยกเลิกบิลสำเร็จ — สัญญากลับเป็นร่าง",
-    "action_void_success": "ยกเลิกสัญญาแล้ว",
-    "action_void_done_headline": "ยกเลิกสัญญาแล้ว",
+    "action_void_success": "ยกเลิกในวันแล้ว",
+    "action_void_done_headline": "ยกเลิกในวันแล้ว",
     "action_void_done_reversedBill": "ใบลดหนี้",
     "action_void_done_reversedAmount": "ยอดที่คืน",
     "action_void_done_closeReason": "เหตุผล",
+    "action_unbind_device_done_headline": "ถอดเครื่องแล้ว",
+    "action_unbind_device_done_device": "เครื่องกลับเข้าคลัง",
+    "action_void_done_refundTotal": "คืนเงินลูกค้าตอนนี้",
+    "action_void_done_insuranceBefore": "เงินประกันที่คืนไปแล้วก่อนหน้า",
+    "action_void_done_downReversed": "ย้อนบิลดาวน์เพิ่ม {{code}}",
+    "terminateSameDayNote": "สัญญาเปิดวันนี้ จึงยังไม่มีปุ่ม “เลิกสัญญา” ถ้าจะยกเลิกให้ใช้ “ยกเลิกในวัน”",
+    "voidSteps": {
+      "title": "ต้องทำก่อนยกเลิกในวัน {{n}} ขั้น ทำตามลำดับ",
+      "DEVICE_STILL_BOUND": "ถอดเครื่องออกจากสัญญาก่อน",
+      "RELATED_BILLS": "ยกเลิกบิล {{codes}} ก่อน",
+      "INSURANCE_BALANCE": "ถอนเงินประกัน {{amount}} บาทคืนลูกค้าก่อน",
+      "CREDIT_BALANCE": "ถอนเงินเครดิต {{amount}} บาทคืนลูกค้าก่อน",
+      "SAVING_BALANCE": "ยังมีเงินออม {{amount}} บาทบนสัญญา",
+      "hint": {
+        "USE_UNBIND_DEVICE": "ไปแท็บเครื่อง → ถอดเครื่อง",
+        "CANCEL_BILLS_FIRST": "ไปแท็บเงิน → บิล",
+        "USE_WALLET_CASHOUT": "ไปแท็บเงิน → กระเป๋า → ถอน",
+        "ASK_SYSTEM_ADMIN": "แจ้งผู้ดูแลระบบ"
+      }
+    },
     "activatedAt": "เปิดใช้เมื่อ",
     "addCoLessee": "เพิ่มผู้เช่าร่วม",
     "added_co_lessee": "เพิ่ม {{customer}} เป็นผู้เช่าร่วมแล้ว",
@@ -3688,6 +3708,7 @@
     "voidEffects": {
       "title": "เมื่อยกเลิกแล้ว",
       "bill": "บิลเปิดสัญญาถูกยกเลิก ถ้ารับเงินแล้วจะออกใบลดหนี้ให้",
+      "addedDown": "บิลดาวน์เพิ่มของสัญญานี้ถูกย้อนให้ด้วย คืนเงินรวมในใบลดหนี้",
       "signing": "เอกสารเซ็นของสัญญานี้ถูกยกเลิกทั้งหมด",
       "device": "เครื่องที่เลือกไว้ยังอยู่ในสต็อก เลือกเข้าสัญญาใหม่ได้ทันที"
     },
@@ -3953,7 +3974,9 @@
       "USE_WALLET_CASHOUT": "ใช้ปุ่มถอนเงินกระเป๋า",
       "USE_WALLET_CASHOUT_SAVING": "ใช้ปุ่ม “ถอนเงินออม”",
       "USE_WALLET_CASHOUT_INSURANCE": "ใช้ปุ่ม “ถอนเงินประกัน”",
-      "USE_WALLET_CASHOUT_CREDIT": "ใช้ปุ่ม “ถอนเงินเครดิต”"
+      "USE_WALLET_CASHOUT_CREDIT": "ใช้ปุ่ม “ถอนเงินเครดิต”",
+      "ASK_SYSTEM_ADMIN": "แจ้งผู้ดูแลระบบ",
+      "USE_VOID_CONTRACT": "ใช้ปุ่ม “ยกเลิกในวัน”"
     },
     "matchReason": {
       "label": "ตรงที่",

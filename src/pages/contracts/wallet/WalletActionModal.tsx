@@ -205,13 +205,6 @@ export function WalletActionForm({
 
   return (
     <>
-      {error && (
-        <div key={errorKey} className="alert alert-danger mb-4 animate-pop-in">
-          <XCircle size={16} />
-          <span>{error}</span>
-        </div>
-      )}
-
       <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
         <div className="font-medium text-sm">{contractCode}</div>
         <div className="text-xs text-subtle">
@@ -359,6 +352,16 @@ export function WalletActionForm({
           <BranchPinInput value={pin} onChange={setPin} required />
         )}
       </div>
+
+      {/* The submit error sits right above the buttons. This form's buttons live inside the
+          scrolling body (it is also embedded in other windows), so an error at the top scrolled
+          out of sight on a tall form and pressing ถอน looked like nothing happened. */}
+      {error && (
+        <div key={errorKey} className="alert alert-danger mt-4 animate-pop-in">
+          <XCircle size={16} />
+          <span>{error}</span>
+        </div>
+      )}
 
       <div className="flex justify-between gap-2 mt-4">
         <Button variant="outline" onClick={onCancel}>

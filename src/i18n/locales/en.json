@@ -3418,7 +3418,7 @@
     "action_unbind_loaner": "Unbind Loaner",
     "action_unbind_loaner_success": "Loaner unbound",
     "action_unbind_undo": "Undo unbind",
-    "action_void": "Void mistaken contract",
+    "action_void": "Void (same day)",
     "action_void_bill": "Void Bill",
     "action_void_bill_success": "Bill voided — contract returned to draft",
     "action_void_success": "Contract voided",
@@ -3426,6 +3426,26 @@
     "action_void_done_reversedBill": "Credit note",
     "action_void_done_reversedAmount": "Amount reversed",
     "action_void_done_closeReason": "Reason",
+    "action_unbind_device_done_headline": "Device unbound",
+    "action_unbind_device_done_device": "Device returned to inventory",
+    "action_void_done_refundTotal": "Refund to the customer now",
+    "action_void_done_insuranceBefore": "Insurance already paid back",
+    "action_void_done_downReversed": "Added down payment {{code}} reversed",
+    "terminateSameDayNote": "The contract opened today, so there is no “Terminate” — use “Void (same day)” to cancel it",
+    "voidSteps": {
+      "title": "Do these {{n}} steps first, in order",
+      "DEVICE_STILL_BOUND": "Unbind the device from the contract",
+      "RELATED_BILLS": "Cancel bill {{codes}} first",
+      "INSURANCE_BALANCE": "Pay the insurance ฿{{amount}} back to the customer",
+      "CREDIT_BALANCE": "Pay the credit ฿{{amount}} back to the customer",
+      "SAVING_BALANCE": "There is ฿{{amount}} in savings on the contract",
+      "hint": {
+        "USE_UNBIND_DEVICE": "Device tab → Unbind",
+        "CANCEL_BILLS_FIRST": "Money tab → Bills",
+        "USE_WALLET_CASHOUT": "Money tab → Wallets → Cash out",
+        "ASK_SYSTEM_ADMIN": "Ask a system admin"
+      }
+    },
     "activatedAt": "Activated",
     "addCoLessee": "Add co-lessee",
     "added_co_lessee": "Added {{customer}} as co-lessee",
@@ -3693,6 +3713,7 @@
     "voidEffects": {
       "title": "When voided",
       "bill": "The contract-opening bill is cancelled; if it was paid, a credit note is issued",
+      "addedDown": "This contract's added down payments are reversed too; the refund includes them",
       "signing": "All signing documents of this contract are voided",
       "device": "The device picked for it stays in stock and can go on a new contract right away"
     },
@@ -3958,7 +3979,9 @@
       "USE_WALLET_CASHOUT": "Use the wallet cash-out action",
       "USE_WALLET_CASHOUT_SAVING": "Use “Cash out savings”",
       "USE_WALLET_CASHOUT_INSURANCE": "Use “Cash out insurance”",
-      "USE_WALLET_CASHOUT_CREDIT": "Use “Cash out credit”"
+      "USE_WALLET_CASHOUT_CREDIT": "Use “Cash out credit”",
+      "ASK_SYSTEM_ADMIN": "Ask a system admin",
+      "USE_VOID_CONTRACT": "Use “Void (same day)”"
     },
     "matchReason": {
       "label": "Matched",

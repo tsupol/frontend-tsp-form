@@ -770,14 +770,20 @@ const MANAGE_ACTION_MAP: { code: string; action: ManageAction; icon: typeof Paus
 
 /** The capability rows by action_code — same query (and cache) as the footer. */
 function useContractActionRows(contractId: number) {
+  return useContractActionRowsAndHidden(contractId).byCode;
+}
+function useContractActionRowsAndHidden(contractId: number) {
   const { data: actionsResp } = useQuery({
     queryKey: ['contract-actions', contractId],
-    queryFn: () => apiClient.rpc<{ actions: ManageActionRow[] }>('fn_contract_available_actions', {
+    queryFn: () => apiClient.rpc<{ actions: ManageActionRow[]; hidden_actions?: ManageActionRow[] }>('fn_contract_available_actions', {
       p_contract_id: contractId,
     }),
     staleTime: 30 * 1000,
   });
-  return new Map((actionsResp?.actions ?? []).map(a => [a.action_code, a]));
+  return {
+    byCode: new Map((actionsResp?.actions ?? []).map(a => [a.action_code, a])),
+    hidden: new Map((actionsResp?.hidden_actions ?? []).map(a => [a.action_code, a])),
+  };
 }
 
 function ManageActionButton({ row, cap, t, onRequestManageAction }: {
@@ -878,10 +884,13 @@ function ManageContractSection({
   t: ReturnType<typeof useTranslation>['t'];
   onRequestManageAction: (action: ManageAction) => void;
 }) {
-  const byCode = useContractActionRows(contractId);
+  const { byCode, hidden } = useContractActionRowsAndHidden(contractId);
   // Only render actions the capability actually knows about for this contract
   // (e.g. RESUME only appears when paused). Hides the whole section if none apply.
   const rows = MANAGE_ACTION_MAP.filter(m => byCode.has(m.code));
+  // mig 1684: on the day the contract opened there is no terminate — say why, so the
+  // missing button doesn't read as a bug, and point at ยกเลิกในวัน.
+  const terminateSameDay = hidden.get('TERMINATE_CONTRACT')?.blocking_reason === 'terminate_use_void_same_day';
   if (rows.length === 0) return null;
 
   return (
@@ -901,6 +910,9 @@ function ManageContractSection({
           />
         ))}
       </div>
+      {terminateSameDay && (
+        <div className="text-xs text-subtle mt-2" data-testid="terminate-same-day-note">{t('contract.terminateSameDayNote')}</div>
+      )}
     </div>
   );
 }
