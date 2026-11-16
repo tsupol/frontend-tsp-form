@@ -20,7 +20,7 @@ export const LANE_TONE: Record<YardLane, string> = {
   MDM_SILENT: '#c2410c',
   NO_MDM: '#475569',
 };
-const BAND_FLOOR: Record<YardBand, string> = {
+export const BAND_FLOOR: Record<YardBand, string> = {
   NEW: '#e9e0f7',
   FREE: '#f4dcdc',
   PICKED: '#dce6f2',
@@ -35,6 +35,9 @@ const MAX_COLS = 8;
 const LANE_MIN = 4.4; // lane signs (three lines, longer names) never overlap at the starting zoom
 const LANE_GAP = 1.0;
 export const SIGN_Y = 2.75;
+/** Where the band slabs start and end along x — the labels and the band hover use the same edges. */
+export const BAND_X0 = 0.1;
+export const bandX1 = (L: { w: number }) => L.w + 0.2;
 
 export interface YardSpot { j: YardJob; x: number; z: number }
 export interface YardLaid {
@@ -116,8 +119,8 @@ export class YardWorld extends QueueWorld {
       }
     };
 
-    const x0 = 0.1;
-    const x1 = L.w + 0.2;
+    const x0 = BAND_X0;
+    const x1 = bandX1(L);
     // The lot, as in the queue.
     box(-2.4, -0.12, -3, L.w + 6.4, 0.12, L.depth + 5, '#cfcbc1', false);
     // One slab per band, edge to edge, side by side in depth (never stacked).

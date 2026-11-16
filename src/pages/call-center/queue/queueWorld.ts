@@ -31,6 +31,13 @@ export const project = (x: number, y: number, z: number): [number, number] => [
   (x * RIGHT.x + z * RIGHT.z) * PX,
   -(x * UP.x + y * UP.y + z * UP.z) * PX,
 ];
+/** The inverse of `project` for a point on the floor (y = 0): screen at zoom 1 → world x, z. */
+export const unprojectFloor = (px: number, py: number): [number, number] => {
+  const a = px / PX;
+  const b = -py / PX;
+  const det = RIGHT.x * UP.z - RIGHT.z * UP.x;
+  return [(a * UP.z - RIGHT.z * b) / det, (RIGHT.x * b - a * UP.x) / det];
+};
 /** Screen pixels per metre of height at zoom 1. */
 export const HEIGHT_PX = UP.y * PX;
 
@@ -194,6 +201,8 @@ export class QueueWorld {
   private ringMesh: InstancedMesh;
   private focusMesh: InstancedMesh;
   private selRing: Mesh;
+  private hoverRing: Mesh;
+  private hovered: number | null = null;
   private cone: Mesh;
   // Protected: the device-watch scene (nnf-extra/deviceWatch) builds its own floor on the same world.
   protected staticRoot = new Group();
@@ -243,6 +252,13 @@ export class QueueWorld {
     ghost.renderOrder = 3;
     this.selRing.add(ghost);
     this.selRing.visible = false;
+    // The same ring, faint, under the person the mouse is on (setHovered) — "you can click this".
+    const hoverMat = new MeshBasicMaterial({ color: SELECT_COLOR, transparent: true, opacity: 0.45, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    this.hoverRing = new Mesh(selGeo, hoverMat);
+    this.hoverRing.renderOrder = 2;
+    this.hoverRing.visible = false;
+    this.scene.add(this.hoverRing);
+    this.owned.push(hoverMat);
     this.cone = new Mesh(CONE, new MeshLambertMaterial({ color: C.cone, side: DoubleSide }));
     this.cone.visible = false;
     this.cone.castShadow = true;
@@ -427,6 +443,7 @@ export class QueueWorld {
   }
 
   setPicked(id: number | null) { this.picked = id; this.start(); }
+  setHovered(id: number | null) { if (id === this.hovered) return; this.hovered = id; this.start(); }
 
   /** Staff member nearest the customer walks out with a traffic cone and shouts in their ear. */
   shout(id: number) {
@@ -680,6 +697,9 @@ export class QueueWorld {
     const sel = this.picked != null ? this.byId.get(this.picked) : null;
     this.selRing.visible = !!sel && !sel.leaving;
     if (sel) this.selRing.position.set(sel.x, 0.03, sel.z);
+    const hov = this.hovered != null && this.hovered !== this.picked ? this.byId.get(this.hovered) : null;
+    this.hoverRing.visible = !!hov && !hov.leaving;
+    if (hov) this.hoverRing.position.set(hov.x, 0.03, hov.z);
     return busy;
   }
 

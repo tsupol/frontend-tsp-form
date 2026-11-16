@@ -7,8 +7,8 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, 
 import { useTranslation } from 'react-i18next';
 import { Button } from 'tsp-form';
 import { House, Lock, MapPin, Minus, Plus, Sparkles } from 'lucide-react';
-import { FIGURE_H, HEIGHT_PX, project } from '../../call-center/queue/queueWorld';
-import { BAND_TONE, LANE_TONE, SIGN_Y, YardWorld, layoutYard } from './yardWorld';
+import { FIGURE_H, HEIGHT_PX, project, unprojectFloor } from '../../call-center/queue/queueWorld';
+import { BAND_FLOOR, BAND_TONE, BAND_X0, LANE_TONE, SIGN_Y, YardWorld, bandX1, layoutYard } from './yardWorld';
 import type { YardBand, YardData, YardJob, YardLane } from './yardApi';
 
 export interface YardSceneHandle { fit: () => void; show: (contractId: number) => void }
@@ -44,12 +44,18 @@ export const YardScene = forwardRef<YardSceneHandle, {
   const laneOrder = useMemo(() => [...data.lanes].sort((a, b) => a.seq - b.seq).map(l => l.code), [data.lanes]);
   const bandOrder = useMemo(() => [...data.bands].sort((a, b) => a.seq - b.seq).map(b => b.code), [data.bands]);
   const L = useMemo(() => layoutYard(data.jobs, laneOrder, bandOrder), [data.jobs, laneOrder, bandOrder]);
+  const layoutRef = useRef(L);
+  layoutRef.current = L;
 
   const [view, setView] = useState({ k: 1.6, ox: 0, oy: 0 });
   const viewRef = useRef(view);
   viewRef.current = view;
   const [size, setSize] = useState({ w: 1, h: 1 });
   const [hover, setHover] = useState<number | null>(null);
+  // The person under the mouse gets a faint ring under their feet (the picked one keeps the full ring).
+  useEffect(() => { worldRef.current?.setHovered(hover); }, [hover]);
+  // The band under the mouse, named beside the pointer once it rests there.
+  const [bandHover, setBandHover] = useState<{ code: YardBand; x: number; y: number } | null>(null);
 
   const glideRaf = useRef(0);
   const stopGlide = () => { cancelAnimationFrame(glideRaf.current); glideRaf.current = 0; };
@@ -192,6 +198,7 @@ export const YardScene = forwardRef<YardSceneHandle, {
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       stopGlide();
+      setBandHover(null); // the floor moved under the name; it comes back once the pointer rests
       const r = el.getBoundingClientRect();
       const mx = e.clientX - r.left;
       const my = e.clientY - r.top;
@@ -219,19 +226,60 @@ export const YardScene = forwardRef<YardSceneHandle, {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     if (pointers.current.size === 0) moved.current = false;
     stopGlide();
+    bandPointer(null, false); // panning / pinching — no name until the pointer rests again
     pointers.current.set(e.pointerId, local(e));
     startGesture();
   };
   const up = (e: RPointerEvent) => { if (pointers.current.delete(e.pointerId)) startGesture(); };
   const hoverRaf = useRef(0);
+  /** The band strip under a point of the stage, or null. */
+  const bandUnder = (sx: number, sy: number): YardBand | null => {
+    const v = viewRef.current;
+    const lay = layoutRef.current;
+    const [x, z] = unprojectFloor((sx - v.ox) / v.k, (sy - v.oy) / v.k);
+    if (x < BAND_X0 || x > bandX1(lay)) return null;
+    return lay.bands.find(bb => z >= bb.z0 && z <= bb.z1)?.code ?? null;
+  };
+  // Hover intent for the band name (the usual hoverIntent rule): sample the pointer every
+  // 100 ms and show the name once it has moved under 6 px for 3 samples in a row. Once shown
+  // it stays where it appeared, like a tooltip, until the pointer leaves that band.
+  const ptr = useRef<{ x: number; y: number } | null>(null);
+  const intent = useRef({ timer: 0, last: null as { x: number; y: number } | null, still: 0 });
+  const stopIntent = () => { window.clearInterval(intent.current.timer); intent.current = { timer: 0, last: null, still: 0 }; };
+  const startIntent = () => {
+    if (intent.current.timer) return;
+    intent.current.timer = window.setInterval(() => {
+      const p = ptr.current;
+      const it = intent.current;
+      if (!p) return;
+      it.still = it.last && Math.hypot(p.x - it.last.x, p.y - it.last.y) < 6 ? it.still + 1 : 0;
+      it.last = { ...p };
+      if (it.still < 3) return;
+      stopIntent();
+      const code = bandUnder(p.x, p.y);
+      if (code) setBandHover({ code, x: p.x, y: p.y });
+    }, 100);
+  };
+  useEffect(() => stopIntent, []);
+  const bandPointer = (p: { x: number; y: number } | null, onPerson: boolean) => {
+    ptr.current = p;
+    if (!p || onPerson) { stopIntent(); setBandHover(null); return; }
+    const code = bandUnder(p.x, p.y);
+    setBandHover(cur => (cur && cur.code === code ? cur : null));
+    if (code) startIntent(); else stopIntent();
+  };
   const move = (e: RPointerEvent) => {
     if (!pointers.current.has(e.pointerId)) {
       if (e.pointerType !== 'mouse') return;
       const p = local(e);
+      // On a head tag counts as on that person (the tag opens their card too).
+      const tagId = Number((e.target as Element).closest<HTMLElement>('.dq-tag')?.dataset.contract) || null;
       cancelAnimationFrame(hoverRaf.current);
       hoverRaf.current = requestAnimationFrame(() => {
         const h = worldRef.current?.hit(p.x, p.y);
-        setHover(h?.kind === 'person' ? h.id : null);
+        const id = tagId ?? (h?.kind === 'person' ? h.id : null);
+        setHover(id);
+        bandPointer(p, id != null);
       });
       return;
     }
@@ -275,8 +323,8 @@ export const YardScene = forwardRef<YardSceneHandle, {
   const bandCount = (code: YardBand) => data.bands.find(b => b.code === code)?.count ?? 0;
 
   return (
-    <div className="dq-scene" ref={wrap} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
-      onPointerLeave={() => setHover(null)} onClick={click} data-testid="yard-scene">
+    <div className={`dq-scene${hover != null ? ' yd-on-person' : ''}`} ref={wrap} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
+      onPointerLeave={() => { setHover(null); bandPointer(null, false); }} onClick={click} data-testid="yard-scene">
       <canvas ref={canvas} className="dq-canvas" />
 
       {/* Over each head, one line: the shop that sent it, days in the queue (red = nobody has
@@ -286,7 +334,7 @@ export const YardScene = forwardRef<YardSceneHandle, {
           const j = s.j;
           const [px, py] = project(s.x, 0, s.z);
           return (
-            <div key={j.contract_id} data-lid={j.contract_id} className="dq-tag" data-contract={j.contract_id}
+            <div key={j.contract_id} data-lid={j.contract_id} className={`dq-tag${hover === j.contract_id ? ' yd-hover' : ''}`} data-contract={j.contract_id}
               style={{ transform: `translate(${view.ox + px * view.k}px, ${view.oy + py * view.k}px)`, opacity: j.is_picked && !j.picked_by_me && j.contract_id !== picked ? 0.6 : 1 }}>
               <div className="dq-tag-top" style={{ ['--end' as string]: endColor(j) }} onClick={() => onPick(j.contract_id)}>
                 {/* One line keeps a crowded lane readable: the shop (its colour), then the days. */}
@@ -314,12 +362,18 @@ export const YardScene = forwardRef<YardSceneHandle, {
           </div>
         );
       })}
-      {/* Band labels at the yard's left edge, level with the band. */}
+      {/* Band labels touching the near end of their strip, in the strip's colours. */}
       {L.bands.map(b => (
-        <div key={b.code} className="yd-band" data-band={b.code} style={{ ...screen(-3.0, 0, (b.z0 + b.z1) / 2), color: BAND_TONE[b.code], transform: `translate(-100%, -50%) scale(${ts})` }}>
+        <div key={b.code} className="yd-band" data-band={b.code}
+          style={{ ...screen(BAND_X0 - 0.1, 0, (b.z0 + b.z1) / 2), color: BAND_TONE[b.code], background: BAND_FLOOR[b.code], borderColor: BAND_TONE[b.code], transform: `translate(-100%, -50%) scale(${ts})` }}>
           {t(`repoYard.band.${b.code}`, { d: data.rules.new_days })} <b>{bandCount(b.code)}</b>
         </div>
       ))}
+      {bandHover && !hovered && (
+        <div className="yd-band yd-band--tip" style={{ left: bandHover.x + 14, top: bandHover.y, color: BAND_TONE[bandHover.code], background: BAND_FLOOR[bandHover.code], borderColor: BAND_TONE[bandHover.code] }}>
+          {t(`repoYard.band.${bandHover.code}`, { d: data.rules.new_days })} <b>{bandCount(bandHover.code)}</b>
+        </div>
+      )}
       <div className="dq-countersign" style={{ ...screen(-0.3, SIGN_Y + 1.6, -0.6), transform: `translate(0, -100%) scale(${ts})` }}>
         <b>{title}</b><span>{sub}</span>
       </div>
