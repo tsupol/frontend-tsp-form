@@ -11643,7 +11643,8 @@
       "SETTLEMENT_SUBMITTED": "Shop submitted a close-out",
       "CHAT_WAITING": "Customer chat waiting",
       "SLIP_PENDING": "Slip waiting too long",
-      "PAYOUT_SUMMARY": "Paid to shops — daily summary"
+      "PAYOUT_SUMMARY": "Paid to shops — daily summary",
+      "PANDA_SHEET_WATCH": "Panda price sheet — changed / unreadable"
     },
     "customized": "Changed",
     "window": "Hours",
