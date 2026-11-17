@@ -66,8 +66,10 @@ export function SubTabDunning({
   // A running relief turns the lock button off: pressing it would be undone
   // by the relief within a minute and look broken (IMPLEMENT relief_24h ③).
   const reliefHoldsLock = !!relief?.lock_buttons_disabled;
-  const enforceDisabled = cmd.pending || paused || !hasDefault || reliefHoldsLock;
-  const releaseDisabled = cmd.pending || paused;
+  const enforceBtn = cmd.button('ENFORCE');
+  const releaseBtn = cmd.button('RELEASE');
+  const enforceDisabled = enforceBtn.busy || paused || !hasDefault || reliefHoldsLock;
+  const releaseDisabled = releaseBtn.busy || paused;
 
   // release() outcome that needs its own explanation (unlocked but image kept).
   const [neutralSkip, setNeutralSkip] = useState<string | null>(null);
@@ -78,6 +80,7 @@ export function SubTabDunning({
     await cmd.run(
       () => enforceDunning({ p_asset_id: status.asset_id }),
       (r) => [r.wallpaper_intent_id, r.lock_intent_id],
+      'ENFORCE',
     );
   };
 
@@ -87,6 +90,7 @@ export function SubTabDunning({
     const r = await cmd.run(
       () => releaseDunning({ p_asset_id: status.asset_id }),
       (res) => [res.unlock_intent_id, res.neutral_wallpaper_intent_id].filter((n): n is number => n != null),
+      'RELEASE',
     );
     if (r && r.neutral_skipped) {
       setNeutralSkip(r.neutral_skip_reason ?? 'unknown');
@@ -155,11 +159,11 @@ export function SubTabDunning({
           <Button
             color="danger"
             size="sm"
-            startIcon={<ShieldAlert size={15} />}
+            startIcon={enforceBtn.icon ?? <ShieldAlert size={15} />}
             disabled={enforceDisabled}
             onClick={() => setConfirm('enforce')}
           >
-            {t('asset.mdm.dunning.enforce.button')}
+            {enforceBtn.label ?? t('asset.mdm.dunning.enforce.button')}
           </Button>
           {reliefHoldsLock && relief?.lock_buttons_disabled_th && (
             <p className="text-xs text-warning-fg">{relief.lock_buttons_disabled_th}</p>
@@ -176,11 +180,11 @@ export function SubTabDunning({
           <Button
             variant="outline"
             size="sm"
-            startIcon={<Unlock size={15} />}
+            startIcon={releaseBtn.icon ?? <Unlock size={15} />}
             disabled={releaseDisabled}
             onClick={() => setConfirm('release')}
           >
-            {t('asset.mdm.dunning.release.button')}
+            {releaseBtn.label ?? t('asset.mdm.dunning.release.button')}
           </Button>
         </div>
       </div>

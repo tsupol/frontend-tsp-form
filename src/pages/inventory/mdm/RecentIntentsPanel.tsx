@@ -4,54 +4,40 @@
 // them HERE. Queue == history (§4) — no separate history section.
 //
 // - Polls every 3s while any row is IN_PROGRESS (async devices report late).
-// - display_status → coloured badge · outcome_code → a real sentence (§12),
-//   never bare "failed". Unknown outcome codes render raw (§12: don't hide).
+// - One line per command: command_kind_th · result_code in words · time · who
+//   (mig 480). Engineering codes (`MDM.…`, intent_type) never reach the screen.
 // - Rows the user just triggered (highlightIds) get a ring for a beat.
 // ============================================================================
 
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Badge, Button } from 'tsp-form';
-import { CheckCircle, Loader2, XCircle, Ban, RefreshCw, Bot, Wrench, User } from 'lucide-react';
+import { Button } from 'tsp-form';
+import { CheckCircle, Loader2, Ban, RefreshCw, WifiOff, AlertTriangle } from 'lucide-react';
 import { DateTime } from '../../../components/DateTime';
 import {
   fetchRecentIntents, hasInFlightIntent,
-  type MdmRecentIntent, type MdmIntentDisplayStatus, type MdmIntentSourceLayer,
+  type MdmRecentIntent, type MdmIntentDisplayStatus, type MdmIntentResultCode,
 } from './mdmApi';
 import { MDM_NO_CACHE } from './useMdmStatus';
 
-const STATUS_META: Record<MdmIntentDisplayStatus, { color: 'success' | 'info' | 'danger' | 'default'; icon: typeof CheckCircle; spin?: boolean }> = {
-  DONE: { color: 'success', icon: CheckCircle },
-  IN_PROGRESS: { color: 'info', icon: Loader2, spin: true },
-  FAILED: { color: 'danger', icon: XCircle },
-  CANCELED: { color: 'default', icon: Ban },
+// result_code → icon + text colour (IMPLEMENT 2026-11-17 recent_intents_result_code_479).
+// DEVICE_OFFLINE is a soft warning: the customer's phone is off the net, nothing broke.
+const RESULT_META: Record<MdmIntentResultCode, { icon: typeof CheckCircle; className: string; spin?: boolean }> = {
+  OK: { icon: CheckCircle, className: 'text-success-fg' },
+  DEVICE_OFFLINE: { icon: WifiOff, className: 'text-warning-fg' },
+  DEVICE_REFUSED: { icon: AlertTriangle, className: 'text-warning-fg' },
+  CANCELED_BY_STATE: { icon: Ban, className: 'text-subtle' },
+  IN_PROGRESS: { icon: Loader2, className: 'text-info-fg', spin: true },
+  OTHER: { icon: AlertTriangle, className: 'text-warning-fg' },
 };
 
-// command_kind → the kind tag's colour (mig 389 suggestion). The words are
-// command_kind_th, printed as sent; unlisted kinds stay grey.
-const KIND_COLOR: Record<string, 'danger' | 'warning' | 'success' | 'info'> = {
-  RESTRICT: 'warning',
-  ERASE: 'danger',
-  LOST_MODE: 'warning',
-  RELEASE: 'success',
-  ONBOARD_WAIT_LOGIN: 'info',
+// No result_code yet (a row from before mig 480): fall back on display_status.
+const STATUS_FALLBACK: Record<MdmIntentDisplayStatus, MdmIntentResultCode> = {
+  DONE: 'OK',
+  IN_PROGRESS: 'IN_PROGRESS',
+  FAILED: 'OTHER',
+  CANCELED: 'CANCELED_BY_STATE',
 };
-
-const SOURCE_ICON: Record<MdmIntentSourceLayer, typeof User> = {
-  STAFF: User,
-  AUTO: Bot,
-  ENGINEER: Wrench,
-};
-
-/** intent_type → a staff-readable label; unknown types fall back to the raw code. */
-function intentTypeLabel(type: string, t: ReturnType<typeof useTranslation>['t']): string {
-  return t(`asset.mdm.intentType.${type}`, { defaultValue: type });
-}
-
-/** outcome_code → sentence (§12). Unknown → raw code (never hidden). */
-function outcomeLabel(code: string, t: ReturnType<typeof useTranslation>['t']): string {
-  return t(`asset.mdm.outcome.${code}`, { defaultValue: code });
-}
 
 export function RecentIntentsPanel({
   assetId,
@@ -120,51 +106,23 @@ function IntentRow({ intent, highlighted, t }: {
   highlighted: boolean;
   t: ReturnType<typeof useTranslation>['t'];
 }) {
-  const meta = STATUS_META[intent.display_status];
-  const StatusIcon = meta.icon;
-  const SourceIcon = SOURCE_ICON[intent.source_layer] ?? User;
-  const isBad = intent.display_status === 'FAILED' || intent.display_status === 'CANCELED';
+  // One row = one line: <kind> · <result> · <time> · <who> (§③).
+  const result = intent.result_code ?? STATUS_FALLBACK[intent.display_status];
+  const meta = RESULT_META[result] ?? RESULT_META.OTHER;
+  const ResultIcon = meta.icon;
 
   return (
-    <li className={`px-3 py-2 flex items-start gap-2.5 transition-shadow ${highlighted ? 'ring-2 ring-primary ring-inset rounded-sm' : ''}`}>
-      <StatusIcon size={15} className={`shrink-0 mt-0.5 ${meta.spin ? 'animate-spin' : ''} ${
-        intent.display_status === 'DONE' ? 'text-success'
-          : intent.display_status === 'FAILED' ? 'text-danger'
-          : intent.display_status === 'CANCELED' ? 'text-subtle' : 'text-info-fg'
-      }`} />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium truncate">{intentTypeLabel(intent.intent_type, t)}</span>
-          {intent.command_kind_th && (
-            <Badge color={KIND_COLOR[intent.command_kind ?? ''] ?? 'default'} variant="outline" size="xs">
-              {intent.command_kind_th}
-            </Badge>
-          )}
-          <Badge color={meta.color} size="xs">{t(`asset.mdm.queue.status.${intent.display_status}`)}</Badge>
-        </div>
-        {/* Failure/cancel reason — always a sentence, never bare "failed". */}
-        {isBad && intent.outcome_code && (
-          <div className="text-xs text-subtle mt-0.5">{outcomeLabel(intent.outcome_code, t)}</div>
-        )}
-        <div className="text-[11px] text-subtler mt-0.5 flex items-center gap-1.5 flex-wrap">
-          <span className="inline-flex items-center gap-1">
-            <SourceIcon size={11} />
-            {intent.source_layer === 'STAFF'
-              ? (intent.created_by_name ?? t('asset.mdm.queue.staff'))
-              : intent.source_layer === 'AUTO'
-                ? t('asset.mdm.queue.system')
-                : (intent.created_by_name ?? t('asset.mdm.queue.engineer'))}
-          </span>
-          <span>·</span>
-          <DateTime value={intent.created_at} showTime />
-          {(intent.attempt_no ?? 0) > 1 && (
-            <>
-              <span>·</span>
-              <span>{t('asset.mdm.queue.attempt', { n: intent.attempt_no, max: intent.max_attempts })}</span>
-            </>
-          )}
-        </div>
-      </div>
+    <li className={`px-3 py-2 flex items-center gap-x-2 gap-y-0.5 flex-wrap text-sm transition-shadow ${highlighted ? 'ring-2 ring-primary ring-inset rounded-sm' : ''}`}>
+      <span className="font-medium">{intent.command_kind_th ?? '—'}</span>
+      <span className="text-subtler">·</span>
+      <span className={`inline-flex items-center gap-1 ${meta.className}`}>
+        <ResultIcon size={14} className={`shrink-0 ${meta.spin ? 'animate-spin' : ''}`} />
+        {t(`asset.mdm.queue.result.${result}`)}
+      </span>
+      <span className="text-subtler">·</span>
+      <span className="text-xs text-subtle"><DateTime value={intent.created_at} showTime /></span>
+      <span className="text-subtler">·</span>
+      <span className="text-xs text-subtle">{intent.created_by_name ?? t('asset.mdm.queue.system')}</span>
     </li>
   );
 }

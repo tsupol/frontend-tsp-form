@@ -163,13 +163,23 @@ export function SubTabLostMode({
   }, [newestFixAt]);
   /* eslint-enable react-hooks/exhaustive-deps */
 
-  const run = (fire: () => Promise<{ intent_id: number }>, after?: () => void) =>
-    cmd.run(fire, (r) => [r.intent_id]).then((res) => { if (res) after?.(); return res; });
+  const run = (key: string, fire: () => Promise<{ intent_id: number }>, after?: () => void) =>
+    cmd.run(fire, (r) => [r.intent_id], key).then((res) => { if (res) after?.(); return res; });
+
+  // Re-press guard (481): each button's state; the key carries the values sent.
+  const enablePhone = branchPhone ? '' : phone.trim();
+  const enableKey = `LOST_ON:${templateKey ?? ''}:${enablePhone}`;
+  const enableBtn = cmd.button(enableKey);
+  const disableBtn = cmd.button('LOST_OFF');
+  const soundBtn = cmd.button('LOST_SOUND');
+  const locateBtn = cmd.button('LOCATE');
+  const loopStartBtn = cmd.button('LOOP_START');
+  const loopStopBtn = cmd.button('LOOP_STOP');
 
   // Enable eligibility.
   // The branch's phone fills the template on the server; a typed one is only
   // needed when neither the branch nor the company has one.
-  const canEnableTemplate = !cmd.pending && actorId != null && !!templateKey
+  const canEnableTemplate = !enableBtn.busy && actorId != null && !!templateKey
     && (!!branchPhone || phone.trim().length > 0);
 
   const loopActive = loop != null;
@@ -179,7 +189,7 @@ export function SubTabLostMode({
   // which used to lock the Stop button forever (Ohm's report). Stop is only busy
   // while a stop command itself is in flight.
   const startBusy = (loop?.pending_intent_count ?? 0) > 0 || loopBackoff.active;
-  const stopBusy = cmd.pending || loopBackoff.active;
+  const stopBusy = loopStopBtn.busy || loopBackoff.active;
 
   return (
     <div className="flex flex-col gap-4">
@@ -247,15 +257,16 @@ export function SubTabLostMode({
                     )}
                   </div>
                   <div className="flex gap-2">
-                    <Button color="danger" size="sm" startIcon={<Bell size={15} />} disabled={!canEnableTemplate}
+                    <Button color="danger" size="sm" startIcon={enableBtn.icon ?? <Bell size={15} />} disabled={!canEnableTemplate}
                       onClick={() => actorId != null && templateKey && run(
+                        enableKey,
                         () => enableLostModeFromTemplate({
                           p_asset_id: status.asset_id, p_actor_id: actorId, p_template_key: templateKey,
-                          p_phone_number: branchPhone ? '' : phone.trim(), p_locale: locale,
+                          p_phone_number: enablePhone, p_locale: locale,
                         }),
                         () => lostBackoff.start(),
                       )}>
-                      {t('asset.mdm.lost.enable')}
+                      {enableBtn.label ?? t('asset.mdm.lost.enable')}
                     </Button>
                     <Button variant="outline" size="sm" startIcon={<Smartphone size={14} />} disabled={!pickedTemplate} onClick={() => setPreviewOpen(true)}>
                       {t('lostMode.preview')}
@@ -264,13 +275,13 @@ export function SubTabLostMode({
             </>
           ) : (
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" startIcon={<BellOff size={15} />} disabled={cmd.pending || actorId == null}
-                onClick={() => actorId != null && run(() => disableLostMode(status.asset_id, actorId), () => lostBackoff.start())}>
-                {t('asset.mdm.lost.disable')}
+              <Button variant="outline" size="sm" startIcon={disableBtn.icon ?? <BellOff size={15} />} disabled={disableBtn.busy || actorId == null}
+                onClick={() => actorId != null && run('LOST_OFF', () => disableLostMode(status.asset_id, actorId), () => lostBackoff.start())}>
+                {disableBtn.label ?? t('asset.mdm.lost.disable')}
               </Button>
-              <Button variant="outline" size="sm" startIcon={<Volume2 size={15} />} disabled={cmd.pending || actorId == null}
-                onClick={() => actorId != null && run(() => playLostModeSound(status.asset_id, actorId))}>
-                {t('asset.mdm.lost.playSound')}
+              <Button variant="outline" size="sm" startIcon={soundBtn.icon ?? <Volume2 size={15} />} disabled={soundBtn.busy || actorId == null}
+                onClick={() => actorId != null && run('LOST_SOUND', () => playLostModeSound(status.asset_id, actorId))}>
+                {soundBtn.label ?? t('asset.mdm.lost.playSound')}
               </Button>
             </div>
           )}
@@ -292,13 +303,13 @@ export function SubTabLostMode({
           )}
 
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" startIcon={<MapPin size={15} />}
-              disabled={cmd.pending || actorId == null || !lostOn || locBackoff.active}
-              onClick={() => actorId != null && run(() => requestLocation(status.asset_id, actorId), () => {
+            <Button variant="outline" size="sm" startIcon={locateBtn.icon ?? <MapPin size={15} />}
+              disabled={locateBtn.busy || actorId == null || !lostOn || locBackoff.active}
+              onClick={() => actorId != null && run('LOCATE', () => requestLocation(status.asset_id, actorId), () => {
                 locReqBaseline.current = newestFixAt; // only a fix newer than this answers the press
                 locBackoff.start();
               })}>
-              {t('asset.mdm.location.request')}
+              {locateBtn.label ?? t('asset.mdm.location.request')}
             </Button>
           </div>
 
@@ -308,19 +319,19 @@ export function SubTabLostMode({
               <>
                 <LoopStatus loop={loop!} />
                 <div>
-                  <Button variant="outline" size="sm" startIcon={<Square size={14} />}
+                  <Button variant="outline" size="sm" startIcon={loopStopBtn.icon ?? <Square size={14} />}
                     disabled={actorId == null || stopBusy}
-                    onClick={() => actorId != null && run(() => stopLocationLoop(status.asset_id, actorId), () => loopBackoff.start())}>
-                    {t('asset.mdm.location.stopLoop')}
+                    onClick={() => actorId != null && run('LOOP_STOP', () => stopLocationLoop(status.asset_id, actorId), () => loopBackoff.start())}>
+                    {loopStopBtn.label ?? t('asset.mdm.location.stopLoop')}
                   </Button>
                 </div>
               </>
             ) : (
               <div>
-                <Button variant="outline" size="sm" startIcon={<Repeat size={14} />}
-                  disabled={cmd.pending || actorId == null || !lostOn || startBusy}
-                  onClick={() => actorId != null && run(() => signalLocationLoop(status.asset_id, actorId, LOOP_WINDOW_SEC), () => loopBackoff.start())}>
-                  {t('asset.mdm.location.startLoop')}
+                <Button variant="outline" size="sm" startIcon={loopStartBtn.icon ?? <Repeat size={14} />}
+                  disabled={loopStartBtn.busy || actorId == null || !lostOn || startBusy}
+                  onClick={() => actorId != null && run('LOOP_START', () => signalLocationLoop(status.asset_id, actorId, LOOP_WINDOW_SEC), () => loopBackoff.start())}>
+                  {loopStartBtn.label ?? t('asset.mdm.location.startLoop')}
                 </Button>
                 <div className="text-xs text-subtler mt-1">{t('asset.mdm.location.loopHint')}</div>
               </div>

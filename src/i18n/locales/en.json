@@ -1322,6 +1322,9 @@
         "encrypted": "Encrypted",
         "managed": "Managed by organization"
       },
+      "sending": "Sending to the device…",
+      "sentHold": "Sent — reaching the device… {{n}}",
+      "justSent": "Just sent — on its way to the device",
       "queue": {
         "title": "Command queue",
         "empty": "No commands yet.",
@@ -1330,6 +1333,14 @@
         "system": "System",
         "engineer": "Engineer",
         "attempt": "attempt {{n}}/{{max}}",
+        "result": {
+          "OK": "Done",
+          "DEVICE_OFFLINE": "Device not online",
+          "DEVICE_REFUSED": "Device refused the command",
+          "CANCELED_BY_STATE": "Canceled — the situation changed",
+          "IN_PROGRESS": "In progress",
+          "OTHER": "Problem — tell the system team"
+        },
         "status": {
           "DONE": "Done",
           "IN_PROGRESS": "In progress",

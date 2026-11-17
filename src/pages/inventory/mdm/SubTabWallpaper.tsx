@@ -49,8 +49,12 @@ export function SubTabWallpaper({
         p_wallpaper_asset_id: selected ?? undefined,
       }),
       (r) => [r.intent_id],
+      sendKey,
     );
   };
+  // Re-press guard (481): same image to the same device within 10 s.
+  const sendKey = `WALLPAPER:${selected ?? 'default'}`;
+  const sendBtn = cmd.button(sendKey);
 
   return (
     <div className="flex flex-col gap-4">
@@ -108,11 +112,11 @@ export function SubTabWallpaper({
             <Button
               color="primary"
               size="sm"
-              startIcon={<Send size={15} />}
-              disabled={cmd.pending || !chosen}
+              startIcon={sendBtn.icon ?? <Send size={15} />}
+              disabled={sendBtn.busy || !chosen}
               onClick={() => setConfirmOpen(true)}
             >
-              {t('asset.mdm.wallpaper.send')}
+              {sendBtn.label ?? t('asset.mdm.wallpaper.send')}
             </Button>
           </div>
         </>

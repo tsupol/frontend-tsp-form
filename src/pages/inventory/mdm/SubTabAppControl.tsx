@@ -90,9 +90,13 @@ export function SubTabAppControl({
     await cmd.run(
       () => applyAppWhitelist(status.asset_id, presetKey, false),
       (r) => (r.intent_id != null ? [r.intent_id] : []),
+      applyKey,
     );
     setPreview(null);
   };
+  // Re-press guard (481): the same preset within 10 s.
+  const applyKey = `WHITELIST_APPLY:${presetKey ?? ''}`;
+  const applyBtn = cmd.button(applyKey);
 
   return (
     <div className="flex flex-col gap-4">
@@ -153,8 +157,8 @@ export function SubTabAppControl({
             ))}
           </ul>
           <div>
-            <Button color="primary" size="sm" startIcon={<Send size={15} />} disabled={cmd.pending} onClick={applyReal}>
-              {t('asset.mdm.appControl.apply')}
+            <Button color="primary" size="sm" startIcon={applyBtn.icon ?? <Send size={15} />} disabled={applyBtn.busy} onClick={applyReal}>
+              {applyBtn.label ?? t('asset.mdm.appControl.apply')}
             </Button>
           </div>
         </div>
@@ -208,8 +212,10 @@ function RemoveRestrictionSection({
     await cmd.run(
       () => removeAppWhitelist(status.asset_id, false),
       (r) => (r.intent_id != null ? [r.intent_id] : []),
+      'WHITELIST_REMOVE',
     );
   };
+  const removeBtn = cmd.button('WHITELIST_REMOVE');
 
   return (
     <div className="border border-line rounded-md p-4 flex flex-col gap-2">
@@ -244,11 +250,11 @@ function RemoveRestrictionSection({
           <Button
             variant="outline"
             size="sm"
-            startIcon={<Unlock size={15} />}
-            disabled={cmd.pending}
+            startIcon={removeBtn.icon ?? <Unlock size={15} />}
+            disabled={removeBtn.busy}
             onClick={openConfirm}
           >
-            {t('asset.mdm.appControl.remove.button')}
+            {removeBtn.label ?? t('asset.mdm.appControl.remove.button')}
           </Button>
         </div>
       )}

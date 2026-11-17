@@ -1495,6 +1495,8 @@
   "OPS.VALIDATION.UNKNOWN_REPO_RESULT": "Unknown visit result",
   "OPS.VALIDATION.NOTE_REQUIRED": "Please write a note",
   "MDM.STATE.FIELD_FIND_NOT_OVERDUE": "This device is {{overdue_days}} days overdue — not yet at the threshold ({{min_overdue_days}} days).",
+  "MDM.STATE.COMMAND_JUST_SENT": "Just sent — on its way to the device",
+  "mdm.state.command_just_sent": "Just sent — on its way to the device",
   "MDM.STATE.FIELD_FIND_NOT_SUPERVISED": "Lost Mode can't be sent to this device.",
   "MDM.STATE.FIELD_FIND_NO_LOCK_TEXT": "Set up the shop's message / phone number first.",
   "MDM.NOT_FOUND.FIELD_FIND_NO_OPEN_JOB": "No find job is running.",

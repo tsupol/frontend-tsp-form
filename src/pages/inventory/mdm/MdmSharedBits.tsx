@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PauseCircle, XCircle, ArrowRight } from 'lucide-react';
+import { PauseCircle, XCircle, ArrowRight, Send } from 'lucide-react';
 import { DateTime } from '../../../components/DateTime';
 import type { AssetMdmStatus, ParsedMdmError } from './mdmApi';
 
@@ -93,6 +93,8 @@ export function MdmErrorAlert({ error, onGoToEnroll }: {
 }) {
   const { t } = useTranslation();
   if (!error) return null;
+  // A repeat press refused within 10 s: the first command is still on its way.
+  if (error.isJustSent) return <CommandJustSentNote show />;
   return (
     <div className="alert alert-danger animate-pop-in">
       <XCircle size={16} />
@@ -107,6 +109,18 @@ export function MdmErrorAlert({ error, onGoToEnroll }: {
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+/** "Just sent, on its way" — a grey status note, not an error (nnf-mdm 481). */
+export function CommandJustSentNote({ show }: { show: boolean }) {
+  const { t } = useTranslation();
+  if (!show) return null;
+  return (
+    <div className="alert animate-pop-in" data-testid="mdm-just-sent">
+      <Send size={16} className="text-subtle" />
+      <div className="alert-description">{t('asset.mdm.justSent')}</div>
     </div>
   );
 }

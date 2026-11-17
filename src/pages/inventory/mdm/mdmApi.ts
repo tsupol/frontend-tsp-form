@@ -358,18 +358,21 @@ export function fetchBranchMdmStories(branchId: number): Promise<AssetMdmStory[]
 export type MdmIntentDisplayStatus = 'DONE' | 'IN_PROGRESS' | 'FAILED' | 'CANCELED';
 export type MdmIntentSourceLayer = 'STAFF' | 'AUTO' | 'ENGINEER';
 
+// mig 480 (IMPLEMENT 2026-11-17 recent_intents_result_code_479): the screen reads
+// only these columns. intent_type / intent_source / source_layer / state /
+// outcome_code / attempt_no / max_attempts / dry_run are engineering fields the
+// view will drop — never print an `MDM.` code to staff.
+export type MdmIntentResultCode =
+  | 'OK' | 'DEVICE_OFFLINE' | 'DEVICE_REFUSED' | 'CANCELED_BY_STATE' | 'IN_PROGRESS' | 'OTHER';
+
 export interface MdmRecentIntent {
   intent_id: number;
-  intent_type: string;
   display_status: MdmIntentDisplayStatus;
-  outcome_code: string | null;
-  source_layer: MdmIntentSourceLayer;
+  result_code: MdmIntentResultCode | null;
   created_by_name: string | null;
   created_by: number | null;
   created_at: string;
   acked_at: string | null;
-  attempt_no: number | null;
-  max_attempts: number | null;
   // mig 389: what the command does to the phone, so a wallpaper change reads
   // as a restriction, a release or the wait-for-login screen. Print the _th.
   command_kind?: MdmCommandKind | null;
@@ -1449,6 +1452,10 @@ export interface ParsedMdmError {
   message: string;              // resolved, translated, user-facing
   isNotEnrolled: boolean;       // MDM.STATE.ASSET_NOT_ENROLLED — handle centrally
   isPermissionDenied: boolean;  // MDM.AUTH.* — should be hidden by may_* flags
+  /** MDM.STATE.COMMAND_JUST_SENT (nnf-mdm 481): the same press within 10 s was
+   *  refused because the first one is still on its way. Not an error — show it
+   *  as a grey status note, never red, never a retry button. */
+  isJustSent: boolean;
 }
 
 /** Split "MDM.X.Y [a=1, b=2]" → { code: "MDM.X.Y", detail: "a=1, b=2" }. */
@@ -1489,13 +1496,14 @@ export function parseMdmError(err: unknown, t: TFunction): ParsedMdmError {
   const upper = code.toUpperCase();
   const isNotEnrolled = upper === 'MDM.STATE.ASSET_NOT_ENROLLED';
   const isPermissionDenied = upper.startsWith('MDM.AUTH.');
+  const isJustSent = upper === 'MDM.STATE.COMMAND_JUST_SENT';
 
   // Translate by code only. defaultValue:'' so a miss falls through to hint →
   // raw code (never a blank, never the English default leaking).
   const translated = code ? t(code, { ns: 'apiErrors', defaultValue: '' }) : '';
   const message = translated || hint || fallbackMsg || code || t('common.error');
 
-  return { code, detail, hint, message, isNotEnrolled, isPermissionDenied };
+  return { code, detail, hint, message, isNotEnrolled, isPermissionDenied, isJustSent };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
