@@ -88,6 +88,21 @@ import { NotificationMenuItem } from './components/NotificationMenu';
 import { SystemSignalSection, SystemSignalDialog, type SignalRow } from './components/SystemSignalSection';
 import { contractMenuActivePath } from './lib/contractMenuPath';
 
+// The menu highlights the item whose path is the longest prefix of the address.
+// The dashboard's path '/admin' is a prefix of every page, so a page with no menu
+// item of its own (settings, my assets) lit up the dashboard. Highlight it only on
+// '/admin' itself: when no other item matches, highlight nothing.
+const DASHBOARD_PATH = '/admin';
+function sideMenuActivePath(items: SideMenuItemData[], path: string): string | undefined {
+  if (path === DASHBOARD_PATH) return path;
+  const matches = (nodes: SideMenuItemData[]): boolean =>
+    nodes.some((n) => {
+      if (n.type === 'group' || n.type === 'separator' || n.type === 'custom') return false;
+      return (!!n.path && n.path !== DASHBOARD_PATH && path.startsWith(n.path)) || (!!n.children && matches(n.children));
+    });
+  return matches(items) ? path : undefined;
+}
+
 const lgQuery = window.matchMedia('(min-width: 1024px)');
 const subscribeLg = (cb: () => void) => { lgQuery.addEventListener('change', cb); return () => lgQuery.removeEventListener('change', cb); };
 const getIsLg = () => lgQuery.matches;
@@ -983,7 +998,7 @@ export const AppSideNav = () => {
             <div className="side-menu-content better-scroll">
               <SideMenuItems
                 items={visibleItems}
-                activePath={contractMenuActivePath(location.pathname, location.search)}
+                activePath={sideMenuActivePath(visibleItems, contractMenuActivePath(location.pathname, location.search))}
                 collapsed={menuCollapsed}
                 isMobile={isMobile}
                 onSelect={handleSelect}
