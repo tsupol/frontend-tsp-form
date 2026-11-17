@@ -87,6 +87,7 @@ import { useChatDock } from './contexts/ChatDockContext';
 import { NotificationMenuItem } from './components/NotificationMenu';
 import { SystemSignalSection, SystemSignalDialog, type SignalRow } from './components/SystemSignalSection';
 import { contractMenuActivePath } from './lib/contractMenuPath';
+import { useSettingsNavItems } from './pages/settings/settingsNavItems';
 
 // The menu highlights the item whose path is the longest prefix of the address.
 // The dashboard's path '/admin' is a prefix of every page, so a page with no menu
@@ -117,6 +118,7 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { theme, setTheme } = useTheme();
+  const settingsItems = useSettingsNavItems();
 
   const handleLogout = async () => {
     setOpen(false);
@@ -171,11 +173,19 @@ function UserMenu({ collapsed }: { collapsed: boolean }) {
           label={t('settings.title')}
           onClick={() => { navigate('/admin/settings/profile'); setOpen(false); }}
         />
-        <MenuItem
-          icon={<Smartphone size={14} />}
-          label={t('nav.myAssets')}
-          onClick={() => { navigate('/admin/settings/my-assets'); setOpen(false); }}
-        />
+        {/* The rest of the settings pages. Below 1024px (iPad) the settings page's own
+            menu is hidden, so this is the only way in. Profile = the ตั้งค่า row above;
+            appearance = the theme row below. */}
+        {settingsItems
+          .filter((it) => it.path !== '/admin/settings/profile' && it.path !== '/admin/settings/appearance')
+          .map(({ path, labelKey, icon: Icon }) => (
+            <MenuItem
+              key={path}
+              icon={<Icon size={14} />}
+              label={t(labelKey)}
+              onClick={() => { navigate(path); setOpen(false); }}
+            />
+          ))}
         <MenuSeparator />
         <SubMenu icon={<Settings size={14} />} label={t('theme.title')}>
           <MenuItem
