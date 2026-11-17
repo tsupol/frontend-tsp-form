@@ -10,7 +10,7 @@
 // job is open: every answer that carries a fix writes an audit row (§2).
 // Shown on the MDM.FIELD_FIND permission; the RPC refuses what can't be pressed (§1).
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button } from 'tsp-form';
@@ -18,6 +18,7 @@ import { ExternalLink, Loader2, MapPin, Radar, Square, Volume2, VolumeX, XCircle
 import { ApiError } from '../../lib/api';
 import { translateApiError } from '../../lib/apiErrors';
 import { formatTel } from '../../lib/format';
+import { ConfirmDialog } from '../ConfirmDialog';
 import { DateTime } from '../DateTime';
 import { PhoneInput } from '../PhoneInput';
 import {
@@ -43,6 +44,11 @@ export function FieldFindPanel({ target, className = '' }: { target: FieldFindTa
 
   const [phone, setPhone] = useState('');
   const [busy, setBusy] = useState<FieldFindMode | 'stop' | null>(null);
+  // The start buttons ask first: one press locks a customer's device.
+  const [confirming, setConfirming] = useState<FieldFindMode | null>(null);
+  const lastConfirming = useRef<FieldFindMode>('FIND');
+  if (confirming) lastConfirming.current = confirming;
+  const confirmMode = confirming ?? lastConfirming.current; // keeps the text through the close animation
   const [error, setError] = useState<string | null>(null);
   // What the device shows, from the start answer — kept while the job runs.
   const [sent, setSent] = useState<FieldFindStartResult | null>(null);
@@ -115,12 +121,13 @@ export function FieldFindPanel({ target, className = '' }: { target: FieldFindTa
             <div className="text-xs text-subtle mt-1">{t('fieldFind.phoneHint')}</div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" color="danger" startIcon={busy === 'FIND' ? <Loader2 size={14} className="animate-spin" /> : <VolumeX size={14} />}
-              disabled={!!busy || !phoneOk} onClick={() => start('FIND')} data-action="FIELD_FIND_START">
+            {/* Silent = outline, sound = solid: the two labels differ by one word, so the fill tells them apart. */}
+            <Button size="sm" color="danger" variant="outline" startIcon={busy === 'FIND' ? <Loader2 size={14} className="animate-spin" /> : <VolumeX size={14} />}
+              disabled={!!busy || !phoneOk} onClick={() => setConfirming('FIND')} data-action="FIELD_FIND_START">
               {t('fieldFind.startSilent')}
             </Button>
             <Button size="sm" color="danger" startIcon={busy === 'FIND_SOUND' ? <Loader2 size={14} className="animate-spin" /> : <Volume2 size={14} />}
-              disabled={!!busy || !phoneOk} onClick={() => start('FIND_SOUND')} data-action="FIELD_FIND_START_SOUND">
+              disabled={!!busy || !phoneOk} onClick={() => setConfirming('FIND_SOUND')} data-action="FIELD_FIND_START_SOUND">
               {t('fieldFind.startSound')}
             </Button>
           </div>
@@ -167,6 +174,29 @@ export function FieldFindPanel({ target, className = '' }: { target: FieldFindTa
           <span>{error}</span>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirming != null}
+        onClose={() => setConfirming(null)}
+        onConfirm={() => { const m = confirming; setConfirming(null); if (m) start(m); }}
+        title={confirmMode === 'FIND_SOUND' ? t('fieldFind.startSound') : t('fieldFind.startSilent')}
+        message={
+          <span className="flex flex-col gap-2">
+            <span>{confirmMode === 'FIND_SOUND' ? t('fieldFind.confirm.sound') : t('fieldFind.confirm.silent')}</span>
+            <span className="text-subtle">
+              {phone ? t('fieldFind.confirm.phone', { phone: formatTel(phone) }) : t('fieldFind.confirm.shopPhone')}
+            </span>
+          </span>
+        }
+        confirmLabel={t('fieldFind.confirm.go')}
+        color="danger"
+        // Same look as the button that opened it: silent = outline + muted speaker, sound = solid + speaker.
+        confirmVariant={confirmMode === 'FIND_SOUND' ? 'solid' : 'outline'}
+        titleIcon={confirmMode === 'FIND_SOUND'
+          ? <Volume2 size={18} className="text-danger-fg" />
+          : <VolumeX size={18} className="text-danger-fg" />}
+        confirmIcon={confirmMode === 'FIND_SOUND' ? <Volume2 size={16} /> : <VolumeX size={16} />}
+      />
     </div>
   );
 }

@@ -27,6 +27,9 @@ export function ConfirmDialog({
   confirmLabel,
   cancelLabel,
   color = 'danger',
+  confirmVariant = 'solid',
+  titleIcon,
+  confirmIcon,
   pending = false,
 }: {
   open: boolean;
@@ -42,6 +45,12 @@ export function ConfirmDialog({
   cancelLabel?: string;
   /** Confirm button color. Defaults to 'danger' since these are usually destructive. */
   color?: 'primary' | 'danger';
+  /** Confirm button fill — match the button that opened the dialog when two look alike. */
+  confirmVariant?: 'solid' | 'outline';
+  /** Icon before the title, e.g. the opening button's icon. */
+  titleIcon?: React.ReactNode;
+  /** Icon on the confirm button. */
+  confirmIcon?: React.ReactNode;
   /** Disables both buttons while a mutation is in flight. */
   pending?: boolean;
 }) {
@@ -50,7 +59,7 @@ export function ConfirmDialog({
   return (
     <Modal open={open} onClose={onClose} maxWidth="24rem" width="100%">
       <div className="modal-header">
-        <h2 className="modal-title">{title ?? t('common.confirm')}</h2>
+        <h2 className="modal-title inline-flex items-center gap-2">{titleIcon}{title ?? t('common.confirm')}</h2>
       </div>
       <div className="modal-content">
         <p className="text-sm">{message}</p>
@@ -59,7 +68,7 @@ export function ConfirmDialog({
         <Button type="button" onClick={onClose} disabled={pending}>
           {cancelLabel ?? t('common.cancel')}
         </Button>
-        <Button type="button" color={color} onClick={onConfirm} disabled={pending}>
+        <Button type="button" color={color} variant={confirmVariant} startIcon={confirmIcon} onClick={onConfirm} disabled={pending}>
           {pending ? t('common.saving') : (confirmLabel ?? t('common.confirm'))}
         </Button>
       </div>

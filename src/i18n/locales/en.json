@@ -12217,6 +12217,13 @@
     "accuracy": "±{{m}} m",
     "noFix": "No location yet",
     "openMap": "Open map",
-    "lockScreen": "The device's lock screen shows"
+    "lockScreen": "The device's lock screen shows",
+    "confirm": {
+      "silent": "The device locks, shows that it belongs to the shop and keeps sending its location until someone presses Stop.",
+      "sound": "The device locks, shows that it belongs to the shop, rings, and keeps sending its location until someone presses Stop.",
+      "phone": "Phone number on the lock screen: {{phone}}",
+      "shopPhone": "Phone number on the lock screen: the shop's number",
+      "go": "Start tracking"
+    }
   }
 }
