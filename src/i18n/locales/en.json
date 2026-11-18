@@ -1,4 +1,129 @@
 {
+  "swapDevice": {
+    "button": "Swap device",
+    "buttonCompany": "Swap device (office helps shop)",
+    "title": "Swap device",
+    "titleCompany": "Swap device (office helps shop)",
+    "needsManager": "Only the shop manager can swap the device",
+    "contractSays": "Contract states: {{model}} · {{condition}}",
+    "currentDevice": "Device bound now: {{code}}",
+    "new": "new",
+    "used": "used",
+    "pickDevice": "New device from the shop's stock",
+    "pickPlaceholder": "Pick a device (search code / IMEI / serial)",
+    "pickHint": "Only {{model}} · {{condition}} devices free in the shop's stock",
+    "noStock": "The shop has no {{model}} ({{condition}}) free in stock",
+    "noStockWayOut": "Only the same model and condition as the contract can be swapped in. To change the model, credit must approve again.",
+    "reason": "Reason",
+    "reasonPlaceholder": "e.g. wrong device bound",
+    "note": "Note (optional)",
+    "pinLabel": "Shop PIN (not the login password)",
+    "submit": "Swap device",
+    "submitCompany": "Swap device",
+    "doneTitle": "Device swapped",
+    "oldDevice": "Old device (back in the shop's stock, quarantined)",
+    "newDevice": "New device",
+    "resubmitReminder": "Submit the close-out again with photos of the new device, otherwise there is no payout.",
+    "mdmFollows": "MDM follows the new device by itself within about a minute. Instalments and balance don't change.",
+    "goSign": "Sign the new handover",
+    "withdrawButton": "Withdraw close-out",
+    "withdrawNote": "Device swap",
+    "withdrawDone": "Close-out withdrawn. You can swap now; remember to submit again.",
+    "withdrawUnavailable": "The close-out can't be withdrawn now. Contact finance.",
+    "err": {
+      "partner_state_settlement_close_submitted": {
+        "what": "The shop already submitted close-out {{settlement_code}}; it is waiting for finance, so the device can't be swapped",
+        "next": "Press \"Withdraw close-out\", swap the device, then submit again with photos of the new device",
+        "who": ""
+      },
+      "partner_state_settlement_in_payout": {
+        "what": "{{settlement_code}} is already in a finance payout round",
+        "next": "",
+        "who": "Ask finance to take it out of the payout round first"
+      },
+      "partner_state_already_paid_to_branch": {
+        "what": "The fund has already paid {{settlement_code}}; the device belongs to the fund",
+        "next": "",
+        "who": "Contact the office: this needs a device return, not a swap"
+      },
+      "partner_state_use_return_document": {
+        "what": "It's past the day the contract opened, so the shop can't swap the device itself",
+        "next": "",
+        "who": "Ask the office to swap it",
+        "withReturn": "(return document {{return_code}} is open)"
+      },
+      "sale_auth_pin_required": {
+        "what": "Shop PIN missing",
+        "next": "Enter the shop PIN (not the login password)",
+        "who": "Forgot the PIN? Contact the office"
+      },
+      "core_auth_invalid_pin": {
+        "what": "Wrong shop PIN",
+        "next": "Enter the shop PIN again (not the login password)",
+        "who": "Forgot the PIN? Contact the office"
+      },
+      "sale_validation_reason_required": {
+        "what": "Reason missing",
+        "next": "Enter a reason, e.g. wrong device bound",
+        "who": ""
+      },
+      "sale_auth_permission_denied": {
+        "what": "This account may not swap this contract's device",
+        "next": "Ask the shop manager to press it",
+        "who": ""
+      },
+      "contract_validation_asset_not_owned_by_branch": {
+        "what": "This device belongs to {{owner_name}}, not this shop",
+        "next": "Pick a device from this shop's stock",
+        "who": ""
+      },
+      "contract_validation_asset_model_mismatch": {
+        "what": "The contract states {{contract_model_name}} but the picked device is {{asset_model_name}}",
+        "next": "Pick a device of the same model",
+        "who": "To change the model, credit must approve again"
+      },
+      "contract_validation_asset_condition_mismatch": {
+        "what": "The device condition doesn't match the contract (contract: {{condition}})",
+        "next": "Pick a device in the same condition",
+        "who": "To change it, credit must approve again"
+      },
+      "contract_validation_asset_cross_company_type": {
+        "what": "This device belongs to a different company type than the contract",
+        "next": "Pick another device",
+        "who": "If it keeps happening, contact the office"
+      },
+      "sale_validation_same_device": {
+        "what": "That's the contract's current device",
+        "next": "Pick a different device",
+        "who": ""
+      },
+      "inv_state_asset_not_available": {
+        "what": "This device isn't in sellable stock",
+        "next": "Pick another device",
+        "who": ""
+      },
+      "contract_validation_not_eligible_for_snapshot": {
+        "what": "This device is held or bound by another contract",
+        "next": "Pick another device",
+        "who": ""
+      },
+      "sale_validation_bind_denied": {
+        "what": "This device can't be bound in its current state (e.g. quarantined)",
+        "next": "Pick another device",
+        "who": "To use a quarantined device, ask the office to release it first"
+      },
+      "contract_state_snapshot_requires_active_or_pending": {
+        "what": "The contract's state doesn't allow changing the device now",
+        "next": "",
+        "who": "Contact the office"
+      },
+      "unknown": {
+        "what": "This can't be done right now",
+        "next": "",
+        "who": "Contact the office with the code below"
+      }
+    }
+  },
   "abmOtp": {
     "title": "ABM account OTP",
     "subtitle": "Verification codes Apple sends to the phone tied to your ABM accounts.",
@@ -1789,8 +1914,13 @@
       "note": "Note (optional)",
       "submit": "Correct model",
       "blockedTitle": "Cannot change model",
-      "blockedContract": "This device is bound to a contract — its model can't be changed. Void or re-sign the contract first.",
+      "blockedContract": "This device is in a contract already sent for approval — its model can't be changed.",
       "blockedGeneric": "This device's model cannot be changed.",
+      "draftTitle": "Draft contract {{codes}} uses this device",
+      "draftBody": "Changing the model moves the draft to the new model too and clears its prices and plan — they must be set again.",
+      "repricedTitle": "Draft contract {{codes}} now uses the new model",
+      "repricedBody": "Its prices and plan were cleared — set them again before sending it for approval.",
+      "repricedGo": "Set prices again",
       "model": "Model",
       "colour": "Colour"
     },
@@ -3703,6 +3833,12 @@
     "identifierCorrectSerial": "Correct serial number",
     "identifierCorrectSuccess": "Identifier corrected",
     "identifierCorrectTitle": "Correct {{label}}",
+    "identifierCorrectOld": "Old number",
+    "identifierCorrectNewValue": "New number",
+    "identifierResyncTitle": "The signed documents of contract {{code}} now show the new number",
+    "identifierResyncPrint": "Print signed documents",
+    "identifierResyncHint": "The customer's paper copy still shows the old number: print the document from the system for them again. They don't sign again.",
+    "identifierResyncOpen": "Print from the signed-documents tab of {{code}}",
     "identifierInvalidImei": "Invalid IMEI (checksum failed)",
     "identifierInvalidSerial": "Invalid serial number",
     "installmentAmount": "Installment",
@@ -4587,6 +4723,31 @@
     "payoutEditElsewhere": "Edit under Bank accounts → Shop payout accounts"
   },
   "deposit": {
+    "notCollected": {
+      "reasonNotCollected": "Customer never collected the deposited device",
+      "title": "Deposit not collected — steps to cancel the contract",
+      "intro": "The pickup deadline has passed; the deposit slip treats this as the device returned and the contract cancelled. Do the steps in order.",
+      "step1": "Waive the late fee",
+      "step1Owed": "Late fee owed {{amount}}",
+      "step1Clear": "No late fee owed",
+      "step1Button": "Waive late fee",
+      "step2": "Unbind the device",
+      "step2Done": "Unbound — the device is quarantined at the branch",
+      "step2NoUndo": "Unbinding can't be undone",
+      "step2NotYet": "Not yet — the customer may still collect until the deadline · possible from the day after",
+      "step3": "Insurance money",
+      "step3Clear": "No insurance balance",
+      "step3Choose": "Insurance {{amount}} — as agreed with the customer: keep it as a service charge, or give it back",
+      "step3AfterUnbind": "Insurance {{amount}} — after the device is unbound",
+      "step3Keep": "Keep as service charge",
+      "step3Refund": "Give back to customer",
+      "keepDescription": "Insurance kept — deposit not collected",
+      "step4": "Terminate contract",
+      "step4Detail": "Reason: customer request. The terminate window says if anything is still open.",
+      "step4AfterUnbind": "After the device is unbound",
+      "unbindWarning": "This device is deposited at the branch. Unbinding can't be undone — if the customer turns up later, contact the office.",
+      "undoBlocked": "Can't undo: this was a deposited device the customer never collected. If the customer turns up, contact the office."
+    },
     "chip_all": "All",
     "empty": "No deposited devices.",
     "subState_DEPOSITED": "Deposited",
@@ -5867,6 +6028,7 @@
     "inUseInternal": "Internal Use",
     "damagedScrap": "Damaged / Scrap",
     "withCustomer": "With Customer",
+    "depositedByCustomer": "Deposited at the branch",
     "repossessed": "Repossessed",
     "loanedOut": "Loaned Out",
     "ownershipTransferred": "Transferred",
@@ -7429,6 +7591,15 @@
     "warehouseTitle": "Returns to receive"
   },
   "partnerSettlement": {
+    "swap": {
+      "badge": "Device swapped {{count}}×",
+      "afterCheckBadge": "Swapped after check",
+      "title": "The shop swapped the device {{count}}×",
+      "afterCheckTitle": "The device was swapped after the last check — check the photos again",
+      "when": "Last swap",
+      "count": "{{count}} in total",
+      "checkPhotos": "Compare the handover photos with device {{code}}"
+    },
     "queueTitle": "Shop payment requests",
     "reviewTitle": "Review request",
     "foundCount": "{{count}} requests",

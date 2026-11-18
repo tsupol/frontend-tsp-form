@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Badge, Button, Modal, Input, FormErrorMessage, useSnackbarContext } from 'tsp-form';
-import { Smartphone, ShieldCheck, ExternalLink, Wrench, ArrowDownToLine, ArrowUpFromLine, Link2, Link2Off, Cloud, CloudOff, CheckCircle, Pencil, XCircle, Loader2, Archive, Undo2 } from 'lucide-react';
+import { Badge, Button, Modal, Input, FormErrorMessage, Tooltip, useSnackbarContext } from 'tsp-form';
+import { Smartphone, ShieldCheck, ExternalLink, Wrench, ArrowDownToLine, ArrowUpFromLine, Link2, Link2Off, Cloud, CloudOff, CheckCircle, Pencil, XCircle, Loader2, Archive, Undo2, Repeat } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { BranchPinInput } from '../../components/BranchPinInput';
 import { DateTime } from '../../components/DateTime';
@@ -17,6 +17,8 @@ import { ColorSwatch } from '../../components/ColorAutocomplete';
 import { ImeiInput } from '../../components/ImeiInput';
 import { identifierFormatReason, isAppleBrand } from '../../lib/validators';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
+import { IdentifierResyncNotice, resyncPrintAction, type ResyncedSigning } from '../../components/IdentifierResyncNotice';
+import { ActionDoneView } from './ActionDoneView';
 import { SerialInput } from '../../components/SerialInput';
 import { translateApiError } from '../../lib/apiErrors';
 import { useAuth } from '../../contexts/AuthContext';
@@ -25,6 +27,10 @@ import { MdmCheckBody, MdmCheckToggle } from '../inventory/MdmCheck';
 import { DeviceLocationButton } from '../../components/deviceLocation/DeviceLocationDialog';
 import { useLocationViewCan } from '../../components/deviceLocation/deviceLocationApi';
 import { IcloudLockBox, type ContractIcloudLockFields } from './IcloudLockBox';
+import { DepositNotCollectedSteps } from './DepositNotCollectedSteps';
+import { SwapDeviceModal, type SwapAction } from './SwapDeviceModal';
+import { SwapProblemBox } from './swapDeviceMessages';
+import { blockingReasonText } from '../../lib/apiErrors';
 
 type IdentifierType = 'IMEI' | 'SERIAL_NO';
 
@@ -47,6 +53,19 @@ interface ContractForDevice extends ContractIcloudLockFields {
   deposit_deadline?: string | null;
   deposit_days_left?: number | null;
   deposit_sub_state?: 'DEPOSITED' | 'NEAR_DEADLINE' | 'PICKUP_OVERDUE' | null;
+  // What the contract was sold as — the swap list must match both (mig 1699).
+  model_id?: number | null;
+  is_used_asset?: boolean;
+  // For the not-collected deposit steps (balances tick the steps off).
+  code?: string;
+  code_display?: string | null;
+  holding_id?: number;
+  company_id?: number | null;
+  customer_id?: number | null;
+  late_fee_balance?: number | null;
+  insurance_balance?: number | null;
+  saving_balance?: number | null;
+  credit_balance?: number | null;
 }
 
 interface AssetSummary {
@@ -88,6 +107,8 @@ interface RepairOrder {
 type DeviceAction =
   | 'bind_device'
   | 'unbind_device'
+  | 'late_fee_collect'
+  | 'terminate'
   | 'deposit_device'
   | 'return_deposit'
   | 'loan_assign'
@@ -173,7 +194,14 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
   // as the only path. Shares the query cache with ContractActionButtons.
   const { data: actionsResp } = useQuery({
     queryKey: ['contract-actions', contract.id],
-    queryFn: () => apiClient.rpc<{ actions: { action_code: string; is_available: boolean }[] }>(
+    queryFn: () => apiClient.rpc<{ actions: {
+      action_code: string;
+      is_available: boolean;
+      is_permitted?: boolean;
+      required_permission?: string | null;
+      blocking_reason?: string | null;
+      blocking_params?: Record<string, unknown> | null;
+    }[] }>(
       'fn_contract_available_actions',
       { p_contract_id: contract.id },
     ),
@@ -196,6 +224,39 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
     staleTime: 30 * 1000,
   });
 
+  // A deposited device past its pickup deadline can be unbound only from the
+  // day after (mig 1724). Before that the button stays visible, greyed, with
+  // the deadline — never hidden (work order: "ห้ามซ่อนปุ่มถอดเครื่องเฉยๆ ตอนเทา").
+  const unbindRow = actionsResp?.actions?.find(a => a.action_code === 'UNBIND_DEVICE');
+  const unbindWaitsForDeadline = !!unbindRow && !unbindRow.is_available
+    && unbindRow.blocking_reason === 'deposit_not_yet_due';
+  // Not-collected deposit: the steps show while overdue, and keep showing after
+  // the unbind — the backend then names it through the undo check
+  // (UNDO_NOT_ALLOWED_AFTER_DEPOSIT), which is the only trace once the deposit
+  // is closed — until the contract is terminated.
+  const depositNotCollected = contract.state === 'ACTIVE' && (
+    contract.deposit_sub_state === 'PICKUP_OVERDUE'
+    || (contract.device_id == null && undoCheck?.reason === 'UNDO_NOT_ALLOWED_AFTER_DEPOSIT')
+  );
+
+  // "สลับเครื่อง" (mig 1697/1701): two rows, one per who presses — the shop's
+  // SWAP_DEVICE and the office's SWAP_DEVICE_COMPANY. Each user is permitted on
+  // their own one; that is the one shown. A shop user who may not swap at all
+  // still sees the shop's button, greyed, saying who can (§5c) — never a silent gap.
+  // Only on a deal-partner contract: elsewhere the backend still lists both rows,
+  // blocked as branch_type_not_match — not a reason to show a greyed button.
+  const swapRows = (actionsResp?.actions ?? []).filter(a =>
+    (a.action_code === 'SWAP_DEVICE' || a.action_code === 'SWAP_DEVICE_COMPANY')
+    && a.blocking_reason !== 'branch_type_not_match');
+  const swapRow = swapRows.find(a => a.is_permitted !== false) ?? null;
+  const swapNeedsManager = !swapRow && isDealPartner && swapRows.some(a => a.action_code === 'SWAP_DEVICE');
+  const swapBlockCode = swapRow && !swapRow.is_available && typeof swapRow.blocking_params?.code === 'string'
+    ? swapRow.blocking_params.code as string : null;
+  const [swapOpen, setSwapOpen] = useState(false);
+  // Held from the moment the window opens: the done view still names the old device
+  // after the contract refetches with the new one.
+  const [swapOldCode, setSwapOldCode] = useState<string | null>(null);
+
   const hasPrimary = contract.device_id != null;
   const hasLoaner = contract.loaner_device_id != null;
   const primaryBucket = contract.device_current_bucket;
@@ -217,6 +278,14 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
           depositedAt={contract.deposited_at ?? null}
           deadline={contract.deposit_deadline ?? null}
           daysLeft={contract.deposit_days_left ?? null}
+        />
+      )}
+
+      {depositNotCollected && (
+        <DepositNotCollectedSteps
+          contract={contract}
+          actions={actionsResp?.actions}
+          onRequestAction={onRequestAction}
         />
       )}
 
@@ -397,7 +466,8 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
                   answers (collectors, the repo team while the job is theirs). */}
               <DeviceSignalsPanel contractId={contract.id} showDeviceCode={false} className="mt-2" />
 
-              {(canViewLocation || canDo('DEVICE_REPAIR_REQUEST') || canDo('UNBIND_DEVICE') || canDo('CUSTOMER_DEPOSIT_DEVICE') || canDo('RETURN_DEPOSIT')) && (
+              {(canViewLocation || canDo('DEVICE_REPAIR_REQUEST') || canDo('UNBIND_DEVICE') || unbindWaitsForDeadline || canDo('CUSTOMER_DEPOSIT_DEVICE') || canDo('RETURN_DEPOSIT') || swapRow || swapNeedsManager) && (
+                <>
                 <div className="flex flex-wrap gap-2 pt-2 border-t border-line mt-2">
                   <DeviceLocationButton contractId={contract.id} />
                   {canDo('DEVICE_REPAIR_REQUEST') && (
@@ -423,6 +493,49 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
                       {t('contract.action_unbind_device')}
                     </Button>
                   )}
+                  {(swapRow || swapNeedsManager) && (
+                    <Tooltip
+                      content={swapNeedsManager
+                        ? t('swapDevice.needsManager')
+                        : swapRow && !swapRow.is_available && !swapBlockCode && swapRow.blocking_reason
+                          ? blockingReasonText({ blocking_reason: swapRow.blocking_reason, blocking_params: swapRow.blocking_params }, t)
+                          : t(swapRow?.action_code === 'SWAP_DEVICE_COMPANY' ? 'swapDevice.titleCompany' : 'swapDevice.title')}
+                    >
+                      <span className="inline-flex">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          startIcon={<Repeat size={14} />}
+                          data-action={swapRow?.action_code ?? 'SWAP_DEVICE'}
+                          data-blocked-reason={swapRow && !swapRow.is_available ? (swapBlockCode ?? swapRow.blocking_reason ?? undefined) : swapNeedsManager ? 'not_permitted' : undefined}
+                          disabled={!swapRow?.is_available}
+                          onClick={() => {
+                            setSwapOldCode(primaryAsset ? (primaryAsset.asset_code_display ?? primaryAsset.asset_code) : null);
+                            setSwapOpen(true);
+                          }}
+                        >
+                          {t(swapRow?.action_code === 'SWAP_DEVICE_COMPANY' ? 'swapDevice.buttonCompany' : 'swapDevice.button')}
+                        </Button>
+                      </span>
+                    </Tooltip>
+                  )}
+                  {unbindWaitsForDeadline && (
+                    <Tooltip content={blockingReasonText({ blocking_reason: unbindRow!.blocking_reason ?? null, blocking_params: unbindRow!.blocking_params }, t)}>
+                      <span className="inline-flex">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          color="danger"
+                          startIcon={<Link2Off size={14} />}
+                          data-action="UNBIND_DEVICE"
+                          data-blocked-reason={unbindRow!.blocking_reason ?? undefined}
+                          disabled
+                        >
+                          {t('contract.action_unbind_device')}
+                        </Button>
+                      </span>
+                    </Tooltip>
+                  )}
                   {canDo('CUSTOMER_DEPOSIT_DEVICE') && (
                     <Button
                       size="sm"
@@ -444,6 +557,18 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
                     </Button>
                   )}
                 </div>
+                {/* Why the swap can't be pressed, said before anyone presses it — and when
+                    the shop already submitted its close-out, the withdraw button right here (§5b). */}
+                {swapBlockCode && (
+                  <div className="mt-2">
+                    <SwapProblemBox
+                      problem={{ code: swapBlockCode, params: swapRow?.blocking_params ?? {} }}
+                      contractId={contract.id}
+                      tone="warning"
+                    />
+                  </div>
+                )}
+                </>
               )}
             </div>
           ) : (
@@ -453,6 +578,18 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
                 {/* Undo an accidental unbind — brings the just-removed device back
                     through the real inventory path. Only offered while the undo
                     window is open (backend readiness check). PIN required. */}
+                {/* After a not-collected deposit was unbound the undo stays greyed
+                    (mig 1724): the device was at the branch, not with the customer,
+                    so a customer turning up later is the office's call. */}
+                {undoCheck?.reason === 'UNDO_NOT_ALLOWED_AFTER_DEPOSIT' && (
+                  <Tooltip content={t('deposit.notCollected.undoBlocked')}>
+                    <span className="inline-flex">
+                      <Button size="sm" variant="outline" startIcon={<Undo2 size={14} />} disabled>
+                        {t('contract.action_unbind_undo')}
+                      </Button>
+                    </span>
+                  </Tooltip>
+                )}
                 {undoCheck?.allowed && (
                   <Button
                     size="sm"
@@ -704,21 +841,23 @@ export function DeviceTab({ contract, onRequestAction }: DeviceTabProps) {
             oldValue={fixIdentifier?.oldValue ?? ''}
             isApple={isAppleBrand(primaryAsset.brand_name)}
             onSuccess={() => {
-              setFixIdentifier(null);
+              // The modal stays open on its done view; refresh what shows the number.
               queryClient.invalidateQueries({ queryKey: ['asset-summary', contract.device_id] });
-              addSnackbar({
-                message: (
-                  <div className="alert alert-success">
-                    <CheckCircle size={16} />
-                    <span>{t('contract.identifierCorrectSuccess', { defaultValue: 'Identifier corrected' })}</span>
-                  </div>
-                ),
-                type: 'success',
-              });
+              queryClient.invalidateQueries({ queryKey: ['contract-detail', contract.id] });
             }}
           />
         </>
       )}
+
+      {/* Outside the bound-device block: after the swap the device changes and that
+          block re-renders, while this window stays on its done view. */}
+      <SwapDeviceModal
+        open={swapOpen}
+        onClose={() => setSwapOpen(false)}
+        contract={contract}
+        action={(swapRow?.action_code as SwapAction | undefined) ?? 'SWAP_DEVICE'}
+        oldDeviceCode={swapOldCode}
+      />
 
       <UndoUnbindModal
         open={undoUnbindOpen}
@@ -977,23 +1116,38 @@ function CorrectIdentifierModal({
   oldValue: string;
   // Apple serials are 10 or 12 characters; other brands 6-20 (mig 1357).
   isApple: boolean;
+  /** Refresh the host's data; the modal stays open on its done view. */
   onSuccess: () => void;
 }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [newValue, setNewValue] = useState('');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [done, setDone] = useState<{ newValue: string; resynced: ResyncedSigning[] } | null>(null);
+  const [confirmClose, setConfirmClose] = useState(false);
 
-  // Reset fields each time the modal opens for a fresh target.
-  const [seenOld, setSeenOld] = useState<string | null>(null);
-  if (open && seenOld !== oldValue) {
-    setSeenOld(oldValue);
+  // Reset fields each time the modal opens for a fresh target. Keyed on `open`
+  // (not on the old value) so the done view survives the host refetching the
+  // asset with its new number.
+  const [seenOpen, setSeenOpen] = useState(false);
+  if (open && !seenOpen) {
+    setSeenOpen(true);
     setNewValue('');
     setNote('');
     setError('');
+    setDone(null);
+    setConfirmClose(false);
   }
-  if (!open && seenOld !== null) setSeenOld(null);
+  if (!open && seenOpen) setSeenOpen(false);
+
+  const isDirty = newValue.trim() !== '' || note.trim() !== '';
+  const handleClose = () => {
+    if (saving) return;
+    if (!done && isDirty) { setConfirmClose(true); return; }
+    onClose();
+  };
 
   const isImei = type === 'IMEI';
   const trimmed = newValue.trim();
@@ -1009,7 +1163,7 @@ function CorrectIdentifierModal({
     setSaving(true);
     setError('');
     try {
-      await apiClient.rpc('fn_inv_identifier_correct', {
+      const res = await apiClient.rpc<{ resynced_signings?: ResyncedSigning[] | null }>('fn_inv_identifier_correct', {
         p_asset_id: assetId,
         p_identifier_type: type,
         p_old_value: oldValue,
@@ -1017,6 +1171,7 @@ function CorrectIdentifierModal({
         p_note: note.trim() || null,
         p_branch_id: branchId,
       });
+      setDone({ newValue: trimmed, resynced: res?.resynced_signings ?? [] });
       onSuccess();
     } catch (err) {
       if (err instanceof ApiError) {
@@ -1033,13 +1188,28 @@ function CorrectIdentifierModal({
   const label = isImei ? 'IMEI' : t('contract.serialNumber', { defaultValue: 'Serial number' });
 
   return (
-    <Modal open={open} onClose={onClose} maxWidth="26rem" width="100%">
+    <>
+    <Modal open={open} onClose={handleClose} maxWidth="26rem" width="100%">
       <div className="modal-header">
         <h2 className="modal-title">
           {t('contract.identifierCorrectTitle', { defaultValue: 'Correct {{label}}', label })}
         </h2>
-        <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+        <button type="button" className="modal-close-btn" onClick={handleClose} aria-label="Close">&times;</button>
       </div>
+      {done ? (
+        <ActionDoneView
+          headline={t('contract.identifierCorrectSuccess')}
+          contractCode={label}
+          detailRows={[
+            { label: t('contract.identifierCorrectOld'), value: <span className="font-mono">{oldValue}</span> },
+            { label: t('contract.identifierCorrectNewValue'), value: <span className="font-mono">{done.newValue}</span>, emphasis: true },
+          ]}
+          extras={<IdentifierResyncNotice signings={done.resynced} onNavigate={onClose} />}
+          secondaryAction={resyncPrintAction(done.resynced, t, (to) => { onClose(); navigate(to); })}
+          onClose={onClose}
+        />
+      ) : (
+      <>
       <div className="modal-content">
         <div className="form-grid">
           <div className="flex flex-col">
@@ -1063,7 +1233,7 @@ function CorrectIdentifierModal({
       </div>
       <ModalErrorBand message={error} onDismiss={() => setError('')} />
       <div className="modal-footer">
-        <Button onClick={onClose} disabled={saving}>{t('common.cancel')}</Button>
+        <Button onClick={handleClose} disabled={saving}>{t('common.cancel')}</Button>
         <Button
           color="primary"
           onClick={handleSave}
@@ -1073,6 +1243,17 @@ function CorrectIdentifierModal({
           {saving ? t('common.loading') : t('common.save')}
         </Button>
       </div>
+      </>
+      )}
     </Modal>
+    <Modal open={confirmClose} onClose={() => setConfirmClose(false)} maxWidth="24rem" width="100%">
+      <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
+      <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={() => setConfirmClose(false)}>{t('common.cancel')}</Button>
+        <Button color="danger" onClick={() => { setConfirmClose(false); onClose(); }}>{t('common.discard')}</Button>
+      </div>
+    </Modal>
+    </>
   );
 }

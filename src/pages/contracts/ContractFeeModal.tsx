@@ -88,11 +88,22 @@ interface BillCreateResult {
   status?: string;
 }
 
-export function ContractFeeModal({ open, contract, onClose, onSuccess }: {
+export interface ContractFeePreset {
+  chargeType: string;
+  amount: number;
+  description: string;
+  method: PaymentMethod;
+}
+
+export function ContractFeeModal({ open, contract, onClose, onSuccess, preset }: {
   open: boolean;
   contract: ContractForFee | null;
   onClose: () => void;
   onSuccess: () => void;
+  /** Opens with one line already in the cart and paid in full by `method` — e.g.
+   *  keeping a not-collected deposit's insurance as a service charge. Staff still
+   *  review and confirm; nothing is sent until they do. */
+  preset?: ContractFeePreset;
 }) {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
@@ -170,6 +181,19 @@ export function ContractFeeModal({ open, contract, onClose, onSuccess }: {
     staleTime: 5 * 60 * 1000,
   });
 
+
+  // Seed the preset once per opening, after the charge types arrive (the line
+  // needs its owner from them). Skipped if the type is not addable here.
+  const presetSeeded = useRef(false);
+  useEffect(() => { if (open) presetSeeded.current = false; }, [open]);
+  useEffect(() => {
+    if (!open || !preset || presetSeeded.current || preset.amount <= 0) return;
+    const row = chargeTypes.find(c => c.charge_type === preset.chargeType);
+    if (!row) return;
+    presetSeeded.current = true;
+    setLines([{ id: nextLineId(), charge_type: row.charge_type, owner_type: row.owner_type, description: preset.description, amount: preset.amount }]);
+    setPayments([{ method: preset.method, amount: preset.amount, bank_account_id: null }]);
+  }, [open, preset, chargeTypes]);
 
   const chargeLabel = (row: { name_th: string; name_en: string; charge_type: string }) =>
     (i18n.language === 'th' ? row.name_th : row.name_en) || row.charge_type;

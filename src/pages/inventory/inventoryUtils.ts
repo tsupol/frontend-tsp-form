@@ -28,6 +28,7 @@ export const BUCKET_CONFIG: Record<string, { labelKey: string; color: BucketBadg
   DAMAGED_SCRAP_PENDING: { labelKey: 'inventory.damagedScrap', color: 'danger' },
   // Customer
   WITH_CUSTOMER_ACTIVE: { labelKey: 'inventory.withCustomer', color: 'primary' },
+  DEPOSITED_BY_CUSTOMER: { labelKey: 'inventory.depositedByCustomer', color: 'info' },
   REPOSSESSED_PENDING_CLEARANCE: { labelKey: 'inventory.repossessed', color: 'warning' },
   LOANED_OUT: { labelKey: 'inventory.loanedOut', color: 'info' },
   // Exit

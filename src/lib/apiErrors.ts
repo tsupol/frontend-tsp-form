@@ -100,6 +100,10 @@ export function prepareErrorParams(
   if (typeof params.existing_bucket === 'string') {
     params.existing_bucket = getBucketLabel(params.existing_bucket, t as (k: string) => string);
   }
+  // mig 1724 DEPOSIT_NOT_YET_DUE ships the pickup deadline as a bare date.
+  if (typeof params.deposit_deadline === 'string') {
+    params.deposit_deadline = formatDateTime(params.deposit_deadline, i18n.language, false);
+  }
   // BRANCH_TYPE_NOT_ALLOWED_FOR_COMPANY_TYPE ships the allowed types as an array
   // of codes. i18next would interpolate that as "INTERNAL,EXTERNAL"; the sentence
   // exists to tell the user which branch types they CAN pick, so translate each

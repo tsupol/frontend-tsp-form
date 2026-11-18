@@ -33,6 +33,7 @@ import {
   usePartnerSettlementStatusRef,
 } from './usePartnerSettlements';
 import { PartnerSettlementReturnModal } from './PartnerSettlementReturnModal';
+import { DeviceSwapNotice } from './DeviceSwapFlag';
 import { PartnerSettlementCheckModal } from './PartnerSettlementCheckModal';
 import {
   settlementStatusColor,
@@ -146,7 +147,9 @@ export function PartnerSettlementReviewPanel({
   const submitSnapshot = [...logRows]
     .reverse()
     .find(r => r.action_code === 'CLOSE_SUBMIT')?.check_snapshot ?? null;
-  const deviceId = submitSnapshot?.device_id ?? null;
+  // The device bound now (mig 1700) wins over the one at submit: after a swap the
+  // MDM check must be on the new device.
+  const deviceId = detail.device_id ?? submitSnapshot?.device_id ?? null;
 
   const lines = detail.lines ?? [];
   const showBuildPayout = isChecked && detail.status === 'CLOSE_SUBMITTED' && canPayPartners;
@@ -181,6 +184,8 @@ export function PartnerSettlementReviewPanel({
           productName={productName ?? null}
           onOpenContract={() => navigate(`/admin/contracts/search/${detail.contract_id}`)}
         />
+
+        <DeviceSwapNotice row={detail} />
 
         <AmountsBlock detail={detail} lines={lines} />
 

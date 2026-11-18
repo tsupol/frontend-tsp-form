@@ -29,6 +29,7 @@ import {
   type SettlementQueueTab,
 } from './usePartnerSettlements';
 import { PartnerSettlementReviewPanel } from './PartnerSettlementReviewPanel';
+import { DeviceSwapBadge } from './DeviceSwapFlag';
 import {
   settlementStatusColor,
   type PartnerSettlementQueueRow,
@@ -325,6 +326,7 @@ function QueueRow({ row, tab, statusLabel, onPick, onOpenPayout, onOpenAccountSe
         {row.product_display_name && (
           <div className="text-xs text-subtle mt-0.5 truncate">{row.product_display_name}</div>
         )}
+        <DeviceSwapBadge row={row} />
 
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
           {row.close_submitted_at && (

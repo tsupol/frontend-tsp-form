@@ -271,6 +271,15 @@
     --color-badge-outline-danger-border: var(--color-danger);
     --color-badge-outline-warning-border: var(--color-warning);
     --color-badge-outline-info-border: var(--color-info);
+    /* Outline badge text is text: the -fg colour, not the fill. Unset, the
+       library falls back to the fill (#2333d6 primary in dark — dim on the page).
+       Trial here; moves into tsp-form with the next library release. */
+    --color-badge-outline-primary-fg: var(--color-primary-fg);
+    --color-badge-outline-secondary-fg: var(--color-secondary-fg);
+    --color-badge-outline-success-fg: var(--color-success-fg);
+    --color-badge-outline-danger-fg: var(--color-danger-fg);
+    --color-badge-outline-warning-fg: var(--color-warning-fg);
+    --color-badge-outline-info-fg: var(--color-info-fg);
 }
 
 /* Declare which scheme is actually in force, so browsers with their own dark

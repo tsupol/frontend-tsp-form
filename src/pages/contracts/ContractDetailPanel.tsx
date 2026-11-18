@@ -318,6 +318,7 @@ export function ContractDetailPanel({ contractId, isMobile }: { contractId: numb
   const [requestedAction, setRequestedAction] = useState<
     | 'bind_device'
     | 'unbind_device'
+    | 'late_fee_collect'
     | 'deposit_device'
     | 'return_deposit'
     | 'loan_assign'

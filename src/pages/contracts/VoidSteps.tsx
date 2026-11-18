@@ -6,6 +6,7 @@
 
 import { useTranslation } from 'react-i18next';
 import { ExternalLink } from 'lucide-react';
+import { Badge } from 'tsp-form';
 import { fmtCurrency } from '../../lib/format';
 import type { VoidStep, VoidStepTarget } from './voidStepData';
 
@@ -42,7 +43,9 @@ export function VoidStepsList({ steps, onGo }: { steps: VoidStep[]; onGo?: (targ
         const target = targetOf(s);
         return (
           <li key={`${s.step}-${i}`} className="flex items-start gap-2 text-sm" data-step={s.step}>
-            <span className="shrink-0 w-5 h-5 rounded-full border border-warning-border bg-warning-soft text-warning-fg text-xs font-semibold inline-flex items-center justify-center">{i + 1}</span>
+            {/* Badge carries the theme's --text-shift-y, so the digit sits centred
+                in Noto Sans Thai; a hand-made circle left it ~1px high. */}
+            <Badge size="sm" color="warning" className="w-5 h-5 px-0 shrink-0 font-semibold">{i + 1}</Badge>
             <div className="min-w-0 flex flex-col gap-0.5">
               <span className="font-medium">{text(s)}</span>
               {target && onGo ? (

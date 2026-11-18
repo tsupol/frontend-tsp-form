@@ -44,6 +44,7 @@ import { AppointmentCreateModal, AppointmentCancelModal } from './AppointmentMod
 import { TransferBranchModal } from './TransferBranchModal';
 import { ActionDoneView, type ActionDoneDetailRow } from './ActionDoneView';
 import { VoidStepsList } from './VoidSteps';
+import { getBucketLabel } from '../inventory/inventoryUtils';
 import { voidStepsOf, type VoidStep } from './voidStepData';
 import { ModalErrorBand } from '../../components/ModalErrorBand';
 import { BillDayBlockedNotice } from '../../components/BillDayPreview';
@@ -92,6 +93,8 @@ interface ContractForActions {
   is_used_asset?: boolean;
   target_asset_condition_grade?: string | null;
   outstanding_amount: number | null;
+  /** A device deposited at the branch (mig 674); unbinding it can't be undone (mig 1724). */
+  is_device_deposited?: boolean;
   late_fee_balance: number | null;
   credit_balance: number | null;
   credit_balance_company: number | null;
@@ -660,7 +663,7 @@ const FOOTER_ACTION_ALLOWLIST: ReadonlySet<string> = new Set([
   // FEE
   'LATE_FEE_COLLECT', 'SERVICE_CHARGE', 'SAVING_DEDUCT',
   // DEVICE
-  'BIND_DEVICE', 'UNBIND_DEVICE',
+  'BIND_DEVICE', 'UNBIND_DEVICE', 'SWAP_DEVICE', 'SWAP_DEVICE_COMPANY',
   'CUSTOMER_DEPOSIT_DEVICE', 'RETURN_DEPOSIT',
   'REPOSSESS', 'LOAN_ASSIGN', 'LOAN_RETURN', 'DEVICE_REPAIR_REQUEST',
   // CUSTOMER (contract-scoped only)
@@ -706,6 +709,8 @@ const ELSEWHERE_TAB: Record<string, 'overview' | 'device' | 'notes' | 'customers
   REMOVE_CO_LESSEE: 'customers',
   BIND_DEVICE: 'device',
   UNBIND_DEVICE: 'device',
+  SWAP_DEVICE: 'device',
+  SWAP_DEVICE_COMPANY: 'device',
   CUSTOMER_DEPOSIT_DEVICE: 'device',
   RETURN_DEPOSIT: 'device',
   LOAN_ASSIGN: 'device',
@@ -755,6 +760,8 @@ const ACTION_PLACEMENT: Record<string, ActionPlacement> = {
   // Device ops live in the Device tab
   BIND_DEVICE:           { kind: 'elsewhere', where: 'Device tab' },
   UNBIND_DEVICE:         { kind: 'elsewhere', where: 'Device tab' },
+  SWAP_DEVICE:           { kind: 'elsewhere', where: 'Device tab' },
+  SWAP_DEVICE_COMPANY:   { kind: 'elsewhere', where: 'Device tab' },
   CUSTOMER_DEPOSIT_DEVICE: { kind: 'elsewhere', where: 'Device tab' },
   RETURN_DEPOSIT:        { kind: 'elsewhere', where: 'Device tab' },
   LOAN_ASSIGN:           { kind: 'elsewhere', where: 'Device tab' },
@@ -1044,6 +1051,9 @@ export function ContractActionButtons({ contract, onRefresh, requestedAction, on
     .filter(a => FOOTER_ACTION_ALLOWLIST.has(a.action_code))
     .filter(a => a.blocking_reason !== 'permission_denied')
     .filter(a => a.is_permitted !== false)
+    // The device swap exists only on deal-partner contracts; elsewhere the
+    // backend lists it blocked as branch_type_not_match.
+    .filter(a => !(a.action_code.startsWith('SWAP_DEVICE') && a.blocking_reason === 'branch_type_not_match'))
     // mig 1673: one button for the amend window — the down payment action shows on its own
     // only for someone who cannot amend the instalments (a shop manager).
     .filter(a => !(a.action_code === 'ADJUST_DOWN_PAYMENT' && downMerged))
@@ -1556,7 +1566,7 @@ interface Branch {
   name: string;
 }
 
-interface Asset {
+export interface Asset {
   asset_id: number;
   asset_code: string;
   asset_code_display: string | null;
@@ -1574,7 +1584,7 @@ interface Asset {
   box_branch_name: string | null;
 }
 
-function AssetSummaryLines({ asset, dense, contractBranchId }: { asset: Asset; dense?: boolean; contractBranchId?: number | null }) {
+export function AssetSummaryLines({ asset, dense, contractBranchId }: { asset: Asset; dense?: boolean; contractBranchId?: number | null }) {
   const { t } = useTranslation();
   const code = asset.asset_code_display ?? asset.asset_code;
   const headlineParts = [asset.family_name, asset.model_name, asset.physical_color].filter(Boolean);
@@ -1899,6 +1909,9 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
       if (pinNeeded && pin) params.p_pin = pin;
       if (config.needsNote && note.trim()) params.p_note = note.trim();
       if (config.needsReason && reason.trim()) params.p_reason = reason.trim();
+      // A deposited device the customer never collected: the work order's
+      // suggested reason when staff typed none (mig 1724, free text).
+      if (action === 'unbind_device' && contract.is_device_deposited && !params.p_reason) params.p_reason = 'NOT_COLLECTED';
       if (config.needsCloseReason && closeReason) params.p_close_reason = closeReason;
       if (config.needsBranch && toBranchId) params.p_to_branch_id = Number(toBranchId);
       if (config.needsDevice && deviceId) params.p_device_id = Number(deviceId);
@@ -2179,6 +2192,13 @@ function ContractActionModal({ open, action, contract, onClose, onSuccess, onNav
                 </div>
               )}
 
+              {action === 'unbind_device' && contract.is_device_deposited && (
+                <div className="alert alert-warning">
+                  <AlertTriangle size={16} />
+                  <span>{t('deposit.notCollected.unbindWarning')}</span>
+                </div>
+              )}
+
               {config.needsReason && (
                 <div className="flex flex-col">
                   <label className="form-label">{t('contract.reason')}{action === 'void' ? ' *' : ''}</label>
@@ -2253,10 +2273,15 @@ interface ContractActionFormCtx {
 
 interface AssetMovementForAction {
   txn_id?: number;
+  inventory_txn_id?: number;
   asset_id?: number;
   asset_code?: string | null;
+  asset_code_display?: string | null;
+  // The unbind RPC sends bucket_from / bucket_to; older shapes used from_/to_.
   from_bucket?: string | null;
   to_bucket?: string | null;
+  bucket_from?: string | null;
+  bucket_to?: string | null;
   to_owner_type?: string | null;
 }
 
@@ -2446,7 +2471,12 @@ function ContractActionDoneView({
           contractCode={contractCode}
           tone="neutral"
           detailRows={result.reason ? [
-            { label: t('contract.reason', { defaultValue: 'Reason' }), value: String(result.reason) },
+            {
+              label: t('contract.reason', { defaultValue: 'Reason' }),
+              // NOT_COLLECTED is the reason the screen itself sends for a deposit the
+              // customer never collected — say it in words, never the code.
+              value: result.reason === 'NOT_COLLECTED' ? t('deposit.notCollected.reasonNotCollected') : String(result.reason),
+            },
           ] : undefined}
           extras={
             movements && movements.length > 0 ? (
@@ -2454,18 +2484,22 @@ function ContractActionDoneView({
                 <div className="text-xs text-subtle mb-1.5">
                   {t('contract.action_unbind_device_done_device', { defaultValue: 'Device returned to inventory' })}
                 </div>
-                {movements.map((m, i) => (
-                  <div key={m.txn_id ?? i} className="flex items-center gap-2 text-sm">
-                    <span className="font-medium">{m.asset_code ?? `asset #${m.asset_id}`}</span>
-                    {m.from_bucket && m.to_bucket && (
+                {movements.map((m, i) => {
+                  const from = m.bucket_from ?? m.from_bucket;
+                  const to = m.bucket_to ?? m.to_bucket;
+                  return (
+                  <div key={m.inventory_txn_id ?? m.txn_id ?? i} className="flex items-center gap-2 text-sm">
+                    <span className="font-medium">{m.asset_code_display ?? m.asset_code ?? `asset #${m.asset_id}`}</span>
+                    {from && to && (
                       <>
-                        <span className="text-xs text-subtle">{m.from_bucket}</span>
+                        <span className="text-xs text-subtle">{getBucketLabel(from, t)}</span>
                         <ArrowRight size={12} className="text-subtle" />
-                        <span className="text-xs">{m.to_bucket}</span>
+                        <span className="text-xs">{getBucketLabel(to, t)}</span>
                       </>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             ) : null
           }

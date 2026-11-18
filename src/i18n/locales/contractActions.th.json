@@ -1,4 +1,6 @@
 {
+  "SWAP_DEVICE": "สลับเครื่อง",
+  "SWAP_DEVICE_COMPANY": "สลับเครื่อง (สำนักงานช่วยร้าน)",
   "SAVE_WIZARD_STEP": "บันทึกขั้นตอน",
   "CHANGE_DRAFT_OWNER": "เปลี่ยนผู้รับผิดชอบ draft",
   "SET_PRODUCT": "เลือกสินค้า",

@@ -1,3 +1,4 @@
+import type { DeviceSwapFields } from './DeviceSwapFlag';
 // Shapes of the deal-partner settlement ("ใบขอรับเงิน") views and RPCs.
 //
 // Canonical: UI_SUMMARY/140_PARTNER_SETTLEMENT.md — §1 views, §4 close-out
@@ -16,8 +17,10 @@ export type PartnerSettlementStatus =
 /** Who the settlement is waiting on. Null once it is paid or void. */
 export type PartnerSettlementWaitingOn = 'BRANCH' | 'FINANCE' | null;
 
-/** One row of `v_partner_settlement_queue` (staff finance queue). */
-export interface PartnerSettlementQueueRow {
+/** One row of `v_partner_settlement_queue` (staff finance queue). The device
+ *  fields (mig 1700) say whether the shop swapped the bound device. */
+export interface PartnerSettlementQueueRow extends DeviceSwapFields {
+  device_id?: number | null;
   settlement_id: number;
   settlement_code: string;
   contract_id: number;

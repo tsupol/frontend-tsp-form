@@ -16,6 +16,7 @@ import { buildBillActionToast, type StandardBillResponse } from '../../lib/billA
 import { useAuth } from '../../contexts/AuthContext';
 import { AssignIcloudModal, ReleaseIcloudModal, IcloudPasswordRow } from '../contracts/IcloudModals';
 import { ActionDoneView } from '../contracts/ActionDoneView';
+import { IdentifierResyncNotice, resyncPrintAction, type ResyncedSigning } from '../../components/IdentifierResyncNotice';
 import { MdmStoryBadge } from './mdm/MdmStoryBox';
 import type { AssetMdmStory } from './mdm/mdmApi';
 import { AssetScreenTimeSection } from '../../components/AssetScreenTimeSection';
@@ -33,6 +34,7 @@ import { SellExternalModal } from './SellExternalModal';
 import { SellOutRequestModal } from './SellOutRequestModal';
 import { OwnerBadge } from '../../components/OwnerBadge';
 import { ApiErrorBand } from '../../components/ApiErrorAlert';
+import { ModalErrorBand } from '../../components/ModalErrorBand';
 import type { OwnerType } from '../../lib/ownerTypes';
 import { translateApiError, blockingReasonText } from '../../lib/apiErrors';
 import { SEARCH_MIN_CHARS, isSearchable, isBelowSearchMin } from '../../lib/searchKeyword';
@@ -1093,12 +1095,18 @@ function AssetDetailPanel({
   const { user } = useAuth();
   const canCorrectVariant = ['BRANCH_MANAGER', 'COMPANY_INVENTORY', 'COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV']
     .includes(user?.role_code ?? '');
-  // INVENTORY.MODEL_CORRECT audience (NOTICE 2026-07-12, mig 585) — admin-only,
-  // crosses model families (vs correct-variant which is same-model colour only).
-  // Client-side visibility only; the RPC re-checks permission, contract-binding,
-  // category, and IMEI. Preflight also disables submit when not correctable.
-  const canCorrectModel = ['COMPANY_ADMIN', 'HOLDING_ADMIN', 'SYSTEM_DEV']
-    .includes(user?.role_code ?? '');
+  // INVENTORY.MODEL_CORRECT — crosses model families (vs correct-variant, same
+  // model colour only). Company admins, plus deal-partner shop managers for their
+  // own devices since mig 1687/1688. The permission code sits on the whole
+  // BRANCH_MANAGER role, so an ordinary shop's manager holds it too: the pencil
+  // follows the backend's preflight instead of any permission list —
+  // 403 → hidden, is_correctable=false → greyed with the reason, true → usable.
+  const { data: modelPreflight } = useQuery({
+    queryKey: ['asset-model-options', asset.asset_id],
+    queryFn: () => apiClient.rpc<ModelOptionsResponse>('fn_inv_asset_model_options', {
+      p_asset_id: asset.asset_id,
+    }),
+  });
 
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
@@ -1213,16 +1221,25 @@ function AssetDetailPanel({
       <div className="flex-none px-4 py-4 border-b border-line bg-surface flex flex-col gap-1.5 min-w-0">
         <div className="text-xs text-subtle inline-flex items-center gap-2 min-w-0">
           <span className="truncate">{[asset.brand_name, asset.family_name, asset.model_name].filter(Boolean).join(' > ')}</span>
-          {canCorrectModel && (
-            <Tooltip content={t('asset.correctModel.button', { defaultValue: 'Correct model' })}>
-              <button
-                type="button"
-                onClick={() => setCorrectModelOpen(true)}
-                className="text-subtle hover:text-fg cursor-pointer bg-transparent border-none p-0 inline-flex shrink-0"
-                aria-label={t('asset.correctModel.button', { defaultValue: 'Correct model' })}
-              >
-                <Pencil size={12} />
-              </button>
+          {modelPreflight && (
+            <Tooltip content={modelPreflight.is_correctable
+              ? t('asset.correctModel.button', { defaultValue: 'Correct model' })
+              : modelBlockReason(modelPreflight, t)}
+            >
+              {/* span: a disabled button fires no hover, so the tooltip hangs on its wrapper */}
+              <span className="inline-flex shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setCorrectModelOpen(true)}
+                  disabled={!modelPreflight.is_correctable}
+                  className={`bg-transparent border-none p-0 inline-flex ${modelPreflight.is_correctable
+                    ? 'text-subtle hover:text-fg cursor-pointer'
+                    : 'text-subtler cursor-not-allowed pointer-events-none'}`}
+                  aria-label={t('asset.correctModel.button', { defaultValue: 'Correct model' })}
+                >
+                  <Pencil size={12} />
+                </button>
+              </span>
             </Tooltip>
           )}
         </div>
@@ -1535,6 +1552,7 @@ function AssetDetailPanel({
         }}
         asset={asset}
         t={t}
+        onSaved={onRefresh}
         onSuccess={(msgKey, response) => {
           setActiveAction(null);
           setActionPreset(undefined);
@@ -1838,6 +1856,9 @@ interface ModelOptionsResponse {
   asset_id: number;
   is_correctable: boolean;
   block_reason: string | null;
+  /** Draft contracts pointing at this device (mig 1687). Correcting the model
+   *  moves them to the new model and clears their prices. */
+  draft_contracts?: { contract_id: number; contract_code: string }[];
   scope: { holding_id: number; category_id: number; family_id: number; family_name: string | null };
   current: {
     model_id: number;
@@ -1869,6 +1890,11 @@ interface ProductSearchResponse {
   has_more: boolean;
 }
 
+function modelBlockReason(p: ModelOptionsResponse, t: ReturnType<typeof useTranslation>['t']): string {
+  if (p.block_reason === 'ASSET_BOUND_TO_CONTRACT') return t('asset.correctModel.blockedContract');
+  return t('asset.correctModel.blockedGeneric');
+}
+
 interface ModelVariantRow {
   variant_id: number;
   sku_code: string;
@@ -1898,10 +1924,14 @@ function CorrectModelModal({
   const [error, setError] = useState('');
   const [confirmClose, setConfirmClose] = useState(false);
   const [savedName, setSavedName] = useState('');
+  const [repriced, setRepriced] = useState<{ contract_id: number; contract_code: string }[]>([]);
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (open) {
       setView('form');
+      setRepriced([]);
       setModelQuery('');
       setDebouncedQuery('');
       setScopeAllFamilies(false);
@@ -1965,14 +1995,23 @@ function CorrectModelModal({
     setSelectedVariant(null);
   };
 
-  // Colour/SKU list for the chosen model.
-  const { data: variants, isFetching: variantsLoading } = useQuery({
+  // Colour/SKU list for the chosen model. A deal-partner shop session can't read
+  // v_product_variant_list (42501, mig 1687 notes §5) — it falls back to the
+  // search row's own variants[], which carry the name but no swatch colour.
+  const { data: variantRows, isFetching: variantsLoading, isError: variantsDenied } = useQuery({
     queryKey: ['asset-model-variant-list', selectedModel?.model_id],
     queryFn: () => apiClient.get<ModelVariantRow[]>(
       `/v_product_variant_list?model_id=eq.${selectedModel!.model_id}&is_active=eq.true&order=sku_code`,
     ),
     enabled: open && selectedModel != null,
+    retry: false,
   });
+  const variants: ModelVariantRow[] | undefined = variantsDenied
+    ? (selectedModel?.variants ?? []).filter(v => v.is_active).map(v => ({
+        variant_id: v.variant_id, sku_code: v.sku_code, item_name: v.name,
+        manufacturer_color: null, master_color_hex: null, master_color_name_en: null, is_active: true,
+      }))
+    : variantRows;
 
   const isDirty = selectedModel != null || selectedVariant != null || note.trim() !== '';
   const forceClose = () => { setConfirmClose(false); onClose(); };
@@ -1983,7 +2022,11 @@ function CorrectModelModal({
   };
 
   const mutation = useMutation({
-    mutationFn: () => apiClient.rpc<{ product_display_name: string | null; new: { model_code: string; sku_code: string } }>(
+    mutationFn: () => apiClient.rpc<{
+      product_display_name: string | null;
+      new: { model_code: string; sku_code: string };
+      contracts_repriced?: { contract_id: number; contract_code: string }[];
+    }>(
       'fn_inv_asset_correct_model',
       {
         p_asset_id: asset.asset_id,
@@ -1994,6 +2037,8 @@ function CorrectModelModal({
     ),
     onSuccess: (res) => {
       setSavedName(res?.product_display_name ?? selectedModel?.model_name ?? '');
+      setRepriced(res?.contracts_repriced ?? []);
+      queryClient.invalidateQueries({ queryKey: ['asset-model-options', asset.asset_id] });
       onSuccess();
       setView('done');
     },
@@ -2033,10 +2078,15 @@ function CorrectModelModal({
                 </div>
               </div>
 
-              {error && (
-                <div className="alert alert-danger mb-4">
-                  <XCircle size={18} />
-                  <div><div className="alert-description">{error}</div></div>
+              {preflight?.is_correctable && (preflight.draft_contracts?.length ?? 0) > 0 && (
+                <div className="alert alert-warning mb-4">
+                  <AlertTriangle size={18} />
+                  <div>
+                    <div className="alert-title">
+                      {t('asset.correctModel.draftTitle', { codes: preflight.draft_contracts!.map(c => c.contract_code).join(', ') })}
+                    </div>
+                    <div className="alert-description">{t('asset.correctModel.draftBody')}</div>
+                  </div>
                 </div>
               )}
 
@@ -2049,11 +2099,7 @@ function CorrectModelModal({
                   <AlertTriangle size={18} />
                   <div>
                     <div className="alert-title">{t('asset.correctModel.blockedTitle', { defaultValue: 'Cannot change model' })}</div>
-                    <div className="alert-description">
-                      {preflight.block_reason === 'ASSET_BOUND_TO_CONTRACT'
-                        ? t('asset.correctModel.blockedContract', { defaultValue: "This device is bound to a contract — its model can't be changed. Void or re-sign the contract first." })
-                        : (preflight.block_reason ?? t('asset.correctModel.blockedGeneric', { defaultValue: "This device's model cannot be changed." }))}
-                    </div>
+                    <div className="alert-description">{modelBlockReason(preflight, t)}</div>
                   </div>
                 </div>
               )}
@@ -2121,10 +2167,13 @@ function CorrectModelModal({
                                   active ? 'border-primary-fg bg-primary-soft' : 'border-line hover:bg-surface-hover cursor-pointer'
                                 }`}
                               >
-                                <ColorSwatch hex={v.master_color_hex} title={v.master_color_name_en ?? undefined} />
+                                {v.master_color_hex && <ColorSwatch hex={v.master_color_hex} title={v.master_color_name_en ?? undefined} />}
                                 <div className="min-w-0 flex-1">
                                   <div className="text-sm truncate">{v.master_color_name_en ?? v.manufacturer_color ?? v.item_name}</div>
-                                  <div className="text-xs text-subtler truncate">{v.item_name}</div>
+                                  {/* The shop's fallback list has only the item name — don't print it twice. */}
+                                  {(v.master_color_name_en ?? v.manufacturer_color) && (
+                                    <div className="text-xs text-subtler truncate">{v.item_name}</div>
+                                  )}
                                 </div>
                               </button>
                             );
@@ -2142,6 +2191,7 @@ function CorrectModelModal({
                 </>
               )}
             </div>
+            <ModalErrorBand message={error} onDismiss={() => setError('')} />
             <div className="modal-footer">
               <Button variant="ghost" onClick={handleClose} disabled={mutation.isPending}>{t('common.cancel')}</Button>
               <Button
@@ -2165,6 +2215,34 @@ function CorrectModelModal({
                 ? [{ label: t('asset.correctModel.colour', { defaultValue: 'Colour' }), value: selectedVariantRow.master_color_name_en ?? selectedVariantRow.manufacturer_color ?? selectedVariantRow.item_name }]
                 : []),
             ]}
+            extras={repriced.length > 0 ? (
+              <div className="alert alert-warning items-start">
+                <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+                <div className="flex flex-col gap-1 min-w-0">
+                  <span className="font-medium">
+                    {t('asset.correctModel.repricedTitle', { codes: repriced.map(c => c.contract_code).join(', ') })}
+                  </span>
+                  <span className="text-xs">{t('asset.correctModel.repricedBody')}</span>
+                  {repriced.length > 1 && repriced.map(c => (
+                    <Link
+                      key={c.contract_id}
+                      to={`/admin/contracts/new/${c.contract_id}`}
+                      onClick={(e) => { if (!e.ctrlKey && !e.metaKey) onClose(); }}
+                      className="text-sm font-medium text-primary-fg hover:underline inline-flex items-center gap-1"
+                    >
+                      {c.contract_code}
+                      <ExternalLink size={12} />
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ) : undefined}
+            secondaryAction={repriced.length === 1 ? {
+              label: t('asset.correctModel.repricedGo'),
+              to: `/admin/contracts/new/${repriced[0].contract_id}`,
+              onClick: () => { onClose(); navigate(`/admin/contracts/new/${repriced[0].contract_id}`); },
+              isNextStep: true,
+            } : undefined}
             onClose={onClose}
           />
         )}
@@ -2986,6 +3064,7 @@ function AssetActionModal({
   asset,
   t,
   onSuccess,
+  onSaved,
 }: {
   open: boolean;
   action: BackendAssetAction | null;
@@ -2994,11 +3073,27 @@ function AssetActionModal({
   asset: Asset;
   t: ReturnType<typeof useTranslation>['t'];
   onSuccess: (msgKey: string, response: Partial<StandardBillResponse>) => void;
+  /** Refresh only — for actions that stay open on a done view (identifier correct). */
+  onSaved?: () => void;
 }) {
   const { i18n } = useTranslation();
+  const navigate = useNavigate();
   const [reason, setReason] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [extra, setExtra] = useState<Record<string, string>>({});
+  const [initialExtra, setInitialExtra] = useState<Record<string, string>>({});
+  const [confirmClose, setConfirmClose] = useState(false);
+  // fn_inv_identifier_correct stays open on a done view: when the device is bound
+  // to an unfinished contract, its sealed documents were rewritten to the new
+  // number (mig 1722) and the shop has to print them again.
+  const [identifierDone, setIdentifierDone] = useState<{
+    oldValue: string; newValue: string; resynced: ResyncedSigning[];
+  } | null>(null);
+  // Own effect, keyed on `open` only: the form-reset effect below also re-runs
+  // when the asset refetches after the save, which must not wipe the done view.
+  useEffect(() => {
+    if (open) { setIdentifierDone(null); setConfirmClose(false); }
+  }, [open]);
   // Holds the caught error itself, so ApiErrorBand can offer a link to the
   // conflicting asset when the backend names one.
   const [error, setError] = useState<unknown>(null);
@@ -3069,8 +3164,16 @@ function AssetActionModal({
       });
       if (presetExtra) Object.assign(initial, presetExtra);
       setExtra(initial);
+      setInitialExtra(initial);
     }
   }, [open, config, presetExtra, asset]);
+
+  const isDirty = !!reason || note.trim() !== ''
+    || Object.keys({ ...extra, ...initialExtra }).some(k => (extra[k] ?? '') !== (initialExtra[k] ?? ''));
+  const handleClose = () => {
+    if (!identifierDone && isDirty) { setConfirmClose(true); return; }
+    onClose();
+  };
 
   const isFieldFilled = (name: string) => {
     const v = extra[name];
@@ -3156,7 +3259,20 @@ function AssetActionModal({
 
       return apiClient.rpc<Partial<StandardBillResponse>>(config.rpc, params);
     },
-    onSuccess: (data) => onSuccess(config!.successKey, data),
+    onSuccess: (data) => {
+      if (config!.rpc === 'fn_inv_identifier_correct') {
+        let oldValue = '';
+        try { oldValue = (JSON.parse(extra.p_old_value ?? '') as { value: string }).value; } catch { /* keep '' */ }
+        setIdentifierDone({
+          oldValue,
+          newValue: (extra.p_new_value ?? '').trim(),
+          resynced: (data as { resynced_signings?: ResyncedSigning[] | null }).resynced_signings ?? [],
+        });
+        onSaved?.();
+        return;
+      }
+      onSuccess(config!.successKey, data);
+    },
     // Keep the error object, not just its message: ApiErrorBand reads
     // `existing_asset_id` off an identifier conflict to link to that asset.
     onError: (err) => setError(err),
@@ -3174,13 +3290,28 @@ function AssetActionModal({
 
   // Modal stays mounted; inner content only renders when action+config are present.
   return (
-    <Modal open={open && !!action && !!config} onClose={onClose} maxWidth="28rem" width="100%">
+    <>
+    <Modal open={open && !!action && !!config} onClose={handleClose} maxWidth="28rem" width="100%">
       {action && config ? (
       <div className="flex flex-col overflow-hidden">
         <div className="modal-header">
           <h2 className="modal-title">{label}</h2>
-          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">&times;</button>
+          <button type="button" className="modal-close-btn" onClick={handleClose} aria-label="Close">&times;</button>
         </div>
+        {identifierDone ? (
+          <ActionDoneView
+            headline={t('contract.identifierCorrectSuccess')}
+            contractCode={codeDisplay(asset.asset_code_display, asset.asset_code)}
+            detailRows={[
+              { label: t('contract.identifierCorrectOld'), value: <span className="font-mono">{identifierDone.oldValue}</span> },
+              { label: t('contract.identifierCorrectNewValue'), value: <span className="font-mono">{identifierDone.newValue}</span>, emphasis: true },
+            ]}
+            extras={<IdentifierResyncNotice signings={identifierDone.resynced} onNavigate={onClose} />}
+            secondaryAction={resyncPrintAction(identifierDone.resynced, t, (to) => { onClose(); navigate(to); })}
+            onClose={onClose}
+          />
+        ) : (
+        <>
         <div className="modal-content">
           <div className="mb-4 px-3 py-2.5 rounded-md bg-surface border border-line">
             <div className="font-medium text-sm">{codeDisplay(asset.asset_code_display, asset.asset_code)}</div>
@@ -3384,7 +3515,7 @@ function AssetActionModal({
         </div>
         <ApiErrorBand error={error} onDismiss={() => setError(null)} />
         <div className="modal-footer">
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button onClick={handleClose}>{t('common.cancel')}</Button>
           <Button
             color={config.color}
             onClick={() => mutation.mutate()}
@@ -3393,9 +3524,20 @@ function AssetActionModal({
             {mutation.isPending ? t('common.loading') : label}
           </Button>
         </div>
+        </>
+        )}
       </div>
       ) : null}
     </Modal>
+    <Modal open={confirmClose} onClose={() => setConfirmClose(false)} maxWidth="24rem" width="100%">
+      <div className="modal-header"><h2 className="modal-title">{t('common.unsavedChanges')}</h2></div>
+      <div className="modal-content"><p>{t('common.unsavedChangesMessage')}</p></div>
+      <div className="modal-footer">
+        <Button variant="ghost" onClick={() => setConfirmClose(false)}>{t('common.cancel')}</Button>
+        <Button color="danger" onClick={() => { setConfirmClose(false); onClose(); }}>{t('common.discard')}</Button>
+      </div>
+    </Modal>
+    </>
   );
 }
 
