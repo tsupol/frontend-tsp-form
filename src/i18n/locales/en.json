@@ -9796,6 +9796,27 @@
     "withdrawHint": "The submission comes back to you: the photos unlock and the contract can be cancelled again. You can submit again afterwards."
   },
   "signing": {
+    "clearLessee": {
+      "button": "Clear signature",
+      "title": "Clear customer signature",
+      "signedAt": "signed",
+      "hintReopens": "This document goes back to \"Collecting signatures\" so the customer signs the same document again. The text does not change, the old signature is kept as evidence, and the customer is told in chat.",
+      "hintCollecting": "Only the customer's slot is cleared so they sign the same document again. The old signature is kept as evidence, and the customer is told in chat.",
+      "reasonLabel": "Reason",
+      "reason_WRONG_SIGNER": "Wrong person signed",
+      "reason_BAD_SIGNATURE": "Signature incomplete",
+      "reason_BLANK_SIGNATURE": "Blank signature (saved before signing)",
+      "reason_HANDOVER_WRONG": "Handover items wrong (box / cable / charger)",
+      "reason_OTHER": "Other",
+      "noteLabel": "Note",
+      "notePlaceholder": "e.g. the signature is smudged",
+      "submit": "Clear signature",
+      "doneHeadline": "Customer signature cleared",
+      "customer": "Customer",
+      "next": "Next",
+      "nextValue": "Customer signs again",
+      "resign": "Have the customer sign again"
+    },
     "empty": "No signings yet",
     "auditToggle": "Show system events",
     "auditToggleHint": "Includes signings auto-voided by bill cancel / unbind / detach. Off by default.",

@@ -1520,5 +1520,12 @@
   "blockingReason.void_steps_pending": "มีขั้นที่ต้องทำก่อน — กดเพื่อดูรายการ",
   "blockingReason.void_blocked_wallet_paid": "บิลเปิดสัญญาจ่ายด้วยเงินออม ยกเลิกในวันเองไม่ได้",
   "blockingReason.void_blocked_down_refund": "สัญญานี้ลดดาวน์ไปแล้ว ยกเลิกในวันเองไม่ได้",
-  "blockingReason.terminate_use_void_same_day": "สัญญาเปิดวันนี้ ใช้ “ยกเลิกในวัน” แทน"
+  "blockingReason.terminate_use_void_same_day": "สัญญาเปิดวันนี้ ใช้ “ยกเลิกในวัน” แทน",
+  "SALE.STATE.SIGNING_CLEAR_UNSUPPORTED_DOCUMENT": "ล้างลายเซ็นได้เฉพาะสัญญาเช่าและใบรับเครื่อง",
+  "SALE.STATE.SIGNING_CLEAR_DOCUMENT_NOT_ACTIVE": "เอกสารนี้ถูกยกเลิกหรือมีฉบับใหม่แทนแล้ว",
+  "SALE.STATE.SIGNING_CLEAR_CONTRACT_NOT_ACTIVE": "สัญญาไม่อยู่ในสถานะที่ล้างลายเซ็นได้",
+  "SALE.STATE.SIGNING_CLEAR_NOT_SIGNED": "ลูกค้ายังไม่ได้เซ็นช่องนี้ (หรือล้างไปแล้ว) — ให้ลูกค้าเซ็นได้เลย",
+  "SALE.STATE.SIGNING_CLEAR_NOT_SAME_DAY": "ล้างลายเซ็นได้เฉพาะสัญญาที่เปิดและเซ็นวันนี้ — ติดต่อ admin",
+  "SALE.STATE.SIGNING_CLEAR_PARTNER_LOCKED": "ร้านยื่นปิดงานแล้ว — กด \"ถอนการยื่นปิดงาน\" ก่อน",
+  "SALE.VALIDATION.NOTE_REQUIRED": "กรุณาใส่หมายเหตุ"
 }

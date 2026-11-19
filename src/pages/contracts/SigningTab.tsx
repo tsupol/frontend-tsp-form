@@ -23,7 +23,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, Switch, Tooltip } from 'tsp-form';
 import {
-  Bot, CheckCircle2, ChevronDown, ChevronRight, Circle, Eye, FileSignature, Info, PenLine,
+  Bot, CheckCircle2, ChevronDown, ChevronRight, Circle, Eraser, Eye, FileSignature, Info, PenLine,
   Printer, Smartphone, Trash2, XCircle,
 } from 'lucide-react';
 import { ContractSignQrModal } from './workspace/ContractSignQrModal';
@@ -38,11 +38,16 @@ import { SigningVoidModal } from './SigningVoidModal';
 import { SigningSignModal } from './SigningSignModal';
 import { SigningDetailModal } from './SigningDetailModal';
 import { ContractAttachments } from './ContractAttachments';
+import { SigningClearLesseeModal, type ClearLesseePreview } from './SigningClearLesseeModal';
+
+interface ClearTarget { preview: ClearLesseePreview; docLabel: string }
 
 type SigningStatus = 'COLLECTING' | 'SEALED' | 'SUPERSEDED' | 'VOIDED';
 type SigningCategory = 'CONTRACT' | 'AMENDMENT' | 'RECEIPT' | null;
 type PartyRole = 'LESSOR' | 'LESSEE' | 'OUTGOING_LESSEE' | 'CO_LESSEE' | 'WITNESS';
 const CUSTOMER_ROLES: ReadonlySet<string> = new Set(['LESSEE', 'OUTGOING_LESSEE', 'CO_LESSEE']);
+// The only two documents whose customer signature a branch manager can clear (mig 1726).
+const CLEARABLE_REASONS: ReadonlySet<string> = new Set(['CONTRACT_OPEN', 'BIND']);
 
 interface SigningHistoryRow {
   signing_id: number;
@@ -202,7 +207,9 @@ export function SigningTab({
   // A shop can't sign for the customer inside the app (it can't read the
   // signing preview); its customers sign on the signing page — so a customer's
   // Sign button opens that page's dialog instead of a dead end.
-  const { isDealPartner } = useAuth();
+  const { isDealPartner, can } = useAuth();
+  const canClearLessee = can('CONTRACT.SIGNING.CLEAR_LESSEE');
+  const [clearTarget, setClearTarget] = useState<ClearTarget | null>(null);
   const [voidTarget, setVoidTarget] = useState<{ signingId: number; isSealedAddendum: boolean } | null>(null);
   const [signTarget, setSignTarget] = useState<SignTarget | null>(null);
   const [signQrOpen, setSignQrOpen] = useState(false);
@@ -388,6 +395,8 @@ export function SigningTab({
             parties={partiesBySigning.get(s.signing_id) ?? []}
             expanded={expanded.has(s.signing_id)}
             onToggleExpand={() => toggleExpanded(s.signing_id)}
+            canClearLessee={canClearLessee}
+            onRequestClearLessee={setClearTarget}
             onRequestVoid={() => setVoidTarget({
               signingId: s.signing_id,
               isSealedAddendum: s.status === 'SEALED' && s.type === 'ADDENDUM',
@@ -423,6 +432,14 @@ export function SigningTab({
         signingId={voidTarget?.signingId ?? 0}
         isSealedAddendum={voidTarget?.isSealedAddendum ?? false}
       />
+      <SigningClearLesseeModal
+        open={clearTarget !== null}
+        onClose={() => setClearTarget(null)}
+        contractId={contractId}
+        preview={clearTarget?.preview ?? null}
+        docLabel={clearTarget?.docLabel ?? null}
+        onResign={() => setSignQrOpen(true)}
+      />
       <SigningSignModal
         open={signTarget !== null}
         onClose={() => setSignTarget(null)}
@@ -456,7 +473,7 @@ export function SigningTab({
 function SigningCard({
   signing, isStale, parties, expanded, contractId, onToggleExpand,
   onRequestVoid, onRequestSign, onRequestPreview, onRequestPrint, onRequestSignQr, onRequestDetail,
-  onWitnessAssigned,
+  onWitnessAssigned, canClearLessee, onRequestClearLessee,
 }: {
   signing: SigningHistoryRow;
   isStale: boolean;
@@ -471,11 +488,32 @@ function SigningCard({
   onRequestSignQr?: () => void;
   onRequestDetail: () => void;
   onWitnessAssigned: () => void;
+  canClearLessee: boolean;
+  onRequestClearLessee: (target: ClearTarget) => void;
 }) {
   const { t } = useTranslation();
   const ttl = formatTtl(signing.ttl_remaining);
   const isCollecting = signing.status === 'COLLECTING';
   const isActionable = isCollecting && !isStale;
+
+  // "Clear the customer's signature" — only the backend knows whether it is
+  // allowed today (same day, day not closed, shop not submitted), so ask its
+  // preview, and only for an open card whose customer has signed.
+  const clearCandidate = canClearLessee && expanded && !isStale
+    && CLEARABLE_REASONS.has(signing.change_reason ?? '')
+    && (signing.status === 'SEALED' || signing.status === 'COLLECTING')
+    && parties.some(p => p.party_role === 'LESSEE' && p.has_signed);
+  const clearPreviewQuery = useQuery({
+    queryKey: ['signing-clear-lessee-preview', signing.signing_id],
+    queryFn: () => apiClient.rpc<ClearLesseePreview>('fn_contract_signing_clear_lessee', {
+      p_signing_id: signing.signing_id,
+      p_preview: true,
+    }),
+    enabled: clearCandidate,
+    staleTime: 30_000,
+    retry: false,
+  });
+  const clearPreview = clearCandidate && clearPreviewQuery.data?.allowed ? clearPreviewQuery.data : null;
   // A SEALED addendum (e.g. the BIND addendum) can be voided by a BRANCH_MANAGER
   // (mig 425) — required before the device can be unbound / the contract
   // cancelled. The FULL_CONTRACT snapshot is never voidable here (the RPC
@@ -625,6 +663,22 @@ function SigningCard({
                     </div>
                   </div>
                   <div className="shrink-0 flex items-center gap-2">
+                    {p.signed_at && p.party_role === 'LESSEE' && clearPreview && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        color="danger"
+                        startIcon={<Eraser size={13} />}
+                        onClick={() => onRequestClearLessee({
+                          preview: clearPreview,
+                          // The modal names the document exactly as this card's header does.
+                          docLabel: `${signing.version != null ? `v${signing.version} ` : ''}${t(`signing.reason_${signing.change_reason}`, { defaultValue: signing.change_reason ?? '' })}`,
+                        })}
+                        data-testid="clear-lessee-open"
+                      >
+                        {t('signing.clearLessee.button')}
+                      </Button>
+                    )}
                     {p.signed_at ? (
                       <Tooltip content={<DateTime value={p.signed_at} />}>
                         <span className="text-[11px] text-subtle tabular-nums">

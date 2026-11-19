@@ -1519,5 +1519,12 @@
   "blockingReason.void_steps_pending": "Steps to do first — press to see them",
   "blockingReason.void_blocked_wallet_paid": "Opening bill paid from savings — can't be voided here",
   "blockingReason.void_blocked_down_refund": "Down payment was lowered — can't be voided here",
-  "blockingReason.terminate_use_void_same_day": "Opened today — use “Void (same day)”"
+  "blockingReason.terminate_use_void_same_day": "Opened today — use “Void (same day)”",
+  "SALE.STATE.SIGNING_CLEAR_UNSUPPORTED_DOCUMENT": "Only a lease contract or a device receipt can have its signature cleared",
+  "SALE.STATE.SIGNING_CLEAR_DOCUMENT_NOT_ACTIVE": "This document was voided or replaced",
+  "SALE.STATE.SIGNING_CLEAR_CONTRACT_NOT_ACTIVE": "The contract is not in a state that allows clearing a signature",
+  "SALE.STATE.SIGNING_CLEAR_NOT_SIGNED": "The customer has not signed this slot (or it was already cleared) — they can sign now",
+  "SALE.STATE.SIGNING_CLEAR_NOT_SAME_DAY": "Only a contract opened and signed today can have its signature cleared — contact admin",
+  "SALE.STATE.SIGNING_CLEAR_PARTNER_LOCKED": "The shop has submitted its close-out — withdraw the submission first",
+  "SALE.VALIDATION.NOTE_REQUIRED": "Please enter a note"
 }
