@@ -10,6 +10,11 @@ import { DateTime } from '../../components/DateTime';
 
 export interface DeviceSwapFields {
   device_code?: string | null;
+  // The sticker form of each code (mig 1725) — what the screen shows. The raw
+  // fields above stay for search; never format a code on the screen.
+  device_code_display?: string | null;
+  device_swapped_from_code_display?: string | null;
+  device_swapped_to_code_display?: string | null;
   device_swap_count?: number | null;
   device_swapped_at?: string | null;
   device_swapped_from_code?: string | null;
@@ -28,9 +33,9 @@ export function DeviceSwapBadge({ row }: { row: DeviceSwapFields }) {
       <Badge size="sm" color={afterCheck ? 'danger' : 'warning'} startIcon={afterCheck ? <AlertTriangle size={12} /> : <Repeat size={12} />}>
         {afterCheck ? t('partnerSettlement.swap.afterCheckBadge', { count }) : t('partnerSettlement.swap.badge', { count })}
       </Badge>
-      {row.device_swapped_from_code && row.device_swapped_to_code && (
+      {row.device_swapped_from_code_display && row.device_swapped_to_code_display && (
         <span className="text-xs text-subtle font-mono truncate">
-          {row.device_swapped_from_code} → {row.device_swapped_to_code}
+          {row.device_swapped_from_code_display} → {row.device_swapped_to_code_display}
         </span>
       )}
     </div>
@@ -51,13 +56,13 @@ export function DeviceSwapNotice({ row }: { row: DeviceSwapFields }) {
           {afterCheck ? t('partnerSettlement.swap.afterCheckTitle') : t('partnerSettlement.swap.title', { count })}
         </span>
         <span className="text-sm font-mono">
-          {row.device_swapped_from_code ?? '—'} → {row.device_swapped_to_code ?? row.device_code ?? '—'}
+          {row.device_swapped_from_code_display ?? '—'} → {row.device_swapped_to_code_display ?? row.device_code_display ?? '—'}
         </span>
         <span className="text-xs">
           {t('partnerSettlement.swap.when')} <DateTime value={row.device_swapped_at ?? null} showTime />
           {' · '}{t('partnerSettlement.swap.count', { count })}
         </span>
-        <span className="text-sm">{t('partnerSettlement.swap.checkPhotos', { code: row.device_code ?? row.device_swapped_to_code ?? '—' })}</span>
+        <span className="text-sm">{t('partnerSettlement.swap.checkPhotos', { code: row.device_code_display ?? row.device_swapped_to_code_display ?? '—' })}</span>
       </div>
     </div>
   );
